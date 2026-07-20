@@ -8,13 +8,15 @@
   "scripts": {
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "dev": "turbo run dev"
   },
   "devDependencies": {
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.0",
     "turbo": "^2.5.0",
     "typescript": "^5.7.0",
-    "prettier": "^3.4.0",
-    "eslint": "^9.18.0",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^4.1.10"
   }
 }

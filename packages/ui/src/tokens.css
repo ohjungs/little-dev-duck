@@ -1,0 +1,33 @@
+:root {
+  --ldd-color-bg: #f6efdd;
+  --ldd-color-surface: #e3d3b9;
+  --ldd-color-accent: #a99c65;
+  --ldd-color-text: #352116;
+  --ldd-color-text-on-accent: #352116;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ldd-color-bg: #352116;
+    --ldd-color-surface: #a99c65;
+    --ldd-color-accent: #e3d3b9;
+    --ldd-color-text: #f6efdd;
+    --ldd-color-text-on-accent: #352116;
+  }
+}
+
+[data-theme="light"] {
+  --ldd-color-bg: #f6efdd;
+  --ldd-color-surface: #e3d3b9;
+  --ldd-color-accent: #a99c65;
+  --ldd-color-text: #352116;
+  --ldd-color-text-on-accent: #352116;
+}
+
+[data-theme="dark"] {
+  --ldd-color-bg: #352116;
+  --ldd-color-surface: #a99c65;
+  --ldd-color-accent: #e3d3b9;
+  --ldd-color-text: #f6efdd;
+  --ldd-color-text-on-accent: #352116;
+}
