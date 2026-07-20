@@ -29,6 +29,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ldd/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@ldd/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -78,6 +81,9 @@ importers:
       '@ldd/core':
         specifier: workspace:*
         version: link:../core
+      '@supabase/supabase-js':
+        specifier: ^2.110.7
+        version: 2.110.7
 
   packages/core:
     dependencies:

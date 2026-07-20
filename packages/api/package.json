@@ -7,9 +7,11 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@ldd/core": "workspace:*"
+    "@ldd/core": "workspace:*",
+    "@supabase/supabase-js": "^2.110.7"
   }
 }
