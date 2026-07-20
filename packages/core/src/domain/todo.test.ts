@@ -39,4 +39,14 @@ describe("todoSchema", () => {
       todoSchema.safeParse({ ...validTodo, dueDate: "not-a-date" }).success,
     ).toBe(false);
   });
+
+  it("Postgres가 실제로 내려주는 +00:00 오프셋 타임스탬프를 허용한다", () => {
+    expect(
+      todoSchema.safeParse({
+        ...validTodo,
+        createdAt: "2026-07-20T09:15:23.456789+00:00",
+        updatedAt: "2026-07-20T09:15:23.456789+00:00",
+      }).success,
+    ).toBe(true);
+  });
 });

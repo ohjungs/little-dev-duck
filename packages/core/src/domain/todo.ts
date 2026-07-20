@@ -5,9 +5,9 @@ export const todoSchema = z.object({
   userId: z.string().uuid(),
   title: z.string().min(1).max(200),
   isDone: z.boolean(),
-  dueDate: z.string().datetime().nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  dueDate: z.string().datetime({ offset: true }).nullable(),
+  createdAt: z.string().datetime({ offset: true }),
+  updatedAt: z.string().datetime({ offset: true }),
 });
 
 export type Todo = z.infer<typeof todoSchema>;

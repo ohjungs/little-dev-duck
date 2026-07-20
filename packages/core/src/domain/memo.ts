@@ -5,8 +5,8 @@ export const memoSchema = z.object({
   userId: z.string().uuid(),
   title: z.string().min(1).max(200),
   content: z.string().max(10000),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.string().datetime({ offset: true }),
+  updatedAt: z.string().datetime({ offset: true }),
 });
 
 export type Memo = z.infer<typeof memoSchema>;
