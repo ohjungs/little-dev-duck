@@ -1,10 +1,19 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **4 GitHub 커밋 잔디 — 구현+코드리뷰+수정 완료, 배포 후 사용자 클릭 검증 대기**
-계획 문서: docs/plans/phase_01.md(완료), docs/plans/phase_02.md(완료), docs/plans/phase_03.md(완료),
-docs/plans/phase_04.md(구현 완료, T5 사용자 검증만 대기)
-재개 방법: 새 대화에서 /next-step (Phase 4 검증 체크리스트부터 확인 — GITHUB_TOKEN 환경변수 등록
-여부 먼저 확인할 것, docs/plans/phase_04.md "사용자 조치 필요" 참조)
+현재 Phase: **4 완료(사용자 검증만 대기) → 5 착수 전 블로커 2건으로 STOP**
+계획 문서: docs/plans/phase_01~03.md(완료), docs/plans/phase_04.md(구현 완료, T5 사용자 검증만 대기),
+docs/plans/phase_05.md(초안 - **블로커 해소 전까지 구현 착수 금지**)
+재개 방법: 새 대화/루프 사이클에서 /next-step — 아래 "Phase 5 블로커" 절부터 확인. 블로커가 아직
+안 풀렸으면 **코드를 건드리지 말고** 이 상태를 그대로 보고만 하고 종료할 것(루프가 5분마다 도는
+중이라 매번 같은 조사를 반복하지 않도록).
+
+## Phase 5 블로커 (2026-07-20, docs/plans/phase_05.md 상세)
+
+1. **Rust 툴체인 미설치** — `cargo`/`rustc` 없음(실측 완료). rustup 설치는 사용자 액션, 자동화 불가.
+2. **아키텍처 결정 필요** — ARCHITECTURE.md의 "Tauri = Next.js static export 탑재"가 Phase 2~4에서
+   생긴 Middleware/서버 컴포넌트/API Route와 충돌(정적 export는 이걸 지원 안 함). 대안 A(배포된
+   웹 URL을 Tauri WebView가 그대로 로드)/B(Node 서버 sidecar)/C(정적 유지+기능 축소) 중 사용자
+   확정 필요 — phase_05.md의 비교표 참조. **사용자 응답 대기 중, 둘 다 해소 전에는 T1 착수 금지.**
 
 **참고**: 이 저장소에는 git worktree가 없어 다른 세션과 같은 폴더를 공유한다. 2026-07-20 21시경
 gstack browse 데몬이 다른 프로세스와 락 경합을 일으켰고(무한 대기, 강제 해제하지 않음), 로컬 3000
