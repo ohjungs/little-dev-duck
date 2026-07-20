@@ -22,3 +22,25 @@ jobs:
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web exec playwright install --with-deps chromium
+      - run: pnpm --filter web e2e
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        # 로그인 세션 파일(e2e/.auth/user.json)이 CI에는 없어 인증 필요 스펙은 전부 자동 스킵된다
+        # (실패 아님, 의도된 동작). auth-redirect.spec.ts 등 비인증 스펙만 실제로 실행된다.
+        # 인증 필요 스펙까지 CI에서 돌리려면 apps/web/e2e/README.md "CI에서 실행" 절 참고.
