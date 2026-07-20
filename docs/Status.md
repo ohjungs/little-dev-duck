@@ -1,19 +1,28 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **4 완료(사용자 검증만 대기) → 5 착수 전 블로커 2건으로 STOP**
+현재 Phase: **4 완료(사용자 검증만 대기) → 5 T0/T3 완료, 블로커 전부 해소 — T1/T2/T4 착수 가능(다음 세션)**
 계획 문서: docs/plans/phase_01~03.md(완료), docs/plans/phase_04.md(구현 완료, T5 사용자 검증만 대기),
-docs/plans/phase_05.md(초안 - **블로커 해소 전까지 구현 착수 금지**)
-재개 방법: 새 대화/루프 사이클에서 /next-step — 아래 "Phase 5 블로커" 절부터 확인. 블로커가 아직
-안 풀렸으면 **코드를 건드리지 말고** 이 상태를 그대로 보고만 하고 종료할 것(루프가 5분마다 도는
-중이라 매번 같은 조사를 반복하지 않도록).
+docs/plans/phase_05.md(T0/T3 완료, 블로커 해소로 T1/T2/T4 착수 가능 — 실제 구현은 다음 세션)
+재개 방법: 새 대화에서 /next-step — Phase 5 T1(Tauri 2 스캐폴딩)부터 시작. `apps/desktop` 신설,
+WebView는 옵션 A(Vercel 배포 URL 로드) 확정 사양대로.
 
-## Phase 5 블로커 (2026-07-20, docs/plans/phase_05.md 상세)
+## Phase 5 블로커 — 전부 해소 (2026-07-21)
 
-1. **Rust 툴체인 미설치** — `cargo`/`rustc` 없음(실측 완료). rustup 설치는 사용자 액션, 자동화 불가.
-2. **아키텍처 결정 필요** — ARCHITECTURE.md의 "Tauri = Next.js static export 탑재"가 Phase 2~4에서
-   생긴 Middleware/서버 컴포넌트/API Route와 충돌(정적 export는 이걸 지원 안 함). 대안 A(배포된
-   웹 URL을 Tauri WebView가 그대로 로드)/B(Node 서버 sidecar)/C(정적 유지+기능 축소) 중 사용자
-   확정 필요 — phase_05.md의 비교표 참조. **사용자 응답 대기 중, 둘 다 해소 전에는 T1 착수 금지.**
+1. ~~Rust 툴체인 미설치~~ → **해소(2026-07-21)** — 사용자 요청으로 이 세션이 rustup + VS Build
+   Tools 2022(C++ 워크로드) 설치 진행. 중간에 네트워크 단절로 멈췄다가 재시작, 강제종료 여파로
+   Windows Installer 뮤텍스 충돌(에러 1618)이 났으나 재시도로 자연 해소(재부팅 불필요).
+   `cargo new` + `cargo build`로 실제 MSVC 컴파일 성공까지 확인 — 툴체인 완전 동작 검증됨.
+   (`vswhere`의 `isComplete`는 여전히 false로 나오나 실제 컴파일이 되므로 무시 가능 [추정: 상태
+   캐시 갱신 지연].)
+2. ~~아키텍처 결정 필요~~ → **해소(2026-07-20)** — 옵션 A(배포된 웹 URL을 Tauri WebView가 그대로
+   로드) 확정, ARCHITECTURE.md 1절 + DECISIONS.md #9-11 갱신 완료.
+
+**T3 완료(2026-07-21, `/loop` 자동 진행)**: `supabase/migrations/20260721000000_activity_daily.sql`
++ down 스크립트 추가. 실제 `supabase db push` 적용은 사용자 확인 후(supabase/README.md 참조).
+
+**이 세션 스코프**: 사용자 지시("실제 개발은 다음 세션에서 할거야") — 이번 세션은 설치/블로커
+해소까지만, T1/T2/T4 실제 구현은 하지 않음. 5분 `/loop` 자동 재실행은 다음 세션에서는 유지되지
+않음(세션 종료 시 소멸) — 다음 세션에서 필요하면 다시 `/loop` 걸 것.
 
 **참고**: 이 저장소에는 git worktree가 없어 다른 세션과 같은 폴더를 공유한다. 2026-07-20 21시경
 gstack browse 데몬이 다른 프로세스와 락 경합을 일으켰고(무한 대기, 강제 해제하지 않음), 로컬 3000

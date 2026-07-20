@@ -78,3 +78,25 @@
   WCAG AA 대비 테스트 재검증 통과. 로그인 페이지에 사용자 제공 오리 로고 이미지 추가
   (`apps/web/public/duck-logo.png`, next/image). 브라우저 시각 확인은 gstack browse 데몬이 다른
   세션과 락 경합(무한 대기)으로 실패 — build 통과만 확인, 실제 렌더링은 미검증 상태로 남음.
+- 2026-07-21 00:10 : [본 세션, `/loop-start` 준비] Phase 5 블로커 2(아키텍처 결정) 사용자 확정 —
+  옵션 A(Tauri WebView가 배포된 Vercel URL을 그대로 로드), ARCHITECTURE.md 1절 + DECISIONS.md #9-11
+  갱신. 블로커 1(Rust 툴체인 미설치)은 재확인해도 여전히 미해소 — 사용자 시스템 조치 필요, 자동화
+  불가. Phase 5용 rfc-dag 루프 runbook 작성(`.claude/plans/phase5-rfc-dag.md`) — T3(Supabase
+  마이그레이션)만 Rust와 무관해 독립 실행 가능, T1/T2/T4는 rust-gate 통과 전 착수 금지로 설계.
+  루프 자체는 사용자 지시로 미시작(기존에 이 저장소를 공유 중인 다른 세션의 5분 폴링 프로세스
+  PID 17248과의 충돌 회피 목적) — `git status`로 그 세션이 `.github/workflows/ci.yml`,
+  `apps/web/e2e/*`(auth-redirect, responsive 등)를 실시간 수정 중임을 확인, 해당 파일은 건드리지 않음.
+- 2026-07-21 01:50 : [본 세션, `/loop` "막힌 건 패스, 가능한 건 구현"] Phase 5 T3 구현 —
+  `supabase/migrations/20260721000000_activity_daily.sql`(user_id/date/source(github|claude_code)/
+  count, `(user_id, date, source)` unique로 Rust 수집기의 향후 upsert 대비, RLS 4개 정책) + 대응
+  down 스크립트(`supabase/rollback/20260721000000_activity_daily_down.sql`), `supabase/README.md`
+  적용/롤백 순서·검증 체크리스트 갱신. T1/T2/T4는 Rust 미설치로 여전히 보류 — packages/core에
+  activity_daily용 zod 스키마는 추가하지 않음(T3 체크리스트 범위 밖, 소비하는 코드가 아직 없어
+  YAGNI 원칙상 보류).
+- 2026-07-21 02:00 : [본 세션, 사용자 요청] Phase 5 블로커 1(Rust 툴체인 미설치) 해소 — rustup으로
+  Rust stable(rustc 1.97.1) 설치, VS Build Tools 2022(C++ 워크로드 + Windows 11 SDK) 설치. 중간에
+  네트워크 단절로 설치가 멈춰 프로세스를 강제 종료 후 재시작했는데, 그 여파로 Windows Installer가
+  일시적으로 뮤텍스 충돌(에러 1618, "다른 설치가 이미 진행 중")을 일으킴 — 재시도로 자연 해소(재부팅
+  없이 해결, 이벤트 로그로 실제 컴포넌트가 정상 설치되고 있음을 확인). `cargo new` + `cargo build`로
+  실제 MSVC 컴파일 성공까지 실측 검증. Phase 5는 이제 블로커 없음 — T1(Tauri 스캐폴딩)/T2(Rust
+  수집기)/T4(빌드 검증)는 다음 세션에서 실제 구현(사용자 지시: "실제 개발은 다음 세션에서").

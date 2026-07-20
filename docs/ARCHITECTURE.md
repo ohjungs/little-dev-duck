@@ -14,7 +14,7 @@
    (앱모드/위젯모드)    always-on-top / 투명 활보 모드
         |                   |
         |              +----+-----+
-        |              | WebView  |  Next.js static export
+        |              | WebView  |  배포된 웹 URL 로드 (Vercel, 네이티브 창을 씌운 웹앱)
         |              +----+-----+
         |              | Rust 사이드: Claude Code 로그 수집기 |
         |              +----+-----+
@@ -45,6 +45,12 @@
 +------------------------+    |    Notion                 |
                               +---------------------------+
 ```
+
+Tauri WebView는 Next.js **정적 export를 탑재하지 않는다** — Middleware 인증 게이트, 서버 컴포넌트,
+API Route(GitHub 잔디, Gemini 프록시 등)가 정적 export로 지원되지 않는 서버 로직에 의존하게 되면서
+원 설계(Phase 1)의 정적 export 전제가 깨졌다. 대신 배포된 Vercel URL을 WebView가 그대로 로드하는
+"네이티브 창을 씌운 웹앱" 방식으로 확정(2026-07-20, Phase 5 착수 전 사고 게이트, DECISIONS.md #9-11).
+오프라인 완전 지원은 없음(Supabase 의존으로 원래도 온라인 전제).
 
 ## 2. 소프트웨어 구조 (모노레포 의존 방향)
 
