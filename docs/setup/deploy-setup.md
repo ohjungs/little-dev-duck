@@ -44,3 +44,38 @@ DSN 발급 후 `apps/web/.env.local`에 `NEXT_PUBLIC_SENTRY_DSN` 추가, Vercel 
 1. 의도적으로 lint 에러(예: 미사용 변수)를 포함한 PR을 연다 -> Actions가 빨간불(실패)
 2. 에러 수정 후 push -> Actions가 초록불(성공)
 3. `main` 브랜치에 push -> Vercel 배포 URL에 변경 사항이 반영되는지 확인
+
+## 7. Supabase MCP (선택, 스키마 확인·마이그레이션 검증용) — 2026-07-20 추가
+
+루트 `.mcp.json`에 Supabase MCP 서버(`@supabase/mcp-server-supabase`)를 `--read-only` +
+`--project-ref=iupprzfmlyfrdcctdupn`로 설정해뒀다. 콘솔 수작업 대신 코드/마이그레이션 파일로
+스키마를 확인·검증하려는 용도이며, 읽기 전용이라 이 MCP로는 스키마를 변경할 수 없다(변경은 항상
+`supabase/migrations`의 up+down 스크립트로만 한다).
+
+동작시키려면 계정 소유자가 아래를 수행해야 한다(자동화 불가 — 브라우저 로그인 필요한 계정 액션):
+
+1. https://supabase.com/dashboard/account/tokens 에서 Personal Access Token 발급
+   (계정 전체 권한이므로 취급 주의 — `--project-ref`로 이 MCP 서버 자체는 해당 프로젝트로 제한됨)
+2. 셸 프로필(`~/.bashrc`, `~/.zshrc` 등)에 등록, 커밋 금지:
+   ```bash
+   export SUPABASE_ACCESS_TOKEN="발급받은 토큰"
+   ```
+3. Claude Code를 재시작하면 `.mcp.json`이 자동 로드된다.
+
+미설정 상태로 둬도 다른 기능에는 영향 없음(선택 사항). GitHub MCP는 별도로 구성하지 않았다 —
+`gh` CLI가 이미 설치돼 있어 이슈/PR 작업은 CLI를 우선 사용한다(2026-07-20-1st_Fut_list.md MCP
+활용 지침과 동일한 결정). Figma/Gmail/Notion/Google Drive/Adobe/Canva는 이 프로젝트가 아니라
+claude.ai 커넥터 설정으로 이미 연결되어 있어 `.mcp.json`에 중복 등록하지 않았다.
+
+## 8. GitHub 잔디 API 환경변수 (Phase 4) — 2026-07-20 추가
+
+`/api/github/contributions`가 GitHub GraphQL API로 컨트리뷰션 캘린더(공개 데이터)를 조회한다.
+공개 데이터 조회라 스코프가 필요 없으므로 scope 미선택 Classic PAT 1개면 충분하다(근거는
+docs/plans/phase_04.md "착수 전 확인" 참조).
+
+1. https://github.com/settings/tokens 에서 "Generate new token (classic)" 선택,
+   scope는 아무것도 체크하지 않고 발급(공개 정보 읽기 전용).
+2. `apps/web/.env.local`에 `GITHUB_TOKEN=발급받은 토큰` 추가(커밋 금지, .gitignore로 이미 제외됨).
+3. Vercel 프로젝트 Environment Variables에도 동일하게 `GITHUB_TOKEN` 등록 후 재배포.
+
+미설정 상태에서도 앱은 죽지 않는다 — 위젯이 에러 상태(재시도 버튼)로 표시된다.

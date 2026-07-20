@@ -13,5 +13,8 @@
   "dependencies": {
     "@ldd/core": "workspace:*",
     "@supabase/supabase-js": "^2.110.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20"
   }
 }

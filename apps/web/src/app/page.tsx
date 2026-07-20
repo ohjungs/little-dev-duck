@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DuckWidget } from "@/components/DuckWidget";
 import { TodoWidget } from "@/components/TodoWidget";
 import { MemoWidget } from "@/components/MemoWidget";
+import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,10 @@ export default async function Home() {
       >
         <TodoWidget />
         <MemoWidget />
+      </div>
+
+      <div style={{ width: "100%", maxWidth: "900px" }}>
+        <GithubContributionWidget />
       </div>
     </main>
   );

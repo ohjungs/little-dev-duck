@@ -15,3 +15,5 @@ export {
   type CreateMemoInput,
   type UpdateMemoInput,
 } from "./memos";
+
+export { fetchGithubContributions } from "./github";
