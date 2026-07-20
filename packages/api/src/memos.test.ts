@@ -69,17 +69,97 @@ describe("createMemo", () => {
     const supabase = fakeSupabase({
       auth: { getUser: async () => ({ data: { user: null } }) },
     });
-    await expect(
-      createMemo(supabase, { title: "test", content: "" }),
-    ).rejects.toThrow("로그인이 필요합니다.");
+    await expect(createMemo(supabase, { content: "test" })).rejects.toThrow(
+      "로그인이 필요합니다.",
+    );
   });
 
   it("정상 입력이면 Memo를 반환한다", async () => {
     const result = await createMemo(fakeSupabase(), {
-      title: "회의 메모",
       content: "다음 스프린트 계획",
     });
-    expect(result.title).toBe("회의 메모");
+    expect(result.content).toBe("다음 스프린트 계획");
+  });
+
+  it("스티커 메모는 title 입력 없이 content만으로 저장된다 (title은 content 첫 줄에서 자동 유도)", async () => {
+    let insertedPayload: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      from: () => ({
+        insert: (payload: Record<string, unknown>) => {
+          insertedPayload = payload;
+          return {
+            select: () => ({
+              single: async () => ({ data: VALID_ROW, error: null }),
+            }),
+          };
+        },
+      }),
+    });
+
+    await createMemo(supabase, { content: "첫 줄\n둘째 줄" });
+
+    expect(insertedPayload?.title).toBe("첫 줄");
+    expect(insertedPayload?.content).toBe("첫 줄\n둘째 줄");
+  });
+
+  it("빈 content로 저장하면 기본 제목이 유도된다", async () => {
+    let insertedPayload: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      from: () => ({
+        insert: (payload: Record<string, unknown>) => {
+          insertedPayload = payload;
+          return {
+            select: () => ({
+              single: async () => ({ data: VALID_ROW, error: null }),
+            }),
+          };
+        },
+      }),
+    });
+
+    await createMemo(supabase, { content: "" });
+
+    expect(insertedPayload?.title).toBe("메모");
+  });
+
+  it("공백만 있는 content도 기본 제목이 유도된다", async () => {
+    let insertedPayload: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      from: () => ({
+        insert: (payload: Record<string, unknown>) => {
+          insertedPayload = payload;
+          return {
+            select: () => ({
+              single: async () => ({ data: VALID_ROW, error: null }),
+            }),
+          };
+        },
+      }),
+    });
+
+    await createMemo(supabase, { content: "   \n  " });
+
+    expect(insertedPayload?.title).toBe("메모");
+  });
+
+  it("첫 줄이 200자를 넘으면 title은 200자로 잘린다 (DB check 제약 준수)", async () => {
+    let insertedPayload: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      from: () => ({
+        insert: (payload: Record<string, unknown>) => {
+          insertedPayload = payload;
+          return {
+            select: () => ({
+              single: async () => ({ data: VALID_ROW, error: null }),
+            }),
+          };
+        },
+      }),
+    });
+
+    await createMemo(supabase, { content: "a".repeat(250) });
+
+    expect((insertedPayload?.title as string).length).toBe(200);
   });
 });
 
@@ -89,6 +169,29 @@ describe("updateMemo", () => {
       content: "수정된 내용",
     });
     expect(result.id).toBe(VALID_ROW.id);
+  });
+
+  it("content를 수정하면 title도 새 content 첫 줄로 재유도된다", async () => {
+    let updatedPayload: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      from: () => ({
+        update: (payload: Record<string, unknown>) => {
+          updatedPayload = payload;
+          return {
+            eq: () => ({
+              select: () => ({
+                single: async () => ({ data: VALID_ROW, error: null }),
+              }),
+            }),
+          };
+        },
+      }),
+    });
+
+    await updateMemo(supabase, VALID_ROW.id, { content: "수정된 첫 줄\n나머지" });
+
+    expect(updatedPayload?.title).toBe("수정된 첫 줄");
+    expect(updatedPayload?.content).toBe("수정된 첫 줄\n나머지");
   });
 });
 

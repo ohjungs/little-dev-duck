@@ -21,6 +21,13 @@ function fromRow(row: MemoRow): Memo {
   });
 }
 
+// 스티커 메모는 제목 입력을 받지 않는다 — DB의 title 컬럼(not null)은 검색·목록 표시용으로
+// content 첫 줄에서 자동 유도해 채운다.
+function deriveTitle(content: string): string {
+  const firstLine = content.trim().split("\n")[0]?.trim() ?? "";
+  return (firstLine || "메모").slice(0, 200);
+}
+
 export async function listMemos(supabase: SupabaseClient): Promise<Memo[]> {
   const { data, error } = await supabase
     .from("memos")
@@ -32,7 +39,6 @@ export async function listMemos(supabase: SupabaseClient): Promise<Memo[]> {
 }
 
 export type CreateMemoInput = {
-  title: string;
   content: string;
 };
 
@@ -47,7 +53,11 @@ export async function createMemo(
 
   const { data, error } = await supabase
     .from("memos")
-    .insert({ user_id: user.id, title: input.title, content: input.content })
+    .insert({
+      user_id: user.id,
+      title: deriveTitle(input.content),
+      content: input.content,
+    })
     .select()
     .single();
 
@@ -56,7 +66,6 @@ export async function createMemo(
 }
 
 export type UpdateMemoInput = Partial<{
-  title: string;
   content: string;
 }>;
 
@@ -67,7 +76,13 @@ export async function updateMemo(
 ): Promise<Memo> {
   const { data, error } = await supabase
     .from("memos")
-    .update({ ...patch, updated_at: new Date().toISOString() })
+    .update({
+      ...patch,
+      ...(patch.content !== undefined
+        ? { title: deriveTitle(patch.content) }
+        : {}),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id)
     .select()
     .single();

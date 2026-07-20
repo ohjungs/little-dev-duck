@@ -14,6 +14,8 @@ export function TodoWidget() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [onlyToday, setOnlyToday] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   const supabase = createClient();
 
@@ -76,13 +78,32 @@ export function TodoWidget() {
     }
   };
 
+  const startEdit = (todo: Todo) => {
+    setEditingId(todo.id);
+    setEditTitle(todo.title);
+  };
+
+  const saveEdit = async (id: string) => {
+    const title = editTitle.trim();
+    if (!title) return;
+    const prevTodos = todos;
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
+    try {
+      await updateTodo(supabase, id, { title });
+      setEditingId(null);
+    } catch {
+      setTodos(prevTodos);
+      setActionError("수정하지 못했습니다. 다시 시도해 주세요.");
+    }
+  };
+
   const today = new Date().toISOString().slice(0, 10);
   const visibleTodos = onlyToday
     ? todos.filter((t) => t.dueDate?.slice(0, 10) === today)
     : todos;
 
   return (
-    <Card style={{ width: "100%", maxWidth: "420px" }}>
+    <Card data-testid="todo-widget" style={{ width: "100%", maxWidth: "420px" }}>
       <div
         style={{
           display: "flex",
@@ -91,7 +112,7 @@ export function TodoWidget() {
           marginBottom: "0.75rem",
         }}
       >
-        <h2 style={{ fontSize: "1.1rem" }}>투두</h2>
+        <h2 style={{ fontSize: "1.1rem" }}>TO-DO</h2>
         <Button
           type="button"
           onClick={() => setOnlyToday((v) => !v)}
@@ -143,35 +164,77 @@ export function TodoWidget() {
             gap: "0.4rem",
           }}
         >
-          {visibleTodos.map((todo) => (
-            <li
-              key={todo.id}
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-            >
-              <input
-                type="checkbox"
-                checked={todo.isDone}
-                onChange={() => handleToggle(todo)}
-              />
-              <span
-                style={{
-                  flex: 1,
-                  textDecoration: todo.isDone ? "line-through" : "none",
-                  opacity: todo.isDone ? 0.6 : 1,
-                }}
+          {visibleTodos.map((todo) =>
+            editingId === todo.id ? (
+              <li
+                key={todo.id}
+                data-testid={`todo-${todo.id}`}
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
               >
-                {todo.title}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleDelete(todo.id)}
-                aria-label="삭제"
-                style={{ background: "none", border: "none", cursor: "pointer" }}
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveEdit(todo.id);
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  autoFocus
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  type="button"
+                  onClick={() => saveEdit(todo.id)}
+                  style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
+                >
+                  저장
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setEditingId(null)}
+                  style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
+                >
+                  취소
+                </Button>
+              </li>
+            ) : (
+              <li
+                key={todo.id}
+                data-testid={`todo-${todo.id}`}
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
               >
-                ✕
-              </button>
-            </li>
-          ))}
+                <input
+                  type="checkbox"
+                  checked={todo.isDone}
+                  onChange={() => handleToggle(todo)}
+                />
+                <span
+                  style={{
+                    flex: 1,
+                    textDecoration: todo.isDone ? "line-through" : "none",
+                    opacity: todo.isDone ? 0.6 : 1,
+                  }}
+                >
+                  {todo.title}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => startEdit(todo)}
+                  aria-label="수정"
+                  style={{ background: "none", border: "none", cursor: "pointer" }}
+                >
+                  수정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(todo.id)}
+                  aria-label="삭제"
+                  style={{ background: "none", border: "none", cursor: "pointer" }}
+                >
+                  ✕
+                </button>
+              </li>
+            ),
+          )}
         </ul>
       )}
     </Card>
