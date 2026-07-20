@@ -9,4 +9,11 @@
 - 상태: active | stale | resolved
 - 상세 예제: docs/anti-patterns/<slug>.md
 
-(아직 항목 없음 — Phase 1 첫 /review 이후 축적 시작)
+## post-redirect-get 기본 상태코드
+
+- `NextResponse.redirect()`를 상태코드 없이 쓰면 기본값 307이 원 요청 메서드(POST)를 유지해,
+  GET만 받는 라우트로 리다이렉트 시 405가 난다. 상태 변경(POST/PUT/DELETE) 핸들러의 리다이렉트는
+  항상 303을 명시해야 한다.
+- 최초 발견: 2026-07-20 / 마지막 재발견: 2026-07-20 / 재발견 횟수: 1회 (같은 세션 내 2곳: logout, proxy)
+- 상태: active
+- 상세 예제: docs/anti-patterns/post-redirect-get.md
