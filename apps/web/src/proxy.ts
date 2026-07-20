@@ -34,7 +34,7 @@ export async function proxy(request: NextRequest) {
   );
 
   if (!user && !isPublicPath) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/login", request.url), 303);
   }
 
   return response;
