@@ -12,3 +12,5 @@ dist/
 .vercel
 .env*
 supabase/.temp
+.gstack/
+!.env.example
