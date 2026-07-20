@@ -1,17 +1,11 @@
 # 배포 연결 안내 (Vercel + GitHub)
 
-Phase 1 T6. GitHub 원격 저장소 생성/push와 Vercel 프로젝트 연결은 계정 소유자 액션이라 자동화하지 않는다.
+Phase 1 T6. Vercel 프로젝트 연결은 브라우저 로그인이 필요한 계정 소유자 액션이라 자동화하지 않는다.
 
-## 1. GitHub 원격 저장소
+## 1. GitHub 원격 저장소 — 완료
 
-현재 로컬 저장소(`master` 브랜치)에 원격이 연결돼 있지 않다.
-
-```bash
-gh repo create little-dev-duck --public --source=. --remote=origin
-git push -u origin master
-```
-
-(DECISIONS.md 결정: 공개 모노레포)
+https://github.com/ohjungs/little-dev-duck (main 브랜치, 공개 저장소, DECISIONS.md 결정대로).
+`gh repo create`로 생성 + push, CI 1회 성공 확인까지 완료됨(2026-07-20).
 
 ## 2. GitHub Actions
 
