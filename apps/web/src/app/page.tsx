@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Button } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/server";
+import { DuckWidget } from "@/components/DuckWidget";
 import { TodoWidget } from "@/components/TodoWidget";
 import { MemoWidget } from "@/components/MemoWidget";
 
@@ -45,6 +46,10 @@ export default async function Home() {
         <form action="/auth/logout" method="post">
           <Button type="submit">로그아웃</Button>
         </form>
+      </div>
+
+      <div style={{ width: "100%", maxWidth: "300px" }}>
+        <DuckWidget />
       </div>
 
       <div
