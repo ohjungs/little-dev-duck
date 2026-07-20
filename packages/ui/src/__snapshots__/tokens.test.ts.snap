@@ -3,14 +3,14 @@
 exports[`design tokens > 라이트/다크 토큰 스냅샷 1`] = `
 {
   "darkTheme": {
-    "accent": "#E3D3B9",
+    "accent": "#D97757",
     "bg": "#352116",
     "surface": "#A99C65",
     "text": "#F6EFDD",
     "textOnAccent": "#352116",
   },
   "lightTheme": {
-    "accent": "#A99C65",
+    "accent": "#D97757",
     "bg": "#F6EFDD",
     "surface": "#E3D3B9",
     "text": "#352116",

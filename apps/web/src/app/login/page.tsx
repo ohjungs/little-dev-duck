@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Button } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,12 +24,20 @@ export default function LoginPage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: "1rem",
+        gap: "1.25rem",
         minHeight: "100vh",
         padding: "2rem",
       }}
     >
-      <h1>Little Dev Duck</h1>
+      <Image
+        src="/duck-logo.png"
+        alt="Little Dev Duck 로고"
+        width={112}
+        height={112}
+        priority
+        style={{ borderRadius: "50%" }}
+      />
+      <h1 style={{ color: "var(--ldd-color-text)" }}>Little Dev Duck</h1>
       <Button onClick={() => handleLogin("google")}>Google로 로그인</Button>
       <Button onClick={() => handleLogin("github")}>GitHub로 로그인</Button>
     </main>
