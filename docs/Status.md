@@ -1,32 +1,32 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: 1 (코어 기반) — 코드 작성 + GitHub 연결/CI 통과 완료, **Supabase/OAuth/Vercel 계정 설정 대기**
+현재 Phase: 1 (코어 기반) — 코드/인프라 전부 구축 완료, **Google/GitHub OAuth 앱 등록만 남음**
 계획 문서: docs/plans/phase_01.md
-재개 방법: 새 대화에서 /next-step (사용자가 아래 대기 항목을 처리한 뒤 재개 권장)
+재개 방법: 새 대화에서 /next-step
 
 ## Phase 1 Task 체크
 - [x] T1 모노레포 골격 (2026-07-20 완료)
-- [x] T2 core 도메인 계약 v1 (2026-07-20 완료, 계약 잠금됨 — Todo/Memo/Profile/DuckState 변경은 병렬 구간 밖에서만)
-- [x] T3 디자인 토큰 + ui 기초 (2026-07-20 완료, apps/web에도 적용됨)
-- [x] T4 Supabase 스키마 v1 + RLS — 마이그레이션 SQL 작성 완료(supabase/migrations, supabase/rollback). **적용은 Supabase 프로젝트 생성 후 사용자 실행**
-- [x] T5 Auth (Google + GitHub) — 코드 작성 완료(로그인 화면, OAuth 콜백, 세션 proxy.ts, 로그아웃, profiles 자동생성 트리거). **실기기 검증은 OAuth 앱 등록 + 환경변수 설정 후 가능**
-- [x] T6 CI/CD — GitHub Actions(.github/workflows/ci.yml: build+lint+test) 작성 완료, Vercel Analytics 연결 완료.
-  **GitHub 저장소 생성+push 완료** (https://github.com/ohjungs/little-dev-duck, main 브랜치).
-  **CI 그린 확인 완료** (run 29714759669, build/lint/test 전부 통과 — 최초 시도는 Node 20 고정 탓에 pnpm 11(node>=22.13 요구)과 충돌해 실패했고, node-version:22로 수정 후 재통과).
-  **Vercel 프로젝트 연결은 사용자 실행 필요** (vercel CLI 로그인은 브라우저 인증이라 대행 불가).
+- [x] T2 core 도메인 계약 v1 (계약 잠금됨 — Todo/Memo/Profile/DuckState 변경은 병렬 구간 밖에서만)
+- [x] T3 디자인 토큰 + ui 기초 (apps/web에도 적용됨)
+- [x] T4 Supabase 스키마 v1 + RLS — **완료**. 프로젝트 `iupprzfmlyfrdcctdupn`(서울) 생성,
+  마이그레이션 5개(profiles/todos/memos/duck_state + RLS + profiles 트리거) 적용 완료.
+- [x] T5 Auth (Google + GitHub) — 코드 완료 + 배포 후 curl로 `/login` 리다이렉트 동작 확인.
+  **남은 것: Google Cloud OAuth 클라이언트 + GitHub OAuth App 등록** (브라우저 전용, 절차: docs/setup/oauth-setup.md 1~2절)
+- [x] T6 CI/CD — **완료**. GitHub Actions 그린(run 29714759669), Vercel Analytics 연결,
+  Vercel 프로젝트(`5555jungs-5168s-projects/web`) 생성 + Root Directory=apps/web 설정 +
+  프로덕션 배포 확인(https://web-sepia-one-88.vercel.app, `/` -> `/login` 리다이렉트 정상).
+  **남은 것: Vercel 프로젝트 설정 페이지에서 "Connect Git Repository"** (push 자동배포용, git으로는 아직 미연결 — CLI 수동 배포로는 됨)
   Sentry는 계정 미생성으로 [미해결] 이월
 
-전 Task의 코드/설정 파일은 로컬에 존재하고 `pnpm build && pnpm lint && pnpm test` 전부 통과 확인됨.
-단, 실제 로그인/배포 동작 확인은 아래 "차단/대기 항목"을 사용자가 처리해야 가능하다.
-그 전까지는 Phase 1 DoD(로그인 화면, 배포 URL 반영 등)를 최종 확인할 수 없으므로 Phase 완료 처리는 보류한다.
+## 남은 차단 항목 (사용자만 가능, 브라우저 작업)
 
-## 차단/대기 항목 (사용자 수행, 순서대로)
-
-1. Supabase 프로젝트 생성 -> `supabase link` -> `supabase db push` (절차: supabase/README.md)
-2. Google Cloud OAuth 클라이언트 + GitHub OAuth App 등록, Supabase Auth Provider/URL 설정 (절차: docs/setup/oauth-setup.md)
-3. `apps/web/.env.local` 값 채우기 (`.env.example` 참고)
-4. Vercel 프로젝트 연결(브라우저 로그인 필요) + 환경변수 등록 (절차: docs/setup/deploy-setup.md — GitHub 연결은 이미 완료됨)
-5. 위 완료 후 docs/plans/phase_01.md의 "검증 체크리스트" 5개 항목 사용자 실행 -> 결과를 다음 세션에 공유하면 Phase 1 종료 절차(/review, History.md 갱신) 진행
+1. **Google Cloud OAuth 클라이언트 등록** — 절차: docs/setup/oauth-setup.md 1절
+2. **GitHub OAuth App 등록** — 절차: docs/setup/oauth-setup.md 2절
+   (1, 2 완료 후 Supabase 대시보드 Authentication > Providers에 Client ID/Secret 입력)
+3. Vercel 프로젝트 설정(https://vercel.com/5555jungs-5168s-projects/web/settings/git)에서
+   "Connect Git Repository" — 지금은 `vercel deploy`로 수동 배포만 되고, push 시 자동배포는 안 됨
+4. 위 완료 후 docs/setup/oauth-setup.md 4절의 검증 체크리스트 실행 (실제 로그인 -> profiles 자동생성 확인)
+5. 검증 결과를 다음 세션에 공유하면 Phase 1 종료 절차(/review, History.md 갱신, Phase 2 계획) 진행
 
 ## 그 외 대기
 - 별도 트랙: Meshy에서 model.glb 다운로드 (Phase 3 전까지)
