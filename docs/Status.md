@@ -4,8 +4,11 @@
 검증만 사용자 대기 (2026-07-22 새벽, `/loop /next-step` 밤샘 자율).** Phase 1~7 완료.
 Phase 8 = AI 1단계(룰 대사→RAG Q&A). 사용자 "정지 말고 구현 가능한 것 전부 구현, 아침에 확인" 지시로
 Phase 7 선례대로 T0 게이트 기본값 확정 후 빌드(상세·게이트값은 phase_08.md "구현 진행" 절).
-계획 문서: docs/plans/phase_01~08.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
+계획 문서: docs/plans/phase_01~09.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
 docs/plans/notion-inventory-delta-2026-07-21.md.
+**다음 Phase 9(워크스페이스 코어=블록 에디터) 초안 작성됨**(docs/plans/phase_09.md) — 착수 전 T0 게이트
+7건(Phase 8 검증, pages jsonb 스키마, BlockNote 통합, extractPlainText, soft delete, 앱 셸, 파일 업로드)
+사용자 결정 필요. Phase 9 = Phase 8 이월 "pages jsonb" 게이트의 해소 지점.
 
 ## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현·리뷰·배포 완료 (2026-07-22 새벽, `/loop` 밤샘 자율)
 
