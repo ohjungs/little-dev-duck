@@ -9,9 +9,11 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "coverage": "vitest run --config vitest.coverage.config.ts --coverage",
     "dev": "turbo run dev"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.18.0",
     "prettier": "^3.4.0",
     "turbo": "^2.5.0",

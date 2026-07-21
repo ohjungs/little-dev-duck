@@ -14,3 +14,6 @@ dist/
 supabase/.temp
 .gstack/
 !.env.example
+
+# 테스트 커버리지 리포트
+coverage/
