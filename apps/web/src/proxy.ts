@@ -2,7 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback"];
+// /api/keepalive는 Vercel Cron이 세션 없이 호출하므로 인증 게이트를 통과시킨다(무인증 no-op).
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/api/keepalive"];
 
 // Tauri WebView가 이 배포 URL을 그대로 로드하는 구조(옵션 A)라 Tauri 쪽 CSP 설정은
 // 무효하다(원격 https 콘텐츠에는 주입되지 않음, docs/plans/phase_05.md T2 참조) - 실질적인
