@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-collect-claude-logs"
+description = "Claude Code 세션 로그의 날짜별 집계(collect_claude_logs) 실행을 허용한다."
+commands.allow = ["collect_claude_logs"]

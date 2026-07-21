@@ -1,10 +1,13 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **4 완료(사용자 검증만 대기) → 5 T0/T3 완료, 블로커 전부 해소 — T1/T2/T4 착수 가능(다음 세션)**
+현재 Phase: **4 완료(사용자 검증만 대기) → 5 T0/T1/T2/T3 완료 + 코드/보안 리뷰 반영 완료, T4(통합
+검증)만 남음**
 계획 문서: docs/plans/phase_01~03.md(완료), docs/plans/phase_04.md(구현 완료, T5 사용자 검증만 대기),
-docs/plans/phase_05.md(T0/T3 완료, 블로커 해소로 T1/T2/T4 착수 가능 — 실제 구현은 다음 세션)
-재개 방법: 새 대화에서 /next-step — Phase 5 T1(Tauri 2 스캐폴딩)부터 시작. `apps/desktop` 신설,
-WebView는 옵션 A(Vercel 배포 URL 로드) 확정 사양대로.
+docs/plans/phase_05.md(T0/T1/T2/T3 완료 + 리뷰 HIGH 4건 수정 완료, T4 통합 검증만 남음)
+재개 방법: 새 대화에서 /next-step — Phase 5 T4(통합 검증). `pnpm --filter desktop tauri:dev`로
+실제 앱 실행 → 로그인 상태에서 위젯 창 표시 확인, 새 CSP가 브라우저 콘솔에 위반 로그를 남기지
+않는지 확인 → Supabase `activity_daily`에 오늘 날짜 `source=claude_code` 행이 생기는지 확인(전부
+이 세션 환경에서는 GUI 한계로 못함, 사용자 검증 필요).
 
 ## Phase 5 블로커 — 전부 해소 (2026-07-21)
 
@@ -20,9 +23,47 @@ WebView는 옵션 A(Vercel 배포 URL 로드) 확정 사양대로.
 **T3 완료(2026-07-21, `/loop` 자동 진행)**: `supabase/migrations/20260721000000_activity_daily.sql`
 + down 스크립트 추가. 실제 `supabase db push` 적용은 사용자 확인 후(supabase/README.md 참조).
 
-**이 세션 스코프**: 사용자 지시("실제 개발은 다음 세션에서 할거야") — 이번 세션은 설치/블로커
-해소까지만, T1/T2/T4 실제 구현은 하지 않음. 5분 `/loop` 자동 재실행은 다음 세션에서는 유지되지
-않음(세션 종료 시 소멸) — 다음 세션에서 필요하면 다시 `/loop` 걸 것.
+**T1 완료(2026-07-21, `/next-step`)**: `apps/desktop` Tauri 2 스캐폴딩 — WebView가 Vercel 배포
+URL을 로드(옵션 A), always-on-top 위젯 창(360x640), `cargo build` 전체 컴파일 성공. 상세와 판단
+근거(패키지 스크립트명을 `tauri:build`로 바꿔 CI `pnpm build`와의 충돌을 피한 이유 포함)는
+docs/plans/phase_05.md T1 절 참조. **빌드된 앱을 실행해 프로세스 생존은 확인했으나, 위젯 창이
+실제로 화면에 렌더링되는지는 이 세션 환경에서 시각적으로 확인하지 못함** — 사용자가 직접
+`pnpm --filter desktop tauri:dev`로 확인 권장.
+
+**부수 발견 및 수정(Phase 5와 무관, T1 작업 중 발견)**: `apps/web`이 `zod`를 소스에서 직접 import
+(`api/github/contributions/route.ts`, Phase 4)하면서도 `package.json`에 의존성으로 선언한 적이
+없었다 — 그동안 `packages/core`를 통해 우연히 node_modules에서 해석되던 phantom dependency였다.
+이번 세션의 `pnpm install`(desktop용 `@tauri-apps/cli` 추가)이 워크스페이스를 다시 링크하면서
+그 우연한 해석이 깨져 루트 `pnpm build`가 실패하는 것을 발견 — `apps/web/package.json`에 `zod`를
+명시적 의존성으로 추가해 해소, 재빌드로 확인. main에 이미 잠재해 있던 버그라 CI가 같은 이유로
+아무 때나 깨질 수 있었던 상태였음.
+
+**T2 완료(2026-07-21, `/next-step`)**: Rust `collect_claude_logs`(파일 내용은 안 읽고 mtime만으로
+날짜 판정 — DECISIONS.md #9-2보다 보수적) + `collector://progress` 이벤트. Rust는 Supabase에 직접
+접속하지 않고 로컬 집계만 반환 — 실제 업로드는 이미 로그인된 WebView 쪽에서 새로 만든
+`packages/api`의 `upsertActivityDaily`가 수행(Rust 바이너리에 Supabase 자격 증명 불필요). 배포된
+Vercel origin에는 `capabilities/remote.json` + `permissions/default.toml`로 `collect_claude_logs`
+커맨드와 이벤트 리스닝만 최소 권한 부여. `apps/web`은 `window.__TAURI__`(withGlobalTauri) 존재
+여부로 데스크톱 실행을 감지해 자동 동기화(`DesktopCollectorSync`, 브라우저에서는 no-op). 상세는
+docs/plans/phase_05.md T2 절 참조. `cargo build` + 전체 `pnpm build`/`lint`/`test`(5/5, 9/9, 8/8)
+통과 — **단, 실제 로그인 상태로 실행해 activity_daily에 데이터가 실제로 쌓이는지는 end-to-end로
+확인 못함**(GUI 시각 확인 불가, T1과 동일 한계) — T4에서 사용자 확인 필요.
+
+**T1/T2 code-reviewer + security-reviewer 병렬 리뷰 및 후속 수정(2026-07-21)**: T4 진행 전 방어적으로
+실행. HIGH 4건 발견, 전부 이 세션에서 수정:
+- (보안) `capabilities/remote.json`의 origin 스코핑이 옵션 A 구조(frontendDist=배포 URL)에서는
+  Tauri가 이 origin을 "Local"로 판정해 사실상 무효라는 걸 설치된 tauri 크레이트 소스로 확인
+  — 구조적 한계라 되돌리지 않고 DECISIONS.md #9-11 + phase_05.md에 정확히 기록
+- (보안) `security.csp: null`도 원격 https 콘텐츠엔 무효, `apps/web`에 보안 헤더가 전혀 없던 것도
+  함께 확인 — `apps/web/src/proxy.ts`에 CSP+5개 보안 헤더 추가(실제 응답에 반영되는지 curl로
+  실측 확인, Next.js가 요청 헤더에도 CSP를 같이 실어야 최종 응답까지 전달한다는 함정도 실측으로 발견)
+- (코드) Rust `collector/mod.rs`가 UTC 기준으로 날짜를 매겨 KST 자정 근처 작업이 하루 밀려
+  집계되던 버그 — `time::UtcOffset::current_local_offset()`(실패 시 UTC 대체)로 수정
+- (코드) Rust 쪽 단위 테스트 0건이던 것 — `session_date`/`find_session_files` 등 5개 테스트 추가,
+  `cargo test` 통과
+- MEDIUM/LOW(심볼릭 링크 미검증, `updated_at` 미갱신, 동기화 실패 무알림 등)는 이번 라운드에서
+  고치지 않고 phase_05.md에 후속 과제로 남김(사용자에게 HIGH만 우선 처리하기로 확인받음)
+- 수정 후 전체 `pnpm build`/`lint`/`test` 재실행 — 5/5, 9/9, 8/8 재확인
 
 **참고**: 이 저장소에는 git worktree가 없어 다른 세션과 같은 폴더를 공유한다. 2026-07-20 21시경
 gstack browse 데몬이 다른 프로세스와 락 경합을 일으켰고(무한 대기, 강제 해제하지 않음), 로컬 3000

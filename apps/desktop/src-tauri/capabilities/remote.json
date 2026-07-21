@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "remote-web",
+  "description": "배포된 웹앱(Vercel)에 Claude Code 로그 수집기 IPC만 최소 권한으로 허용",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://web-sepia-one-88.vercel.app"]
+  },
+  "permissions": ["core:event:default", "allow-collect-claude-logs"]
+}

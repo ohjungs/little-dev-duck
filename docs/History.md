@@ -100,3 +100,71 @@
   없이 해결, 이벤트 로그로 실제 컴포넌트가 정상 설치되고 있음을 확인). `cargo new` + `cargo build`로
   실제 MSVC 컴파일 성공까지 실측 검증. Phase 5는 이제 블로커 없음 — T1(Tauri 스캐폴딩)/T2(Rust
   수집기)/T4(빌드 검증)는 다음 세션에서 실제 구현(사용자 지시: "실제 개발은 다음 세션에서").
+- 2026-07-21 03:30 : [본 세션, `/next-step`] Phase 5 T1(Tauri 2 스캐폴딩) 구현 — `apps/desktop`
+  신설, `tauri init --ci`로 `src-tauri` 생성 후 `tauri.conf.json`을 옵션 A 사양대로 편집
+  (`build.frontendDist`/`build.devUrl`을 로컬 경로 대신 Vercel 배포 URL로 직접 지정 — Tauri 2가
+  공식 지원하는 원격 URL 로드 방식, WebSearch로 사양 확인 후 적용), `identifier`는
+  `dev.littledevduck.desktop`, `app.windows[0].alwaysOnTop: true` + 360x640 세로형 위젯 크기.
+  `cargo build`로 전체 의존성 컴파일 성공(첫 빌드 ~20분) — 단, 이 세션의 bash가 방금 설치된 Rust의
+  PATH를 자동 인식하지 못해 매 호출마다 `export PATH="$HOME/.cargo/bin:$PATH"` 명시가 필요함을
+  확인. 빌드된 `app.exe`를 실행해 프로세스가 크래시 없이 살아있고 `Responding=True`임을 확인했으나
+  `MainWindowHandle`이 0으로 나와 위젯 창의 실제 화면 렌더링은 이 세션 환경에서 시각적으로 확인
+  못함(Phase 3 마스코트/로그인 오리 로고와 동일한 패턴 — 사용자 검증 필요). `apps/desktop/
+  package.json`의 스크립트명을 `dev`/`build`가 아닌 `tauri:dev`/`tauri:build`로 지어 루트 `pnpm
+  build`(CI의 `lint-and-test`가 실행)가 Rust 없는 CI 러너에서 `tauri build`까지 실행하다 깨지는
+  것을 사전 방지(`.github/workflows/ci.yml`은 다른 세션 소관이라 미수정).
+  **부수 발견·수정(Phase 5와 무관)**: 위 검증을 위해 실행한 루트 `pnpm build`에서 `apps/web`이
+  `zod`를 소스에서 직접 import하면서도 `package.json`에 의존성 선언이 없던 phantom dependency를
+  발견 — 그동안 `packages/core` 경유로 우연히 node_modules에서 해석되고 있었는데, 이번 `pnpm
+  install`(desktop용 `@tauri-apps/cli` 추가)이 워크스페이스를 재링크하며 그 우연한 해석이 깨져
+  빌드가 실패했다. `apps/web/package.json`에 `zod` 명시적 의존성 추가로 해소, 재빌드로 확인 —
+  main에 원래도 잠재해 있던 버그라 CI가 같은 이유로 아무 때나 깨질 수 있었던 상태였음. 전체
+  `pnpm build`/`lint`/`test` 재실행으로 회귀 없음 확인(desktop은 build/lint/test 스크립트가 없어
+  turbo가 자동 스킵 — 의도한 격리 동작 확인). 커밋은 아직 하지 않음(사용자 지시 대기).
+- 2026-07-21 07:10 : [본 세션, `/next-step` 계속] Phase 5 T2(Rust 사이드 Claude Code 로그 수집기)
+  구현 — `apps/desktop/src-tauri/src/collector/mod.rs`에 `collect_claude_logs` 커맨드: 파일 내용은
+  전혀 읽지 않고 각 `.jsonl`의 수정 시각(mtime, `time` crate)만으로 날짜를 판정해 집계(DECISIONS.md
+  #9-2가 허용한 "timestamp 필드 로컬 파싱"보다 더 보수적으로 선택 — 파일을 아예 열지 않아 프라이버시
+  여유폭 확보, 세션이 여러 날에 걸치면 마지막 활동일로 집계되는 근사치는 트레이드오프). 스캔 중
+  `collector://progress` 이벤트 emit. **Rust는 Supabase에 직접 접속하지 않는 구조로 설계**
+  (ARCHITECTURE.md 3절 인터페이스 (3)+(1) 조합) — Rust가 로컬 집계만 반환하면, 이미 로그인된
+  WebView 쪽 JS가 그 값을 받아 신규 `packages/api`의 `upsertActivityDaily`(supabase-js upsert
+  `onConflict: user_id,date,source`)로 업로드한다. 덕분에 Rust 바이너리에 Supabase 자격 증명이
+  전혀 필요 없다. `packages/core`에 `activityDailyEntrySchema` 추가, `apps/web`에
+  `DesktopCollectorSync`(`window.__TAURI__` 존재로 데스크톱 실행 감지, 브라우저에서는 완전 no-op —
+  `@tauri-apps/api`를 apps/web 의존성에 추가하지 않으려고 `tauri.conf.json`의
+  `app.withGlobalTauri: true`로 주입된 전역 객체를 타입 캐스팅으로 사용) 추가, 홈 화면에 마운트.
+  배포된 Vercel origin에는 `apps/desktop/src-tauri/capabilities/remote.json` +
+  `permissions/default.toml`로 `collect_claude_logs` 커맨드와 이벤트 리스닝만 최소 권한 부여 —
+  최초 시도에서는 `allow-collect-claude-logs` 권한을 capability에서만 참조하고 `permissions/`에
+  실제 정의하지 않아 `cargo build`가 "Permission not found"로 실패했음(앱 자체 커맨드는 플러그인과
+  달리 권한이 자동 생성되지 않음, WebSearch로 확인 후 `permissions/default.toml` 추가로 해결).
+  `cargo build` 성공, 전체 `pnpm build`/`lint`/`test`(5/5, 9/9, 8/8) 통과. **실제 로그인 상태로
+  앱을 실행해 `activity_daily`에 데이터가 실제로 쌓이는지는 end-to-end로 확인 못함**(GUI 시각
+  확인이 이 세션 환경에서 안 되는 T1과 동일한 한계) — T4에서 사용자 확인 필요. 커밋은 아직 하지
+  않음(사용자 지시 대기).
+- 2026-07-21 10:27 : [본 세션, `/next-step` 계속] T4(사용자 검증) 착수 전 방어적으로 code-reviewer
+  + security-reviewer 병렬 리뷰 실행(CLAUDE.md 필수 리뷰 트리거 — 외부 API 노출, 파일 시스템
+  접근, 인증 경로 전부 해당). HIGH 4건 발견, 사용자 승인 받아 전부 이 세션에서 수정:
+  **(1) capability 스코핑 무효 확인** — `capabilities/remote.json`이 배포 origin에만 최소 권한을
+  주려 했으나, 옵션 A 구조(`frontendDist`=배포 URL 그 자체)에서는 Tauri가 이 origin을 "Local"로
+  판정해(설치된 tauri 2.11.5/`tauri-utils` 2.9.3 소스를 직접 읽어 확인: `is_local_url()`,
+  `Capability.local` 기본값 true) 스코핑 분기가 실행되지 않고 `default.json`의 `core:default`까지
+  통째로 적용됨을 발견. 구조적 한계라 되돌리지 않고 DECISIONS.md #9-11 + phase_05.md에 정확한
+  동작을 기록. **(2) CSP 무효 + 보안 헤더 부재 확인** — `security.csp: null`도 `https://` 원격
+  콘텐츠엔 주입 안 됨(Tauri는 `data:` 스킴에만 CSP 주입) 확인, `apps/web`엔 애초에 보안 헤더가
+  하나도 없었음 — `apps/web/src/proxy.ts`에 CSP + X-Content-Type-Options/X-Frame-Options/
+  Referrer-Policy/Permissions-Policy/Strict-Transport-Security 추가. 구현 중 Next.js App Router의
+  함정을 실측으로 발견: 응답에 `.headers.set()`만 하면 X-Frame-Options 등은 살아남는데 CSP/HSTS만
+  렌더 단계에서 사라짐 — Next 공식 가이드대로 요청 헤더에도 같이 실어야(`NextResponse.next({
+  request: { headers } })`) 최종 응답까지 전달됨을 확인. `pnpm --filter web dev` + curl로 `/login`
+  응답에 6개 헤더 전부 포함, 본문도 정상 렌더링(15KB, 제목 태그 정상) 실측 확인 — 단 브라우저
+  콘솔의 CSP 위반 로그 유무까지는 이 세션에서 확인 못함. **(3) Rust UTC 버그** — `session_date`가
+  UTC 기준이라 KST 자정 근처 작업이 하루 밀려 집계되던 버그를 `time::UtcOffset::
+  current_local_offset()`(실패 시 UTC 대체)로 수정. **(4) Rust 테스트 0건** — `session_date`/
+  `find_session_files`/집계 로직에 단위 테스트 5개 추가, `cargo test` 통과. MEDIUM/LOW 6건(심볼릭
+  링크 미검증, `updated_at` 미갱신, 동기화 실패 무알림 등)은 사용자 확인 하에 이번 라운드에서
+  고치지 않고 phase_05.md에 후속 과제로 남김. 디버깅 과정에서 실수로 `Stop-Process -Name node`를
+  광범위 매칭으로 실행해 다른 프로세스에 영향을 줬을 가능성이 있었음(과도하게 넓은 매칭 — 이후
+  TaskStop으로 정확한 프로세스만 종료하도록 수정) — 재발 방지 필요. 수정 후 전체 `pnpm build`/
+  `lint`/`test` 재실행 — 5/5, 9/9, 8/8 재확인. 커밋은 아직 하지 않음(사용자 지시 대기).

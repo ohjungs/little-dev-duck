@@ -17,3 +17,8 @@ export {
 } from "./memos";
 
 export { fetchGithubContributions } from "./github";
+
+export {
+  upsertActivityDaily,
+  type UpsertActivityDailyInput,
+} from "./activity";

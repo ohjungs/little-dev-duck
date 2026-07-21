@@ -5,6 +5,7 @@ import { DuckWidget } from "@/components/DuckWidget";
 import { TodoWidget } from "@/components/TodoWidget";
 import { MemoWidget } from "@/components/MemoWidget";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
+import { DesktopCollectorSync } from "@/components/DesktopCollectorSync";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,8 @@ export default async function Home() {
       <div style={{ width: "100%", maxWidth: "900px" }}>
         <GithubContributionWidget />
       </div>
+
+      <DesktopCollectorSync />
     </main>
   );
 }

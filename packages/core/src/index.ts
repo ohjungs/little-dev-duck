@@ -8,3 +8,9 @@ export {
   type ContributionDay,
   type ContributionSummary,
 } from "./domain/github-contribution";
+export {
+  activitySourceSchema,
+  activityDailyEntrySchema,
+  type ActivitySource,
+  type ActivityDailyEntry,
+} from "./domain/activity-daily";

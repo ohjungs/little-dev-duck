@@ -4,8 +4,56 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback"];
 
+// Tauri WebView가 이 배포 URL을 그대로 로드하는 구조(옵션 A)라 Tauri 쪽 CSP 설정은
+// 무효하다(원격 https 콘텐츠에는 주입되지 않음, docs/plans/phase_05.md T2 참조) - 실질적인
+// XSS 방어선은 여기, 이 앱 자체의 응답 헤더뿐이다. script-src에서 인라인 스크립트를 막는 게
+// 핵심이라 nonce 없이도 'self'만 허용(현재 앱은 next/script 외 인라인 스크립트를 쓰지 않음).
+// style-src는 컴포넌트 전반이 style={{}} 인라인 속성을 쓰는 관례라 unsafe-inline을 허용한다
+// (CSS 인라인 삽입은 스크립트 실행보다 위험도가 낮음 - 전면 nonce 전환은 후속 과제로 남김).
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "frame-src 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
+function withSecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set("Content-Security-Policy", CSP);
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()",
+  );
+  response.headers.set(
+    "Strict-Transport-Security",
+    "max-age=31536000; includeSubDomains",
+  );
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Next.js는 App Router 렌더 단계에서 응답 헤더를 다시 조립하기 때문에, 미들웨어 응답
+  // 자체에 .set()만 해서는 CSP가 최종 응답까지 살아남지 않는다(X-Frame-Options 등 다른
+  // 헤더는 살아남는데 CSP/HSTS만 사라지는 걸 실측으로 확인) - Next 공식 가이드대로 요청
+  // 헤더에도 같이 실어 보내야 렌더 단계까지 전달된다.
+  const requestHeadersWithCsp = () => {
+    const headers = new Headers(request.headers);
+    headers.set("Content-Security-Policy", CSP);
+    return headers;
+  };
+
+  let response = NextResponse.next({
+    request: { headers: requestHeadersWithCsp() },
+  });
 
   const { url, anonKey } = getSupabaseEnv();
   const supabase = createServerClient(url, anonKey, {
@@ -17,7 +65,9 @@ export async function proxy(request: NextRequest) {
         cookiesToSet.forEach(({ name, value }) =>
           request.cookies.set(name, value),
         );
-        response = NextResponse.next({ request });
+        response = NextResponse.next({
+          request: { headers: requestHeadersWithCsp() },
+        });
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, options),
         );
@@ -34,10 +84,12 @@ export async function proxy(request: NextRequest) {
   );
 
   if (!user && !isPublicPath) {
-    return NextResponse.redirect(new URL("/login", request.url), 303);
+    return withSecurityHeaders(
+      NextResponse.redirect(new URL("/login", request.url), 303),
+    );
   }
 
-  return response;
+  return withSecurityHeaders(response);
 }
 
 export const config = {
