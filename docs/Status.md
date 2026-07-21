@@ -1,19 +1,30 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 6 구현 완료(2026-07-21) → 사용자 실기 검증 대기.** Phase 1~5 완료. Phase 6
-(오리 2단계: 상태 반응/자율 행동/활보 모드) T1~T3 구현 + 머신 검증 완료, T4 사용자 실기 검증만 대기.
-착수 전 P1 하드닝 게이트는 전건 통과(다른 세션이 커밋 `cbda478`~`97208dc`).
-계획 문서: docs/plans/phase_01~06.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md.
-**Notion 480항목 인벤토리 델타 반영 완료(2026-07-21)**: docs/plans/notion-inventory-delta-2026-07-21.md
-— 약 95%가 기존 로드맵 흡수/구조적 제외, 신규 등재 2건(역방향 MCP 서버·페이지 아카이브), 로드맵
-순서·Phase 정의 변경 없음.
-다음: Phase 6 T4 사용자 실기 검증(phase_06.md). **Phase 7 계획 초안 작성 완료**(docs/plans/phase_07.md
-— 게임화 XP/레벨/먹이/코스튬 + 생산성 모듈 뽀모도로/습관/캘린더). Phase 7 착수는 T0 게이트(T4 통과 +
-TZ 단일기준·스트릭 하루경계·밸런스 설정데이터 확정) + 별도 승인 필요. 규모가 커 분할 승인 검토 권고.
-재개 방법: 새 대화에서 /next-step. Phase 6 T4는 사용자만 확인 가능(활보 모드는 배포 후 데스크톱
-검증, phase_06.md "T4 검증 상태" 참조).
+현재 Phase: **Phase 7 구현 완료(2026-07-21) → 마이그레이션 적용 + 사용자 실기 검증 대기.** Phase 1~6
+완료(Phase 6 T4 사용자 검증 완료). Phase 7(게임화 XP/레벨/먹이 + 생산성 모듈 습관/뽀모도로/캘린더)은
+[직렬 계약잠금]→[병렬 4슬라이스]→[직렬 통합]으로 구현·머신검증·리뷰 완료.
+계획 문서: docs/plans/phase_01~07.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
+docs/plans/notion-inventory-delta-2026-07-21.md.
+**즉시 필요(사용자)**: `supabase db push`로 Phase 7 신규 4테이블(habits/habit_checks/pomodoro_sessions/
+calendar_events) 적용 — 적용 전까지 해당 위젯·게임화 표시는 에러 상태(supabase/README 참조). 적용 후
+T4 실기 검증(투두 완료→XP·레벨업, 습관 체크→스트릭, 뽀모도로 완료→XP, 캘린더 D-day).
+다음: Phase 7 마이그레이션 적용·검증 후 Phase 8(AI 1단계) 착수 초안. Phase 7 리뷰 알려진 한계(서버
+권위 XP 미도입, 솔로 v1 의도)는 phase_07.md "리뷰 결과 및 알려진 한계" 참조.
+재개 방법: 새 대화에서 /next-step.
 
-## Phase 6 — 오리 2단계 (상태 반응·자율 행동·활보 모드) — 구현 완료, 사용자 실기 검증 대기 (2026-07-21)
+## Phase 7 — 게임화 + 생산성 모듈 — 구현 완료, 마이그레이션 적용·검증 대기 (2026-07-21)
+
+`/loop /next-step` 자율 진행. 사용자 "전부 분할·병렬" 승인. 상세·리뷰·알려진 한계는 phase_07.md.
+
+- [x] 계약 잠금(직렬, 커밋 39d23d0): core 게임화/생산성 도메인+순수함수(69 tests) + DB 마이그레이션 4개 + duckState XP api
+- [x] 병렬 4슬라이스(서브에이전트): 습관 / 뽀모도로 / 캘린더 / 게임화 UI(각 api+위젯, disjoint 파일 경계)
+- [x] 통합(직렬): index/page 배선 + xpSignal(XP→오리 갱신) + 투두 XP + DuckWidget 구독·레벨업 celebrate
+- [x] 검증: core 69 / api 59 / mascot 5 tests, 전 build, apps/web lint+build. code+security 리뷰 배포차단 0건
+- [ ] 마이그레이션 적용(사용자 `supabase db push`) + T4 실기 검증
+- 반영: (L-2) 뽀모도로 재완료 XP 이중지급 DB 차단. 이월(알려진 한계): 서버 권위 XP(M-1/M-2/M-3/L-1,
+  솔로 자기치팅·타 사용자 무피해)는 소셜 기능 전 선결로 문서화.
+
+## Phase 6 — 오리 2단계 (상태 반응·자율 행동·활보 모드) — 완료 (T4 사용자 검증 완료, 2026-07-21)
 
 `/loop /next-step` 자율 진행. 계약 잠금: 상태 반응 = **클라이언트 파생**(DB 없음, 사용자 승인),
 범위 = T1+T2+T3 전부(사용자 승인). 상세·판단근거는 docs/plans/phase_06.md.

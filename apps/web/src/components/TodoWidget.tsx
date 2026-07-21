@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createTodo, deleteTodo, listTodos, updateTodo } from "@ldd/api";
+import {
+  applyXpAward,
+  createTodo,
+  deleteTodo,
+  listTodos,
+  updateTodo,
+} from "@ldd/api";
 import type { Todo } from "@ldd/core";
 import { Button, Card, Input, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 import { emitTodosChanged } from "@/lib/todoSignal";
+import { emitXpChanged } from "@/lib/xpSignal";
 import { todayIso } from "@/lib/today";
 
 type LoadState = "loading" | "error" | "ready";
@@ -68,12 +75,22 @@ export function TodoWidget() {
   };
 
   const handleToggle = async (todo: Todo) => {
+    const willBeDone = !todo.isDone;
     const prevTodos = todos;
     setTodos((prev) =>
-      prev.map((t) => (t.id === todo.id ? { ...t, isDone: !t.isDone } : t)),
+      prev.map((t) => (t.id === todo.id ? { ...t, isDone: willBeDone } : t)),
     );
     try {
-      await updateTodo(supabase, todo.id, { isDone: !todo.isDone });
+      await updateTodo(supabase, todo.id, { isDone: willBeDone });
+      if (willBeDone) {
+        // 할일 완료 시 오리 XP 적립(원천: 할일 완료). 적립/신호 실패는 완료 자체를 되돌리지 않는다.
+        try {
+          await applyXpAward(supabase, "todoComplete");
+          emitXpChanged();
+        } catch {
+          // XP 적립 실패는 조용히 무시(완료 상태는 유지)
+        }
+      }
     } catch {
       setTodos(prevTodos);
       setActionError("변경하지 못했습니다.");

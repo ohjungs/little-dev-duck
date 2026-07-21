@@ -70,3 +70,43 @@ Phase 7은 게임화 + 4개 생산성 축(습관·뽀모도로·캘린더 + duck
 편**이다. 착수 게이트에서 (a) T1(게임화 코어)만 우선 닫고 생산성 모듈을 T2~T4로 순차 진행할지, (b)
 습관·뽀모도로·캘린더를 별도 승인 단위로 쪼갤지 사용자와 범위를 정한다(Phase 6이 T1+T2+T3 전부를
 한 번에 승인받은 것과 달리, 규모상 분할 승인이 나을 수 있음).
+
+## 구현 완료 (2026-07-21, `/loop /next-step`, 사용자 "전부 분할·병렬" 승인)
+
+착수 승인 후 **[직렬 계약잠금] → [병렬 4슬라이스] → [직렬 통합]** 순으로 진행(CLAUDE.md 3-3).
+T0 정책 기본값: TZ 로컬계산/UTC저장, 스트릭 하루경계=로컬자정, 밸런스=설정데이터 분리.
+
+- **[직렬] 계약 잠금(커밋 39d23d0)**: core `duck-xp`/`habit`/`pomodoro`/`calendar-event`/`balance`/
+  `date-util` + 순수함수 테스트(69 tests), DB 마이그레이션 4개(habits/habit_checks/pomodoro_sessions/
+  calendar_events, RLS+down), `packages/api/duckState.ts`(getDuckState/applyXpAward).
+- **[병렬] 4슬라이스**(패키지 경계 disjoint, 서브에이전트 4개): 습관(api+위젯), 뽀모도로(api+위젯),
+  캘린더(api+위젯), 게임화 UI(DuckWidget XP/레벨/먹이 + mascot celebrate + duckState.test).
+- **[직렬] 통합**: api/index.ts 전 export, page.tsx 전 위젯 배선, `lib/xpSignal.ts`(XP 획득→오리 갱신
+  네이티브 신호, Phase 6 todoSignal 패턴), 투두 완료 XP 적립, DuckWidget이 신호 구독→재조회→레벨업 시
+  celebrate. 병렬 중 발견한 PomodoroWidget lint 2건(렌더 중 ref, 이펙트 동기 setState) 통합에서 수정.
+- **검증**: core 69 / api 59 / mascot 5 tests, 전 패키지 build, apps/web lint+build 전부 GREEN.
+
+**주의 — 실제 동작은 마이그레이션 적용 후**: 신규 4테이블은 미적용(supabase/README 참조). 사용자가
+`supabase db push` 하기 전까지 습관/뽀모도로/캘린더 위젯·게임화 표시는 에러 상태(테이블 부재, 교차
+노출 위험 없음). T4 사용자 실기 검증(투두 완료→XP/레벨업 축하, 습관 체크→스트릭, 뽀모도로 완료→XP,
+캘린더 D-day)은 적용 후 가능.
+
+## 리뷰 결과 및 알려진 한계 (2026-07-21, code + security 병렬)
+
+**배포 차단 0건**(SEC-CRITICAL/HIGH 0, code CRITICAL/HIGH 0). 반영·이월:
+
+- **반영(커밋 전)**: (L-2) `completePomodoro`를 `completed_at IS NULL` 조건부 UPDATE로 바꿔 재시도·
+  중복 완료의 XP 이중 지급을 DB에서 차단 + 재완료·XP부수효과 테스트 추가. supabase/README 신규 4테이블
+  반영.
+- **알려진 한계 — 서버 권위 XP 미도입(솔로 v1 의도적)**: 아래는 전부 "사용자가 자기 duck_state를
+  치팅" 부류로 **타 사용자 피해·데이터 유출 없음**(양 리뷰 공통 판정). 1인 자기 동기부여 앱에서
+  안티치트 RPC 인프라는 과설계(ponytail)라 문서화로 이월한다. **리더보드/소셜/친구 비교 기능 도입 전
+  선결**:
+  - (M-1) 투두 완료↔해제 반복 시 XP 재적립(투두엔 상한 없음), 습관도 언체크→재체크로 재적립.
+  - (M-2) `applyXpAward`가 공개 export라 devtools에서 임의 호출 가능.
+  - (M-3) `duck_state` UPDATE RLS가 소유권만 검사 → PostgREST로 xp/level 직접 조작 가능(근본 원인 —
+    이게 열려 있는 한 클라이언트 XP는 본질적으로 신뢰값). 해법: `apply_xp_award` SECURITY DEFINER RPC
+    + xp/level/feed 컬럼 UPDATE grant 회수.
+  - (L-1) `checkHabit`이 checkedDate가 오늘인지 미검증(클라 검증은 devtools로 우회 가능, 서버 검증 필요).
+- **후속(비차단)**: habit/pomodoro api 테스트의 XP 부수효과 검증 확대(pomodoro는 이번에 추가, habit은
+  이월), DuckWidget 조회 실패 무알림(의도적 설계로 유지).

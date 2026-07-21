@@ -22,3 +22,30 @@ export {
   upsertActivityDaily,
   type UpsertActivityDailyInput,
 } from "./activity";
+
+export { getDuckState, applyXpAward } from "./duckState";
+
+export {
+  listCalendarEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+  type CreateCalendarEventInput,
+  type UpdateCalendarEventInput,
+} from "./calendar";
+
+export {
+  listHabits,
+  createHabit,
+  deleteHabit,
+  listHabitChecks,
+  checkHabit,
+  uncheckHabit,
+  type CreateHabitInput,
+} from "./habits";
+
+export {
+  listPomodoroSessions,
+  startPomodoro,
+  completePomodoro,
+} from "./pomodoro";

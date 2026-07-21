@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { DuckWidget } from "@/components/DuckWidget";
 import { TodoWidget } from "@/components/TodoWidget";
 import { MemoWidget } from "@/components/MemoWidget";
+import { CalendarWidget } from "@/components/CalendarWidget";
+import { HabitWidget } from "@/components/HabitWidget";
+import { PomodoroWidget } from "@/components/PomodoroWidget";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 import { DesktopCollectorSync } from "@/components/DesktopCollectorSync";
 import { WalkingModeToggle } from "@/components/WalkingModeToggle";
@@ -70,6 +73,9 @@ export default async function Home() {
       >
         <TodoWidget />
         <MemoWidget />
+        <HabitWidget />
+        <PomodoroWidget />
+        <CalendarWidget />
       </div>
 
       <div style={{ width: "100%", maxWidth: "900px" }}>

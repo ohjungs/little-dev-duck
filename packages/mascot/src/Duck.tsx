@@ -18,6 +18,11 @@ const COLOR_OUTLINE = "#352116";
 const SPEECH_BUBBLE_DURATION_MS = 2000;
 const SQUISH_DECAY_PER_SECOND = 4;
 
+// 레벨업 축하 연출: 진행값이 1→0으로 감쇠하는 동안 y축 한 바퀴 회전 + 한 번 도약.
+// 0.85/초라 약 1.2초 만에 자연 종료(별도 타이머 없이 useFrame에서 decay).
+const CELEBRATE_DECAY_PER_SECOND = 0.85;
+const CELEBRATE_HOP_HEIGHT = 0.5;
+
 // 유휴 상태에서 스스로 말풍선을 띄우는 주기(T2 자율 행동). 사용자가 클릭하면 리셋된다.
 const IDLE_MIN_MS = 12_000;
 const IDLE_MAX_MS = 24_000;
@@ -42,14 +47,22 @@ const MOOD_LABEL: Record<DuckMood, string> = {
 function DuckModel({
   mood,
   reducedMotion,
+  celebrate,
   onGreet,
 }: {
   mood: DuckMood;
   reducedMotion: boolean;
+  celebrate: boolean;
   onGreet: () => void;
 }) {
   const groupRef = useRef<Group>(null);
   const squishRef = useRef(0);
+  const celebrateRef = useRef(0);
+
+  // celebrate가 true로 바뀌는 순간 축하 연출을 시작한다. reduced-motion이면 모션을 생략한다.
+  useEffect(() => {
+    if (celebrate && !reducedMotion) celebrateRef.current = 1;
+  }, [celebrate, reducedMotion]);
 
   useFrame((state, delta) => {
     const group = groupRef.current;
@@ -61,13 +74,27 @@ function DuckModel({
     );
     const squish = squishRef.current;
 
+    celebrateRef.current = Math.max(
+      0,
+      celebrateRef.current - CELEBRATE_DECAY_PER_SECOND * delta,
+    );
+    const celebration = celebrateRef.current;
+
     const motion = MOOD_MOTION[mood];
     // reduced-motion: 흔들림은 끄되 mood별 정적 자세(높이/기울기)는 유지해 정보는 남긴다.
     const bob = reducedMotion
       ? 0
       : Math.sin(state.clock.elapsedTime * motion.bobSpeed) * motion.bobAmp;
-    group.position.y = motion.baseY + bob;
+    // 축하 도약: 연출 구간(1→0) 동안 sin 곡선으로 한 번 크게 튀어올랐다 내려온다.
+    const hop =
+      celebration > 0
+        ? Math.sin((1 - celebration) * Math.PI) * CELEBRATE_HOP_HEIGHT
+        : 0;
+    group.position.y = motion.baseY + bob + hop;
     group.rotation.x = motion.tiltX;
+    // 축하 회전: 감쇠하는 동안 y축 한 바퀴(2π), 종료 시 정확히 0으로 복귀(mood 모션과 무간섭).
+    group.rotation.y =
+      celebration > 0 ? (1 - celebration) * Math.PI * 2 : 0;
     group.scale.set(1 + squish * 0.3, 1 - squish * 0.4, 1 + squish * 0.3);
   });
 
@@ -139,9 +166,15 @@ function DuckModel({
 export interface DuckProps {
   height?: number;
   mood?: DuckMood;
+  // true가 되는 순간 짧은 레벨업 축하 연출(회전+도약)을 재생한다. 기본 false(하위호환).
+  celebrate?: boolean;
 }
 
-export function Duck({ height = 220, mood = "neutral" }: DuckProps) {
+export function Duck({
+  height = 220,
+  mood = "neutral",
+  celebrate = false,
+}: DuckProps) {
   const reducedMotion = usePrefersReducedMotion();
   const clickCountRef = useRef(0);
   const [phrase, setPhrase] = useState(() => pickPhrase(0));
@@ -206,6 +239,7 @@ export function Duck({ height = 220, mood = "neutral" }: DuckProps) {
         <DuckModel
           mood={mood}
           reducedMotion={reducedMotion}
+          celebrate={celebrate}
           onGreet={handleGreet}
         />
         {showBubble && (

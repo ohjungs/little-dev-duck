@@ -7,9 +7,9 @@
 - [x] Phase 3 오리 1단계 (GLB, 클릭 반응, 말풍선) — 2026-07-20 완료 (아래 기록 참조)
 - [x] Phase 4 GitHub 커밋 잔디 — 2026-07-21 실사용 검증 완료 (아래 기록 참조)
 - [x] Phase 5 Tauri 위젯 + Claude Code 수집기 — 2026-07-21 완료 (아래 기록 참조)
-- [ ] Phase 6 오리 2단계 (상태 반응, 자율 행동, 활보 모드) — 2026-07-21 T1~T3 구현+머신검증 완료,
-      T4 사용자 실기 검증 대기 (아래 기록 참조)
-- [ ] Phase 7 게임화 (XP/먹이/코스튬) + 생산성 모듈 (뽀모도로/습관/캘린더)
+- [x] Phase 6 오리 2단계 (상태 반응, 자율 행동, 활보 모드) — 2026-07-21 완료 (T4 사용자 검증 완료, 아래 기록)
+- [~] Phase 7 게임화 (XP/먹이/코스튬) + 생산성 모듈 (뽀모도로/습관/캘린더) — 2026-07-21 구현+머신검증+리뷰
+      완료, 마이그레이션 적용(사용자)·T4 실기 검증 대기 (아래 기록)
 - [ ] Phase 8 AI 1단계 (룰 기반 대사 -> RAG Q&A)
 - [ ] Phase 9 블록 에디터
 - [ ] Phase 10 AI 2단계 (에이전트 액션: Figma/Gamma/Google/GitHub/Notion/Gmail)
@@ -209,3 +209,15 @@
   FEATURES 146항목 / 로드맵에 이미 흡수 또는 구조적 제외(enterprise B/E 전량·다인 협업·무료티어 저촉).
   신규 로드맵 등재 2건뿐(역방향 MCP 서버 노출=DEFER 백로그, 페이지 아카이브=P9 휴지통 흡수). 로드맵
   순서·Phase 정의 변경 없음. FEATURES.md에 델타 문서 포인터 1줄 추가(원 소스 provenance 보존).
+- 2026-07-21 : Phase 6 T4 사용자 실기 검증 완료 보고받음 → Phase 6 종료. 이어 Phase 7(게임화+생산성)
+  착수 승인("전부 분할·병렬"). **[직렬 계약잠금(커밋 39d23d0)]→[병렬 4슬라이스]→[직렬 통합]**으로
+  진행(CLAUDE.md 3-3). 계약 잠금: core `duck-xp`/`habit`/`pomodoro`/`calendar-event`/`balance`/`date-util`
+  순수함수(69 tests) + DB 마이그레이션 4개(habits/habit_checks/pomodoro_sessions/calendar_events,
+  RLS+down) + `packages/api/duckState.ts`. 병렬: 서브에이전트 4개가 습관/뽀모도로/캘린더/게임화UI를
+  disjoint 파일 경계로 구현. 통합: index/page 배선 + `lib/xpSignal.ts`(XP 획득→오리 레벨/XP/먹이 갱신,
+  Phase 6 신호 패턴) + 투두 완료 XP + DuckWidget 신호구독→레벨업 celebrate. 병렬 부산물 PomodoroWidget
+  lint 2건 수정. 검증 core 69/api 59/mascot 5 tests, 전 build, apps/web lint+build GREEN. code+security
+  리뷰 배포차단 0건 — (L-2) 뽀모도로 재완료 XP 이중지급 DB 차단(조건부 UPDATE) 반영, 나머지(서버 권위
+  XP 미도입: 투두/습관 파밍·applyXpAward export·duck_state 직접 PATCH·습관 날짜검증)는 전부 "솔로 자기
+  치팅, 타 사용자 무피해"라 소셜 기능 전 선결로 문서화 이월(phase_07.md). **미완: 신규 4테이블
+  `supabase db push`(사용자) + T4 실기 검증** — 적용 전 위젯은 테이블 부재로 에러 상태(교차 노출 없음).
