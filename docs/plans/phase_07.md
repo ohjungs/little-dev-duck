@@ -86,10 +86,10 @@ T0 정책 기본값: TZ 로컬계산/UTC저장, 스트릭 하루경계=로컬자
   celebrate. 병렬 중 발견한 PomodoroWidget lint 2건(렌더 중 ref, 이펙트 동기 setState) 통합에서 수정.
 - **검증**: core 69 / api 59 / mascot 5 tests, 전 패키지 build, apps/web lint+build 전부 GREEN.
 
-**주의 — 실제 동작은 마이그레이션 적용 후**: 신규 4테이블은 미적용(supabase/README 참조). 사용자가
-`supabase db push` 하기 전까지 습관/뽀모도로/캘린더 위젯·게임화 표시는 에러 상태(테이블 부재, 교차
-노출 위험 없음). T4 사용자 실기 검증(투두 완료→XP/레벨업 축하, 습관 체크→스트릭, 뽀모도로 완료→XP,
-캘린더 D-day)은 적용 후 가능.
+**마이그레이션 적용 완료(2026-07-21, 사용자 승인)**: 신규 4테이블을 `supabase db push`로 프로덕션에
+적용(`migration list --linked` 10개 local==remote 확인). 위젯 실동작 상태. 남은 것은 T4 사용자 실기
+검증(로그인 후 투두 완료→XP/레벨업 축하, 습관 체크→스트릭, 뽀모도로 완료→XP, 캘린더 D-day)뿐이며
+기능은 이미 라이브.
 
 ## 리뷰 결과 및 알려진 한계 (2026-07-21, code + security 병렬)
 
