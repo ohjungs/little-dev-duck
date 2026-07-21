@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { indexSource } from "@ldd/api";
+import { indexSource, allowRequest } from "@ldd/api";
 import { embeddingSourceSchema } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
-import { allowRequest } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 

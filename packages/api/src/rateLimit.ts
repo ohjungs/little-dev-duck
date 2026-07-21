@@ -3,6 +3,7 @@
 // ponytail: 인스턴스별 근사. 멀티 인스턴스 정확성이 필요하면 Upstash/Redis로 교체.
 const buckets = new Map<string, number[]>();
 
+// now는 테스트 주입용(기본 Date.now). limit개까지 windowMs 창 안에서 허용, 초과 시 false.
 export function allowRequest(
   key: string,
   limit: number,

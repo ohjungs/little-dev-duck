@@ -66,3 +66,5 @@ export {
 } from "./embeddings";
 
 export { answerQuestion, type AiAnswer } from "./aiChat";
+
+export { allowRequest } from "./rateLimit";

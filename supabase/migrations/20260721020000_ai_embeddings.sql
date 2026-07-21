@@ -4,10 +4,13 @@ create extension if not exists vector;
 create table public.embeddings (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
-  source_type text not null,
-  source_id text not null,
+  -- 앱 계층(zod/chunkText) 우회(PostgREST 직접 호출)에 대비한 DB 레벨 방어 — 다른 테이블 컨벤션과 동일.
+  source_type text not null check (
+    source_type in ('memo', 'todo', 'habit', 'calendar_event', 'activity')
+  ),
+  source_id text not null check (char_length(source_id) between 1 and 200),
   chunk_index int not null default 0,
-  content text not null,
+  content text not null check (char_length(content) <= 2000),
   embedding vector(768) not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

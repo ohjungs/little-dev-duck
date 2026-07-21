@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { answerQuestion } from "@ldd/api";
+import { answerQuestion, allowRequest } from "@ldd/api";
 import { isLddError } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
-import { allowRequest } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 

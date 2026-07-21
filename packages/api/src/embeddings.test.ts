@@ -22,19 +22,32 @@ type FakeOpts = {
   rpcData?: unknown[];
   rpcError?: string;
   deleteError?: string;
+  onDelete?: () => void;
 };
 
-// embeddings 테이블: from().upsert(payload,opts) / from().delete().eq().eq().eq() / rpc(name,params)
+// embeddings 테이블: from().upsert(payload,opts) / from().delete().eq().eq().eq()[.gte()] / rpc(name,params)
+// delete 체인은 eq 다수 + 선택적 gte 뒤 await 가능해야 하므로 thenable 체인으로 만든다.
 function fakeSupabase(opts: FakeOpts = {}) {
-  const { onUpsert, rpcData = [], rpcError, deleteError } = opts;
-  const eq = () => ({ eq: () => ({ eq: async () => ({ error: deleteError ? { message: deleteError } : null }) }) });
+  const { onUpsert, rpcData = [], rpcError, deleteError, onDelete } = opts;
+  const makeDeleteChain = () => {
+    const result = { error: deleteError ? { message: deleteError } : null };
+    const chain: Record<string, unknown> = {
+      eq: () => chain,
+      gte: () => Promise.resolve(result),
+      then: (resolve: (value: unknown) => void) => resolve(result),
+    };
+    return chain;
+  };
   return {
     from: () => ({
       upsert: (payload: Record<string, unknown>, upsertOpts: unknown) => {
         onUpsert?.(payload, upsertOpts);
         return Promise.resolve({ error: null });
       },
-      delete: () => ({ eq }),
+      delete: () => {
+        onDelete?.();
+        return makeDeleteChain();
+      },
     }),
     rpc: async () => ({
       data: rpcError ? null : rpcData,
@@ -103,6 +116,21 @@ describe("indexSource", () => {
     expect(upserts).toHaveLength(1);
     expect(upserts[0].content).toBe("할 일 내용");
     expect(upserts[0].embedding).toBe("[0.1,0.2]");
+  });
+
+  it("임베딩 실패(429) 시 기존 인덱스를 삭제하지 않는다(데이터 유실 방지)", async () => {
+    let deleteCalled = false;
+    const supabase = fakeSupabase({ onDelete: () => (deleteCalled = true) });
+    const f = fakeFetch({ error: "rate" }, false, 429);
+    await expect(
+      indexSource(
+        supabase,
+        "key",
+        { userId: USER_ID, sourceType: "memo", sourceId: "m1", text: "긴 내용" },
+        f,
+      ),
+    ).rejects.toMatchObject({ code: "quota_exceeded" });
+    expect(deleteCalled).toBe(false);
   });
 });
 

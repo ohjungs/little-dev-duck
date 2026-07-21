@@ -155,6 +155,20 @@ rollback. 검증: core 88 tests(+19)·build·lint GREEN. **적용은 사용자 `
 (2) Vercel 환경변수 `GEMINI_API_KEY` 등록(무료 티어), (3) 실호출 검증(메모/할일 저장→자동 인덱싱, 오리에게
 질문→RAG 답변, 인사→룰 대사). 적용 전까지 대화 패널은 키 미설정 안내(500)/빈 응답 — 기존 위젯은 정상.
 
-**리뷰(자율) 이월**: 서버 권위 XP(Phase 7)와 같은 결의 알려진 한계로, allowlist 미도입(솔로 v1) 및
-인메모리 레이트리밋(인스턴스별 근사)은 소셜/멀티유저 전 재검토. 프롬프트 인젝션은 buildRagPrompt 경계
-지시 + RLS로 본인 데이터 한정.
+**code + security 리뷰(자율, 병렬) 결과**: 배포 차단(SEC-CRITICAL/HIGH, code CRITICAL) 0건.
+
+- **반영(수정 커밋)**:
+  - (code HIGH) `indexSource`가 "삭제 먼저 → 임베딩 나중" 순서라 Gemini 실패(쿼터 소진 등, 이 Phase의
+    주 실패 모드) 시 기존 RAG 인덱스가 유실되던 문제 → **임베딩 성공 후에만 갱신**하도록 순서 반전
+    (`deleteStaleChunks`로 꼬리 청크만 정리). 실패 시 기존 인덱스 보존. 회귀 테스트 추가.
+  - (sec M1) `embeddings` 테이블에 DB 레벨 제약(`source_type` enum check, `content`/`source_id` 길이
+    check) 추가 — PostgREST 직접 호출로 앱 계층(zod/chunkText) 우회 시 자기계정 self-DoS 방어.
+    `searchEmbeddings`도 `parse`→`safeParse`로 손상 행 건너뛰기.
+  - (code MED) `allowRequest`(레이트리밋)를 `apps/web`(테스트 인프라 없음)에서 `packages/api`로 이전 +
+    단위 테스트(한도·윈도우 경계) 추가.
+  - (LOW) `.env.example`에 `GEMINI_API_KEY` 추가.
+- **이월(비차단, 문서화)**:
+  - (sec M2) 프롬프트 인젝션 방어를 Gemini `systemInstruction` 필드 분리로 강화 — 현재는 읽기 전용 Q&A +
+    본인 데이터(RLS) 한정이라 실피해 제한적. **Phase 10 에이전트 액션(tool-calling) 도입 전 선결**로 이월.
+  - allowlist 미도입(솔로 v1), 인메모리 레이트리밋(인스턴스별 근사)은 소셜/멀티유저 전 재검토.
+  - reindexSource fire-and-forget 재시도 큐 없음(RAG 품질 문제 시 도입).

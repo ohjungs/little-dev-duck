@@ -52,6 +52,24 @@ export async function deleteSourceEmbeddings(
   if (error) throw new LddError("internal", error.message);
 }
 
+// 재인덱싱으로 청크 수가 줄었을 때 남는 꼬리 행 삭제(chunk_index >= keepCount).
+async function deleteStaleChunks(
+  supabase: SupabaseClient,
+  userId: string,
+  sourceType: EmbeddingSource,
+  sourceId: string,
+  keepCount: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from("embeddings")
+    .delete()
+    .eq("user_id", userId)
+    .eq("source_type", sourceType)
+    .eq("source_id", sourceId)
+    .gte("chunk_index", keepCount);
+  if (error) throw new LddError("internal", error.message);
+}
+
 export type IndexSourceInput = {
   userId: string;
   sourceType: EmbeddingSource;
@@ -60,7 +78,8 @@ export type IndexSourceInput = {
 };
 
 // 텍스트를 청크→임베딩→upsert. 저장 시 인덱싱의 핵심(슬라이스 B/C가 호출). 빈 텍스트면 기존 임베딩 삭제.
-// 반환: 저장된 청크 수. 재저장 시 이전보다 청크가 줄면 꼬리 청크가 남으므로 먼저 삭제 후 재작성.
+// 반환: 저장된 청크 수. **임베딩(실패 가능 지점: 쿼터·네트워크)을 먼저 성공시킨 뒤에만 기존 인덱스를
+// 갱신**한다 — geminiEmbed가 던지면 기존 임베딩은 그대로 보존돼 재인덱싱 실패로 검색이 유실되지 않는다.
 export async function indexSource(
   supabase: SupabaseClient,
   apiKey: string,
@@ -68,8 +87,11 @@ export async function indexSource(
   fetchImpl: typeof fetch = fetch,
 ): Promise<number> {
   const chunks = chunkText(input.text);
-  await deleteSourceEmbeddings(supabase, input.userId, input.sourceType, input.sourceId);
-  if (chunks.length === 0) return 0;
+  // 내용이 비면 기존 임베딩만 삭제(원본 삭제/비움).
+  if (chunks.length === 0) {
+    await deleteSourceEmbeddings(supabase, input.userId, input.sourceType, input.sourceId);
+    return 0;
+  }
 
   const vectors = await geminiEmbed(chunks, apiKey, fetchImpl);
   for (let i = 0; i < chunks.length; i += 1) {
@@ -85,6 +107,14 @@ export async function indexSource(
       vectors[i],
     );
   }
+  // 이전보다 청크 수가 줄었으면 꼬리(chunk_index >= 새 청크 수) 잔여 행 삭제(upsert 성공 후에만).
+  await deleteStaleChunks(
+    supabase,
+    input.userId,
+    input.sourceType,
+    input.sourceId,
+    chunks.length,
+  );
   return chunks.length;
 }
 
@@ -107,12 +137,15 @@ export async function searchEmbeddings(
   });
   if (error) throw new LddError("internal", error.message);
 
-  return ((data ?? []) as MatchRow[]).map((row) =>
-    retrievedChunkSchema.parse({
+  // 손상된 행(앱 계층 우회로 들어온 잘못된 source_type 등)은 조용히 건너뛴다 — 한 행이 채팅 전체를
+  // 깨뜨리지 않도록(parse 대신 safeParse).
+  return ((data ?? []) as MatchRow[]).flatMap((row) => {
+    const parsed = retrievedChunkSchema.safeParse({
       sourceType: row.source_type,
       sourceId: row.source_id,
       content: row.content,
       similarity: row.similarity,
-    }),
-  );
+    });
+    return parsed.success ? [parsed.data] : [];
+  });
 }
