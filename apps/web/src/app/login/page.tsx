@@ -1,45 +1,11 @@
-"use client";
+import { LoginForm } from "./LoginForm";
 
-import Image from "next/image";
-import { Button } from "@ldd/ui";
-import { createClient } from "@/lib/supabase/client";
-
-type Provider = "google" | "github";
+// CSP script-src의 nonce는 요청마다 새로 발급되는데, 이 페이지가 정적 프리렌더링되면
+// 빌드 시점에 구워진 스크립트 태그의 nonce가 요청마다 바뀌는 헤더 nonce와 영영 일치하지
+// 않아 프로덕션에서 스크립트가 전부 차단된다(사용자가 실제 배포에서 실측 발견). Next.js
+// 공식 문서: nonce 기반 CSP는 동적 렌더링 페이지에서만 동작 - force-dynamic으로 강제.
+export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
-  const handleLogin = async (provider: Provider) => {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-  };
-
-  return (
-    <main
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "1.25rem",
-        minHeight: "100vh",
-        padding: "2rem",
-      }}
-    >
-      <Image
-        src="/duck-logo.png"
-        alt="Little Dev Duck 로고"
-        width={112}
-        height={112}
-        priority
-        style={{ borderRadius: "50%" }}
-      />
-      <h1 style={{ color: "var(--ldd-color-text)" }}>Little Dev Duck</h1>
-      <Button onClick={() => handleLogin("google")}>Google로 로그인</Button>
-      <Button onClick={() => handleLogin("github")}>GitHub로 로그인</Button>
-    </main>
-  );
+  return <LoginForm />;
 }
