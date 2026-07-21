@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ContributionDay, ContributionSummary } from "@ldd/core";
-import { Button, Card } from "@ldd/ui";
+import { Button, Card, Spinner } from "@ldd/ui";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -74,7 +74,11 @@ export function GithubContributionWidget() {
     >
       <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>GitHub 잔디</h2>
 
-      {state === "loading" && <p>불러오는 중...</p>}
+      {state === "loading" && (
+        <p style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <Spinner size={14} /> 불러오는 중...
+        </p>
+      )}
 
       {state === "error" && (
         <div>

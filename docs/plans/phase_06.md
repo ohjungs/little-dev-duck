@@ -14,25 +14,26 @@ Phase 5 종료 시점 상태를 함께 표기한다.
   (2026-07-21)**. `updated_at`은 Phase 5 종료 리뷰(REF-M2)에서 수정, 입력단
   `activityDailyEntrySchema.parse` 검증 + core 스키마에 `count` 상한(`ACTIVITY_COUNT_MAX=100000`,
   `.max()`) 추가 + 상한 초과 거부 테스트.
-- [ ] **동기화 실패 무알림 → Toast/Spinner 도입** — `apps/web`에 Toast + Spinner/Skeleton 공용
-  컴포넌트를 만들고(`packages/ui`), `DesktopCollectorSync`의 동기화 실패와 위젯 3개(투두/메모/잔디)의
-  로딩·에러 상태를 이걸로 통일. notion-gap 6절 참조. **(미착수 — 신규 UI 컴포넌트라 자기완결 작업으로
-  분리)**
+- [x] **동기화 실패 무알림 → Toast/Spinner 도입** — **완료(2026-07-21)**. `packages/ui`에 `Toast`
+  (자기소멸, 전역 프로바이더 없이 부모가 상태 소유)·`Spinner`(keyframes 자체 렌더) 추가,
+  `DesktopCollectorSync`의 동기화 실패를 console.error 대신 Toast로 노출, 위젯 3개(투두/메모/잔디)의
+  로딩 텍스트를 Spinner로 통일.
 - [x] **Rust symlink 미검증** (`find_session_files`) — **완료(2026-07-21)**. `fs::symlink_metadata`로
   심링크/정션 디렉터리를 걸러 ~/.claude/projects 밖을 집계에 섞지 않도록 함. `cargo test` 통과.
-- [ ] **커버리지 측정 도입** — `@vitest/coverage-v8` + 루트 공용 vitest projects 설정. 현재 각 패키지가
-  개별 `vitest run`(config 파일 없음, 4개 패키지)을 돌려 통합 커버리지 수치가 없다. notion-gap 6.1절.
-  **(미착수 — 의존성 설치 + vitest 4 projects 설정 필요, 반쯤 깨진 설정 방지 위해 집중 작업으로 분리)**
+- [x] **커버리지 측정 도입** — **완료(2026-07-21)**. `@vitest/coverage-v8` + 루트 `vitest.coverage.config.ts`
+  (자동 탐색 안 되는 이름이라 패키지별 격리 유지) + `pnpm coverage` 스크립트. 전 패키지 통합
+  74 tests, 91.56% stmts / 100% lines. `pnpm test` 8/8 격리 재확인.
 - [x] **SEC-04: auth callback `next` 파라미터 `/` 시작 검증** — **완료(2026-07-21)**.
   `apps/web/src/app/auth/callback/route.ts`에서 `next`가 `/`로 시작하되 `//`/`/\`(프로토콜 상대 URL)는
   배제하도록 검증, 아니면 `/`로 폴백. open redirect 방어.
-- [ ] **Supabase 7일 pause 방지 keepalive** (15분 작업) — 무료 티어는 7일 무활동 시 프로젝트가
-  일시정지된다. 주기적 no-op 쿼리 워크플로. docs/CONSTRAINTS_FREE_TIER.md 1절. **(미착수 — 사용자
-  개입 필요: GitHub Actions secrets에 Supabase 키 등록 + `.github/workflows/*`는 과거 다른 세션이
-  다루던 공유 파일이라 충돌 확인 선행. 자율 실행 대상 아님.)**
+- [x] **Supabase 7일 pause 방지 keepalive** — **완료(2026-07-21)**. GitHub Actions 대신 **Vercel Cron**
+  으로 구현(새 시크릿 불필요 — anon 키가 이미 Vercel env에 있음). `apps/web/vercel.json`에 일일 cron
+  (`0 6 * * *`) → `/api/keepalive`가 anon 키로 가벼운 read 요청으로 DB를 깨움. `proxy.ts` PUBLIC_PATHS에
+  추가. CRON_SECRET 설정 시 자동 하드닝. (참고: Vercel 프로젝트 root directory가 `apps/web`이라는 전제
+  하에 vercel.json을 거기 뒀다 — 배포 후 Vercel 대시보드 Cron 탭에서 등록 여부 확인 권장.)
 
-**게이트 규칙**: 위 6항목(첫 항목의 잔여분 포함)을 완료하고 build/lint/test + cargo test/clippy가
-통과해야 T1 착수. 잔여 REF-LOW(DST 경계, 언더카운트 로깅, serde_json 정리, LoginForm 에러 UI,
+**게이트 규칙**: 위 6항목을 완료하고 build/lint/test + cargo test/clippy가
+통과해야 T1 착수. **→ 2026-07-21 전부 완료, T1 착수 조건 충족.** 잔여 REF-LOW(DST 경계, 언더카운트 로깅, serde_json 정리, LoginForm 에러 UI,
 잔디 접근성 등, docs/reviews/2026-07-21-phase5.md "REF-LOW" 절)는 이 게이트의 필수는 아니며 여유 시
 함께 정리.
 

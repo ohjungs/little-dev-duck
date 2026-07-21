@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { upsertActivityDaily } from "@ldd/api";
+import { Spinner, Toast } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 
 type DailyCount = { date: string; count: number };
@@ -27,6 +28,7 @@ function getTauri(): TauriGlobal | null {
 // 사용자 계정으로 업로드한다(DECISIONS.md 6절 프라이버시 원칙).
 export function DesktopCollectorSync() {
   const [progress, setProgress] = useState<ScanProgress | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const tauri = getTauri();
@@ -46,8 +48,10 @@ export function DesktopCollectorSync() {
           const supabase = createClient();
           await upsertActivityDaily(supabase, "claude_code", counts);
         }
-      } catch (error) {
-        console.error("Claude Code 활동 동기화 실패:", error);
+      } catch (err) {
+        // 무음 실패는 사용자가 미동기화를 영영 모른다 - Toast로 알린다.
+        console.error("Claude Code 활동 동기화 실패:", err);
+        if (!cancelled) setError("Claude Code 활동 동기화에 실패했어요.");
       } finally {
         if (!cancelled) setProgress(null);
       }
@@ -61,11 +65,25 @@ export function DesktopCollectorSync() {
     };
   }, []);
 
-  if (!progress || progress.scanned >= progress.total) return null;
-
   return (
-    <p style={{ fontSize: "0.75rem", opacity: 0.6 }}>
-      Claude Code 활동 동기화 중... ({progress.scanned}/{progress.total})
-    </p>
+    <>
+      {progress && progress.scanned < progress.total && (
+        <p
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontSize: "0.75rem",
+            opacity: 0.6,
+          }}
+        >
+          <Spinner size={12} />
+          Claude Code 활동 동기화 중... ({progress.scanned}/{progress.total})
+        </p>
+      )}
+      {error && (
+        <Toast message={error} type="error" onDismiss={() => setError(null)} />
+      )}
+    </>
   );
 }

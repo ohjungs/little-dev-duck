@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createMemo, deleteMemo, listMemos, updateMemo } from "@ldd/api";
 import type { Memo } from "@ldd/core";
-import { Button, Card } from "@ldd/ui";
+import { Button, Card, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 
 type LoadState = "loading" | "error" | "ready";
@@ -147,7 +147,11 @@ export function MemoWidget() {
         </p>
       )}
 
-      {state === "loading" && <p>불러오는 중...</p>}
+      {state === "loading" && (
+        <p style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <Spinner size={14} /> 불러오는 중...
+        </p>
+      )}
       {state === "error" && (
         <div>
           <p>목록을 불러오지 못했습니다.</p>

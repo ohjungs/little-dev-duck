@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createTodo, deleteTodo, listTodos, updateTodo } from "@ldd/api";
 import type { Todo } from "@ldd/core";
-import { Button, Card, Input } from "@ldd/ui";
+import { Button, Card, Input, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 
 type LoadState = "loading" | "error" | "ready";
@@ -143,7 +143,11 @@ export function TodoWidget() {
         </p>
       )}
 
-      {state === "loading" && <p>불러오는 중...</p>}
+      {state === "loading" && (
+        <p style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <Spinner size={14} /> 불러오는 중...
+        </p>
+      )}
       {state === "error" && (
         <div>
           <p>목록을 불러오지 못했습니다.</p>
