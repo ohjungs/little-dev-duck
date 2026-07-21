@@ -49,3 +49,20 @@ export {
   startPomodoro,
   completePomodoro,
 } from "./pomodoro";
+
+export {
+  geminiEmbed,
+  geminiGenerate,
+  GEMINI_EMBED_MODEL,
+  GEMINI_GEN_MODEL,
+} from "./gemini";
+
+export {
+  upsertEmbedding,
+  deleteSourceEmbeddings,
+  indexSource,
+  searchEmbeddings,
+  type IndexSourceInput,
+} from "./embeddings";
+
+export { answerQuestion, type AiAnswer } from "./aiChat";
