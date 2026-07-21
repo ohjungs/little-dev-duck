@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useDuckMood } from "./useDuckMood";
 
 const DUCK_HEIGHT = 220;
 
@@ -12,5 +13,6 @@ const Duck = dynamic(() => import("@ldd/mascot").then((mod) => mod.Duck), {
 });
 
 export function DuckWidget() {
-  return <Duck height={DUCK_HEIGHT} />;
+  const mood = useDuckMood();
+  return <Duck height={DUCK_HEIGHT} mood={mood} />;
 }

@@ -19,7 +19,9 @@ struct ScanProgress {
 }
 
 fn claude_projects_dir() -> Option<PathBuf> {
-    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).ok()?;
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()?;
     Some(PathBuf::from(home).join(".claude").join("projects"))
 }
 
@@ -68,7 +70,12 @@ fn local_offset() -> UtcOffset {
 // 테스트로 고정한다(회귀 방지 - session_date를 UTC로 되돌리는 실수를 잡기 위함).
 fn format_local_date(modified: SystemTime, offset: UtcOffset) -> String {
     let date = OffsetDateTime::from(modified).to_offset(offset).date();
-    format!("{:04}-{:02}-{:02}", date.year(), u8::from(date.month()), date.day())
+    format!(
+        "{:04}-{:02}-{:02}",
+        date.year(),
+        u8::from(date.month()),
+        date.day()
+    )
 }
 
 // 파일 내용은 읽지 않고 수정 시각(mtime)만으로 날짜를 판단한다(프라이버시 원칙,
@@ -87,7 +94,10 @@ fn aggregate(files: &[PathBuf]) -> Vec<DailyCount> {
             *counts.entry(date).or_insert(0) += 1;
         }
     }
-    counts.into_iter().map(|(date, count)| DailyCount { date, count }).collect()
+    counts
+        .into_iter()
+        .map(|(date, count)| DailyCount { date, count })
+        .collect()
 }
 
 // async 커맨드로 워커 스레드에서 실행한다(동기 커맨드는 webview UI 스레드를 인라인 점유해
@@ -99,7 +109,13 @@ pub fn collect_claude_logs(app: AppHandle) -> Result<Vec<DailyCount>, String> {
     let total = files.len();
     let counts = aggregate(&files);
     // 스캔은 보통 1초 이내라 완료 이벤트 1회만 보낸다(파일당 emit로 IPC를 폭증시키지 않음).
-    if let Err(err) = app.emit("collector://progress", ScanProgress { scanned: total, total }) {
+    if let Err(err) = app.emit(
+        "collector://progress",
+        ScanProgress {
+            scanned: total,
+            total,
+        },
+    ) {
         log::warn!("collector://progress emit 실패: {err}");
     }
     Ok(counts)
@@ -110,7 +126,8 @@ mod tests {
     use super::*;
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("ldd-collector-test-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("ldd-collector-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -208,7 +225,11 @@ mod tests {
 
         let result = aggregate(&files);
         // 서로 다른 두 날짜 버킷, 합계 3, 각 버킷 카운트는 2와 1.
-        assert_eq!(result.len(), 2, "3일 차이 나는 파일은 날짜별로 분리 집계돼야 한다");
+        assert_eq!(
+            result.len(),
+            2,
+            "3일 차이 나는 파일은 날짜별로 분리 집계돼야 한다"
+        );
         assert_eq!(result.iter().map(|d| d.count).sum::<u32>(), 3);
         let mut counts: Vec<u32> = result.iter().map(|d| d.count).collect();
         counts.sort_unstable();

@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 // /api/keepalive는 Vercel Cron이 세션 없이 호출하므로 인증 게이트를 통과시킨다(무인증 no-op).
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/api/keepalive"];
+// /walker는 데스크톱 활보 오버레이(사용자 데이터 미노출, 순수 표시용)라 공개 경로로 둔다.
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/api/keepalive", "/walker"];
 
 // Tauri WebView가 이 배포 URL을 그대로 로드하는 구조(옵션 A)라 Tauri 쪽 CSP 설정은
 // 무효하다(원격 https 콘텐츠에는 주입되지 않음, docs/plans/phase_05.md T2 참조) - 실질적인
@@ -88,8 +89,11 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublicPath = PUBLIC_PATHS.some((path) =>
-    request.nextUrl.pathname.startsWith(path),
+  // 정확 일치 또는 하위 경로만 공개로 판정한다. startsWith만 쓰면 "/walker"가 미래의
+  // "/walker-admin" 같은 라우트까지 의도치 않게 무인증 공개시킬 수 있다.
+  const { pathname } = request.nextUrl;
+  const isPublicPath = PUBLIC_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 
   if (!user && !isPublicPath) {

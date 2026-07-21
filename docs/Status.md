@@ -1,13 +1,34 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 5 완료(2026-07-21) → Phase 6 대기.** Phase 1~5 전부 완료(Phase 4도 실사용
-검증 완료). Phase 5는 DETECT 리뷰(SEC- 배포차단 0건) 후 종료, 리뷰가 확정한 REF-MEDIUM 6건도
-이 세션에서 수정 완료.
-계획 문서: docs/plans/phase_01~05.md(완료), 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md.
-다음: **Phase 6 착수 전 P1 하드닝**(docs/plans/notion-gap-analysis-2026-07-21.md 7절) 잔여분 →
-docs/plans/phase_06.md 착수. 상세는 phase_06.md 서두 "착수 조건" 참조.
-재개 방법: 새 대화에서 /next-step — phase_06.md의 착수 조건(P1 하드닝 잔여 항목) 확인 후 Phase 6
-(오리 2단계: 상태 반응/자율 행동/활보 모드) T 분해·구현.
+현재 Phase: **Phase 6 구현 완료(2026-07-21) → 사용자 실기 검증 대기.** Phase 1~5 완료. Phase 6
+(오리 2단계: 상태 반응/자율 행동/활보 모드) T1~T3 구현 + 머신 검증 완료, T4 사용자 실기 검증만 대기.
+착수 전 P1 하드닝 게이트는 전건 통과(다른 세션이 커밋 `cbda478`~`97208dc`).
+계획 문서: docs/plans/phase_01~06.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md.
+다음: **Notion 480항목 인벤토리 로드맵 반영·계획화**(사용자 요청, 2026-07-21 — 무분별 대량 구현이
+아니라 FEATURES.md/phase 매핑 대조 → 델타 → 무료티어 실현가능성 → Phase 배치 제안). 그 뒤 Phase 6
+사용자 검증 확인 → Phase 7 착수 초안.
+재개 방법: 새 대화에서 /next-step. Phase 6 T4는 사용자만 확인 가능(활보 모드는 배포 후 데스크톱
+검증, phase_06.md "T4 검증 상태" 참조).
+
+## Phase 6 — 오리 2단계 (상태 반응·자율 행동·활보 모드) — 구현 완료, 사용자 실기 검증 대기 (2026-07-21)
+
+`/loop /next-step` 자율 진행. 계약 잠금: 상태 반응 = **클라이언트 파생**(DB 없음, 사용자 승인),
+범위 = T1+T2+T3 전부(사용자 승인). 상세·판단근거는 docs/plans/phase_06.md.
+
+- [x] T1 상태 반응 — core `deriveDuckMood`/`daysSinceLastCommit`(순수함수, 13개 테스트) + mascot Duck
+      `mood` prop(자세로 표현, aria-label) + `TodoWidget`→`DuckWidget` CustomEvent 배선(`todoSignal.ts`,
+      `useDuckMood`). 몸통 색은 캐릭터 바이블 고정값이라 불변.
+- [x] T2 자율 행동 — 상시 idle bob(useFrame) + 유휴 12~24초 혼잣말(mascot `pickIdlePhrase`, mood별
+      문구) + reduced-motion 준수(흔들림만 끄고 자세·텍스트 유지).
+- [x] T3 활보 모드 — Tauri `walker` 창(투명·클릭통과·always-on-top·기본 숨김) + Rust
+      `set_walking_mode` 커맨드(`set_ignore_cursor_events`는 옵션 A 특성상 Rust에서 설정) + `/walker`
+      라우트(투명 배경·CSS 걷기) + 데스크톱 전용 `WalkingModeToggle`. 권한 `allow-set-walking-mode`.
+- [ ] T4 검증 — 머신 검증(core 48/mascot 5 tests, cargo fmt/clippy/test, lint) 완료. **사용자 실기
+      검증 대기**: 투두 완료→happy, 커밋 공백→sad, 유휴 혼잣말, 활보 오버레이(배포 후) 클릭통과.
+      절차는 phase_06.md "T4 검증 상태".
+
+**부수(Phase 6 무관, T1 작업 중 필요)**: `@ldd/mascot`이 `DuckMood` 타입을 쓰려고 `@ldd/core`를
+의존에 추가(`workspace:*`) — pnpm install로 재링크.
 
 ## Phase 5 종료 (2026-07-21)
 

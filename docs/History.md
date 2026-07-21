@@ -7,7 +7,8 @@
 - [x] Phase 3 오리 1단계 (GLB, 클릭 반응, 말풍선) — 2026-07-20 완료 (아래 기록 참조)
 - [x] Phase 4 GitHub 커밋 잔디 — 2026-07-21 실사용 검증 완료 (아래 기록 참조)
 - [x] Phase 5 Tauri 위젯 + Claude Code 수집기 — 2026-07-21 완료 (아래 기록 참조)
-- [ ] Phase 6 오리 2단계 (상태 반응, 자율 행동, 활보 모드)
+- [ ] Phase 6 오리 2단계 (상태 반응, 자율 행동, 활보 모드) — 2026-07-21 T1~T3 구현+머신검증 완료,
+      T4 사용자 실기 검증 대기 (아래 기록 참조)
 - [ ] Phase 7 게임화 (XP/먹이/코스튬) + 생산성 모듈 (뽀모도로/습관/캘린더)
 - [ ] Phase 8 AI 1단계 (룰 기반 대사 -> RAG Q&A)
 - [ ] Phase 9 블록 에디터
@@ -188,3 +189,17 @@
   `upsertActivityDaily` updated_at 갱신 + 테스트가 upsert 인자(user_id 스탬핑/onConflict) 검증하도록
   강화, CSP 문서 드리프트 정정. 잔여 REF-LOW 24건은 phase_06.md 착수 조건/후속 하드닝으로 이월.
   전체 `pnpm build`/`lint`/`test` + `cargo test`/`clippy` 통과.
+- 2026-07-21 : Phase 6 오리 2단계 T1~T3 구현 (`/loop /next-step` 자율 진행). 착수 게이트에서 계약 잠금
+  결정 = 상태 반응 클라이언트 파생(DB 없음, 사용자 승인), 범위 T1+T2+T3 전부(사용자 승인). 착수 전 P1
+  하드닝 게이트는 다른 세션이 커밋(`cbda478`~`97208dc`)해 전건 통과된 상태였음. **T1**: core에 순수함수
+  `deriveDuckMood`/`daysSinceLastCommit`(오늘 투두 완료·커밋 공백 → happy/sad/neutral, 13개 테스트) +
+  mascot Duck `mood` prop(몸통 색 불변, 자세로 표현, aria-label) + `TodoWidget`→`DuckWidget` 네이티브
+  CustomEvent 배선(`todoSignal.ts`/`useDuckMood`, 스토어 없이 중복조회 없이). **T2**: 상시 idle bob +
+  유휴 12~24초 룰기반 혼잣말(mascot `pickIdlePhrase`, mood별) + reduced-motion 준수. **T3**: Tauri
+  `walker` 창(투명·클릭통과·always-on-top·기본숨김) + Rust `set_walking_mode`(옵션 A 특성상 클릭통과를
+  Rust에서 설정) + `/walker` 라우트(투명·CSS 걷기·공개경로) + 데스크톱 전용 토글 버튼 + 권한
+  `allow-set-walking-mode`. 머신 검증: core 48/mascot 5 tests, cargo fmt/clippy(3m40s)/test, apps/web lint
+  통과. **T4 사용자 실기 검증(투두→happy, 커밋공백→sad, 유휴 혼잣말, 활보 오버레이 클릭통과)은 대기** —
+  활보 모드는 배포 후에야 데스크톱 창이 `/walker`를 로드(옵션 A), Phase 5 T4와 동일 한계. 부수: mascot이
+  `DuckMood` 타입 위해 `@ldd/core` 의존 추가. 다음 예정: Notion 480항목 인벤토리 로드맵 반영·계획화(사용자
+  요청) — 무분별 대량 구현 아님.

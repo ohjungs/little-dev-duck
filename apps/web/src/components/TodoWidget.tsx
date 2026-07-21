@@ -5,6 +5,8 @@ import { createTodo, deleteTodo, listTodos, updateTodo } from "@ldd/api";
 import type { Todo } from "@ldd/core";
 import { Button, Card, Input, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
+import { emitTodosChanged } from "@/lib/todoSignal";
+import { todayIso } from "@/lib/today";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -40,6 +42,17 @@ export function TodoWidget() {
     setState("loading");
     fetchTodos();
   };
+
+  // 오늘 마감인 투두의 완료 집계를 오리에게 알린다(Phase 6 T1). 목록이 바뀔 때마다 발행하므로
+  // 체크/추가/삭제가 즉시 오리 기분에 반영된다. DuckWidget은 이 신호만 구독한다(중복 조회 없음).
+  useEffect(() => {
+    const today = todayIso();
+    const todayTodos = todos.filter((t) => t.dueDate?.slice(0, 10) === today);
+    emitTodosChanged({
+      total: todayTodos.length,
+      done: todayTodos.filter((t) => t.isDone).length,
+    });
+  }, [todos]);
 
   const handleAdd = async () => {
     const title = newTitle.trim();
@@ -97,7 +110,7 @@ export function TodoWidget() {
     }
   };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const visibleTodos = onlyToday
     ? todos.filter((t) => t.dueDate?.slice(0, 10) === today)
     : todos;

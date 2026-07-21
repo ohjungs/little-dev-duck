@@ -6,6 +6,7 @@ import { TodoWidget } from "@/components/TodoWidget";
 import { MemoWidget } from "@/components/MemoWidget";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 import { DesktopCollectorSync } from "@/components/DesktopCollectorSync";
+import { WalkingModeToggle } from "@/components/WalkingModeToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -45,9 +46,12 @@ export default async function Home() {
         }}
       >
         <p>환영합니다, {displayName}님</p>
-        <form action="/auth/logout" method="post">
-          <Button type="submit">로그아웃</Button>
-        </form>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <WalkingModeToggle />
+          <form action="/auth/logout" method="post">
+            <Button type="submit">로그아웃</Button>
+          </form>
+        </div>
       </div>
 
       <div style={{ width: "100%", maxWidth: "300px" }}>

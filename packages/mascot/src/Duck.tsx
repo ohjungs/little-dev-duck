@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import type { Group } from "three";
-import { pickPhrase } from "./phrases";
+import type { DuckMood } from "@ldd/core";
+import { pickIdlePhrase, pickPhrase } from "./phrases";
+import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
 // ponytail: Meshy에서 model.glb를 아직 받지 못해 기본 도형(sphere/cone/torus)으로
 // 캐릭터 바이블(ducky-mascot repo docs/CHARACTER.md) 색상·비율만 맞춘 플레이스홀더.
@@ -16,18 +18,57 @@ const COLOR_OUTLINE = "#352116";
 const SPEECH_BUBBLE_DURATION_MS = 2000;
 const SQUISH_DECAY_PER_SECOND = 4;
 
-function DuckModel({ onGreet }: { onGreet: () => void }) {
+// 유휴 상태에서 스스로 말풍선을 띄우는 주기(T2 자율 행동). 사용자가 클릭하면 리셋된다.
+const IDLE_MIN_MS = 12_000;
+const IDLE_MAX_MS = 24_000;
+
+// mood별 지속 자세 파라미터. 몸통 색은 캐릭터 바이블 고정값이라 건드리지 않고(DECISIONS.md 4절),
+// 자세(높이/기울기/흔들림 진폭·속도)로만 기분을 표현한다.
+const MOOD_MOTION: Record<
+  DuckMood,
+  { baseY: number; bobAmp: number; bobSpeed: number; tiltX: number }
+> = {
+  happy: { baseY: 0.05, bobAmp: 0.12, bobSpeed: 3.2, tiltX: 0 },
+  sad: { baseY: -0.12, bobAmp: 0.02, bobSpeed: 1.0, tiltX: 0.18 },
+  neutral: { baseY: 0.0, bobAmp: 0.05, bobSpeed: 1.5, tiltX: 0 },
+};
+
+const MOOD_LABEL: Record<DuckMood, string> = {
+  happy: "기분 좋음",
+  sad: "시무룩함",
+  neutral: "평온함",
+};
+
+function DuckModel({
+  mood,
+  reducedMotion,
+  onGreet,
+}: {
+  mood: DuckMood;
+  reducedMotion: boolean;
+  onGreet: () => void;
+}) {
   const groupRef = useRef<Group>(null);
   const squishRef = useRef(0);
 
-  useFrame((_, delta) => {
-    if (!groupRef.current) return;
+  useFrame((state, delta) => {
+    const group = groupRef.current;
+    if (!group) return;
+
     squishRef.current = Math.max(
       0,
       squishRef.current - SQUISH_DECAY_PER_SECOND * delta,
     );
     const squish = squishRef.current;
-    groupRef.current.scale.set(1 + squish * 0.3, 1 - squish * 0.4, 1 + squish * 0.3);
+
+    const motion = MOOD_MOTION[mood];
+    // reduced-motion: 흔들림은 끄되 mood별 정적 자세(높이/기울기)는 유지해 정보는 남긴다.
+    const bob = reducedMotion
+      ? 0
+      : Math.sin(state.clock.elapsedTime * motion.bobSpeed) * motion.bobAmp;
+    group.position.y = motion.baseY + bob;
+    group.rotation.x = motion.tiltX;
+    group.scale.set(1 + squish * 0.3, 1 - squish * 0.4, 1 + squish * 0.3);
   });
 
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
@@ -97,19 +138,20 @@ function DuckModel({ onGreet }: { onGreet: () => void }) {
 
 export interface DuckProps {
   height?: number;
+  mood?: DuckMood;
 }
 
-export function Duck({ height = 220 }: DuckProps) {
+export function Duck({ height = 220, mood = "neutral" }: DuckProps) {
+  const reducedMotion = usePrefersReducedMotion();
   const clickCountRef = useRef(0);
   const [phrase, setPhrase] = useState(() => pickPhrase(0));
   const [showBubble, setShowBubble] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 마지막 상호작용 시각. 유휴 판정(T2)의 기준이며, 클릭 때마다 갱신된다.
+  const lastInteractionRef = useRef(0);
 
-  const handleGreet = () => {
-    // 클릭 시점의 문구를 바로 고정한다 - clickCount를 렌더링에서 파생시키면
-    // setClickCount로 인한 리렌더 이후 값을 읽어 항상 한 칸 밀려 표시된다.
-    setPhrase(pickPhrase(clickCountRef.current));
-    clickCountRef.current += 1;
+  const speak = (next: string) => {
+    setPhrase(next);
     setShowBubble(true);
     if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(
@@ -118,12 +160,54 @@ export function Duck({ height = 220 }: DuckProps) {
     );
   };
 
+  const handleGreet = () => {
+    // 클릭 시점의 문구를 바로 고정한다 - clickCount를 렌더링에서 파생시키면
+    // setClickCount로 인한 리렌더 이후 값을 읽어 항상 한 칸 밀려 표시된다.
+    speak(pickPhrase(clickCountRef.current));
+    clickCountRef.current += 1;
+    lastInteractionRef.current = Date.now();
+  };
+
+  // T2 자율 행동: 일정 시간 상호작용이 없으면 mood에 맞는 혼잣말을 스스로 띄운다.
+  // reduced-motion이어도 동작(모션)이 아닌 텍스트라 접근성상 유지한다.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleIdle = () => {
+      const wait = IDLE_MIN_MS + Math.random() * (IDLE_MAX_MS - IDLE_MIN_MS);
+      timer = setTimeout(() => {
+        const idleFor = Date.now() - lastInteractionRef.current;
+        if (idleFor >= IDLE_MIN_MS) {
+          speak(pickIdlePhrase(mood));
+        }
+        scheduleIdle();
+      }, wait);
+    };
+    scheduleIdle();
+    return () => clearTimeout(timer);
+    // mood가 바뀌면 다음 유휴 대사부터 새 mood를 반영하도록 재스케줄한다.
+  }, [mood]);
+
+  useEffect(() => {
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, []);
+
   return (
-    <div style={{ height, width: "100%" }} data-testid="duck-widget">
+    <div
+      style={{ height, width: "100%" }}
+      data-testid="duck-widget"
+      role="img"
+      aria-label={`오리 상태: ${MOOD_LABEL[mood]}`}
+    >
       <Canvas camera={{ position: [0, 0, 4], fov: 40 }}>
         <ambientLight intensity={0.8} />
         <directionalLight position={[2, 3, 4]} intensity={1} />
-        <DuckModel onGreet={handleGreet} />
+        <DuckModel
+          mood={mood}
+          reducedMotion={reducedMotion}
+          onGreet={handleGreet}
+        />
         {showBubble && (
           <Html position={[0, 1.4, 0]} center distanceFactor={8}>
             <div

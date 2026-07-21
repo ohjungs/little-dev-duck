@@ -2,3 +2,8 @@
 identifier = "allow-collect-claude-logs"
 description = "Claude Code 세션 로그의 날짜별 집계(collect_claude_logs) 실행을 허용한다."
 commands.allow = ["collect_claude_logs"]
+
+[[permission]]
+identifier = "allow-set-walking-mode"
+description = "활보 모드 창 표시/숨김(set_walking_mode) 실행을 허용한다."
+commands.allow = ["set_walking_mode"]

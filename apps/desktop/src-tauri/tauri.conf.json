@@ -17,6 +17,21 @@
         "resizable": true,
         "fullscreen": false,
         "alwaysOnTop": true
+      },
+      {
+        "label": "walker",
+        "title": "Little Dev Duck — 활보",
+        "url": "/walker",
+        "width": 1280,
+        "height": 800,
+        "maximized": true,
+        "resizable": false,
+        "transparent": true,
+        "decorations": false,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false
       }
     ],
     "security": {

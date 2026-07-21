@@ -14,3 +14,12 @@ export {
   type ActivitySource,
   type ActivityDailyEntry,
 } from "./domain/activity-daily";
+export {
+  DUCK_MOODS,
+  STALE_COMMIT_DAYS,
+  deriveDuckMood,
+  daysSinceLastCommit,
+  type DuckMood,
+  type DuckMoodInput,
+  type TodayTodoTally,
+} from "./domain/duck-mood";
