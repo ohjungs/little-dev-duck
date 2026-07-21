@@ -53,3 +53,29 @@ export {
   daysUntil,
   type CalendarEvent,
 } from "./domain/calendar-event";
+export {
+  LddError,
+  isLddError,
+  toLddError,
+  userMessage,
+  type LddErrorCode,
+} from "./domain/ldd-error";
+export {
+  EMBEDDING_DIM,
+  embeddingSourceSchema,
+  embeddingChunkSchema,
+  retrievedChunkSchema,
+  chunkText,
+  type EmbeddingSource,
+  type EmbeddingChunk,
+  type RetrievedChunk,
+} from "./domain/embedding";
+export {
+  chatRoleSchema,
+  chatMessageSchema,
+  routeUtterance,
+  buildRagPrompt,
+  type ChatRole,
+  type ChatMessage,
+  type UtteranceRoute,
+} from "./domain/ai-chat";

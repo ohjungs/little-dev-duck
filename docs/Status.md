@@ -1,15 +1,27 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 7 구현·마이그레이션 적용 완료(2026-07-21) → 사용자 실기 검증만 남음.** Phase 1~6
-완료. Phase 7(게임화 XP/레벨/먹이 + 생산성 모듈 습관/뽀모도로/캘린더)은 [직렬 계약잠금]→[병렬 4슬라이스]
-→[직렬 통합]으로 구현·머신검증·리뷰 완료, **신규 4테이블 `supabase db push` 프로덕션 적용 완료**
-(10개 마이그레이션 local==remote 확인). 위젯 실동작 상태.
-계획 문서: docs/plans/phase_01~07.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
+현재 Phase: **Phase 8(AI 1단계) 구현 진행 중 — `/loop /next-step` 자율(2026-07-21 밤).** Phase 1~7
+완료(Phase 7 마이그레이션 프로덕션 적용, 실기 검증만 사용자 선택으로 남음).
+Phase 8 = AI 1단계(룰 대사→RAG Q&A). 사용자 "정지 말고 구현 가능한 것 전부 구현, 아침에 확인" 지시로
+Phase 7 선례대로 T0 게이트 기본값 확정 후 빌드(상세·게이트값은 phase_08.md "구현 진행" 절).
+계획 문서: docs/plans/phase_01~08.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
 docs/plans/notion-inventory-delta-2026-07-21.md.
-남은 것(사용자, 선택): T4 실기 검증(로그인 후 투두 완료→XP·레벨업, 습관 체크→스트릭, 뽀모도로 완료→XP,
-캘린더 D-day). 기능은 이미 라이브.
-다음: Phase 8(AI 1단계: 룰 대사→RAG Q&A) 착수 초안 — 착수 전 구조 게이트(pages jsonb, packages/ai 경계,
-임베딩 768, LddError). Phase 7 리뷰 알려진 한계(서버 권위 XP 미도입, 솔로 v1)는 phase_07.md 참조.
+
+## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현 진행 중 (2026-07-21 밤, `/loop /next-step` 자율)
+
+Gemini 키(`GEMINI_API_KEY`)는 배포 시 주입(Phase 4 GITHUB_TOKEN 패턴)이라 코드는 전부 빌드 가능.
+
+- [x] 계약 잠금(직렬): core `ldd-error`(LddError)·`embedding`(768/chunkText)·`ai-chat`(routeUtterance/
+  buildRagPrompt) + 마이그레이션 `20260721020000_ai_embeddings`(pgvector+embeddings RLS+match_embeddings)
+  + rollback. 검증 core 88 tests·build·lint GREEN. **`supabase db push` 필요(배포 시, 사용자)**.
+- [ ] 슬라이스 A `packages/api`: geminiEmbed/geminiGenerate + embeddings upsert/search + aiChat 오케스트레이션
+- [ ] 슬라이스 B `packages/ai` 신설: useChat 훅 + 저장 시 임베딩 트리거
+- [ ] 슬라이스 C `apps/web`: /api/ai/chat·/embed 라우트(서버 키+인증 가드+레이트리밋) + 오리 대화 UI + 홈 배선
+- [ ] 통합·검증: 전 패키지 GREEN + 문서 갱신
+- 남은 사용자 몫: `supabase db push`(embeddings 테이블), Vercel `GEMINI_API_KEY` 등록, 실호출 검증.
+
+**Phase 7 남은 것(사용자, 선택)**: T4 실기 검증(로그인 후 투두 완료→XP·레벨업, 습관 체크→스트릭, 뽀모도로
+완료→XP, 캘린더 D-day). 기능은 이미 라이브.
 재개 방법: 새 대화에서 /next-step.
 
 ## Phase 7 — 게임화 + 생산성 모듈 — 구현 완료, 마이그레이션 적용·검증 대기 (2026-07-21)
