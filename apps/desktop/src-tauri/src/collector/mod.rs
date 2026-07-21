@@ -32,7 +32,12 @@ fn find_session_files(projects_dir: &Path) -> Vec<PathBuf> {
 
     for project_entry in project_entries.flatten() {
         let project_path = project_entry.path();
-        if !project_path.is_dir() {
+        // symlink_metadata는 링크 대상이 아니라 링크 자체를 본다 - 심볼릭 링크/정션이면
+        // is_dir()가 false라 걸러진다. ~/.claude/projects 밖을 링크로 끌어와 집계에 섞는 것을 막음.
+        let Ok(meta) = fs::symlink_metadata(&project_path) else {
+            continue;
+        };
+        if !meta.is_dir() {
             continue;
         }
 

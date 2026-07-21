@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activityDailyEntrySchema } from "./activity-daily";
+import { activityDailyEntrySchema, ACTIVITY_COUNT_MAX } from "./activity-daily";
 
 describe("activityDailyEntrySchema", () => {
   it("정상값을 통과시킨다", () => {
@@ -58,6 +58,16 @@ describe("activityDailyEntrySchema", () => {
         date: "not-a-date",
         source: "claude_code",
         count: 1,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("상한을 넘는 count를 거부한다", () => {
+    expect(
+      activityDailyEntrySchema.safeParse({
+        date: "2026-07-21",
+        source: "claude_code",
+        count: ACTIVITY_COUNT_MAX + 1,
       }).success,
     ).toBe(false);
   });
