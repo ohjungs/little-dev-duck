@@ -9,6 +9,7 @@ import {
   updateTodo,
 } from "@ldd/api";
 import type { Todo } from "@ldd/core";
+import { reindexSource } from "@ldd/ai";
 import { Button, Card, Input, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 import { emitTodosChanged } from "@/lib/todoSignal";
@@ -69,6 +70,8 @@ export function TodoWidget() {
     try {
       const created = await createTodo(supabase, { title });
       setTodos((prev) => [created, ...prev]);
+      // RAG 인덱싱(fire-and-forget). 실패해도 저장 흐름을 막지 않는다.
+      void reindexSource({ sourceType: "todo", sourceId: created.id, text: title });
     } catch {
       setActionError("추가하지 못했습니다.");
     }
@@ -102,6 +105,7 @@ export function TodoWidget() {
     setTodos((prev) => prev.filter((t) => t.id !== id));
     try {
       await deleteTodo(supabase, id);
+      void reindexSource({ sourceType: "todo", sourceId: id, text: "" });
     } catch {
       setTodos(prevTodos);
       setActionError("삭제하지 못했습니다.");
@@ -121,6 +125,7 @@ export function TodoWidget() {
     try {
       await updateTodo(supabase, id, { title });
       setEditingId(null);
+      void reindexSource({ sourceType: "todo", sourceId: id, text: title });
     } catch {
       setTodos(prevTodos);
       setActionError("수정하지 못했습니다. 다시 시도해 주세요.");

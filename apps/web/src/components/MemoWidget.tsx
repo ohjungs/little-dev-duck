@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createMemo, deleteMemo, listMemos, updateMemo } from "@ldd/api";
 import type { Memo } from "@ldd/core";
+import { reindexSource } from "@ldd/ai";
 import { Button, Card, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 
@@ -78,6 +79,8 @@ export function MemoWidget() {
       const created = await createMemo(supabase, { content });
       setMemos((prev) => [created, ...prev]);
       setNewContent("");
+      // RAG 인덱싱(fire-and-forget). 실패해도 저장 흐름을 막지 않는다.
+      void reindexSource({ sourceType: "memo", sourceId: created.id, text: content });
     } catch {
       setActionError("메모를 추가하지 못했습니다.");
     }
@@ -98,6 +101,7 @@ export function MemoWidget() {
     try {
       await updateMemo(supabase, id, { content });
       setEditingId(null);
+      void reindexSource({ sourceType: "memo", sourceId: id, text: content });
     } catch {
       setMemos(prevMemos);
       setActionError("메모를 수정하지 못했습니다. 다시 시도해 주세요.");
@@ -109,6 +113,8 @@ export function MemoWidget() {
     setMemos((prev) => prev.filter((m) => m.id !== id));
     try {
       await deleteMemo(supabase, id);
+      // 빈 텍스트로 재인덱싱 = 서버가 해당 소스 임베딩 삭제.
+      void reindexSource({ sourceType: "memo", sourceId: id, text: "" });
     } catch {
       setMemos(prevMemos);
       setActionError("메모를 삭제하지 못했습니다.");

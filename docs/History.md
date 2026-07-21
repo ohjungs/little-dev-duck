@@ -10,7 +10,8 @@
 - [x] Phase 6 오리 2단계 (상태 반응, 자율 행동, 활보 모드) — 2026-07-21 완료 (T4 사용자 검증 완료, 아래 기록)
 - [~] Phase 7 게임화 (XP/먹이/코스튬) + 생산성 모듈 (뽀모도로/습관/캘린더) — 2026-07-21 구현+머신검증+리뷰
       완료, 마이그레이션 적용(사용자)·T4 실기 검증 대기 (아래 기록)
-- [ ] Phase 8 AI 1단계 (룰 기반 대사 -> RAG Q&A)
+- [~] Phase 8 AI 1단계 (룰 기반 대사 -> RAG Q&A) — 2026-07-21 코드 구현 완료(`/loop /next-step` 자율),
+      배포(마이그레이션·GEMINI_API_KEY)·실호출 검증 사용자 대기 (아래 기록)
 - [ ] Phase 9 블록 에디터
 - [ ] Phase 10 AI 2단계 (에이전트 액션: Figma/Gamma/Google/GitHub/Notion/Gmail)
 - [ ] Phase 11 DB 뷰 (표/보드)
@@ -221,3 +222,16 @@
   XP 미도입: 투두/습관 파밍·applyXpAward export·duck_state 직접 PATCH·습관 날짜검증)는 전부 "솔로 자기
   치팅, 타 사용자 무피해"라 소셜 기능 전 선결로 문서화 이월(phase_07.md). **미완: 신규 4테이블
   `supabase db push`(사용자) + T4 실기 검증** — 적용 전 위젯은 테이블 부재로 에러 상태(교차 노출 없음).
+- 2026-07-21 밤 : Phase 8 AI 1단계 코드 구현 완료 (`/loop /next-step` 자율 — 사용자 "정지 말고 구현
+  가능한 것 전부 구현, 아침에 확인" 지시). Gemini 키는 배포 시 주입(Phase 4 GITHUB_TOKEN 패턴)이라 코드
+  전량 빌드 가능. Phase 7 선례대로 T0 게이트를 기본값 확정(생성 gemini-2.5-flash, 임베딩
+  gemini-embedding-001/768, 인덱싱 대상=현존 데이터, allowlist 미도입, LddError 도입). [직렬] 계약 잠금
+  (48b27f9): core `ldd-error`/`embedding`/`ai-chat` + 마이그레이션 `20260721020000_ai_embeddings`
+  (pgvector + embeddings RLS + match_embeddings top-k) + rollback. [슬라이스 A a50eb2d] packages/api:
+  Gemini 클라이언트(embed/generate) + RAG(upsert/search/indexSource) + aiChat(answerQuestion). [슬라이스
+  B 2f3e4a2] packages/ai 신설: useChat 훅 + resolveDuckReply + reindexSource. [슬라이스 C 769fa7f]
+  apps/web: /api/ai/chat·/embed(서버 키+auth 가드+인메모리 레이트리밋+zod) + DuckChatPanel + 홈 배선.
+  저장 시 임베딩 배선: Memo/Todo 생성·수정·삭제 → reindexSource(빈 텍스트=삭제). 검증 core 88/api 75/
+  ai 6/mascot 5 tests + 전체 next build GREEN(/api/ai/* 라우트 확인). **미완(사용자 아침): `supabase
+  db push`(embeddings) + Vercel `GEMINI_API_KEY` 등록 + 실호출 검증.** 상세·게이트값·알려진 한계는
+  phase_08.md "구현 진행" 절.
