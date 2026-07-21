@@ -38,6 +38,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ldd/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@ldd/api':
         specifier: workspace:*
         version: link:../../packages/api

@@ -10,6 +10,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@ldd/ai": "workspace:*",
     "@ldd/api": "workspace:*",
     "@ldd/core": "workspace:*",
     "@ldd/mascot": "workspace:*",

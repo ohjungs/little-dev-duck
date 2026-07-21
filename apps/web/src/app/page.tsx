@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/server";
 import { DuckWidget } from "@/components/DuckWidget";
+import { DuckChatPanel } from "@/components/DuckChatPanel";
 import { TodoWidget } from "@/components/TodoWidget";
 import { MemoWidget } from "@/components/MemoWidget";
 import { CalendarWidget } from "@/components/CalendarWidget";
@@ -59,6 +60,10 @@ export default async function Home() {
 
       <div style={{ width: "100%", maxWidth: "300px" }}>
         <DuckWidget />
+      </div>
+
+      <div style={{ width: "100%", maxWidth: "560px" }}>
+        <DuckChatPanel />
       </div>
 
       <div
