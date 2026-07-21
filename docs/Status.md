@@ -1,15 +1,24 @@
 # Status.md — 현재 Phase 진행 현황
 
 현재 Phase: **4 완료(사용자 검증만 대기) → 5 T0/T1/T2/T3 완료, T4 중 창 렌더링 확인은 이 세션에서
-실측 완료, 로그인 필요한 나머지 2항목만 사용자 검증 대기**
+실측 완료, 로그인 필요한 나머지 2항목만 사용자 검증 대기(로그인을 막던 CSP 버그는 발견·수정·배포
+완료)**
 계획 문서: docs/plans/phase_01~03.md(완료), docs/plans/phase_04.md(구현 완료, T5 사용자 검증만 대기),
-docs/plans/phase_05.md(T0/T1/T2/T3 완료 + 리뷰 HIGH 4건 수정 완료, T4 3항목 중 1항목 완료)
+docs/plans/phase_05.md(T0/T1/T2/T3 완료 + 리뷰 HIGH 4건 수정 완료, T4 3항목 중 1항목 완료 + 실사용
+중 발견한 로그인 차단 CSP 버그 2건 수정)
 재개 방법: 새 대화에서 /next-step — Phase 5 T4 잔여 2항목(로그인 필요). `pnpm --filter desktop
-tauri:dev`로 실제 앱 실행 → Google/GitHub 로그인 → 브라우저 콘솔에 CSP 위반 로그 없는지 확인 →
-Supabase `activity_daily`에 오늘 날짜 `source=claude_code` 행이 생기는지 확인 → 웹에서도 같은 데이터
-보이는지 확인(위젯 창 표시 자체는 2026-07-21 세션에서 프로세스/DNS 실측으로 검증 완료 — 상세는
-docs/plans/phase_05.md T4 절 참조. 이전 세션들의 "GUI 확인 불가" 추정은 틀렸었음, 이 세션은 실제
-인터랙티브 데스크톱에서 실행됨).
+tauri:dev`로 실제 앱 실행 → Google/GitHub 로그인(이전에는 CSP가 스크립트를 전부 막아 로그인
+자체가 불가능했으나 2026-07-21 중 두 차례 수정·배포로 해결됨 — 상세는 docs/plans/phase_05.md T4
+"실사용 중 발견 및 수정" 절 참조) → Supabase `activity_daily`에 오늘 날짜 `source=claude_code` 행이
+생기는지 확인 → 웹에서도 같은 데이터 보이는지 확인.
+
+**노션 격차 분석 지시서 작성 (2026-07-21)**: docs/plans/notion-gap-analysis-2026-07-21.md —
+노션 2025 대비 26축 격차 매트릭스, 차별화 전략, 기술 부채 상환표(P0/P1/P2), 로드맵 정합 결정
+(Phase 순서 유지, Phase 9 = "워크스페이스 코어" 재정의, 하드닝 Phase 신설 안 함). **Phase 6 착수
+조건은 이 지시서 7절의 "Phase 6 전" P1 항목 전건**(Toast/Spinner, activity.ts 3건, Rust symlink,
+커버리지 측정, SEC-04, Supabase keepalive) — phase_06.md 작성 시 서두에 반영할 것. 함께 적용된
+P0 문서 수정: CLAUDE.md 불일치 정정(static export/Tauri Release/8절), DECISIONS.md 5절 재검토
+기록(미배정 5건 회수), ARCHITECTURE.md 5절 blocks 검토 표기.
 
 ## Phase 5 블로커 — 전부 해소 (2026-07-21)
 

@@ -14,8 +14,10 @@
 - 프론트: Next.js(App Router) + TypeScript, BlockNote, react-three-fiber
 - 백엔드: Supabase (Auth Google+GitHub / Postgres+RLS / pgvector / Storage / Realtime)
 - AI: Gemini API 무료 티어 (키는 서버 env 전용, 클라이언트 노출 금지)
-- 데스크톱: Tauri 2 (Next.js static export 탑재, Rust 사이드 = Claude Code 로그 수집기)
-- 배포: Vercel (git push = 배포), GitHub Actions (lint/test + Tauri Release)
+- 데스크톱: Tauri 2 (배포된 Vercel URL을 WebView로 로드 — 옵션 A, ARCHITECTURE.md 1절.
+  Rust 사이드 = Claude Code 로그 수집기)
+- 배포: Vercel (git push = 배포), GitHub Actions (lint/test). Tauri Release 파이프라인은
+  설치 바이너리 배포가 필요해지는 시점(Phase 13 근처)에 재도입
 - 모노레포: pnpm + Turborepo
 - 모바일: React Native (최종 단계, core/api/ai만 공유)
 
@@ -84,4 +86,5 @@ docs/reviews/는 immutable. 배포 차단은 SEC- 등급만으로 판정한다.
 
 ## 8. 현재 상태
 
-Phase 1 (코어 기반) 착수 전. 계획: docs/plans/phase_01.md. 진행 현황: docs/Status.md.
+현재 Phase와 진행 현황은 docs/Status.md 참조 (이 절은 갱신하지 않는다 — Status.md가 단일 출처).
+노션 대비 격차 분석과 개발 지시서: docs/plans/notion-gap-analysis-2026-07-21.md.

@@ -151,6 +151,10 @@ activity_daily(source: github|claude_code), memories, embeddings(pgvector),
 connections(서비스별 OAuth 토큰, 암호화), duck_state(XP, 레벨, 먹이, 코스튬),
 notifications_rules. 전 테이블 user_id RLS.
 
+검토 중(2026-07-21): blocks 테이블은 BlockNote 문서를 pages.content jsonb로 통짜 저장하는 방식으로
+대체 검토 — 파생 데이터(tsvector 전문 검색, page_links 백링크)로 약점 보완. 근거는
+docs/plans/notion-gap-analysis-2026-07-21.md 6.5절, 확정은 Phase 8/9 착수 사고 게이트에서.
+
 ## 6. Phase 로드맵
 
 1 코어 기반 - 2 투두+메모 위젯 - 3 오리 1단계(GLB, 클릭반응, 말풍선) - 4 GitHub 잔디
