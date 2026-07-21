@@ -1,16 +1,23 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **4 완료(사용자 검증만 대기) → 5 T0/T1/T2/T3 완료, T4 인프라 블로커 전부 해소
-(로그인 CSP 버그 2건·GITHUB_TOKEN 미등록·잔디 색·activity_daily 테이블 부재 모두 수정/적용),
-남은 건 위젯 로그인으로 activity_daily에 실제 행이 쌓이는지 E2E 확인 1건뿐**
-계획 문서: docs/plans/phase_01~03.md(완료), docs/plans/phase_04.md(구현 완료, T5 사용자 검증만 대기),
-docs/plans/phase_05.md(T0/T1/T2/T3 완료 + 리뷰 HIGH 4건 수정 완료, T4 3항목 중 1항목 완료 + 실사용
-중 발견한 로그인 차단 CSP 버그 2건 수정)
-재개 방법: 새 대화에서 /next-step — Phase 5 T4 잔여 2항목(로그인 필요). `pnpm --filter desktop
-tauri:dev`로 실제 앱 실행 → Google/GitHub 로그인(이전에는 CSP가 스크립트를 전부 막아 로그인
-자체가 불가능했으나 2026-07-21 중 두 차례 수정·배포로 해결됨 — 상세는 docs/plans/phase_05.md T4
-"실사용 중 발견 및 수정" 절 참조) → Supabase `activity_daily`에 오늘 날짜 `source=claude_code` 행이
-생기는지 확인 → 웹에서도 같은 데이터 보이는지 확인.
+현재 Phase: **Phase 5 완료(2026-07-21) → Phase 6 대기.** Phase 1~5 전부 완료(Phase 4도 실사용
+검증 완료). Phase 5는 DETECT 리뷰(SEC- 배포차단 0건) 후 종료, 리뷰가 확정한 REF-MEDIUM 6건도
+이 세션에서 수정 완료.
+계획 문서: docs/plans/phase_01~05.md(완료), 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md.
+다음: **Phase 6 착수 전 P1 하드닝**(docs/plans/notion-gap-analysis-2026-07-21.md 7절) 잔여분 →
+docs/plans/phase_06.md 착수. 상세는 phase_06.md 서두 "착수 조건" 참조.
+재개 방법: 새 대화에서 /next-step — phase_06.md의 착수 조건(P1 하드닝 잔여 항목) 확인 후 Phase 6
+(오리 2단계: 상태 반응/자율 행동/활보 모드) T 분해·구현.
+
+## Phase 5 종료 (2026-07-21)
+
+- T0~T4 전부 완료. T4 실사용 검증 중 인프라 결함 다수 발견·해소(로그인 CSP 2건, GITHUB_TOKEN
+  미등록, 잔디 색, activity_daily 테이블 프로덕션 미적용) — 사용자가 위젯 로그인으로 activity_daily
+  반영까지 확인. 상세는 docs/plans/phase_05.md T4 절, docs/History.md 2026-07-21 16:00 기록.
+- DETECT 리뷰: 6차원 병렬 + 적대적 검증(39개 서브에이전트). **SEC- 배포차단 0건.** 확정 30건 전부
+  REF-MEDIUM(6)/REF-LOW(24). REF-MEDIUM 6건 수정(Rust async 커맨드·순수함수 회귀테스트,
+  activity updated_at·테스트 인자검증 강화, CSP 문서정정). 잔여 REF-LOW는 phase_06.md 착수조건/
+  후속 하드닝으로 이월. 전문은 docs/reviews/2026-07-21-phase5.md(immutable).
 
 **노션 격차 분석 지시서 작성 (2026-07-21)**: docs/plans/notion-gap-analysis-2026-07-21.md —
 노션 2025 대비 26축 격차 매트릭스, 차별화 전략, 기술 부채 상환표(P0/P1/P2), 로드맵 정합 결정

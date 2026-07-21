@@ -5,8 +5,8 @@
 - [x] Phase 1 코어 기반 (모노레포, core 계약, 토큰, Supabase+RLS, Auth, CI/CD) — 2026-07-20 완료
 - [x] Phase 2 투두 + 메모 위젯 — 2026-07-20 완료 (실사용 피드백 반영 완료, 아래 기록 참조)
 - [x] Phase 3 오리 1단계 (GLB, 클릭 반응, 말풍선) — 2026-07-20 완료 (아래 기록 참조)
-- [ ] Phase 4 GitHub 커밋 잔디
-- [ ] Phase 5 Tauri 위젯 + Claude Code 수집기
+- [x] Phase 4 GitHub 커밋 잔디 — 2026-07-21 실사용 검증 완료 (아래 기록 참조)
+- [x] Phase 5 Tauri 위젯 + Claude Code 수집기 — 2026-07-21 완료 (아래 기록 참조)
 - [ ] Phase 6 오리 2단계 (상태 반응, 자율 행동, 활보 모드)
 - [ ] Phase 7 게임화 (XP/먹이/코스튬) + 생산성 모듈 (뽀모도로/습관/캘린더)
 - [ ] Phase 8 AI 1단계 (룰 기반 대사 -> RAG Q&A)
@@ -168,3 +168,23 @@
   광범위 매칭으로 실행해 다른 프로세스에 영향을 줬을 가능성이 있었음(과도하게 넓은 매칭 — 이후
   TaskStop으로 정확한 프로세스만 종료하도록 수정) — 재발 방지 필요. 수정 후 전체 `pnpm build`/
   `lint`/`test` 재실행 — 5/5, 9/9, 8/8 재확인. 커밋은 아직 하지 않음(사용자 지시 대기).
+- 2026-07-21 16:00 : [본 세션, `/next-step` + 실사용 검증] **Phase 4·5 종료.** 사용자가 위젯/브라우저
+  에서 실제 로그인하며 검증하는 과정에서 인프라 결함 여러 건이 드러나 전부 해소: **(a)** 로그인이
+  CSP로 완전히 깨지던 버그 2건 — `script-src 'self'`가 Next RSC 하이드레이션 인라인 스크립트까지
+  막던 문제를 nonce 기반 CSP로 전환(커밋 4de6028), 그래도 남아서 원인 추적하니 `/login`이 정적
+  프리렌더링돼 빌드 시점 nonce와 요청 nonce가 영영 불일치 → `force-dynamic`으로 전환(서버
+  page.tsx + 클라 LoginForm.tsx 분리, 커밋 accc4e3). 프로덕션 curl로 요청별 nonce 일치 실측.
+  lessons-learned.md에 교훈 등재. **(b)** GitHub 잔디 API 500 — Vercel에 `GITHUB_TOKEN` 미등록
+  (Phase 4 검증 체크리스트 1번이 실제 미이행이던 것)이라 사용자가 등록+재배포로 해소. **(c)** 잔디
+  빈 칸이 카드 배경과 동색이라 안 보이던 문제(`color-mix` 최소 0% → 12%, 커밋 42b637f). **(d)**
+  `activity_daily` 테이블이 프로덕션에 없어(REST 404) 위젯 업로드가 조용히 실패하던 것 발견 —
+  사용자 명시 승인 하에 `supabase db push`로 적용(REST 200 전환 확인, 마이그레이션 히스토리 동기화
+  상태라 이 하나만 적용). 이후 사용자가 위젯 로그인으로 activity_daily 반영까지 실사용 확인.
+  **DETECT 리뷰**(6차원 병렬 + 적대적 검증, 39개 서브에이전트)를 실행해
+  docs/reviews/2026-07-21-phase5.md에 기록 — **SEC- 배포 차단 0건**(확정 30건 전부 REF-MEDIUM/LOW,
+  "proxy.ts 죽은 코드" SEC-HIGH 주장은 Next16 native proxy 인식으로 반증). 확정 REF-MEDIUM 6건은
+  이 세션에서 수정: Rust 수집기를 async 커맨드로(UI 스레드 블로킹 해소) + 순수 함수
+  `format_local_date`/`aggregate` 추출해 자정 경계·복수 날짜 회귀 테스트 고정(cargo test 5→6),
+  `upsertActivityDaily` updated_at 갱신 + 테스트가 upsert 인자(user_id 스탬핑/onConflict) 검증하도록
+  강화, CSP 문서 드리프트 정정. 잔여 REF-LOW 24건은 phase_06.md 착수 조건/후속 하드닝으로 이월.
+  전체 `pnpm build`/`lint`/`test` + `cargo test`/`clippy` 통과.
