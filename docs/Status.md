@@ -1,8 +1,8 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **4 완료(사용자 검증만 대기) → 5 T0/T1/T2/T3 완료, T4 중 창 렌더링 확인은 이 세션에서
-실측 완료, 로그인 필요한 나머지 2항목만 사용자 검증 대기(로그인을 막던 CSP 버그는 발견·수정·배포
-완료)**
+현재 Phase: **4 완료(사용자 검증만 대기) → 5 T0/T1/T2/T3 완료, T4 인프라 블로커 전부 해소
+(로그인 CSP 버그 2건·GITHUB_TOKEN 미등록·잔디 색·activity_daily 테이블 부재 모두 수정/적용),
+남은 건 위젯 로그인으로 activity_daily에 실제 행이 쌓이는지 E2E 확인 1건뿐**
 계획 문서: docs/plans/phase_01~03.md(완료), docs/plans/phase_04.md(구현 완료, T5 사용자 검증만 대기),
 docs/plans/phase_05.md(T0/T1/T2/T3 완료 + 리뷰 HIGH 4건 수정 완료, T4 3항목 중 1항목 완료 + 실사용
 중 발견한 로그인 차단 CSP 버그 2건 수정)

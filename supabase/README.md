@@ -1,7 +1,12 @@
 # Supabase 스키마 v1
 
-Phase 1 T4 산출물. `migrations/`의 SQL은 아직 어떤 프로젝트에도 적용되지 않았다.
-적용 전 사용자 확인이 필요하다 (CLAUDE.md 5장 안전 규칙).
+Phase 1 T4 산출물. 적용 전 사용자 확인이 필요하다 (CLAUDE.md 5장 안전 규칙).
+
+**적용 현황(2026-07-21 기준)**: 6개 마이그레이션 전부 프로덕션(`iupprzfmlyfrdcctdupn`)에 적용 완료.
+profiles/todos/memos/duck_state/트리거는 Phase 1~2 진행 중, `activity_daily`는 Phase 5 T4 검증 중
+사용자 명시 승인 하에 `supabase db push`로 적용(그전까지는 테이블 부재로 데스크톱 위젯의 업로드가
+조용히 실패하고 있었음 — REST 프로브 404로 발견). `supabase migration list --linked`로 로컬/원격
+동기화 상태 확인 가능.
 
 ## 사전 준비 (사용자 수행)
 
