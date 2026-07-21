@@ -1,13 +1,15 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **4 완료(사용자 검증만 대기) → 5 T0/T1/T2/T3 완료 + 코드/보안 리뷰 반영 완료, T4(통합
-검증)만 남음**
+현재 Phase: **4 완료(사용자 검증만 대기) → 5 T0/T1/T2/T3 완료, T4 중 창 렌더링 확인은 이 세션에서
+실측 완료, 로그인 필요한 나머지 2항목만 사용자 검증 대기**
 계획 문서: docs/plans/phase_01~03.md(완료), docs/plans/phase_04.md(구현 완료, T5 사용자 검증만 대기),
-docs/plans/phase_05.md(T0/T1/T2/T3 완료 + 리뷰 HIGH 4건 수정 완료, T4 통합 검증만 남음)
-재개 방법: 새 대화에서 /next-step — Phase 5 T4(통합 검증). `pnpm --filter desktop tauri:dev`로
-실제 앱 실행 → 로그인 상태에서 위젯 창 표시 확인, 새 CSP가 브라우저 콘솔에 위반 로그를 남기지
-않는지 확인 → Supabase `activity_daily`에 오늘 날짜 `source=claude_code` 행이 생기는지 확인(전부
-이 세션 환경에서는 GUI 한계로 못함, 사용자 검증 필요).
+docs/plans/phase_05.md(T0/T1/T2/T3 완료 + 리뷰 HIGH 4건 수정 완료, T4 3항목 중 1항목 완료)
+재개 방법: 새 대화에서 /next-step — Phase 5 T4 잔여 2항목(로그인 필요). `pnpm --filter desktop
+tauri:dev`로 실제 앱 실행 → Google/GitHub 로그인 → 브라우저 콘솔에 CSP 위반 로그 없는지 확인 →
+Supabase `activity_daily`에 오늘 날짜 `source=claude_code` 행이 생기는지 확인 → 웹에서도 같은 데이터
+보이는지 확인(위젯 창 표시 자체는 2026-07-21 세션에서 프로세스/DNS 실측으로 검증 완료 — 상세는
+docs/plans/phase_05.md T4 절 참조. 이전 세션들의 "GUI 확인 불가" 추정은 틀렸었음, 이 세션은 실제
+인터랙티브 데스크톱에서 실행됨).
 
 ## Phase 5 블로커 — 전부 해소 (2026-07-21)
 
@@ -64,6 +66,18 @@ docs/plans/phase_05.md T2 절 참조. `cargo build` + 전체 `pnpm build`/`lint`
 - MEDIUM/LOW(심볼릭 링크 미검증, `updated_at` 미갱신, 동기화 실패 무알림 등)는 이번 라운드에서
   고치지 않고 phase_05.md에 후속 과제로 남김(사용자에게 HIGH만 우선 처리하기로 확인받음)
 - 수정 후 전체 `pnpm build`/`lint`/`test` 재실행 — 5/5, 9/9, 8/8 재확인
+
+**T4 부분 검증(2026-07-21, `/next-step`)**: T1/T2가 이미 커밋(`d2f8f4c`)돼 있어 build/lint/test
+전체 재확인(5/5, 9/9, 8/8) 후 `cargo test`(5/5)까지 통과 확인. 이어서 `pnpm --filter desktop
+tauri:dev`로 위젯을 실제로 기동 — 이전 세션들이 "이 에이전트 세션엔 상호작용 가능한 desktop/window
+station이 없을 가능성"이라 추정했던 것과 달리, 이 세션은 `SessionId=1`(Console,
+`UserInteractive=True`)의 실제 인터랙티브 데스크톱에서 동작 중이었다. `Get-Process`로 창 핸들이
+0이 아님(`4067222`), 타이틀 정상(`Little Dev Duck`), `Responding=True`, WebView2 자식 프로세스가
+배포 URL을 DNS로 실제 조회한 기록까지 확인 — 위젯 창 렌더링 자체는 실측 검증됨. 픽셀 스크린샷은
+백신이 PowerShell의 화면 캡처 패턴을 악성으로 오탐해 차단, 우회하지 않고 프로세스 레벨 증거로
+갈음. 검증 후 프로세스 정리(`Stop-Process`)함. 나머지 T4 2항목(activity_daily 반영, 웹-위젯 데이터
+일치)은 실제 Google/GitHub 로그인이 있어야 하는 영역이라 이 세션이 대신할 수 없음 — 사용자 검증
+절차는 docs/plans/phase_05.md T4 절에 기록.
 
 **참고**: 이 저장소에는 git worktree가 없어 다른 세션과 같은 폴더를 공유한다. 2026-07-20 21시경
 gstack browse 데몬이 다른 프로세스와 락 경합을 일으켰고(무한 대기, 강제 해제하지 않음), 로컬 3000
