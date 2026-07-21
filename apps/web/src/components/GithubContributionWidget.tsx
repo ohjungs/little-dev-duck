@@ -10,7 +10,9 @@ type ContributionsResponse =
   | { linked: true; summary: ContributionSummary }
   | { linked: false };
 
-const LEVEL_MIX_PERCENT = [0, 25, 50, 75, 100] as const;
+// 레벨 0(기여 없음)도 accent를 살짝 섞어야 한다 - 0%면 Card 배경(--ldd-color-surface)과
+// 완전히 같은 색이 되어 빈 칸이 통째로 안 보인다(실사용 중 발견).
+const LEVEL_MIX_PERCENT = [12, 30, 55, 78, 100] as const;
 
 function levelForCount(count: number): 0 | 1 | 2 | 3 | 4 {
   if (count === 0) return 0;
