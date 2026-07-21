@@ -7,6 +7,7 @@ import {
   listCalendarEvents,
 } from "@ldd/api";
 import { daysUntil, type CalendarEvent } from "@ldd/core";
+import { reindexSource } from "@ldd/ai";
 import { Button, Card, Input, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 import { todayIso } from "@/lib/today";
@@ -67,6 +68,8 @@ export function CalendarWidget() {
     try {
       const created = await createCalendarEvent(supabase, { title, startAt });
       setEvents((prev) => [...prev, created].sort(byStartAt));
+      // RAG 인덱싱(fire-and-forget).
+      void reindexSource({ sourceType: "calendar_event", sourceId: created.id, text: title });
     } catch {
       setActionError("추가하지 못했습니다.");
     }
@@ -77,6 +80,7 @@ export function CalendarWidget() {
     setEvents((prev) => prev.filter((e) => e.id !== id));
     try {
       await deleteCalendarEvent(supabase, id);
+      void reindexSource({ sourceType: "calendar_event", sourceId: id, text: "" });
     } catch {
       setEvents(prevEvents);
       setActionError("삭제하지 못했습니다.");

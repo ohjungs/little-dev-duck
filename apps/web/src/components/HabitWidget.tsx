@@ -10,6 +10,7 @@ import {
   uncheckHabit,
 } from "@ldd/api";
 import { deriveHabitStreak, type Habit, type HabitCheck } from "@ldd/core";
+import { reindexSource } from "@ldd/ai";
 import { Button, Card, Input, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 import { emitXpChanged } from "@/lib/xpSignal";
@@ -69,6 +70,8 @@ export function HabitWidget() {
         timesPerWeek: null,
       });
       setHabits((prev) => [created, ...prev]);
+      // RAG 인덱싱(fire-and-forget).
+      void reindexSource({ sourceType: "habit", sourceId: created.id, text: title });
     } catch {
       setActionError("추가하지 못했습니다.");
     }
@@ -112,6 +115,7 @@ export function HabitWidget() {
     setChecks((prev) => prev.filter((c) => c.habitId !== id));
     try {
       await deleteHabit(supabase, id);
+      void reindexSource({ sourceType: "habit", sourceId: id, text: "" });
     } catch {
       setHabits(prevHabits);
       setChecks(prevChecks);

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import {
   allowRequest,
   indexSource,
+  listCalendarEvents,
+  listHabits,
   listMemos,
   listTodos,
 } from "@ldd/api";
@@ -39,9 +41,11 @@ export async function POST() {
   }
 
   try {
-    const [memos, todos] = await Promise.all([
+    const [memos, todos, habits, events] = await Promise.all([
       listMemos(supabase),
       listTodos(supabase),
+      listHabits(supabase),
+      listCalendarEvents(supabase),
     ]);
     const items = [
       ...memos.map((m) => ({
@@ -53,6 +57,16 @@ export async function POST() {
         sourceType: "todo" as const,
         sourceId: t.id,
         text: t.title,
+      })),
+      ...habits.map((h) => ({
+        sourceType: "habit" as const,
+        sourceId: h.id,
+        text: h.title,
+      })),
+      ...events.map((e) => ({
+        sourceType: "calendar_event" as const,
+        sourceId: e.id,
+        text: e.title,
       })),
     ].slice(0, MAX_ITEMS);
 
