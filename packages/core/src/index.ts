@@ -23,3 +23,33 @@ export {
   type DuckMoodInput,
   type TodayTodoTally,
 } from "./domain/duck-mood";
+export { epochDay } from "./domain/date-util";
+export {
+  XP_REWARDS,
+  XP_PER_LEVEL_BASE,
+  FEED_PER_XP,
+  FEED_MAX,
+  type XpSource,
+} from "./domain/balance";
+export {
+  xpForLevel,
+  deriveLevel,
+  xpAfterAward,
+  levelProgress,
+} from "./domain/duck-xp";
+export {
+  habitSchema,
+  habitCheckSchema,
+  deriveHabitStreak,
+  type Habit,
+  type HabitCheck,
+} from "./domain/habit";
+export {
+  pomodoroSessionSchema,
+  type PomodoroSession,
+} from "./domain/pomodoro";
+export {
+  calendarEventSchema,
+  daysUntil,
+  type CalendarEvent,
+} from "./domain/calendar-event";

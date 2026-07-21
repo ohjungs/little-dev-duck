@@ -1,4 +1,5 @@
 import type { ContributionDay } from "./github-contribution";
+import { epochDay } from "./date-util";
 
 // 오리의 데이터 반응 기분. Phase 6 T1의 클라이언트 파생 상태 — DB에 저장하지 않고
 // 이미 로드된 투두/커밋 데이터에서 매번 파생한다. (게임화 duck_state는 Phase 7 별개.)
@@ -32,12 +33,6 @@ export function deriveDuckMood(input: DuckMoodInput): DuckMood {
   return "neutral";
 }
 
-// "YYYY-MM-DD" → UTC 자정 기준 epoch day 수. 로컬 타임존 영향 없이 날짜 차이만 계산.
-function toEpochDay(isoDate: string): number {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
-}
-
 // 오늘(today, "YYYY-MM-DD") 기준 마지막 커밋일로부터 지난 일수. 커밋 기록이 없으면 null.
 export function daysSinceLastCommit(
   days: readonly ContributionDay[],
@@ -47,5 +42,5 @@ export function daysSinceLastCommit(
   if (commitDates.length === 0) return null;
   // ISO 날짜 문자열의 사전식 비교 = 시간순 비교.
   const latest = commitDates.reduce((a, b) => (a > b ? a : b));
-  return toEpochDay(today) - toEpochDay(latest);
+  return epochDay(today) - epochDay(latest);
 }
