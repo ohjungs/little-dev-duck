@@ -86,3 +86,20 @@ export {
   type Page,
   type PageVersion,
 } from "./domain/page";
+export {
+  AGENT_MAX_ITERATIONS,
+  toolKindSchema,
+  jsonSchemaTypeSchema,
+  toolParameterSchema,
+  toolDeclarationSchema,
+  toolCallSchema,
+  toolResultSchema,
+  requiresApproval,
+  partitionToolCalls,
+  type ToolKind,
+  type JsonSchemaType,
+  type ToolParameterSchema,
+  type ToolDeclaration,
+  type ToolCall,
+  type ToolResult,
+} from "./domain/agent-tool";
