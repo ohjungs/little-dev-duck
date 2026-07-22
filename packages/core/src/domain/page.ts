@@ -28,21 +28,45 @@ export const pageVersionSchema = z.object({
 });
 export type PageVersion = z.infer<typeof pageVersionSchema>;
 
-// 인라인 콘텐츠(text 노드 배열, 또는 링크 등 중첩 content)에서 text 문자열만 이어붙인다.
-function inlineText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  const parts: string[] = [];
-  for (const item of content) {
-    if (item == null || typeof item !== "object") continue;
-    const it = item as Record<string, unknown>;
-    if (typeof it.text === "string") parts.push(it.text);
-    else if (it.content !== undefined) parts.push(inlineText(it.content));
+// 테이블 블록의 content는 { type:'tableContent', rows:[{cells:[...]}] } 객체다. 셀은 인라인 배열이거나
+// { content } 형태(TableCell)라 방어적으로 둘 다 처리해 셀 텍스트를 공백으로 이어붙인다.
+function tableText(obj: Record<string, unknown>): string {
+  if (obj.type !== "tableContent" || !Array.isArray(obj.rows)) return "";
+  const cellTexts: string[] = [];
+  for (const row of obj.rows) {
+    const cells = (row as Record<string, unknown> | null)?.cells;
+    if (!Array.isArray(cells)) continue;
+    for (const cell of cells) {
+      if (Array.isArray(cell)) cellTexts.push(inlineText(cell));
+      else if (cell != null && typeof cell === "object") {
+        cellTexts.push(inlineText((cell as Record<string, unknown>).content));
+      }
+    }
   }
-  return parts.join("");
+  return cellTexts.filter(Boolean).join(" ");
 }
 
-// 블록 배열을 순회하며 블록별 한 줄씩 out에 쌓는다(children 재귀).
+// 인라인 콘텐츠(text 노드 배열, 링크 등 중첩 content, 또는 테이블 content 객체)에서 text만 이어붙인다.
+function inlineText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const item of content) {
+      if (item == null || typeof item !== "object") continue;
+      const it = item as Record<string, unknown>;
+      if (typeof it.text === "string") parts.push(it.text);
+      else if (it.content !== undefined) parts.push(inlineText(it.content));
+    }
+    return parts.join("");
+  }
+  if (content != null && typeof content === "object") {
+    return tableText(content as Record<string, unknown>);
+  }
+  return "";
+}
+
+// 블록 배열을 순회하며 블록별 한 줄씩 out에 쌓는다. 이미지/파일 등 미디어 블록의 캡션은 props에 있어
+// 별도로 긁는다(content 순회로는 안 닿음). children 재귀.
 function walkBlocks(node: unknown, out: string[]): void {
   if (!Array.isArray(node)) return;
   for (const block of node) {
@@ -50,6 +74,11 @@ function walkBlocks(node: unknown, out: string[]): void {
     const b = block as Record<string, unknown>;
     const line = inlineText(b.content);
     if (line) out.push(line);
+    const props = b.props;
+    if (props != null && typeof props === "object") {
+      const caption = (props as Record<string, unknown>).caption;
+      if (typeof caption === "string" && caption) out.push(caption);
+    }
     if (Array.isArray(b.children)) walkBlocks(b.children, out);
   }
 }

@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/client";
 
 // 페이지 첨부 Storage 버킷(마이그레이션 20260722050000). 경로는 '<user_id>/<uuid>.<ext>'.
 const ATTACHMENT_BUCKET = "page-attachments";
+// 버킷 allowed_mime_types와 일치. 클라 가드는 친절한 에러용이고 권위 있는 차단은 버킷이 한다.
+const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 // 저장된 content(unknown)를 BlockNote 초기값으로 변환. BlockNote는 빈 배열을 거부하므로(비어 있으면
 // 예외) undefined로 넘겨 기본 빈 문단으로 시작하게 한다.
@@ -56,6 +58,9 @@ export function BlockEditor({
   // 본인 폴더 쓰기만 허용하고, public 버킷이라 <img src>로 읽힌다(경로는 추측 불가한 UUID).
   const uploadFile = useCallback(
     async (file: File): Promise<string> => {
+      if (!ALLOWED_MIME.includes(file.type)) {
+        throw new Error("이미지 파일(PNG/JPEG/WebP/GIF)만 업로드할 수 있습니다.");
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();

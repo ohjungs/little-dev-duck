@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { History, Loader2, RotateCcw } from "lucide-react";
 import { listPageVersions, updatePage } from "@ldd/api";
+import { reindexSource } from "@ldd/ai";
 import type { PageVersion } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,12 +16,15 @@ function timeLabel(iso: string): string {
 }
 
 // 버전 기록 모달(T5): 저장된 스냅샷 목록 + 복원. 복원은 현재 내용을 덮으므로 확인 후 실행(안전 규칙).
+// onBeforeRestore: 상위(PageEditor)의 대기 중 자동저장을 확인창 전에 취소해 복원과의 경쟁을 없앤다.
 export function VersionHistory({
   pageId,
   onClose,
+  onBeforeRestore,
 }: {
   pageId: string;
   onClose: () => void;
+  onBeforeRestore?: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [versions, setVersions] = useState<PageVersion[]>([]);
@@ -38,18 +42,26 @@ export function VersionHistory({
   }, [supabase, pageId]);
 
   const handleRestore = async (version: PageVersion) => {
+    // 확인창(동기 블로킹) '전에' 상위의 대기 중 자동저장을 취소 — confirm 이후엔 이미 큐에 오른 저장을
+    // 못 막아 복원과 경쟁하기 때문.
+    onBeforeRestore?.();
     const ok = window.confirm(
       `이 버전(${timeLabel(version.createdAt)})으로 되돌릴까요?\n현재 내용을 덮어씁니다. 먼저 "버전 저장"을 눌러두면 지금 상태로 다시 돌아올 수 있습니다.`,
     );
     if (!ok) return;
     setRestoringId(version.id);
     try {
-      await updatePage(supabase, pageId, {
+      const updated = await updatePage(supabase, pageId, {
         title: version.title,
         content: version.content,
       });
+      // 복원 내용으로 RAG 인덱스도 즉시 갱신(reload가 in-flight fetch를 취소하므로 완료까지 await).
+      await reindexSource({
+        sourceType: "page",
+        sourceId: pageId,
+        text: updated.plainText,
+      });
       // 복원은 명시적·드문 액션이라 에디터를 재초기화하기 위해 새로고침(클라이언트 상태 통짜 갱신).
-      // RAG 재인덱싱은 다음 편집 시 자연히 갱신됨(부가 기능).
       window.location.reload();
     } catch {
       setRestoringId(null);

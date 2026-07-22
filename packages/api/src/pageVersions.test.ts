@@ -10,6 +10,9 @@ const VALID_ROW = {
   created_at: "2026-07-22T00:00:00.000Z",
 };
 
+// 실제 저장된 페이지(스냅샷 원본). createPageVersion은 클라 입력이 아니라 이 값에서 스냅샷을 뜬다.
+const PAGE_ROW = { title: "서버 제목", content: [{ type: "paragraph", content: [] }] };
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function fakeSupabase(overrides: Record<string, unknown> = {}): any {
   return {
@@ -17,14 +20,18 @@ function fakeSupabase(overrides: Record<string, unknown> = {}): any {
       getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }),
     },
     from: () => ({
-      insert: () => ({
-        select: () => ({ single: async () => ({ data: VALID_ROW, error: null }) }),
-      }),
+      // createPageVersion의 pages SELECT(.eq.single) + listPageVersions(.eq.order.limit) 둘 다 지원.
       select: () => ({
         eq: () => ({
+          single: async () => ({ data: PAGE_ROW, error: null }),
           order: () => ({
             limit: async () => ({ data: [VALID_ROW], error: null }),
           }),
+        }),
+      }),
+      insert: () => ({
+        select: () => ({
+          single: async () => ({ data: VALID_ROW, error: null }),
         }),
       }),
     }),
@@ -38,21 +45,37 @@ describe("createPageVersion", () => {
       auth: { getUser: async () => ({ data: { user: null } }) },
     });
     await expect(
-      createPageVersion(supabase, {
-        pageId: VALID_ROW.page_id,
-        title: "t",
-        content: [],
-      }),
+      createPageVersion(supabase, { pageId: VALID_ROW.page_id }),
     ).rejects.toThrow("로그인이 필요합니다.");
   });
 
-  it("스냅샷을 PageVersion으로 변환해 반환한다", async () => {
+  it("본인 소유가 아니거나 없는 페이지면(SELECT 행 없음) 예외를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: async () => ({ data: null, error: { message: "no rows" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      createPageVersion(supabase, { pageId: VALID_ROW.page_id }),
+    ).rejects.toThrow("no rows");
+  });
+
+  it("스냅샷 title/content를 클라 입력이 아니라 서버 페이지에서 파생하고 user_id를 세션에서 주입한다", async () => {
     let captured: Record<string, unknown> | undefined;
     const supabase = fakeSupabase({
       auth: {
         getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }),
       },
       from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: async () => ({ data: PAGE_ROW, error: null }),
+          }),
+        }),
         insert: (payload: Record<string, unknown>) => {
           captured = payload;
           return {
@@ -63,14 +86,9 @@ describe("createPageVersion", () => {
         },
       }),
     });
-    const version = await createPageVersion(supabase, {
-      pageId: VALID_ROW.page_id,
-      title: "문서",
-      content: VALID_ROW.content,
-    });
-    expect(version.pageId).toBe(VALID_ROW.page_id);
-    expect(version.userId).toBe(VALID_ROW.user_id);
-    // user_id는 세션에서 주입(클라 입력 불신).
+    await createPageVersion(supabase, { pageId: VALID_ROW.page_id });
+    expect(captured?.title).toBe(PAGE_ROW.title);
+    expect(captured?.content).toBe(PAGE_ROW.content);
     expect(captured?.user_id).toBe(VALID_ROW.user_id);
   });
 });

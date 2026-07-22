@@ -11,9 +11,13 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { VersionHistory } from "@/components/VersionHistory";
 
-// 파일명에 못 쓰는 문자를 -로 치환.
+// 파일명에 못 쓰는 문자·제어문자를 -로 치환하고 끝의 점/공백을 정리한다(공백은 중간에선 보존).
+// 결과가 비면(공백만 등) "page"로 폴백.
 function safeFileName(name: string): string {
-  return (name || "page").replace(/[/\\?%*:|"<>]/g, "-").slice(0, 100);
+  const base = name.trim();
+  if (!base) return "page";
+  const cleaned = base.replace(/[/\?%*:|"<>]/g, "-").replace(/[. ]+$/, "");
+  return (cleaned || "page").slice(0, 100);
 }
 
 // BlockNote는 브라우저 전용(window/document 의존)이라 SSR 비활성 동적 로드. 로딩 중엔 스켈레톤.
@@ -37,7 +41,7 @@ export function PageEditor({
   onSaved,
 }: {
   page: Page;
-  onSaved?: (patch: { title: string }) => void;
+  onSaved?: (patch: { title: string; content: unknown }) => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [title, setTitle] = useState(page.title);
@@ -56,12 +60,38 @@ export function PageEditor({
     toMarkdown.current = fn;
   }, []);
 
+  // 실제 저장 1회: 서버가 content에서 plainText를 파생하므로 그 값으로 RAG 재인덱싱하고 상위 스냅샷도 갱신한다.
+  const runSave = useCallback(
+    () =>
+      updatePage(supabase, page.id, {
+        title: latest.current.title,
+        content: latest.current.content,
+      }).then((updated) => {
+        onSaved?.({ title: updated.title, content: updated.content });
+        void reindexSource({
+          sourceType: "page",
+          sourceId: page.id,
+          text: updated.plainText,
+        });
+        return updated;
+      }),
+    [supabase, page.id, onSaved],
+  );
+
+  // 대기 중 디바운스 저장을 즉시 발화(페이지 전환/버전 액션 전에 최신 편집분 확정). 없으면 null.
+  const flushPendingSave = useCallback((): Promise<unknown> | null => {
+    if (!timer.current) return null;
+    clearTimeout(timer.current);
+    timer.current = null;
+    return runSave();
+  }, [runSave]);
+
   // 현재 페이지를 Markdown(.md)으로 내보낸다(T6). 제목을 H1로 앞에 붙인다.
   const handleExport = () => {
     const convert = toMarkdown.current;
     if (!convert) return;
     const body = convert();
-    const md = `# ${latest.current.title || "제목 없음"}\n\n${body}`;
+    const md = `# ${latest.current.title.trim() || "제목 없음"}\n\n${body}`;
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -71,14 +101,12 @@ export function PageEditor({
     URL.revokeObjectURL(url);
   };
 
-  // 현재 상태를 버전 스냅샷으로 저장(T5). 성공 시 잠깐 피드백을 띄운다.
+  // 현재 상태를 버전 스냅샷으로 저장(T5). 대기 중 편집을 먼저 저장한 뒤 서버 상태에서 스냅샷을 뜬다
+  // (버전은 실제 저장된 내용의 통짜 복사 — 무결성/소유권은 서버가 강제).
   const handleSaveVersion = async () => {
     try {
-      await createPageVersion(supabase, {
-        pageId: page.id,
-        title: latest.current.title,
-        content: latest.current.content,
-      });
+      await (flushPendingSave() ?? Promise.resolve());
+      await createPageVersion(supabase, { pageId: page.id });
       setVersionMsg("버전이 저장되었습니다.");
     } catch {
       setVersionMsg("버전 저장에 실패했습니다.");
@@ -86,32 +114,23 @@ export function PageEditor({
     setTimeout(() => setVersionMsg(null), 2500);
   };
 
-  // 언마운트 시 대기 중 저장 타이머 정리.
+  // 언마운트(페이지 전환 포함) 시 대기 중 저장을 폐기하지 말고 즉시 발화 — 디바운스 창 안에 페이지를
+  // 바꿔도 마지막 편집분이 유실되지 않게 한다.
   useEffect(
     () => () => {
-      if (timer.current) clearTimeout(timer.current);
+      flushPendingSave();
     },
-    [],
+    [flushPendingSave],
   );
 
   const scheduleSave = () => {
     if (timer.current) clearTimeout(timer.current);
     setSaveState("saving");
     timer.current = setTimeout(() => {
-      updatePage(supabase, page.id, {
-        title: latest.current.title,
-        content: latest.current.content,
-      }).then(
-        (updated) => {
-          setSaveState("saved");
-          onSaved?.({ title: latest.current.title });
-          // 저장된 본문을 RAG 인덱싱(부가 기능, fire-and-forget). 서버가 파생한 plainText를 그대로 사용.
-          void reindexSource({
-            sourceType: "page",
-            sourceId: page.id,
-            text: updated.plainText,
-          });
-        },
+      // 발화 시점에 '대기 중' 해제 — flush/언마운트가 중복 저장하지 않도록.
+      timer.current = null;
+      runSave().then(
+        () => setSaveState("saved"),
         () => setSaveState("error"),
       );
     }, SAVE_DEBOUNCE_MS);
@@ -157,6 +176,13 @@ export function PageEditor({
         <VersionHistory
           pageId={page.id}
           onClose={() => setShowVersions(false)}
+          onBeforeRestore={() => {
+            // 복원은 현재 내용을 덮어쓰므로, 대기 중 자동저장이 복원과 경쟁하지 않도록 확인창 전에 취소한다.
+            if (timer.current) {
+              clearTimeout(timer.current);
+              timer.current = null;
+            }
+          }}
         />
       )}
       <input

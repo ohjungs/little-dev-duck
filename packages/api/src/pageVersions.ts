@@ -23,11 +23,11 @@ function fromRow(row: PageVersionRow): PageVersion {
 
 export type CreatePageVersionInput = {
   pageId: string;
-  title: string;
-  content: unknown;
 };
 
-// 현재 페이지 상태를 버전 스냅샷으로 저장(T5). user_id는 세션에서 주입(클라 불신).
+// 현재 페이지 상태를 버전 스냅샷으로 저장(T5). 스냅샷 title/content는 클라 입력이 아니라 실제 저장된
+// 페이지에서 뜬다 — RLS SELECT가 본인 소유 페이지만 반환하므로 소유권도 함께 강제되고(타인/부재 페이지는
+// 행이 없어 예외), 스냅샷 무결성이 클라 신뢰에서 벗어난다. user_id는 세션에서 주입.
 export async function createPageVersion(
   supabase: SupabaseClient,
   input: CreatePageVersionInput,
@@ -37,13 +37,21 @@ export async function createPageVersion(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("로그인이 필요합니다.");
 
+  const { data: pageRow, error: pageError } = await supabase
+    .from("pages")
+    .select("title, content")
+    .eq("id", input.pageId)
+    .single();
+  if (pageError) throw new Error(pageError.message);
+  const snapshot = pageRow as { title: string; content: unknown };
+
   const { data, error } = await supabase
     .from("page_versions")
     .insert({
       page_id: input.pageId,
       user_id: user.id,
-      title: input.title,
-      content: input.content,
+      title: snapshot.title,
+      content: snapshot.content,
     })
     .select()
     .single();

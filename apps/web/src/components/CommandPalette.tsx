@@ -26,6 +26,8 @@ export function CommandPalette() {
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 최신 검색어를 담아 out-of-order 응답(느린 옛 요청이 최신 결과를 덮어씀)을 버린다.
+  const latestQuery = useRef("");
   // 전역 리스너(마운트 시 1회 등록)가 항상 최신 open을 읽도록 ref에 동기화(렌더 중 ref 변경 금지 —
   // effect에서 반영).
   const openRef = useRef(open);
@@ -77,6 +79,7 @@ export function CommandPalette() {
     setQuery(raw);
     if (timer.current) clearTimeout(timer.current);
     const q = raw.trim();
+    latestQuery.current = q;
     if (!q) {
       setResults([]);
       setState("idle");
@@ -86,11 +89,14 @@ export function CommandPalette() {
     timer.current = setTimeout(() => {
       searchPages(supabase, q).then(
         (rows) => {
+          // 응답 도착 시점에 검색어가 바뀌었으면(더 최신 요청 존재) 이 결과는 버린다.
+          if (q !== latestQuery.current) return;
           setResults(rows);
           setActiveIndex(0);
           setState("ready");
         },
         () => {
+          if (q !== latestQuery.current) return;
           setResults([]);
           setState("error");
         },

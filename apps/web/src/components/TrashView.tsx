@@ -34,29 +34,35 @@ export function TrashView() {
   }, [supabase]);
 
   const handleRestore = async (id: string, plainText: string) => {
-    const prev = pages;
+    const removed = pages.find((x) => x.id === id);
     setPages((p) => p.filter((x) => x.id !== id));
     try {
       await restorePage(supabase, id);
       // 복원하면 RAG 인덱스에 다시 추가(soft delete 때 제거됐던 것을 되돌림).
       void reindexSource({ sourceType: "page", sourceId: id, text: plainText });
     } catch {
-      setPages(prev);
+      // 롤백은 제거된 항목만 함수형으로 되살린다(동시 작업으로 처리된 다른 항목 부활 방지).
+      if (removed) {
+        setPages((p) => (p.some((x) => x.id === id) ? p : [...p, removed]));
+      }
     }
   };
 
   const handlePurge = async (id: string, title: string) => {
     // 영구 삭제는 되돌릴 수 없고 하위 페이지도 DB cascade로 함께 삭제되므로 실행 전 확인(안전 규칙).
+    // 하위 페이지 임베딩은 pages BEFORE DELETE 트리거(20260722070000)가 같은 트랜잭션에서 정리한다.
     const ok = window.confirm(
       `"${title || "제목 없음"}"을(를) 영구 삭제할까요?\n하위 페이지도 함께 삭제되며 되돌릴 수 없습니다.`,
     );
     if (!ok) return;
-    const prev = pages;
+    const removed = pages.find((x) => x.id === id);
     setPages((p) => p.filter((x) => x.id !== id));
     try {
       await purgePage(supabase, id);
     } catch {
-      setPages(prev);
+      if (removed) {
+        setPages((p) => (p.some((x) => x.id === id) ? p : [...p, removed]));
+      }
     }
   };
 

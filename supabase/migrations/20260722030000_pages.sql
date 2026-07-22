@@ -28,11 +28,14 @@ create index pages_plain_text_trgm_idx on public.pages using gin (plain_text gin
 
 alter table public.pages enable row level security;
 
+-- (select auth.uid())로 감싸 statement당 1회 initplan 평가·캐시(auth_rls_initplan advisor 권장).
+-- trgm 전역검색이 다수 행을 반환하는 pages에선 행별 재평가 회피 이득이 크다.
 create policy "pages_select_own" on public.pages
-  for select using (user_id = auth.uid());
+  for select using (user_id = (select auth.uid()));
 create policy "pages_insert_own" on public.pages
-  for insert with check (user_id = auth.uid());
+  for insert with check (user_id = (select auth.uid()));
 create policy "pages_update_own" on public.pages
-  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+  for update using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
 create policy "pages_delete_own" on public.pages
-  for delete using (user_id = auth.uid());
+  for delete using (user_id = (select auth.uid()));

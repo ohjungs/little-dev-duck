@@ -316,3 +316,24 @@
     코드·빌드·CI는 전부 GREEN(마이그레이션은 배포 시 적용 패턴, Phase 7/8 선례).
   - **남은 Phase 9**: T3(파일 업로드+이미지 블록, Storage 버킷), T5 버전 히스토리(page_versions),
     T6(Markdown 내보내기+백업+템플릿), T8 실기 검증(로그인 필요, 사용자).
+- 2026-07-22 : Phase 9 T3/T5버전/T6 마무리 + 전체 코드 적대적 리뷰·14결함 수정 (`/loop /next-step`,
+  ultracode 자율). T3(파일/이미지 업로드 Storage e2031b5), T6(Markdown 내보내기 308d518), T5 버전
+  히스토리(page_versions b288f75) 추가 배포 후, **Phase 9 전체 코드(9슬라이스, 20파일)를 워크플로로
+  5렌즈 병렬 리뷰(React/보안/마이그레이션/통합/엣지, 36 서브에이전트) → 각 발견 적대적 검증**. 확정 14건
+  (HIGH 5·MEDIUM 5·LOW 4) 전건 수정:
+  - **HIGH**: (1) 버전 복원 vs 대기 중 디바운스 자동저장 레이스로 복원 무효화 — 복원 확인창 전에 상위
+    타이머 취소(onBeforeRestore). (2) 페이지 cascade 삭제 시 자식 임베딩이 RAG에 유령 잔존 —
+    pages BEFORE DELETE 트리거(20260722070000, cascade 자식 행까지 발화해 embeddings 원자 정리). (3)
+    handleSaved가 title만 갱신해 페이지 재선택 시 stale content 렌더→최신분 덮어쓰기 — onSaved가
+    content까지 전달·동기화. (4) extractPlainText가 테이블 셀/미디어 캡션 미순회로 검색·RAG 누락 —
+    tableContent 객체+props.caption 처리 + 회귀 테스트. (5) 언마운트(페이지 전환) 시 pending 저장
+    폐기로 마지막 편집 유실 — cleanup에서 flush.
+  - **MEDIUM**: 검색 out-of-order 응답 가드(latestQuery ref), 낙관적 삭제 롤백을 통짜 스냅샷→함수형
+    단일 항목 복원(동시 삭제 부활 방지, PageWorkspace+TrashView), 버전 복원 시 reindex(인덱스 stale
+    방지), reindex-all을 소스 라운드로빈으로(page 굶짐 방지).
+  - **LOW**: page-attachments 버킷 allowed_mime_types(이미지만)+file_size_limit(10MB, 액티브 콘텐츠
+    SVG/HTML 차단) + 클라 가드, createPageVersion이 클라 입력 대신 서버 페이지에서 스냅샷 파생(RLS로
+    소유권 강제), pages RLS를 (select auth.uid())로(initplan 캐싱), safeFileName 공백만 제목 'page' 폴백.
+  - 검증: core 98 / api 95 / ai 6 tests + web build GREEN, 로컬 full eslint(apps/web) 선검증. 신규
+    마이그레이션 1건(트리거)으로 db push 대기 5건. 리뷰가 오탐으로 판정한 항목(공개 버킷 self-XSS 등)은
+    미반영. 남은 Phase 9: T6 템플릿·백업(선택), T8 실기 검증(로그인 필요, 사용자).

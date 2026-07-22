@@ -111,7 +111,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   };
 
   const handleDelete = async (id: string) => {
-    const prev = pages;
+    const removed = pages.find((x) => x.id === id);
     setPages((p) => p.filter((x) => x.id !== id));
     try {
       await softDeletePage(supabase, id);
@@ -119,13 +119,23 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
       void reindexSource({ sourceType: "page", sourceId: id, text: "" });
       if (pageId === id) router.push("/pages");
     } catch {
-      setPages(prev);
+      // 롤백은 통짜 스냅샷 대신 제거된 항목만 함수형으로 되살린다 — 동시 삭제 시 그 사이 처리된
+      // 다른 항목을 부활시키지 않도록. 순서는 buildTree가 parentId/created_at로 재구성하므로 append로 충분.
+      if (removed) {
+        setPages((p) => (p.some((x) => x.id === id) ? p : [...p, removed]));
+      }
     }
   };
 
-  const handleSaved = (id: string, patch: { title: string }) => {
+  const handleSaved = (
+    id: string,
+    patch: { title: string; content: unknown },
+  ) => {
+    // content까지 스냅샷을 갱신해야 페이지를 오갔다가 돌아와도 최신 저장분으로 리마운트된다(stale 덮어쓰기 방지).
     setPages((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, title: patch.title } : p)),
+      prev.map((p) =>
+        p.id === id ? { ...p, title: patch.title, content: patch.content } : p,
+      ),
     );
   };
 

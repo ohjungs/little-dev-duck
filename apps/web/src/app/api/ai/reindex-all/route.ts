@@ -8,10 +8,13 @@ import {
   listPages,
   listTodos,
 } from "@ldd/api";
+import type { EmbeddingSource } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 import { todoEmbedText } from "@/lib/embedText";
 
 export const dynamic = "force-dynamic";
+
+type ReindexItem = { sourceType: EmbeddingSource; sourceId: string; text: string };
 
 // 무료 티어 보호: 1회 백필로 인덱싱할 최대 항목 수. 순차 처리로 Gemini RPM도 완만하게.
 const MAX_ITEMS = 200;
@@ -50,33 +53,38 @@ export async function POST() {
       listCalendarEvents(supabase),
       listPages(supabase),
     ]);
-    const items = [
-      ...memos.map((m) => ({
-        sourceType: "memo" as const,
+    // 소스별로 나눈 뒤 라운드로빈으로 인터리브해 MAX_ITEMS 상한을 공평 분배한다 — 한 소스(특히 텍스트가
+    // 풍부한 page)가 concat 순서상 뒤에 밀려 통째로 잘려나가지 않게 한다.
+    const bySource: ReindexItem[][] = [
+      memos.map((m) => ({
+        sourceType: "memo",
         sourceId: m.id,
         text: m.content,
       })),
-      ...todos.map((t) => ({
-        sourceType: "todo" as const,
+      todos.map((t) => ({
+        sourceType: "todo",
         sourceId: t.id,
         text: todoEmbedText(t.title, t.isDone),
       })),
-      ...habits.map((h) => ({
-        sourceType: "habit" as const,
-        sourceId: h.id,
-        text: h.title,
-      })),
-      ...events.map((e) => ({
-        sourceType: "calendar_event" as const,
+      habits.map((h) => ({ sourceType: "habit", sourceId: h.id, text: h.title })),
+      events.map((e) => ({
+        sourceType: "calendar_event",
         sourceId: e.id,
         text: e.title,
       })),
-      ...pages.map((p) => ({
-        sourceType: "page" as const,
+      pages.map((p) => ({
+        sourceType: "page",
         sourceId: p.id,
         text: p.plainText,
       })),
-    ].slice(0, MAX_ITEMS);
+    ];
+    const items: ReindexItem[] = [];
+    const maxLen = bySource.reduce((n, s) => Math.max(n, s.length), 0);
+    for (let i = 0; i < maxLen && items.length < MAX_ITEMS; i += 1) {
+      for (const src of bySource) {
+        if (i < src.length && items.length < MAX_ITEMS) items.push(src[i]);
+      }
+    }
 
     // 순차 처리: 무료 티어 RPM 보호 + 쿼터 소진 시 여기까지는 인덱싱 유지(indexSource가 던지면 중단).
     let indexed = 0;

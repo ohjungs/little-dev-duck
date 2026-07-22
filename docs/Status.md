@@ -1,10 +1,12 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 9(워크스페이스 코어) 진행 — T1·T2·T4·T5·T7 구현·배포 완료(main green).** Phase 1~8 완료.
-**남은 Phase 9: T3(파일 업로드+이미지 블록), T5 버전 히스토리, T6(Markdown 내보내기+백업+템플릿), T8 실기
-검증(사용자).** 리디자인 세션 종료 확인 후 T1 WIP 브랜치부터 재개해 5개 슬라이스를 순차 구현.
-**인프라 대기(DB 자격증명 필요): `supabase db push` 2건 — 20260722030000_pages, 20260722040000_
-embeddings_source_page. 미적용 시 /pages 저장·페이지 RAG가 런타임 실패(코드·빌드·CI는 전부 GREEN).**
+현재 Phase: **Phase 9(워크스페이스 코어) 거의 완료 — T1·T2·T3·T4·T5(휴지통+버전)·T6(내보내기)·T7 구현·배포,
+main 전체 CI green.** Phase 1~8 완료. **남은 Phase 9: T6 잔여(템플릿·백업, 선택), T8 실기 검증(사용자).**
+리디자인 세션 종료 확인 후 T1 WIP 브랜치부터 재개해 슬라이스를 순차 구현(각 빌드 검증→커밋→CI).
+**인프라 대기(DB 자격증명 필요): `supabase db push` 5건 — 20260722030000_pages, 20260722040000_
+embeddings_source_page, 20260722050000_page_attachments_bucket, 20260722060000_page_versions,
+20260722070000_pages_cleanup_embeddings. 미적용 시 /pages 저장·페이지 RAG·이미지 업로드·버전이 런타임
+실패(코드·빌드·CI는 전부 GREEN).**
 계획 문서: docs/plans/phase_01~09.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
 docs/plans/notion-inventory-delta-2026-07-21.md.
 
@@ -29,10 +31,28 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
 - [x] T7 RAG page 소스(fb6a49e, 계약 변경 병렬 밖): core embeddingSourceSchema에 'page' + 마이그레이션
   `20260722040000_embeddings_source_page`(source_type CHECK 확장+rollback). 저장→reindex(서버 plainText),
   soft delete→reindex(''), 복원→reindex(plainText), reindex-all 백필에 listPages. **`supabase db push` 필요.**
-- 검증 총계: core 96 / api 90 / ai 6 tests + web build GREEN(전 슬라이스), CI T1·T2 success.
-- [ ] **T3 파일 업로드 + 이미지 블록**(Supabase Storage 버킷+RLS+BlockNote uploadFile 핸들러).
-- [ ] **T5 버전 히스토리**(page_versions 테이블 스냅샷 + 저장 시/수동 + 복원 UI).
-- [ ] **T6 내보내기 + 백업 + 템플릿**(BlockNote blocksToMarkdownLossy → .md 내보내기, 템플릿 프리셋).
+- [x] T3 파일/이미지 업로드(e2031b5): 마이그레이션 `20260722050000_page_attachments_bucket`(public 버킷
+  +본인 폴더 RLS+rollback) + BlockEditor uploadFile 핸들러(본인 폴더 <uuid>.<ext>→public URL). **db push 필요.**
+- [x] T6 Markdown 내보내기(308d518): BlockEditor onExportReady(blocksToMarkdownLossy, 0.52.1 동기 string)
+  + PageEditor 툴바 '.md 내보내기'(제목 H1+Blob 다운로드). **백업/템플릿은 미구현(선택).**
+- [x] T5 버전 히스토리(b288f75): 마이그레이션 `20260722060000_page_versions`(스냅샷+RLS 3정책+rollback) +
+  core pageVersionSchema + api createPageVersion/listPageVersions(4 tests) + VersionHistory 모달(복원=updatePage
+  +reload) + PageEditor '버전 저장'/'버전 기록'. **db push 필요.**
+- [x] lint 복구(49c4426, CI success): CommandPalette 렌더 중 ref 변경 제거 + unused eslint-disable 3건 정리.
+  T4~T5 CI red였던 것 복구, 로컬 full eslint 선검증. **main 전체 green 확인.**
+- [x] Phase 9 전체 코드 리뷰(워크플로 5렌즈 병렬 36에이전트 + 적대적 검증) → 확정 14결함 전건 수정:
+  - HIGH 5: 버전복원 vs 자동저장 레이스(복원 전 타이머 취소), page 임베딩 삭제 정리 트리거 신설
+    (20260722070000, cascade 자식까지 행별 발화), handleSaved가 content까지 동기화(stale 덮어쓰기),
+    extractPlainText 테이블셀/미디어캡션 순회, 언마운트 시 pending 저장 flush(페이지 전환 유실 방지).
+  - MEDIUM 5: 검색 out-of-order 응답 가드, 낙관적 삭제 롤백 함수형(부활 방지), 버전복원 시 reindex,
+    reindex-all 소스 라운드로빈(page 굶짐 방지), purge 임베딩=위 트리거로 해소.
+  - LOW 4: 버킷 mime 화이트리스트(이미지만)+파일크기 상한, createPageVersion 서버 스냅샷(소유권 강제),
+    pages RLS (select auth.uid()) initplan, safeFileName 공백만 폴백.
+- 검증 총계: core 98 / api 95 / ai 6 tests + web build GREEN, 로컬 full eslint 선검증.
+- [ ] **T6 잔여**(선택): 내장 템플릿 프리셋, 전체 백업 내보내기(무료 원칙상 스케줄러 대신 수동).
+- [ ] **인프라(사용자/세션, DB 자격증명)**: `supabase db push` 5건 — 20260722030000_pages,
+  20260722040000_embeddings_source_page, 20260722050000_page_attachments_bucket, 20260722060000_page_versions,
+  20260722070000_pages_cleanup_embeddings(삭제 트리거).
 - [ ] **T8 실기 검증**(사용자, 로그인 필요): 에디터 저장/복원, 검색, soft delete, 페이지 RAG 답변, Storage RLS.
 
 ## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현·리뷰·배포·검증 완료 (2026-07-22, `/loop` 자율+협업)

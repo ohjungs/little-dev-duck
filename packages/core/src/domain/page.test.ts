@@ -56,12 +56,40 @@ describe("extractPlainText", () => {
     expect(extractPlainText(doc)).toBe("링크: 여기");
   });
 
-  it("skips blocks without text (e.g. image)", () => {
+  it("skips blocks without text (e.g. image without caption)", () => {
     const doc = [
       { type: "image", props: { url: "https://x/y.png" } },
       { type: "paragraph", content: [{ type: "text", text: "뒤 문단" }] },
     ];
     expect(extractPlainText(doc)).toBe("뒤 문단");
+  });
+
+  it("extracts media block captions from props", () => {
+    const doc = [
+      { type: "image", props: { url: "https://x/y.png", caption: "그림 설명" } },
+    ];
+    expect(extractPlainText(doc)).toBe("그림 설명");
+  });
+
+  it("extracts text from table cells (inline-array and TableCell forms)", () => {
+    const doc = [
+      {
+        type: "table",
+        content: {
+          type: "tableContent",
+          rows: [
+            { cells: [[{ type: "text", text: "A" }], [{ type: "text", text: "B" }]] },
+            {
+              cells: [
+                { type: "tableCell", content: [{ type: "text", text: "C" }] },
+                { type: "tableCell", content: [{ type: "text", text: "D" }] },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+    expect(extractPlainText(doc)).toBe("A B C D");
   });
 });
 
