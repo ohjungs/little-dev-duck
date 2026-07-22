@@ -1,43 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import { Check, Pencil, Plus, StickyNote, X } from "lucide-react";
 import { createMemo, deleteMemo, listMemos, updateMemo } from "@ldd/api";
 import type { Memo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
-import { Button, Card, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 type LoadState = "loading" | "error" | "ready";
 
-const textareaStyle = {
-  background: "var(--ldd-color-bg)",
-  color: "var(--ldd-color-text)",
-  border: "1px solid var(--ldd-color-accent)",
-  borderRadius: "6px",
-  padding: "0.5rem",
-  fontFamily: "inherit",
-  fontSize: "1rem",
-  resize: "vertical",
-} as const;
-
-// 스티커 메모 카드 시각 스타일. 노트마다 살짝 다른 기울기로 손으로 붙인 느낌을 준다.
+// 노트마다 살짝 다른 기울기로 손으로 붙인 느낌을 준다. hover 시 정렬(rotate-0)되도록
+// CSS 변수로 넘겨 Tailwind hover가 덮어쓸 수 있게 한다(인라인 transform이면 hover가 안 먹음).
 const NOTE_ROTATIONS = ["-2deg", "1.5deg", "-1deg", "2deg", "0.5deg"];
 
-function noteStyle(index: number) {
-  return {
-    background: "var(--ldd-color-bg)",
-    border: "1px solid var(--ldd-color-accent)",
-    borderRadius: "4px",
-    padding: "0.75rem",
-    width: "160px",
-    minHeight: "140px",
-    boxShadow: "2px 3px 6px rgba(0, 0, 0, 0.15)",
-    transform: `rotate(${NOTE_ROTATIONS[index % NOTE_ROTATIONS.length]})`,
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "0.4rem",
-  };
-}
+const textareaClass =
+  "w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none";
 
 export function MemoWidget() {
   const [memos, setMemos] = useState<Memo[]>([]);
@@ -121,123 +105,139 @@ export function MemoWidget() {
     }
   };
 
+  const rotationStyle = (index: number): CSSProperties =>
+    ({
+      "--rot": NOTE_ROTATIONS[index % NOTE_ROTATIONS.length],
+    }) as CSSProperties;
+
   return (
-    <Card data-testid="memo-widget" style={{ width: "100%", maxWidth: "560px" }}>
-      <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>메모</h2>
+    <Card data-testid="memo-widget" className="h-full">
+      <CardHeader>
+        <CardTitle>
+          <StickyNote className="size-4 text-primary" />
+          메모
+        </CardTitle>
+      </CardHeader>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "0.5rem",
-          marginBottom: "0.75rem",
-        }}
-      >
-        <textarea
-          value={newContent}
-          onChange={(e) => setNewContent(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAdd();
-          }}
-          placeholder="메모 (Ctrl+Enter로 추가)"
-          rows={2}
-          style={{ ...textareaStyle, flex: 1 }}
-        />
-        <Button type="button" onClick={handleAdd}>
-          추가
-        </Button>
-      </div>
-
-      {actionError && (
-        <p role="alert" style={{ color: "#b3261e", marginBottom: "0.5rem" }}>
-          {actionError}
-        </p>
-      )}
-
-      {state === "loading" && (
-        <p style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Spinner size={14} /> 불러오는 중...
-        </p>
-      )}
-      {state === "error" && (
-        <div>
-          <p>목록을 불러오지 못했습니다.</p>
-          <Button type="button" onClick={reload}>
-            다시 시도
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <textarea
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAdd();
+            }}
+            placeholder="메모 (Ctrl+Enter로 추가)"
+            rows={2}
+            className={textareaClass}
+          />
+          <Button
+            type="button"
+            size="icon"
+            onClick={handleAdd}
+            aria-label="추가"
+          >
+            <Plus />
           </Button>
         </div>
-      )}
-      {state === "ready" && memos.length === 0 && <p>메모가 없습니다.</p>}
-      {state === "ready" && memos.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
-          {memos.map((memo, index) =>
-            editingId === memo.id ? (
-              <div
-                key={memo.id}
-                data-testid={`memo-${memo.id}`}
-                style={noteStyle(index)}
-              >
-                <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  rows={4}
-                  autoFocus
-                  style={{ ...textareaStyle, flex: 1, border: "none", padding: 0 }}
-                />
-                <div style={{ display: "flex", gap: "0.4rem" }}>
-                  <Button
-                    type="button"
-                    onClick={() => saveEdit(memo.id)}
-                    style={{ padding: "0.2rem 0.5rem", fontSize: "0.8rem" }}
-                  >
-                    저장
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => setEditingId(null)}
-                    style={{ padding: "0.2rem 0.5rem", fontSize: "0.8rem" }}
-                  >
-                    취소
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div
-                key={memo.id}
-                data-testid={`memo-${memo.id}`}
-                style={noteStyle(index)}
-              >
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.4rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => startEdit(memo)}
-                    aria-label="수정"
-                    style={{ background: "none", border: "none", cursor: "pointer" }}
-                  >
-                    수정
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(memo.id)}
-                    aria-label="삭제"
-                    style={{ background: "none", border: "none", cursor: "pointer" }}
-                  >
-                    ✕
-                  </button>
-                </div>
-                <p
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    flex: 1,
-                    margin: 0,
-                  }}
+
+        {actionError && (
+          <p role="alert" className="text-xs text-destructive">
+            {actionError}
+          </p>
+        )}
+
+        {state === "loading" && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="size-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+            불러오는 중...
+          </p>
+        )}
+        {state === "error" && (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-muted-foreground">
+              목록을 불러오지 못했습니다.
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={reload}>
+              다시 시도
+            </Button>
+          </div>
+        )}
+        {state === "ready" && memos.length === 0 && (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            메모가 없습니다.
+          </p>
+        )}
+        {state === "ready" && memos.length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            {memos.map((memo, index) =>
+              editingId === memo.id ? (
+                <div
+                  key={memo.id}
+                  data-testid={`memo-${memo.id}`}
+                  className="flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border bg-secondary/60 p-3 shadow-sm"
                 >
-                  {memo.content}
-                </p>
-              </div>
-            ),
-          )}
-        </div>
-      )}
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    rows={4}
+                    autoFocus
+                    className="flex-1 resize-none bg-transparent text-sm focus-visible:outline-none"
+                  />
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      onClick={() => saveEdit(memo.id)}
+                      aria-label="저장"
+                    >
+                      <Check />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setEditingId(null)}
+                      aria-label="취소"
+                    >
+                      <X />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  key={memo.id}
+                  data-testid={`memo-${memo.id}`}
+                  style={rotationStyle(index)}
+                  className="group flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border bg-secondary/60 p-3 shadow-sm transition-all rotate-[var(--rot)] hover:-translate-y-1 hover:rotate-0 hover:shadow-md"
+                >
+                  <div className="flex justify-end gap-1">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(memo)}
+                      aria-label="수정"
+                      className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(memo.id)}
+                      aria-label="삭제"
+                      className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                  <p className="flex-1 whitespace-pre-wrap text-sm">
+                    {memo.content}
+                  </p>
+                </div>
+              ),
+            )}
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }

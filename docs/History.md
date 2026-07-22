@@ -258,3 +258,19 @@
   postcss, deps 9개 + pnpm-lock.yaml)이 있고 frozen-install이 실패한다. TodoWidget.tsx도 그 세션이
   shadcn으로 재작성(내 RAG 수정은 보존됨). 이 세션은 그 변경을 건드리지 않음 — 그 세션이 lockfile
   정리·커밋 필요.**
+- 2026-07-22 : UI 전면 리디자인 (Phase 무관, 사용자 요청 "UI 개선 - 대시보드로 예쁘게"). 참조:
+  ui.watermelon.sh, cult-ui.com(둘 다 Tailwind+shadcn 기반). **확정 스택 변경 = Tailwind v4 도입:
+  사용자에게 구현 방식을 물어 "Tailwind 도입" 명시 승인받아 게이트 통과**(CLAUDE.md §2). 내용:
+  (1) apps/web에 Tailwind v4(@tailwindcss/postcss) + shadcn 규약 CSS 변수 + framer-motion/lucide-react/
+  cva/clsx/tailwind-merge/tw-animate-css 설치. (2) globals.css를 단일 색 출처로 재작성(라이트 클린 +
+  Geist 폰트 실제 적용 — 기존 Arial 폴백 버그 수정) + 레거시 --ldd-* 토큰 별칭 흡수. (3) UI 프리미티브
+  신설(components/ui/card·button·badge·input·github-mark, lib/utils cn). (4) 홈 page.tsx를 세로 나열 →
+  헤더(로고/테마토글/활보/로그아웃) + 베이토 그리드 대시보드로 재구성. (5) 위젯 8종(Todo/Chat/Duck/
+  Habit/Pomodoro/Calendar/Memo/Github) + 로그인 화면 전부 새 카드 시스템으로 리스타일 — 로직(CRUD/
+  낙관적 업데이트/시그널/RAG 인덱싱)과 E2E data-testid 전부 보존. (6) 이후 사용자 지시로 팔레트를
+  화이트+머스타드 옐로우(--primary #ca8a04)로, GitHub 잔디는 색조 믹스 대신 진짜 초록 스케일
+  (--gh-0..4, 강도↑=진한 초록, 다크는 GitHub 다크 스케일)로 변경. lucide 1.x가 브랜드 아이콘 Github를
+  제거해 공식 마크 인라인 SVG(github-mark.tsx)로 대체. `pnpm --filter web build` GREEN(컴파일+TS+정적생성).
+  결과 미리보기 Artifact 게시(claude.ai/code/artifact/228c0a22). Figma는 새 파일 생성까진 됐으나
+  Starter 플랜 MCP 호출 한도로 내용 채우기 실패(파일 L9VHOW4nS5bSDWXGW1yblO 빈 상태). **미커밋 —
+  사용자 커밋 대기(main 직접 금지, 브랜치 권장).**

@@ -1,35 +1,160 @@
-@import "@ldd/ui/tokens.css";
+@import "tailwindcss";
+@import "tw-animate-css";
 
-html {
-  height: 100%;
+@custom-variant dark (&:is(.dark *));
+
+/* ── Light-clean design system (watermelon-inspired) + duck-orange accent ──
+   단일 색 출처. shadcn CSS 변수 규약을 따르고, 레거시 @ldd/* 컴포넌트가 섞여도
+   튀지 않도록 --ldd-* 토큰을 같은 팔레트로 별칭 처리한다. */
+:root {
+  --radius: 0.85rem;
+
+  --background: #fbfaf7;
+  --foreground: #262117;
+  --card: #ffffff;
+  --card-foreground: #262117;
+  --popover: #ffffff;
+  --popover-foreground: #262117;
+  --primary: #ca8a04;
+  --primary-foreground: #26210d;
+  --secondary: #f5f1e8;
+  --secondary-foreground: #46402f;
+  --muted: #f4f1ea;
+  --muted-foreground: #8a8069;
+  --accent: #f5f1e8;
+  --accent-foreground: #262117;
+  --destructive: #dc2626;
+  --success: #217e3a;
+  --border: #ebe7dd;
+  --input: #ebe7dd;
+  --ring: #ca8a04;
+
+  --chart-1: #ca8a04;
+  --chart-2: #e0b04a;
+  --chart-3: #6ea88f;
+  --chart-4: #7c8cc4;
+  --chart-5: #c47c9e;
+
+  /* GitHub 잔디: 진짜 초록색, 강도가 오를수록 검정을 섞어 진한 초록으로 */
+  --gh-0: #ebe7dd;
+  --gh-1: #9be9a8;
+  --gh-2: #40c463;
+  --gh-3: #2b8a44;
+  --gh-4: #17552b;
+
+  /* legacy @ldd/ui alias → 새 팔레트로 흡수 */
+  --ldd-color-bg: var(--background);
+  --ldd-color-surface: var(--card);
+  --ldd-color-accent: var(--primary);
+  --ldd-color-text: var(--foreground);
+  --ldd-color-text-on-accent: var(--card-foreground);
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
+.dark {
+  --background: #1a1712;
+  --foreground: #f4f0e6;
+  --card: #221e18;
+  --card-foreground: #f4f0e6;
+  --popover: #221e18;
+  --popover-foreground: #f4f0e6;
+  --primary: #eab308;
+  --primary-foreground: #1a1712;
+  --secondary: #2a241c;
+  --secondary-foreground: #e7e1d3;
+  --muted: #26211a;
+  --muted-foreground: #a89e88;
+  --accent: #2a241c;
+  --accent-foreground: #f4f0e6;
+  --destructive: #f87171;
+  --success: #3fb950;
+  --border: #332d24;
+  --input: #332d24;
+  --ring: #eab308;
+
+  /* GitHub 잔디(다크): GitHub 다크 테마의 초록 스케일 */
+  --gh-0: #2a251c;
+  --gh-1: #0e4429;
+  --gh-2: #006d32;
+  --gh-3: #26a641;
+  --gh-4: #39d353;
 }
 
-body {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--ldd-color-text);
-  background: var(--ldd-color-bg);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
+  html {
+    height: 100%;
+  }
+
+  html,
+  body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  body {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    color: var(--foreground);
+    background: var(--background);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
 }
 
 @media (prefers-color-scheme: dark) {

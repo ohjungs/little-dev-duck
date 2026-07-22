@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check, ListTodo, Loader2, Pencil, Plus, X } from "lucide-react";
 import {
   applyXpAward,
   createTodo,
@@ -11,11 +12,19 @@ import {
 import type { Todo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import { todoEmbedText } from "@/lib/embedText";
-import { Button, Card, Input, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 import { emitTodosChanged } from "@/lib/todoSignal";
 import { emitXpChanged } from "@/lib/xpSignal";
 import { todayIso } from "@/lib/today";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -152,146 +161,154 @@ export function TodoWidget() {
   const visibleTodos = onlyToday
     ? todos.filter((t) => t.dueDate?.slice(0, 10) === today)
     : todos;
+  const remaining = visibleTodos.filter((t) => !t.isDone).length;
 
   return (
-    <Card data-testid="todo-widget" style={{ width: "100%", maxWidth: "420px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "0.75rem",
-        }}
-      >
-        <h2 style={{ fontSize: "1.1rem" }}>TO-DO</h2>
+    <Card data-testid="todo-widget" className="h-full">
+      <CardHeader>
+        <CardTitle>
+          <ListTodo className="size-4 text-primary" />
+          할 일
+          {state === "ready" && (
+            <Badge variant="muted">{remaining}개 남음</Badge>
+          )}
+        </CardTitle>
         <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => setOnlyToday((v) => !v)}
-          style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
         >
-          {onlyToday ? "전체 보기" : "오늘만 보기"}
+          {onlyToday ? "전체" : "오늘만"}
         </Button>
-      </div>
+      </CardHeader>
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
-        <Input
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleAdd();
-          }}
-          placeholder="할 일 추가"
-          style={{ flex: 1 }}
-        />
-        <Button type="button" onClick={handleAdd}>
-          추가
-        </Button>
-      </div>
-
-      {actionError && (
-        <p role="alert" style={{ color: "#b3261e", marginBottom: "0.5rem" }}>
-          {actionError}
-        </p>
-      )}
-
-      {state === "loading" && (
-        <p style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Spinner size={14} /> 불러오는 중...
-        </p>
-      )}
-      {state === "error" && (
-        <div>
-          <p>목록을 불러오지 못했습니다.</p>
-          <Button type="button" onClick={reload}>
-            다시 시도
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <Input
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+            }}
+            placeholder="할 일 추가"
+          />
+          <Button
+            type="button"
+            size="icon"
+            onClick={handleAdd}
+            aria-label="추가"
+          >
+            <Plus />
           </Button>
         </div>
-      )}
-      {state === "ready" && visibleTodos.length === 0 && (
-        <p>할 일이 없습니다.</p>
-      )}
-      {state === "ready" && visibleTodos.length > 0 && (
-        <ul
-          style={{
-            listStyle: "none",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.4rem",
-          }}
-        >
-          {visibleTodos.map((todo) =>
-            editingId === todo.id ? (
-              <li
-                key={todo.id}
-                data-testid={`todo-${todo.id}`}
-                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-              >
-                <Input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveEdit(todo.id);
-                    if (e.key === "Escape") setEditingId(null);
-                  }}
-                  autoFocus
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  type="button"
-                  onClick={() => saveEdit(todo.id)}
-                  style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
+
+        {actionError && (
+          <p role="alert" className="text-xs text-destructive">
+            {actionError}
+          </p>
+        )}
+
+        {state === "loading" && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" /> 불러오는 중...
+          </p>
+        )}
+        {state === "error" && (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-muted-foreground">
+              목록을 불러오지 못했습니다.
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={reload}>
+              다시 시도
+            </Button>
+          </div>
+        )}
+        {state === "ready" && visibleTodos.length === 0 && (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            할 일이 없습니다.
+          </p>
+        )}
+        {state === "ready" && visibleTodos.length > 0 && (
+          <ul className="flex flex-col gap-1">
+            {visibleTodos.map((todo) =>
+              editingId === todo.id ? (
+                <li
+                  key={todo.id}
+                  data-testid={`todo-${todo.id}`}
+                  className="flex items-center gap-2"
                 >
-                  저장
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => setEditingId(null)}
-                  style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveEdit(todo.id);
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                    autoFocus
+                    className="h-8"
+                  />
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    onClick={() => saveEdit(todo.id)}
+                    aria-label="저장"
+                  >
+                    <Check />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setEditingId(null)}
+                    aria-label="취소"
+                  >
+                    <X />
+                  </Button>
+                </li>
+              ) : (
+                <li
+                  key={todo.id}
+                  data-testid={`todo-${todo.id}`}
+                  className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60"
                 >
-                  취소
-                </Button>
-              </li>
-            ) : (
-              <li
-                key={todo.id}
-                data-testid={`todo-${todo.id}`}
-                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-              >
-                <input
-                  type="checkbox"
-                  checked={todo.isDone}
-                  onChange={() => handleToggle(todo)}
-                />
-                <span
-                  style={{
-                    flex: 1,
-                    textDecoration: todo.isDone ? "line-through" : "none",
-                    opacity: todo.isDone ? 0.6 : 1,
-                  }}
-                >
-                  {todo.title}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => startEdit(todo)}
-                  aria-label="수정"
-                  style={{ background: "none", border: "none", cursor: "pointer" }}
-                >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(todo.id)}
-                  aria-label="삭제"
-                  style={{ background: "none", border: "none", cursor: "pointer" }}
-                >
-                  ✕
-                </button>
-              </li>
-            ),
-          )}
-        </ul>
-      )}
+                  <input
+                    type="checkbox"
+                    checked={todo.isDone}
+                    onChange={() => handleToggle(todo)}
+                    className="size-4 shrink-0 cursor-pointer accent-primary"
+                  />
+                  <span
+                    className={
+                      todo.isDone
+                        ? "flex-1 text-sm text-muted-foreground line-through"
+                        : "flex-1 text-sm"
+                    }
+                  >
+                    {todo.title}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(todo)}
+                    aria-label="수정"
+                    className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(todo.id)}
+                    aria-label="삭제"
+                    className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </li>
+              ),
+            )}
+          </ul>
+        )}
+      </CardContent>
     </Card>
   );
 }

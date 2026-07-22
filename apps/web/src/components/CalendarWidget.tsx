@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CalendarDays, Plus, X } from "lucide-react";
 import {
   createCalendarEvent,
   deleteCalendarEvent,
@@ -8,9 +9,17 @@ import {
 } from "@ldd/api";
 import { daysUntil, type CalendarEvent } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
-import { Button, Card, Input, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 import { todayIso } from "@/lib/today";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -20,6 +29,14 @@ function ddayLabel(startAt: string): string {
   if (diff === 0) return "오늘";
   if (diff > 0) return `D-${diff}`;
   return `D+${-diff} 지남`;
+}
+
+// 오늘=강조, 지난 일정=흐리게, 다가오는 일정=기본.
+function ddayVariant(startAt: string): "default" | "muted" | "secondary" {
+  const diff = daysUntil(startAt, todayIso());
+  if (diff === 0) return "default";
+  if (diff < 0) return "muted";
+  return "secondary";
 }
 
 function byStartAt(a: CalendarEvent, b: CalendarEvent): number {
@@ -88,103 +105,103 @@ export function CalendarWidget() {
   };
 
   return (
-    <Card
-      data-testid="calendar-widget"
-      style={{ width: "100%", maxWidth: "420px" }}
-    >
-      <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>캘린더</h2>
+    <Card data-testid="calendar-widget" className="h-full">
+      <CardHeader>
+        <CardTitle>
+          <CalendarDays className="size-4 text-primary" />
+          캘린더
+        </CardTitle>
+      </CardHeader>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "0.5rem",
-          marginBottom: "0.5rem",
-          flexWrap: "wrap",
-        }}
-      >
-        <Input
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleAdd();
-          }}
-          placeholder="일정 제목"
-          style={{ flex: 1, minWidth: "8rem" }}
-        />
-        <Input
-          type="date"
-          value={newDate}
-          onChange={(e) => setNewDate(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleAdd();
-          }}
-          aria-label="날짜"
-        />
-        <Button type="button" onClick={handleAdd}>
-          추가
-        </Button>
-      </div>
-
-      {actionError && (
-        <p role="alert" style={{ color: "#b3261e", marginBottom: "0.5rem" }}>
-          {actionError}
-        </p>
-      )}
-
-      {state === "loading" && (
-        <p style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Spinner size={14} /> 불러오는 중...
-        </p>
-      )}
-      {state === "error" && (
-        <div>
-          <p>일정을 불러오지 못했습니다.</p>
-          <Button type="button" onClick={reload}>
-            다시 시도
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-2">
+          <Input
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+            }}
+            placeholder="일정 제목"
+            className="min-w-32 flex-1"
+          />
+          <Input
+            type="date"
+            value={newDate}
+            onChange={(e) => setNewDate(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+            }}
+            aria-label="날짜"
+            className="w-auto"
+          />
+          <Button
+            type="button"
+            size="icon"
+            onClick={handleAdd}
+            aria-label="추가"
+          >
+            <Plus />
           </Button>
         </div>
-      )}
-      {state === "ready" && events.length === 0 && <p>다가오는 일정이 없습니다.</p>}
-      {state === "ready" && events.length > 0 && (
-        <ul
-          style={{
-            listStyle: "none",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.4rem",
-          }}
-        >
-          {events.map((event) => (
-            <li
-              key={event.id}
-              data-testid={`calendar-event-${event.id}`}
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-            >
-              <span
-                style={{
-                  minWidth: "4.5rem",
-                  fontVariantNumeric: "tabular-nums",
-                  fontWeight: 600,
-                }}
+
+        {actionError && (
+          <p role="alert" className="text-xs text-destructive">
+            {actionError}
+          </p>
+        )}
+
+        {state === "loading" && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="size-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+            불러오는 중...
+          </p>
+        )}
+        {state === "error" && (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-muted-foreground">
+              일정을 불러오지 못했습니다.
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={reload}>
+              다시 시도
+            </Button>
+          </div>
+        )}
+        {state === "ready" && events.length === 0 && (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            다가오는 일정이 없습니다.
+          </p>
+        )}
+        {state === "ready" && events.length > 0 && (
+          <ul className="flex flex-col gap-1">
+            {events.map((event) => (
+              <li
+                key={event.id}
+                data-testid={`calendar-event-${event.id}`}
+                className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60"
               >
-                {ddayLabel(event.startAt)}
-              </span>
-              <span style={{ flex: 1 }}>{event.title}</span>
-              <span style={{ opacity: 0.6, fontSize: "0.8rem" }}>
-                {event.startAt.slice(0, 10)}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleDelete(event.id)}
-                aria-label="삭제"
-                style={{ background: "none", border: "none", cursor: "pointer" }}
-              >
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                <Badge
+                  variant={ddayVariant(event.startAt)}
+                  className="min-w-16 justify-center tabular-nums"
+                >
+                  {ddayLabel(event.startAt)}
+                </Badge>
+                <span className="flex-1 truncate text-sm">{event.title}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {event.startAt.slice(0, 10)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(event.id)}
+                  aria-label="삭제"
+                  className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
     </Card>
   );
 }

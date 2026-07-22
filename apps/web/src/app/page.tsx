@@ -1,6 +1,8 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
-import { Button } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { DuckWidget } from "@/components/DuckWidget";
 import { DuckChatPanel } from "@/components/DuckChatPanel";
 import { TodoWidget } from "@/components/TodoWidget";
@@ -29,65 +31,78 @@ export default async function Home() {
     (user.user_metadata.name as string | undefined) ??
     user.email;
 
+  const dateLabel = new Intl.DateTimeFormat("ko-KR", {
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(new Date());
+
   return (
-    <main
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "1.5rem",
-        minHeight: "100vh",
-        padding: "2rem",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          width: "100%",
-          maxWidth: "900px",
-        }}
-      >
-        <p>환영합니다, {displayName}님</p>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <WalkingModeToggle />
-          <form action="/auth/logout" method="post">
-            <Button type="submit">로그아웃</Button>
-          </form>
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-4 md:px-6 lg:px-8">
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-primary/12 ring-1 ring-primary/15">
+              <Image
+                src="/duck-logo.png"
+                alt=""
+                width={24}
+                height={24}
+                className="size-6 object-contain"
+              />
+            </span>
+            <span className="text-sm font-semibold tracking-tight">
+              Little Dev Duck
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <WalkingModeToggle />
+            <form action="/auth/logout" method="post">
+              <Button variant="ghost" size="sm" type="submit">
+                로그아웃
+              </Button>
+            </form>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div style={{ width: "100%", maxWidth: "300px" }}>
-        <DuckWidget />
-      </div>
+      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6 lg:px-8">
+        <div className="mb-6 flex flex-col gap-1">
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            {dateLabel}
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            안녕하세요, {displayName}님
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            오늘도 오리와 함께 차근차근 시작해볼까요.
+          </p>
+        </div>
 
-      <div style={{ width: "100%", maxWidth: "560px" }}>
-        <DuckChatPanel />
-      </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="md:col-span-1 lg:col-span-1">
+            <DuckWidget />
+          </div>
+          <div className="md:col-span-1 lg:col-span-2">
+            <DuckChatPanel />
+          </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "1.5rem",
-          justifyContent: "center",
-          width: "100%",
-          maxWidth: "900px",
-        }}
-      >
-        <TodoWidget />
-        <MemoWidget />
-        <HabitWidget />
-        <PomodoroWidget />
-        <CalendarWidget />
-      </div>
+          <TodoWidget />
+          <HabitWidget />
+          <PomodoroWidget />
+          <div className="md:col-span-2 lg:col-span-2">
+            <MemoWidget />
+          </div>
+          <CalendarWidget />
 
-      <div style={{ width: "100%", maxWidth: "900px" }}>
-        <GithubContributionWidget />
-      </div>
+          <div className="md:col-span-2 lg:col-span-3">
+            <GithubContributionWidget />
+          </div>
+        </div>
+      </main>
 
       <DesktopCollectorSync />
-    </main>
+    </div>
   );
 }

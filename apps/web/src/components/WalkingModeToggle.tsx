@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Toast } from "@ldd/ui";
+import { Footprints } from "lucide-react";
+import { Toast } from "@ldd/ui";
+import { Button } from "@/components/ui/button";
 
 type TauriGlobal = {
   core: {
@@ -45,10 +47,12 @@ export function WalkingModeToggle() {
     <>
       <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={toggle}
         aria-pressed={walking}
-        style={{ padding: "0.25rem 0.7rem", fontSize: "0.8rem" }}
       >
+        <Footprints />
         {walking ? "활보 멈추기" : "바탕화면 활보"}
       </Button>
       {error && (

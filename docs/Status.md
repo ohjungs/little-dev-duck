@@ -214,6 +214,19 @@ model.glb 미확보로 도형 플레이스홀더로 구현(사용자 승인됨, 
 2. GitHub 계정으로 로그인 → 홈 화면에 GitHub 잔디(컨트리뷰션 캘린더)가 표시되는지
 3. Google 계정으로 로그인한 경우 "GitHub 계정으로 로그인하면..." 안내가 뜨는지(에러 아님)
 
+## 그 외 진행 (Phase 무관 UI 전면 리디자인, 2026-07-22, 사용자 요청) — 미커밋
+
+- 사용자 "UI 개선 - 대시보드로 예쁘게"(참조: ui.watermelon.sh, cult-ui.com). **Tailwind v4 도입은
+  확정 스택 변경이라 사용자에게 물어 명시 승인 후 진행**(게이트 통과). apps/web에 Tailwind v4 +
+  shadcn 규약 + framer-motion/lucide 설치, globals.css를 단일 색 출처로 재작성(Geist 폰트 실적용,
+  기존 Arial 폴백 버그 수정), UI 프리미티브 신설(components/ui/*), 홈을 헤더+베이토 그리드 대시보드로
+  재구성, 위젯 8종 + 로그인 리스타일(로직·E2E data-testid 보존).
+- 팔레트: 화이트 + **머스타드 옐로우**(--primary #ca8a04, 다크 #eab308). GitHub 잔디는 진짜 초록
+  스케일(--gh-0..4, 강도↑=진한 초록). lucide 1.x Github 아이콘 제거 → 인라인 SVG 대체.
+- 검증: `pnpm --filter web build` GREEN. 미리보기 Artifact(claude.ai/code/artifact/228c0a22).
+  Figma는 Starter 플랜 MCP 한도로 빈 파일만 생성. **커밋은 사용자 결정 대기(main 직접 금지, 브랜치 권장).**
+- 상세: docs/History.md 2026-07-22 항목.
+
 ## 그 외 진행 (Phase와 무관한 브랜딩 변경, 2026-07-20, 사용자 요청)
 
 - 사이트 테마 accent 토큰을 올리브(#A99C65)에서 앤트로픽 스타일 오렌지(#D97757)로 변경

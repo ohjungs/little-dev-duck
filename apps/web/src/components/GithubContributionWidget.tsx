@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { ContributionDay, ContributionSummary } from "@ldd/core";
-import { Button, Card, Spinner } from "@ldd/ui";
+import { GitHubMark } from "@/components/ui/github-mark";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -10,9 +18,9 @@ type ContributionsResponse =
   | { linked: true; summary: ContributionSummary }
   | { linked: false };
 
-// 레벨 0(기여 없음)도 accent를 살짝 섞어야 한다 - 0%면 Card 배경(--ldd-color-surface)과
-// 완전히 같은 색이 되어 빈 칸이 통째로 안 보인다(실사용 중 발견).
-const LEVEL_MIX_PERCENT = [12, 30, 55, 78, 100] as const;
+// 잔디 색은 GitHub식 진짜 초록 스케일(--gh-0..4, globals.css). 강도가 오를수록 진한 초록이 된다.
+// 레벨 0(기여 없음)은 중립 회색이라 빈 칸도 카드 배경과 구분된다.
+const LEVEL_VAR = ["--gh-0", "--gh-1", "--gh-2", "--gh-3", "--gh-4"] as const;
 
 function levelForCount(count: number): 0 | 1 | 2 | 3 | 4 {
   if (count === 0) return 0;
@@ -22,14 +30,8 @@ function levelForCount(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4;
 }
 
-function cellStyle(count: number) {
-  const percent = LEVEL_MIX_PERCENT[levelForCount(count)];
-  return {
-    width: "10px",
-    height: "10px",
-    borderRadius: "2px",
-    background: `color-mix(in srgb, var(--ldd-color-accent) ${percent}%, var(--ldd-color-surface))`,
-  };
+function cellStyle(count: number): CSSProperties {
+  return { background: `var(${LEVEL_VAR[levelForCount(count)]})` };
 }
 
 function chunkIntoWeeks(days: ContributionDay[]): ContributionDay[][] {
@@ -68,54 +70,59 @@ export function GithubContributionWidget() {
   };
 
   return (
-    <Card
-      data-testid="github-contribution-widget"
-      style={{ width: "100%", maxWidth: "900px" }}
-    >
-      <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>GitHub 잔디</h2>
+    <Card data-testid="github-contribution-widget" className="h-full">
+      <CardHeader>
+        <CardTitle>
+          <GitHubMark className="size-4 text-primary" />
+          GitHub 잔디
+        </CardTitle>
+        {state === "ready" && data && data.linked && (
+          <Badge variant="muted">최근 1년 {data.summary.totalCount}개</Badge>
+        )}
+      </CardHeader>
 
-      {state === "loading" && (
-        <p style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Spinner size={14} /> 불러오는 중...
-        </p>
-      )}
-
-      {state === "error" && (
-        <div>
-          <p>잔디를 불러오지 못했습니다.</p>
-          <Button type="button" onClick={reload}>
-            다시 시도
-          </Button>
-        </div>
-      )}
-
-      {state === "ready" && data && !data.linked && (
-        <p>GitHub 계정으로 로그인하면 잔디를 볼 수 있어요.</p>
-      )}
-
-      {state === "ready" && data && data.linked && (
-        <div>
-          <p style={{ marginBottom: "0.5rem", fontSize: "0.85rem" }}>
-            최근 1년간 {data.summary.totalCount}개의 기여
+      <CardContent>
+        {state === "loading" && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="size-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+            불러오는 중...
           </p>
-          <div style={{ display: "flex", gap: "3px", overflowX: "auto" }}>
+        )}
+
+        {state === "error" && (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-muted-foreground">
+              잔디를 불러오지 못했습니다.
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={reload}>
+              다시 시도
+            </Button>
+          </div>
+        )}
+
+        {state === "ready" && data && !data.linked && (
+          <p className="text-sm text-muted-foreground">
+            GitHub 계정으로 로그인하면 잔디를 볼 수 있어요.
+          </p>
+        )}
+
+        {state === "ready" && data && data.linked && (
+          <div className="flex gap-[3px] overflow-x-auto pb-1">
             {chunkIntoWeeks(data.summary.days).map((week, weekIndex) => (
-              <div
-                key={weekIndex}
-                style={{ display: "flex", flexDirection: "column", gap: "3px" }}
-              >
+              <div key={weekIndex} className="flex flex-col gap-[3px]">
                 {week.map((day) => (
                   <div
                     key={day.date}
                     title={`${day.date}: ${day.count}개 기여`}
                     style={cellStyle(day.count)}
+                    className="size-2.5 rounded-[3px]"
                   />
                 ))}
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </CardContent>
     </Card>
   );
 }

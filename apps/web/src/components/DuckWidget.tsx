@@ -2,11 +2,18 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+import { Drumstick, Sparkles } from "lucide-react";
 import { getDuckState } from "@ldd/api";
 import { levelProgress, type DuckState } from "@ldd/core";
-import { Card } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 import { onXpChanged } from "@/lib/xpSignal";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useDuckMood } from "./useDuckMood";
 
 const DUCK_HEIGHT = 220;
@@ -65,76 +72,49 @@ export function DuckWidget() {
   const ratioPercent = progress ? Math.round(progress.ratio * 100) : 0;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "0.5rem",
-        width: "100%",
-      }}
-    >
-      {duckState && (
-        <span
-          data-testid="duck-level"
-          style={{
-            fontSize: "0.9rem",
-            fontWeight: 700,
-            color: "var(--ldd-color-text, #352116)",
-          }}
-        >
-          Lv {duckState.level}
-        </span>
-      )}
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle>
+          <Sparkles className="size-4 text-primary" />
+          오리
+        </CardTitle>
+        {duckState && (
+          <Badge data-testid="duck-level">Lv {duckState.level}</Badge>
+        )}
+      </CardHeader>
 
-      <Duck height={DUCK_HEIGHT} mood={mood} celebrate={celebrate} />
+      <CardContent className="flex flex-col items-center gap-4">
+        <div className="flex w-full items-center justify-center rounded-xl bg-gradient-to-b from-secondary/60 to-secondary/20">
+          <Duck height={DUCK_HEIGHT} mood={mood} celebrate={celebrate} />
+        </div>
 
-      {duckState && (
-        <Card
-          data-testid="duck-stats"
-          style={{
-            width: "100%",
-            maxWidth: "200px",
-            padding: "0.6rem 0.75rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.4rem",
-          }}
-        >
-          <div
-            role="progressbar"
-            aria-label="레벨 진행도"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={ratioPercent}
-            style={{
-              height: "8px",
-              background: "rgba(0, 0, 0, 0.15)",
-              borderRadius: "999px",
-              overflow: "hidden",
-            }}
-          >
+        {duckState && (
+          <div data-testid="duck-stats" className="flex w-full flex-col gap-2">
             <div
-              style={{
-                height: "100%",
-                width: `${ratioPercent}%`,
-                background: "var(--ldd-color-accent, #A99C65)",
-                transition: "width 300ms ease",
-              }}
-            />
+              role="progressbar"
+              aria-label="레벨 진행도"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={ratioPercent}
+              className="h-2 w-full overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300"
+                style={{ width: `${ratioPercent}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">
+                XP {duckState.xp}
+              </span>
+              <span className="flex items-center gap-1">
+                <Drumstick className="size-3.5" />
+                먹이 {duckState.feed}
+              </span>
+            </div>
           </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "0.75rem",
-            }}
-          >
-            <span>XP {duckState.xp}</span>
-            <span>먹이 {duckState.feed}</span>
-          </div>
-        </Card>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
