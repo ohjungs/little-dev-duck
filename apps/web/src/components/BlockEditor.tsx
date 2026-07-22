@@ -1,10 +1,14 @@
 "use client";
 
 import "@blocknote/shadcn/style.css";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import type { Block, PartialBlock } from "@blocknote/core";
+import { createClient } from "@/lib/supabase/client";
+
+// 페이지 첨부 Storage 버킷(마이그레이션 20260722050000). 경로는 '<user_id>/<uuid>.<ext>'.
+const ATTACHMENT_BUCKET = "page-attachments";
 
 // 저장된 content(unknown)를 BlockNote 초기값으로 변환. BlockNote는 빈 배열을 거부하므로(비어 있으면
 // 예외) undefined로 넘겨 기본 빈 문단으로 시작하게 한다.
@@ -46,8 +50,31 @@ export function BlockEditor({
   onExportReady?: (toMarkdown: () => string) => void;
 }) {
   const theme = useDarkTheme();
+  const supabase = useMemo(() => createClient(), []);
+
+  // 이미지/파일 블록 업로드(T3): 본인 폴더(<user_id>/)에 올리고 public URL을 블록에 저장. RLS가
+  // 본인 폴더 쓰기만 허용하고, public 버킷이라 <img src>로 읽힌다(경로는 추측 불가한 UUID).
+  const uploadFile = useCallback(
+    async (file: File): Promise<string> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("로그인이 필요합니다.");
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+      const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage
+        .from(ATTACHMENT_BUCKET)
+        .upload(path, file, { cacheControl: "3600", upsert: false });
+      if (error) throw new Error(error.message);
+      return supabase.storage.from(ATTACHMENT_BUCKET).getPublicUrl(path).data
+        .publicUrl;
+    },
+    [supabase],
+  );
+
   const editor = useCreateBlockNote({
     initialContent: toInitialContent(initialContent),
+    uploadFile,
   });
 
   useEffect(() => {
