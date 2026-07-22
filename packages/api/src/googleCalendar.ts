@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
+import { LddError, type ToolCall, type ToolDeclaration, type ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
 import { safeBody, upstreamError } from "./gemini";
 
@@ -71,7 +71,14 @@ export function createGoogleCalendarAdapter(
         ...init?.headers,
       },
     });
-    if (!res.ok) throw upstreamError(res.status, await safeBody(res));
+    if (!res.ok) {
+      // access_token은 짧은 수명(~1시간)이고 이 어댑터는 갱신을 모른다(토큰 재발급은 별도 관심사).
+      // 401은 "만료/무효"로 구분해 라우트가 일반 502 대신 "재연동 필요" 안내를 줄 수 있게 한다.
+      if (res.status === 401) {
+        throw new LddError("unauthorized", "Google Calendar 인증이 만료되었습니다");
+      }
+      throw upstreamError(res.status, await safeBody(res));
+    }
     return res.json();
   }
 

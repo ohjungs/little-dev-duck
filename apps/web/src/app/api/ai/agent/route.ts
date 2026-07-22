@@ -11,6 +11,8 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 const MAX_QUESTION_LEN = 1000;
+const RECONNECT_MESSAGE =
+  "Google Calendar가 연동되어 있지 않아요. Google 계정으로 다시 로그인하면 연동됩니다.";
 
 // Phase 10 T2/T3: 오리 에이전트 액션. Phase 8 /chat과 동일한 서버 키+auth+레이트리밋 골격 위에, 질문을
 // Google Calendar 어댑터로 runAgentTurn에 넘긴다. mutating 도구는 여기서 실행하지 않고 approval_pending을
@@ -54,10 +56,7 @@ export async function POST(request: Request) {
 
   const tokens = await getGoogleTokens(supabase, user.id);
   if (!tokens) {
-    return NextResponse.json({
-      status: "unavailable",
-      message: "Google Calendar가 연동되어 있지 않아요. Google 계정으로 다시 로그인하면 연동됩니다.",
-    });
+    return NextResponse.json({ status: "unavailable", message: RECONNECT_MESSAGE });
   }
 
   try {
@@ -70,6 +69,11 @@ export async function POST(request: Request) {
         status: "unavailable",
         message: "지금은 에이전트 액션을 사용할 수 없어요. 잠시 후 다시 시도해주세요.",
       });
+    }
+    // access_token 만료(~1시간, 갱신 미구현) 시 Google이 401을 주고 어댑터가 unauthorized로 표시한다.
+    // 일반 502 대신 실제로 도움이 되는 재연동 안내를 준다.
+    if (isLddError(error) && error.code === "unauthorized") {
+      return NextResponse.json({ status: "unavailable", message: RECONNECT_MESSAGE });
     }
     console.error("AI agent 실패", { userId: user.id, error });
     return NextResponse.json(

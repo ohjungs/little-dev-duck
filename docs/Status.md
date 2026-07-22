@@ -32,7 +32,8 @@ Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
   `getGoogleTokens`(user_id upsert) + `auth/callback`에서 Google 로그인 시 provider_token 캡처·저장
   (refresh_token 없는 재로그인이 기존 저장분을 지우지 않도록 조회 후 보존) + LoginForm Google 버튼에
   `calendar.events` scope + `access_type=offline`+`prompt=consent`(refresh_token 발급 필수 조건, 실측).
-  **db push 필요.**
+  **db push 필요. 범위 컷: 계획 phase_10.md는 내부 `calendar_events`와 동시 반영을 언급했으나 미구현 —
+  현재는 Google에만 생성, 내부 테이블 연동은 후속 Task.**
 - [x] 승인 카드 UI: `packages/ai` `useAgentChat` 훅(대화 상태+승인대기+approve/cancel) + 신규
   `AgentChatPanel.tsx`(DuckChatPanel과 관심사 분리 — RAG 질답 vs 실제 액션, 홈 위젯 그리드 배치). +3 ai tests.
 - [x] T4 인젝션 방어 하드닝 착수(로컬 완결 가능한 부분): `runAgentTurn`에 매 턴 고정 방어 지침(도구 실행
@@ -43,7 +44,14 @@ Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
   토큰/PII 노출 최소화) + 마이그레이션 `20260722090000_action_log`(RLS select+insert only, 불변 레코드+
   rollback) + api `logAction` + `/api/ai/agent/approve`에서 실행 결과별 기록(best-effort, 실패해도 응답
   안 막음). **db push 필요.**
-- 검증: core 117(+4) / api 140(+2) / ai 9 tests + web build GREEN + core·api·web 로컬 full eslint 선검증.
+- [x] code+security 리뷰(병렬) + 수정: CRITICAL 0. HIGH 2건 수정 — (1) `executeApprovedCalls`가 배치 중
+  하나만 실패해도 통째로 예외를 던져 이미 성공한 결과·감사 로그가 유실되던 것 → per-call try/catch로
+  격리(회귀 테스트 추가). (2) Google access_token 만료(~1시간, 갱신 미구현) 시 401→일반 502 "처리하기
+  어려워요"로만 응답하던 것 → `googleCalendar.ts`가 401을 `unauthorized`로 구분해 던지고 양쪽 라우트가
+  "재연동 필요" 안내로 매핑(회귀 테스트 추가). MEDIUM 1건은 mixed-turn(같은 턴에 readonly+mutating 혼재
+  시 readonly 유실) ponytail 주석으로 명시(카탈로그 소규모라 현재는 낮은 우선순위, T5+ 확장 시 재검토).
+  action_log id 매칭(별도 발견, 이미 수정 커밋 b61b228)은 security-reviewer도 독립 재확인.
+- 검증: core 117(+4) / api 142(+4) / ai 9 tests + web build GREEN + core·api·web 로컬 full eslint 선검증.
 - [ ] **T3 실기 검증(사용자, 로그인 필요)**: Google 재로그인(재동의 화면 필수)→provider_token 저장 확인→
   AgentChatPanel에서 "일정 만들어줘" 시도→승인 카드→승인 후 실제 Google Calendar에 반영되는지 +
   action_log에 기록되는지. `gemini-flash-latest`의 function calling 실동작도 이 시점에 실측(phase_10.md

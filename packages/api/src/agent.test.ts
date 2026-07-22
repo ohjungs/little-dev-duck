@@ -194,4 +194,27 @@ describe("executeApprovedCalls", () => {
     expect(executed).toBe(false);
     expect(results[0].response).toHaveProperty("error");
   });
+
+  it("배치 중 하나가 예외를 던져도 나머지 호출을 계속 실행한다(부분 실패가 전체를 지우지 않음)", async () => {
+    const executedIds: string[] = [];
+    const adapter = mockAdapter(async (call) => {
+      if (call.id === "fail") throw new Error("Google 401");
+      executedIds.push(call.id ?? "");
+      return { id: call.id, name: call.name, response: { ok: true } };
+    });
+    const results = await executeApprovedCalls(
+      [
+        { id: "c1", name: "createEvent", args: { title: "첫 회의" } },
+        { id: "fail", name: "createEvent", args: { title: "실패할 회의" } },
+        { id: "c3", name: "createEvent", args: { title: "세 번째 회의" } },
+      ],
+      adapter,
+    );
+    // 실패한 호출 앞뒤로 성공한 두 건이 모두 결과에 남는다 — 하나의 예외가 배치 전체를 지우지 않음.
+    expect(executedIds).toEqual(["c1", "c3"]);
+    expect(results).toHaveLength(3);
+    expect(results[0].response).toEqual({ ok: true });
+    expect(results[1].response).toHaveProperty("error");
+    expect(results[2].response).toEqual({ ok: true });
+  });
 });

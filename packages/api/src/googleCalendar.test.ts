@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isLddError } from "@ldd/core";
 import { createGoogleCalendarAdapter } from "./googleCalendar";
 
 function jsonRes(status: number, body: unknown): Response {
@@ -91,12 +92,26 @@ describe("createGoogleCalendarAdapter", () => {
     expect(result.response).toEqual({ created: { id: "new1", title: "스탠드업" } });
   });
 
-  it("Google API가 실패 응답을 주면 upstream 에러를 던진다", async () => {
+  it("Google이 401을 주면 unauthorized로 구분해 던진다(access_token 만료 → 재연동 안내용)", async () => {
     const fetchImpl = (async () => jsonRes(401, { error: "invalid_token" })) as unknown as typeof fetch;
     const adapter = createGoogleCalendarAdapter("expired", fetchImpl);
-    await expect(
-      adapter.execute({ id: "c1", name: "listUpcomingEvents", args: {} }),
-    ).rejects.toThrow();
+    try {
+      await adapter.execute({ id: "c1", name: "listUpcomingEvents", args: {} });
+      expect.unreachable();
+    } catch (error) {
+      expect(isLddError(error) && error.code).toBe("unauthorized");
+    }
+  });
+
+  it("Google이 401 외 실패 응답을 주면 upstream 에러를 던진다", async () => {
+    const fetchImpl = (async () => jsonRes(500, { error: "server_error" })) as unknown as typeof fetch;
+    const adapter = createGoogleCalendarAdapter("token", fetchImpl);
+    try {
+      await adapter.execute({ id: "c1", name: "listUpcomingEvents", args: {} });
+      expect.unreachable();
+    } catch (error) {
+      expect(isLddError(error) && error.code).toBe("upstream");
+    }
   });
 
   it("알 수 없는 도구명이면 에러 결과를 반환한다", async () => {
