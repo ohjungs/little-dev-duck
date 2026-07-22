@@ -375,3 +375,20 @@
   재사용(gemini.ts safeBody/upstreamError export). 7 tests + tsc GREEN. **남은 T2(승인 실행 배선+
   DuckChatPanel 카드)·T3(Google Calendar 어댑터)**: T3는 OAuth provider_token 필요 → Phase 9 db push +
   로그인이 선행돼야 함(사용자 몫). db push는 이 환경에 CLI/토큰/DB 비번 부재로 세션이 대신 못 함(확인 완료).
+- 2026-07-22 밤 : Phase 10 T2~T3 코드 완료 — 승인 게이트 + Google Calendar 어댑터 end-to-end (`/loop
+  /next-step`, 자율). T1(전 세션)이 잠근 계약 위에 순차 구현:
+  - T2: api `executeApprovedCalls`(승인된 mutating만 실행, readonly/unknown은 승인 경로 자체를 거부해
+    승인 UI 우회를 이중 차단) + `/api/ai/agent`(Phase 8 /chat 패턴 계승: 서버 키+auth+레이트리밋, 토큰
+    미연동 시 "연동 필요" 안내) + `/api/ai/agent/approve`(zod 재검증).
+  - T3: `createGoogleCalendarAdapter`(조회 readonly+생성 mutating, args zod 재검증=인젝션 방어) + core
+    `google-oauth-token` 스키마 + 마이그레이션 `20260722080000_user_google_tokens`(RLS+rollback) + api
+    `saveGoogleTokens`/`getGoogleTokens` + `auth/callback`에서 Google provider_token 캡처(리뷰 중 자체
+    발견·수정: refresh_token 미포함 재로그인이 기존 저장분을 null로 덮어쓰는 버그 — 저장 전 기존값 조회
+    후 보존) + LoginForm Google scope(`calendar.events`)+`access_type=offline`+`prompt=consent`.
+  - UI: `packages/ai` `useAgentChat` 훅 + 신규 `AgentChatPanel.tsx`(DuckChatPanel과 관심사 분리 — RAG
+    질답 vs 실제 액션 실행, 별도 컴포넌트로 병존). 홈 위젯 그리드 배치.
+  - 부수 발견·수정: `packages/api`가 `zod`를 직접 import하면서도 package.json에 의존성 선언이 없어(core
+    를 통한 phantom dependency, Phase 5의 apps/web zod 사례와 동일 패턴) tsc 실패 — 명시 의존성 추가로 해소.
+  - 검증: core 113(+7) / api 138(+18) / ai 9(+3) tests + web build GREEN + core·api·web 로컬 full eslint
+    선검증(전부 exit 0). 실제 Google OAuth consent/토큰 발급은 로컬에서 재현 불가 — T3 실기 검증은 사용자
+    로그인 필요(Status.md 참조). `supabase db push` 신규 마이그레이션 1건 대기.

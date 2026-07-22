@@ -37,6 +37,15 @@ export function LoginForm() {
       provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        // Phase 10 T3: Google 로그인에 Calendar scope를 함께 요청해 오리가 일정을 조회/생성할 수 있게
+        // 한다. access_type=offline+prompt=consent가 있어야 refresh_token이 발급된다(공식 문서 실측,
+        // 없으면 access_token만 오고 만료 후 재로그인 필요). GitHub는 Calendar와 무관해 옵션 없음.
+        ...(provider === "google"
+          ? {
+              scopes: "https://www.googleapis.com/auth/calendar.events",
+              queryParams: { access_type: "offline", prompt: "consent" },
+            }
+          : {}),
       },
     });
   };

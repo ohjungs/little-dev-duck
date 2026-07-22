@@ -145,3 +145,30 @@ export async function runAgentTurn(
     `에이전트 루프가 ${AGENT_MAX_ITERATIONS}회 상한을 초과했습니다`,
   );
 }
+
+// T2 승인 게이트: 사용자가 승인한 mutating 도구 호출들을 실행한다. runAgentTurn이 approval_pending으로
+// 반환한 calls를 클라가 그대로 돌려보내 호출한다. 대화 전체를 라운드트립하지 않고 승인된 호출만 실행해
+// 상태 노출·재-LLM 왕복을 피한다. 카탈로그에 없거나 readonly인 이름은 실행하지 않는다 — 승인 UI를 우회한
+// 임의/파괴적 실행을 서버가 차단(카탈로그 = 유일 판정 근거). call.args 재검증은 어댑터가 담당(인젝션 방어).
+// ponytail: calls를 클라가 돌려보내므로 개인 도구(RLS로 본인 데이터)엔 충분하나, 멀티유저면 승인 토큰
+//   서명/서버 보관으로 격상.
+export async function executeApprovedCalls(
+  calls: ToolCall[],
+  adapter: Adapter,
+): Promise<ToolResult[]> {
+  const byName = new Map(adapter.catalog.map((decl) => [decl.name, decl]));
+  const results: ToolResult[] = [];
+  for (const call of calls) {
+    const decl = byName.get(call.name);
+    if (!decl || decl.kind !== "mutating") {
+      results.push({
+        id: call.id,
+        name: call.name,
+        response: { error: "승인 실행이 허용되지 않는 도구입니다." },
+      });
+      continue;
+    }
+    results.push(await adapter.execute(call));
+  }
+  return results;
+}

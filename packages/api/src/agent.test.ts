@@ -5,7 +5,7 @@ import {
   type ToolDeclaration,
   type ToolResult,
 } from "@ldd/core";
-import { runAgentTurn, type Adapter } from "./agent";
+import { executeApprovedCalls, runAgentTurn, type Adapter } from "./agent";
 
 const READONLY: ToolDeclaration = {
   name: "listEvents",
@@ -147,5 +147,51 @@ describe("runAgentTurn", () => {
     await expect(
       runAgentTurn("q", mockAdapter(), "key", fetchImpl),
     ).rejects.toThrow("429");
+  });
+});
+
+describe("executeApprovedCalls", () => {
+  it("승인된 mutating 도구를 어댑터로 실행한다", async () => {
+    let executed: ToolCall | null = null;
+    const adapter = mockAdapter(async (call) => {
+      executed = call;
+      return { id: call.id, name: call.name, response: { ok: true } };
+    });
+    const results = await executeApprovedCalls(
+      [{ id: "c1", name: "createEvent", args: { title: "회의" } }],
+      adapter,
+    );
+    expect(executed).not.toBeNull();
+    expect(results).toEqual([
+      { id: "c1", name: "createEvent", response: { ok: true } },
+    ]);
+  });
+
+  it("readonly 도구는 승인 경로로 실행하지 않고 거부한다(승인 UI 우회 차단)", async () => {
+    let executed = false;
+    const adapter = mockAdapter(async (call) => {
+      executed = true;
+      return { id: call.id, name: call.name, response: {} };
+    });
+    const results = await executeApprovedCalls(
+      [{ id: "c1", name: "listEvents", args: {} }],
+      adapter,
+    );
+    expect(executed).toBe(false);
+    expect(results[0].response).toHaveProperty("error");
+  });
+
+  it("카탈로그 밖 도구는 실행하지 않고 거부한다", async () => {
+    let executed = false;
+    const adapter = mockAdapter(async (call) => {
+      executed = true;
+      return { id: call.id, name: call.name, response: {} };
+    });
+    const results = await executeApprovedCalls(
+      [{ id: "c1", name: "deleteEverything", args: {} }],
+      adapter,
+    );
+    expect(executed).toBe(false);
+    expect(results[0].response).toHaveProperty("error");
   });
 });

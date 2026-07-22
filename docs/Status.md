@@ -1,20 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 9(워크스페이스 코어) 완료 — 코드 T1~T7 + 적대적 리뷰 14결함 수정 + main CI green +
-`supabase db push` 5건 프로덕션 적용(2026-07-22, 사용자) + T8 로그인 실기 검증 완료(사용자).** Phase 1~9
-전부 완료. 남은 인프라·검증 게이트 없음.
+현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T1~T3 코드 완료(2026-07-22 밤, `/loop` 자율).**
+Phase 1~9 전부 완료(인프라·검증 게이트 없음). Google Calendar 어댑터 end-to-end 배선(계약→어댑터→토큰
+캡처→라우트→UI 승인카드)까지 코드 완료, core/api/ai 전 테스트 + web build GREEN.
 계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md,
 Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
-**Phase 10(AI 2단계=에이전트 액션) 착수** — 사용자 "phase 10 착수하자"(phase_10.md 기본값 승인).
-**T1 프레임워크 완료(보안 표면 없는 부분, 외부 호출 0)**: core 도구 계약 잠금(2f5d155) + api 에이전트
-루프(9e737f1, 목 검증). 계약 형태는 공식 문서 실측 확정(26be814). **선행 게이트(Phase 9 db push+로그인)
-2026-07-22 해소 → 다음 세션은 T3(첫 어댑터 Google Calendar: OAuth scope 추가+provider_token 캡처·저장+
-조회/생성)와 T2(승인 카드 UI+/api/ai/agent 라우트)를 end-to-end로 착수.** 상세 계획 docs/plans/phase_10.md.
+**다음 세션: 사용자 실기 검증 필요(Google 재로그인→Calendar scope 동의→"내일 회의 잡아줘" 시도) — 로컬은
+진짜 Google OAuth consent/토큰 발급을 재현할 수 없어 이 부분만 사람이 확인해야 한다. 검증 후 T4(인젝션
+방어 하드닝) 또는 T5(두 번째 어댑터)로 진행.**
 
-## Phase 10 — AI 2단계 (에이전트 액션) — T1 프레임워크 완료 (2026-07-22, `/loop` 자율)
+## Phase 10 — AI 2단계 (에이전트 액션) — T1~T3 코드 완료 (2026-07-22, `/loop` 자율)
 
 착수 승인: 사용자 "phase 10 착수하자"(phase_10.md T0 기본값 승인). 계약 API 형태는 공식 문서 실측으로
-확정(26be814). 보안 표면 없는 프레임워크(외부 호출 0)부터 STDD로 구현·검증.
+확정(26be814). T1(외부 호출 0) → T2(승인 실행) → T3(첫 어댑터 end-to-end) 순으로 STDD 구현·검증.
 
 - [x] 계약 API 실측(26be814): Gemini generateContent function calling 유지(Interactions API 미채택),
   functionResponse role="user", parameters=OpenAPI 3.0 서브셋, functionCall.id 병렬 매칭, Supabase
@@ -25,10 +23,22 @@ Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
 - [x] T1 api 에이전트 루프(9e737f1): api `agent.ts` `runAgentTurn` — 도구 카탈로그로 Gemini 호출→
   functionCall 파싱→분류→실행→되먹임 반복(상한). readonly 자동, mutating 승인 대기 즉시 반환, unknown
   에러 회신. Adapter 인터페이스 + 목 어댑터·스크립트 fetch 7 시나리오(외부 호출 0). 7 tests + tsc GREEN.
-- [ ] **T2 승인 게이트**(진행 예정): mutating 승인 후 실행 재개(api) + DuckChatPanel 승인/취소 카드(web) +
-  /api/ai/agent 라우트(서버 키+auth+레이트리밋, Phase 8 /chat 패턴 계승).
-- [ ] **T3 첫 어댑터 Google Calendar**(착수 가능, 선행 게이트 해소): OAuth scope 추가 동의 + provider_token
-  캡처·저장 + calendar 조회(readonly)/생성(mutating). Phase 9 db push+로그인 완료(2026-07-22)로 착수 가능.
+- [x] T2 승인 게이트: api `executeApprovedCalls`(승인된 mutating만 실행, readonly/unknown은 승인 경로
+  자체를 거부 — 승인 UI 우회 차단 이중 방어) + `/api/ai/agent`(서버 키+auth+레이트리밋, Phase 8 /chat
+  패턴 계승, 토큰 없으면 "연동 필요" 안내) + `/api/ai/agent/approve`(zod 재검증). +9 api tests.
+- [x] T3 첫 어댑터 Google Calendar(end-to-end): `createGoogleCalendarAdapter`(listUpcomingEvents readonly
+  + createCalendarEvent mutating, args zod 재검증=인젝션 방어) + core `google-oauth-token` 스키마 +
+  마이그레이션 `20260722080000_user_google_tokens`(RLS 4정책+rollback) + api `saveGoogleTokens`/
+  `getGoogleTokens`(user_id upsert) + `auth/callback`에서 Google 로그인 시 provider_token 캡처·저장
+  (refresh_token 없는 재로그인이 기존 저장분을 지우지 않도록 조회 후 보존) + LoginForm Google 버튼에
+  `calendar.events` scope + `access_type=offline`+`prompt=consent`(refresh_token 발급 필수 조건, 실측).
+  **db push 필요.**
+- [x] 승인 카드 UI: `packages/ai` `useAgentChat` 훅(대화 상태+승인대기+approve/cancel) + 신규
+  `AgentChatPanel.tsx`(DuckChatPanel과 관심사 분리 — RAG 질답 vs 실제 액션, 홈 위젯 그리드 배치). +3 ai tests.
+- 검증: core 113 / api 138 / ai 9 tests + web build GREEN + core·api·web 로컬 full eslint 선검증.
+- [ ] **T3 실기 검증(사용자, 로그인 필요)**: Google 재로그인(재동의 화면 필수)→provider_token 저장 확인→
+  AgentChatPanel에서 "일정 만들어줘" 시도→승인 카드→승인 후 실제 Google Calendar에 반영되는지.
+  `gemini-flash-latest`의 function calling 실동작도 이 시점에 실측(phase_10.md 미검증 절).
 - [ ] T4 인젝션 방어 하드닝 / T5 두 번째 어댑터 / T6 Gmail(격리) / T7 감사 로그 — phase_10.md 참조.
 
 ## Phase 9 — 워크스페이스 코어 (블록 에디터) — T1·T2·T4·T5·T7 구현·배포 (2026-07-22 오후, `/loop` 자율)

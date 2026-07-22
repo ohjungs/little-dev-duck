@@ -67,7 +67,18 @@ export {
 
 export { answerQuestion, type AiAnswer } from "./aiChat";
 
-export { runAgentTurn, type Adapter, type AgentResult } from "./agent";
+export {
+  runAgentTurn,
+  executeApprovedCalls,
+  type Adapter,
+  type AgentResult,
+} from "./agent";
+export { createGoogleCalendarAdapter } from "./googleCalendar";
+export {
+  saveGoogleTokens,
+  getGoogleTokens,
+  type SaveGoogleTokenInput,
+} from "./googleTokens";
 
 export { allowRequest } from "./rateLimit";
 
