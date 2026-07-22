@@ -20,10 +20,26 @@ const TOOL_LABELS: Record<string, string> = {
   createCalendarEvent: "캘린더 일정 만들기",
 };
 
+function formatWhen(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
+}
+
+// 승인 카드는 사용자가 정확히 무엇을 승인하는지 안전하게 판단할 수 있어야 한다(CLAUDE.md 5절 안전 규칙
+// + T0-4 승인 게이트 취지) — 도구명뿐 아니라 LLM이 채운 실제 파라미터(제목/시간)를 전부 노출한다.
+// 제목·시간은 LLM 산출이라 신뢰 불가한 텍스트일 수 있으므로 지시문처럼 렌더링하지 않고 순수 텍스트로만
+// 표시(HTML 삽입 없음, React가 이스케이프) — 승인 카드 자체가 프롬프트 인젝션의 실행 표면이 되지 않게.
 function describeCall(call: ToolCall): string {
   const label = TOOL_LABELS[call.name] ?? call.name;
   const title = typeof call.args.title === "string" ? call.args.title : null;
-  return title ? `${label}: "${title}"` : label;
+  const start = formatWhen(call.args.start);
+  const end = formatWhen(call.args.end);
+  const parts = [title ? `"${title}"` : null, start && end ? `${start} ~ ${end}` : null].filter(
+    Boolean,
+  );
+  return parts.length > 0 ? `${label}: ${parts.join(", ")}` : label;
 }
 
 // Phase 10 에이전트 액션 패널. RAG 대화(DuckChatPanel)와 관심사가 달라 별도 컴포넌트로 분리했다 —

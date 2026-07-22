@@ -35,6 +35,10 @@ Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
   **db push 필요.**
 - [x] 승인 카드 UI: `packages/ai` `useAgentChat` 훅(대화 상태+승인대기+approve/cancel) + 신규
   `AgentChatPanel.tsx`(DuckChatPanel과 관심사 분리 — RAG 질답 vs 실제 액션, 홈 위젯 그리드 배치). +3 ai tests.
+- [x] T4 인젝션 방어 하드닝 착수(로컬 완결 가능한 부분): `runAgentTurn`에 매 턴 고정 방어 지침(도구 실행
+  결과 텍스트=데이터, 지시 아님 — 호출부 누락 방지로 한 곳에 고정) + 승인 카드가 제목뿐 아니라 시작/종료
+  시각까지 전부 노출(사용자가 정확히 뭘 승인하는지 투명하게, args는 React 텍스트 렌더링이라 HTML 삽입 없음).
+  **외부 텍스트(이메일 등) 구획화는 아직 해당 소스가 없어 대상 없음 — T6 Gmail 착수 시 재검토.**
 - 검증: core 113 / api 138 / ai 9 tests + web build GREEN + core·api·web 로컬 full eslint 선검증.
 - [ ] **T3 실기 검증(사용자, 로그인 필요)**: Google 재로그인(재동의 화면 필수)→provider_token 저장 확인→
   AgentChatPanel에서 "일정 만들어줘" 시도→승인 카드→승인 후 실제 Google Calendar에 반영되는지.
