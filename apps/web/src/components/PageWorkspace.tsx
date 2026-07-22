@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import { FileText, Loader2, Plus, Trash, Trash2 } from "lucide-react";
 import { createPage, listPages, softDeletePage } from "@ldd/api";
 import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
@@ -170,6 +170,14 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
             />
           ))}
         </nav>
+        <div className="border-t border-border px-2 py-2">
+          <Link
+            href="/pages/trash"
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Trash className="size-3.5 opacity-70" /> 휴지통
+          </Link>
+        </div>
       </aside>
 
       <section className="min-w-0 flex-1">
