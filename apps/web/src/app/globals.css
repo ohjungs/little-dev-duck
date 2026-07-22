@@ -15,8 +15,10 @@
   --card-foreground: #262117;
   --popover: #ffffff;
   --popover-foreground: #262117;
-  --primary: #ca8a04;
-  --primary-foreground: #26210d;
+  /* 채우기(버튼·칩)는 선명한 머스타드 옐로우, 텍스트/아이콘 액센트는 흰 배경에서 읽히는 진한 골드로 분리 */
+  --primary: #eab308;
+  --primary-foreground: #2a2205;
+  --primary-accent: #a16207;
   --secondary: #f5f1e8;
   --secondary-foreground: #46402f;
   --muted: #f4f1ea;
@@ -59,6 +61,7 @@
   --popover-foreground: #f4f0e6;
   --primary: #eab308;
   --primary-foreground: #1a1712;
+  --primary-accent: #eab308;
   --secondary: #2a241c;
   --secondary-foreground: #e7e1d3;
   --muted: #26211a;
@@ -88,6 +91,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-accent: var(--primary-accent);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);

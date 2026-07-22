@@ -75,7 +75,7 @@ export function DuckWidget() {
     <Card className="h-full">
       <CardHeader>
         <CardTitle>
-          <Sparkles className="size-4 text-primary" />
+          <Sparkles className="size-4 text-primary-accent" />
           오리
         </CardTitle>
         {duckState && (

@@ -167,7 +167,7 @@ export function TodoWidget() {
     <Card data-testid="todo-widget" className="h-full">
       <CardHeader>
         <CardTitle>
-          <ListTodo className="size-4 text-primary" />
+          <ListTodo className="size-4 text-primary-accent" />
           할 일
           {state === "ready" && (
             <Badge variant="muted">{remaining}개 남음</Badge>

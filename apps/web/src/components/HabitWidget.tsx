@@ -138,7 +138,7 @@ export function HabitWidget() {
     <Card data-testid="habit-widget" className="h-full">
       <CardHeader>
         <CardTitle>
-          <Repeat className="size-4 text-primary" />
+          <Repeat className="size-4 text-primary-accent" />
           습관
         </CardTitle>
       </CardHeader>

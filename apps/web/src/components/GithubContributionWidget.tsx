@@ -73,7 +73,7 @@ export function GithubContributionWidget() {
     <Card data-testid="github-contribution-widget" className="h-full">
       <CardHeader>
         <CardTitle>
-          <GitHubMark className="size-4 text-primary" />
+          <GitHubMark className="size-4 text-primary-accent" />
           GitHub 잔디
         </CardTitle>
         {state === "ready" && data && data.linked && (

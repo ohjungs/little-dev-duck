@@ -108,7 +108,7 @@ export function CalendarWidget() {
     <Card data-testid="calendar-widget" className="h-full">
       <CardHeader>
         <CardTitle>
-          <CalendarDays className="size-4 text-primary" />
+          <CalendarDays className="size-4 text-primary-accent" />
           캘린더
         </CardTitle>
       </CardHeader>

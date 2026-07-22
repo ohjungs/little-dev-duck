@@ -51,7 +51,7 @@ export function DuckChatPanel() {
     <Card data-testid="duck-chat" className="flex h-full flex-col">
       <CardHeader>
         <CardTitle>
-          <Sparkles className="size-4 text-primary" />
+          <Sparkles className="size-4 text-primary-accent" />
           오리에게 물어보기
         </CardTitle>
         <Button
@@ -73,7 +73,7 @@ export function DuckChatPanel() {
         <div className="mb-3 flex min-h-[220px] flex-1 flex-col gap-2 overflow-y-auto pr-1">
           {messages.length === 0 && (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
-              <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary-accent">
                 <Sparkles className="size-5" />
               </span>
               <p className="text-sm text-muted-foreground">

@@ -146,7 +146,7 @@ export function PomodoroWidget() {
     <Card data-testid="pomodoro-widget" className="h-full">
       <CardHeader>
         <CardTitle>
-          <Timer className="size-4 text-primary" />
+          <Timer className="size-4 text-primary-accent" />
           뽀모도로
         </CardTitle>
         {state === "ready" && (

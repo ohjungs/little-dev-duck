@@ -114,7 +114,7 @@ export function MemoWidget() {
     <Card data-testid="memo-widget" className="h-full">
       <CardHeader>
         <CardTitle>
-          <StickyNote className="size-4 text-primary" />
+          <StickyNote className="size-4 text-primary-accent" />
           메모
         </CardTitle>
       </CardHeader>
