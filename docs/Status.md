@@ -10,11 +10,31 @@ embeddings_source_page, 20260722050000_page_attachments_bucket, 20260722060000_p
 실패(코드·빌드·CI는 전부 GREEN).**
 계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md,
 Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
-**다음 Phase 10(AI 2단계=에이전트 액션) 초안 작성됨**(docs/plans/phase_10.md) — 착수 전 T0 게이트 7건
-(Phase 9 실기 검증, 첫 어댑터 선정, 에이전트 루프/도구 스키마, 승인 게이트 모델, 프롬프트 인젝션 방어,
-Gmail 특수 규칙, 감사 로그) 사용자 결정 필요. Phase 10 T0-1 = Phase 9 실기 검증이라 Phase 9 사용자
-검증이 선행돼야 착수 순서가 온다. **에이전트 액션은 보안 표면(외부 액션·인젝션·OAuth·파괴성)이 커
-계약/보안 모델 결정을 사용자에게 확인 후 착수(CLAUDE.md 3-4).**
+**Phase 10(AI 2단계=에이전트 액션) 착수** — 사용자 "phase 10 착수하자"(phase_10.md 기본값 승인).
+**T1 프레임워크 완료(보안 표면 없는 부분, 외부 호출 0)**: core 도구 계약 잠금(2f5d155) + api 에이전트
+루프(9e737f1, 목 검증). 계약 형태는 공식 문서 실측 확정(26be814). **다음 T2(승인 게이트 실행 배선
++DuckChatPanel 승인 카드)·T3(첫 어댑터 Google Calendar)는 진행 예정이나, T3는 OAuth provider_token이
+필요해 Phase 9 supabase db push + 로그인이 선행돼야 함(사용자 몫).** 상세 계획 docs/plans/phase_10.md.
+
+## Phase 10 — AI 2단계 (에이전트 액션) — T1 프레임워크 완료 (2026-07-22, `/loop` 자율)
+
+착수 승인: 사용자 "phase 10 착수하자"(phase_10.md T0 기본값 승인). 계약 API 형태는 공식 문서 실측으로
+확정(26be814). 보안 표면 없는 프레임워크(외부 호출 0)부터 STDD로 구현·검증.
+
+- [x] 계약 API 실측(26be814): Gemini generateContent function calling 유지(Interactions API 미채택),
+  functionResponse role="user", parameters=OpenAPI 3.0 서브셋, functionCall.id 병렬 매칭, Supabase
+  provider_token은 최초 로그인 시점 캡처·저장 필수. 상세 phase_10.md "공식 문서 조사 결과" 절.
+- [x] T1 코어 계약 잠금(2f5d155): core `agent-tool.ts` — toolDeclaration(name/description/parameters/
+  kind), toolCall/toolResult(Gemini shape), AGENT_MAX_ITERATIONS, requiresApproval, **partitionToolCalls
+  (카탈로그 밖 도구는 unknown 격리=인젝션/할루시네이션 방어)**. 12 tests + tsc GREEN.
+- [x] T1 api 에이전트 루프(9e737f1): api `agent.ts` `runAgentTurn` — 도구 카탈로그로 Gemini 호출→
+  functionCall 파싱→분류→실행→되먹임 반복(상한). readonly 자동, mutating 승인 대기 즉시 반환, unknown
+  에러 회신. Adapter 인터페이스 + 목 어댑터·스크립트 fetch 7 시나리오(외부 호출 0). 7 tests + tsc GREEN.
+- [ ] **T2 승인 게이트**(진행 예정): mutating 승인 후 실행 재개(api) + DuckChatPanel 승인/취소 카드(web) +
+  /api/ai/agent 라우트(서버 키+auth+레이트리밋, Phase 8 /chat 패턴 계승).
+- [ ] **T3 첫 어댑터 Google Calendar**(게이트 대기): OAuth scope 추가 동의 + provider_token 캡처·저장 +
+  calendar 조회(readonly)/생성(mutating). **Phase 9 supabase db push + 로그인 선행 필요(사용자 몫).**
+- [ ] T4 인젝션 방어 하드닝 / T5 두 번째 어댑터 / T6 Gmail(격리) / T7 감사 로그 — phase_10.md 참조.
 
 ## Phase 9 — 워크스페이스 코어 (블록 에디터) — T1·T2·T4·T5·T7 구현·배포 (2026-07-22 오후, `/loop` 자율)
 

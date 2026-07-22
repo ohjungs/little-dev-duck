@@ -362,3 +362,16 @@
   habits)의 create·update·delete·check DB 에러 전파 브랜치 보강. 결과 **전체 stmts 89.92%·branch
   85.39%·lines 92.32%, 테스트 212→234 green**. useChat·useReducedMotion 등 React 훅은 팀 전략(주석
   명시: 훅은 얇게, 순수함수만 유닛·나머지 E2E)에 따라 유닛 대상 제외(jsdom 도입=전략 변경 게이트).
+- 2026-07-22 : Phase 10(에이전트 액션) 착수 — T1 프레임워크 구현·검증 (`/loop /next-step` 자율,
+  사용자 "phase 10 착수하자"). 보안 표면 없는 부분(외부 호출 0)부터 STDD로. **T1 코어 계약 잠금(2f5d155)**:
+  core `agent-tool.ts` — toolDeclaration(name/description/parameters=OpenAPI 3.0 서브셋, kind:
+  readonly|mutating), toolCall/toolResult(실측 Gemini shape, id 병렬 매칭), AGENT_MAX_ITERATIONS,
+  requiresApproval, partitionToolCalls(카탈로그 밖 도구는 실행 안 하고 unknown 격리 = 할루시네이션/인젝션
+  방어선). zod v4 z.record 2-arg 준수. 12 tests + tsc GREEN. **T1 api 에이전트 루프(9e737f1)**: api
+  `agent.ts` `runAgentTurn` — 도구 카탈로그로 Gemini generateContent 호출→functionCall 파싱→core
+  partitionToolCalls 분류→실행→functionResponse(role="user") 되먹임 반복(AGENT_MAX_ITERATIONS 상한).
+  readonly 자동 실행 / mutating 승인 대기 즉시 반환(파괴적 자동 실행 금지) / unknown 에러 회신. Adapter
+  인터페이스(catalog+execute) + 목 어댑터·스크립트 fetch 7 시나리오(외부 호출 0). 429→quota_exceeded
+  재사용(gemini.ts safeBody/upstreamError export). 7 tests + tsc GREEN. **남은 T2(승인 실행 배선+
+  DuckChatPanel 카드)·T3(Google Calendar 어댑터)**: T3는 OAuth provider_token 필요 → Phase 9 db push +
+  로그인이 선행돼야 함(사용자 몫). db push는 이 환경에 CLI/토큰/DB 비번 부재로 세션이 대신 못 함(확인 완료).
