@@ -10,6 +10,7 @@ import {
 } from "@ldd/api";
 import type { Todo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
+import { todoEmbedText } from "@/lib/embedText";
 import { Button, Card, Input, Spinner } from "@ldd/ui";
 import { createClient } from "@/lib/supabase/client";
 import { emitTodosChanged } from "@/lib/todoSignal";
@@ -70,8 +71,12 @@ export function TodoWidget() {
     try {
       const created = await createTodo(supabase, { title });
       setTodos((prev) => [created, ...prev]);
-      // RAG 인덱싱(fire-and-forget). 실패해도 저장 흐름을 막지 않는다.
-      void reindexSource({ sourceType: "todo", sourceId: created.id, text: title });
+      // RAG 인덱싱(fire-and-forget). 실패해도 저장 흐름을 막지 않는다. 신규는 미완료 상태.
+      void reindexSource({
+        sourceType: "todo",
+        sourceId: created.id,
+        text: todoEmbedText(title, false),
+      });
     } catch {
       setActionError("추가하지 못했습니다.");
     }
@@ -85,6 +90,12 @@ export function TodoWidget() {
     );
     try {
       await updateTodo(supabase, todo.id, { isDone: willBeDone });
+      // 완료/미완료 토글도 재인덱싱 — 상태를 임베딩에 반영해야 오리가 완료 여부를 답한다.
+      void reindexSource({
+        sourceType: "todo",
+        sourceId: todo.id,
+        text: todoEmbedText(todo.title, willBeDone),
+      });
       if (willBeDone) {
         // 할일 완료 시 오리 XP 적립(원천: 할일 완료). 적립/신호 실패는 완료 자체를 되돌리지 않는다.
         try {
@@ -121,11 +132,16 @@ export function TodoWidget() {
     const title = editTitle.trim();
     if (!title) return;
     const prevTodos = todos;
+    const isDone = prevTodos.find((t) => t.id === id)?.isDone ?? false;
     setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
     try {
       await updateTodo(supabase, id, { title });
       setEditingId(null);
-      void reindexSource({ sourceType: "todo", sourceId: id, text: title });
+      void reindexSource({
+        sourceType: "todo",
+        sourceId: id,
+        text: todoEmbedText(title, isDone),
+      });
     } catch {
       setTodos(prevTodos);
       setActionError("수정하지 못했습니다. 다시 시도해 주세요.");

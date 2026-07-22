@@ -8,6 +8,7 @@ import {
   listTodos,
 } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
+import { todoEmbedText } from "@/lib/embedText";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,7 @@ export async function POST() {
       ...todos.map((t) => ({
         sourceType: "todo" as const,
         sourceId: t.id,
-        text: t.title,
+        text: todoEmbedText(t.title, t.isDone),
       })),
       ...habits.map((h) => ({
         sourceType: "habit" as const,
