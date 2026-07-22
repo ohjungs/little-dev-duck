@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Settings, ShieldCheck } from "lucide-react";
+import { FileText, LayoutDashboard, Settings, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -12,6 +12,7 @@ import { WalkingModeToggle } from "@/components/WalkingModeToggle";
 // 개인화/관리 메뉴 탭. 항목을 늘리려면 여기만 고치면 사이드바·모바일바 양쪽에 반영된다.
 const NAV = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
+  { href: "/pages", label: "페이지", icon: FileText },
   { href: "/settings", label: "설정", icon: Settings },
   { href: "/admin", label: "관리자", icon: ShieldCheck },
 ];
