@@ -1,7 +1,8 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 8(AI 1단계) 완료(실호출 검증 통과) → Phase 9(워크스페이스 코어) 착수 — 백엔드/계약 층
-구현 중(2026-07-22 오후, 사용자 "백엔드 가자" 승인).** Phase 1~8 완료.
+현재 Phase: **Phase 9(워크스페이스 코어) 진행 — 백엔드/계약 층 완료·병합(a7a363e), T1 페이지 UI는
+브랜치 `phase9-t1-wip`(d3e7d38, 미검증)에 보존하고 사용자 요청으로 정지("다음 세션에서").** Phase 1~8 완료.
+**다음 세션 재개점: 아래 Phase 9 절의 T1 bullet "다음 세션 재개 순서" 참조.** main CI 완전 green 상태.
 Phase 9 백엔드(pages 마이그레이션 + core pageSchema/extractPlainText + api CRUD)는 다른 세션의 apps/web
 UI 리디자인과 파일이 안 겹쳐 병렬 진행. **apps/web 에디터 UI(T2~)는 리디자인 세션 종료 후 착수.**
 **다른 세션 현황: UI 전면 리디자인(shadcn/Tailwind) 배포 완료(e495bd8). 그 push가 깬 CI(lint·e2e)는 이
@@ -27,9 +28,16 @@ docs/plans/notion-inventory-delta-2026-07-21.md.
 - [x] api `pages.ts`: list/listTrashed/get/create/update/softDelete/restore/purge. plain_text는 저장 시
   서버가 extractPlainText로 파생(클라 불신). 8 tests + tsc GREEN.
 - [ ] `supabase db push`(pages) — 사용자/세션.
-- [ ] apps/web 에디터 UI(T2~): 앱 셸/`/app/[pageId]`, BlockNote 에디터, 사이드바 트리, Cmd+K 검색, 휴지통.
-  **리디자인 세션 종료 후 착수.** BlockNote 0.52.1/MPL-2.0/React19 OK, 단 기본 UI=Mantine ↔ shadcn 충돌
-  → T2 게이트에서 "headless+Tailwind vs 에디터만 Mantine" 결정.
+- [~] apps/web T1 페이지 워크스페이스 UI — **WIP, 브랜치 `phase9-t1-wip`(커밋 d3e7d38, 미검증)**.
+  리디자인 세션 종료·전권 위임 후 착수. 구현: `/pages` + `/pages/[id]` 라우트(`(app)` 그룹 내),
+  `PageWorkspace.tsx`(페이지 트리 사이드바 + 생성/soft삭제/네비, buildTree 재귀), `PageEditor.tsx`
+  (제목+textarea, 디바운스 자동저장, `textToBlocks`로 **BlockNote 호환 content 저장** — T2에서 에디터
+  내부만 교체), `AppNav.tsx`에 "페이지" nav 추가. **다음 세션 재개 순서: (1) 브랜치 checkout →
+  `pnpm --filter web build` 검증·오류 수정 → main 병합, (2) `supabase db push`(pages 마이그레이션),
+  (3) T2: `@blocknote/shadcn`(0.52.1, 존재 확인 — 리디자인 shadcn과 정합, Mantine 충돌 게이트 해소)로
+  PageEditor 내부를 BlockNote로 교체.** BlockNote MPL-2.0/React19 OK. 스택 Next16+React19+Tailwind4라
+  BlockNote 통합 시 SSR(next/dynamic ssr:false)·Tailwind4 호환 주의.
+- [ ] T4 Cmd+K 검색(pages.plain_text ilike), T5 휴지통/복원 UI + 버전, T3 파일 업로드, T7 RAG page 소스.
 - [ ] RAG "page" 소스(T7): `embeddingSourceSchema`에 "page" + DB source_type 제약 확장(계약 변경, 병렬 밖)
   + 페이지 저장 시 `reindexSource('page', id, extractPlainText(content))`.
 
