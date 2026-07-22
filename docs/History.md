@@ -350,3 +350,15 @@
   `pnpm --filter web e2e`를 돌므로 동일 경로로 수렴. **실측 검증**: 기존 빌드(.next 18:22) 대상 `next start`
   webServer가 즉시 바인딩, 33 스펙 중 **12 passed / 21 skipped(인증 세션 없는 스펙 자동 스킵, 의도된 동작)
   / exit 0** (2.3m). 이로써 로컬·CI 양쪽에서 비인증 E2E가 재현 가능하게 green.
+- 2026-07-22 : Phase 10 계약 API 실측 조사 + 유닛 커버리지 기준 정합 (`/loop /next-step` 자율,
+  커밋 26be814·d6e29e6·5a3ed24). (1) **Phase 10 de-risking**: WebFetch로 Gemini/Supabase 공식 문서를
+  대조해 계약 형태를 좌우하던 미검증 항목 확정 — generateContent 유지(Legacy 표기이나 안정 프로덕션
+  공식 권장, Interactions API 미채택), functionResponse content `role="user"`(오류 최다 지점),
+  parameters=OpenAPI 3.0 서브셋, functionCall.id 병렬 매칭, toolConfig mode에 VALIDATED, Supabase
+  provider_token은 최초 로그인 시점에만 추출 가능(OAuth 콜백 캡처·저장 필수). phase_10.md "미검증" 절
+  갱신. alias 실동작·무료 한도는 사용자 키 필요라 착수 스파이크로 이월. (2) **커버리지 실측·보강**:
+  `pnpm coverage`로 실측(212 tests, branch 78.09%로 기준 미달) → 미테스트 함수·에러 전파 브랜치 보강.
+  pages.ts(73.17%→97.56% stmts, listTrashedPages+에러 전파 7건), Phase 7 api 4모듈(memos/todos/calendar/
+  habits)의 create·update·delete·check DB 에러 전파 브랜치 보강. 결과 **전체 stmts 89.92%·branch
+  85.39%·lines 92.32%, 테스트 212→234 green**. useChat·useReducedMotion 등 React 훅은 팀 전략(주석
+  명시: 훅은 얇게, 순수함수만 유닛·나머지 E2E)에 따라 유닛 대상 제외(jsdom 도입=전략 변경 게이트).
