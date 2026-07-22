@@ -56,18 +56,19 @@ export async function POST(request: Request) {
     const adapter = createGoogleCalendarAdapter(tokens.accessToken);
     const results = await executeApprovedCalls(parsed.data.calls, adapter);
     // T7 감사 로그(best-effort, 부가 기능) — 로깅 실패로 실제 실행 결과 응답이 막히면 안 되므로 삼킨다.
-    for (const result of results) {
+    // call.id는 optional(병렬 호출 없으면 비어 있을 수 있음)이라 id로 매칭하면 id 없는 호출이 2개 이상일
+    // 때 잘못 매칭될 수 있다. executeApprovedCalls는 입력 순서를 그대로 보존하므로 인덱스로 짝짓는다.
+    results.forEach((result, i) => {
+      const call = parsed.data.calls[i];
       const isError = typeof result.response.error === "string";
       void logAction(supabase, {
         userId: user.id,
         toolName: result.name,
-        argsSummary: summarizeForLog(
-          parsed.data.calls.find((c) => c.id === result.id)?.args ?? {},
-        ),
+        argsSummary: summarizeForLog(call?.args ?? {}),
         status: isError ? "error" : "success",
         resultSummary: summarizeForLog(result.response),
       }).catch((logError) => console.error("action_log 기록 실패", logError));
-    }
+    });
     return NextResponse.json({ results });
   } catch (error) {
     console.error("AI agent 승인 실행 실패", { userId: user.id, error });
