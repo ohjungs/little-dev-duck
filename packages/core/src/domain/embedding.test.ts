@@ -35,20 +35,24 @@ describe("chunkText", () => {
 });
 
 describe("embeddingChunkSchema", () => {
-  it("현존 소스 타입만 허용", () => {
-    const ok = embeddingChunkSchema.safeParse({
-      userId: "22222222-2222-4222-8222-222222222222",
-      sourceType: "memo",
-      sourceId: "m1",
-      chunkIndex: 0,
-      content: "내용",
-    });
-    expect(ok.success).toBe(true);
+  it("현존 소스 타입(page 포함)을 허용한다", () => {
+    for (const sourceType of ["memo", "page"] as const) {
+      const ok = embeddingChunkSchema.safeParse({
+        userId: "22222222-2222-4222-8222-222222222222",
+        sourceType,
+        sourceId: "s1",
+        chunkIndex: 0,
+        content: "내용",
+      });
+      expect(ok.success).toBe(true);
+    }
+  });
 
+  it("정의되지 않은 소스 타입은 거부한다", () => {
     const bad = embeddingChunkSchema.safeParse({
       userId: "22222222-2222-4222-8222-222222222222",
-      sourceType: "page",
-      sourceId: "p1",
+      sourceType: "file",
+      sourceId: "f1",
       chunkIndex: 0,
       content: "내용",
     });

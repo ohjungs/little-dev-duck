@@ -5,6 +5,7 @@ import {
   listCalendarEvents,
   listHabits,
   listMemos,
+  listPages,
   listTodos,
 } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
@@ -42,11 +43,12 @@ export async function POST() {
   }
 
   try {
-    const [memos, todos, habits, events] = await Promise.all([
+    const [memos, todos, habits, events, pages] = await Promise.all([
       listMemos(supabase),
       listTodos(supabase),
       listHabits(supabase),
       listCalendarEvents(supabase),
+      listPages(supabase),
     ]);
     const items = [
       ...memos.map((m) => ({
@@ -68,6 +70,11 @@ export async function POST() {
         sourceType: "calendar_event" as const,
         sourceId: e.id,
         text: e.title,
+      })),
+      ...pages.map((p) => ({
+        sourceType: "page" as const,
+        sourceId: p.id,
+        text: p.plainText,
       })),
     ].slice(0, MAX_ITEMS);
 

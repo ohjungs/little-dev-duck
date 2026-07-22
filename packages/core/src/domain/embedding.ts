@@ -3,14 +3,16 @@ import { z } from "zod";
 // 임베딩 벡터 차원(Status.md 2026-07-21 게이트 결정). DB 컬럼 vector(768)과 반드시 일치.
 export const EMBEDDING_DIM = 768;
 
-// 임베딩 대상 소스 종류. 현존 데이터만 — "page"는 Phase 9 블록 에디터 이후 이 enum + DB source_type
-// 확장으로 흡수(phase_08.md T0-4/T0-7). enum 확장은 계약 변경이라 병렬 구간 밖에서만.
+// 임베딩 대상 소스 종류. "page"는 Phase 9 블록 에디터에서 추가(phase_08.md T0-4/T0-7 이월 해소) —
+// DB source_type CHECK 제약도 마이그레이션 20260722040000_embeddings_source_page로 함께 확장했다.
+// enum 확장은 계약 변경이라 병렬 구간 밖에서만.
 export const embeddingSourceSchema = z.enum([
   "memo",
   "todo",
   "habit",
   "calendar_event",
   "activity",
+  "page",
 ]);
 export type EmbeddingSource = z.infer<typeof embeddingSourceSchema>;
 

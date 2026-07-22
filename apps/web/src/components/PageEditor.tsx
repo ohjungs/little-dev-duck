@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { Block } from "@blocknote/core";
 import { type Page } from "@ldd/core";
 import { updatePage } from "@ldd/api";
+import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 
 // BlockNote는 브라우저 전용(window/document 의존)이라 SSR 비활성 동적 로드. 로딩 중엔 스켈레톤.
@@ -56,9 +57,15 @@ export function PageEditor({
         title: latest.current.title,
         content: latest.current.content,
       }).then(
-        () => {
+        (updated) => {
           setSaveState("saved");
           onSaved?.({ title: latest.current.title });
+          // 저장된 본문을 RAG 인덱싱(부가 기능, fire-and-forget). 서버가 파생한 plainText를 그대로 사용.
+          void reindexSource({
+            sourceType: "page",
+            sourceId: page.id,
+            text: updated.plainText,
+          });
         },
         () => setSaveState("error"),
       );

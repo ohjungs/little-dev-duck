@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { listTrashedPages, purgePage, restorePage } from "@ldd/api";
+import { reindexSource } from "@ldd/ai";
 import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -33,11 +34,13 @@ export function TrashView() {
     );
   }, [supabase]);
 
-  const handleRestore = async (id: string) => {
+  const handleRestore = async (id: string, plainText: string) => {
     const prev = pages;
     setPages((p) => p.filter((x) => x.id !== id));
     try {
       await restorePage(supabase, id);
+      // 복원하면 RAG 인덱스에 다시 추가(soft delete 때 제거됐던 것을 되돌림).
+      void reindexSource({ sourceType: "page", sourceId: id, text: plainText });
     } catch {
       setPages(prev);
     }
@@ -110,7 +113,7 @@ export function TrashView() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleRestore(page.id)}
+              onClick={() => handleRestore(page.id, page.plainText)}
             >
               <RotateCcw className="size-3.5" /> 복원
             </Button>

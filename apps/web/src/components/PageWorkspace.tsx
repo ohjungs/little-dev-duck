@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Loader2, Plus, Trash, Trash2 } from "lucide-react";
 import { createPage, listPages, softDeletePage } from "@ldd/api";
+import { reindexSource } from "@ldd/ai";
 import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -115,6 +116,8 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
     setPages((p) => p.filter((x) => x.id !== id));
     try {
       await softDeletePage(supabase, id);
+      // 휴지통으로 보낸 페이지는 RAG 인덱스에서 제거(빈 텍스트=삭제, 타 소스와 동일 패턴).
+      void reindexSource({ sourceType: "page", sourceId: id, text: "" });
       if (pageId === id) router.push("/pages");
     } catch {
       setPages(prev);
