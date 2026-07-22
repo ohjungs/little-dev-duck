@@ -8,8 +8,13 @@
 embeddings_source_page, 20260722050000_page_attachments_bucket, 20260722060000_page_versions,
 20260722070000_pages_cleanup_embeddings. 미적용 시 /pages 저장·페이지 RAG·이미지 업로드·버전이 런타임
 실패(코드·빌드·CI는 전부 GREEN).**
-계획 문서: docs/plans/phase_01~09.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
-docs/plans/notion-inventory-delta-2026-07-21.md.
+계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md,
+Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
+**다음 Phase 10(AI 2단계=에이전트 액션) 초안 작성됨**(docs/plans/phase_10.md) — 착수 전 T0 게이트 7건
+(Phase 9 실기 검증, 첫 어댑터 선정, 에이전트 루프/도구 스키마, 승인 게이트 모델, 프롬프트 인젝션 방어,
+Gmail 특수 규칙, 감사 로그) 사용자 결정 필요. Phase 10 T0-1 = Phase 9 실기 검증이라 Phase 9 사용자
+검증이 선행돼야 착수 순서가 온다. **에이전트 액션은 보안 표면(외부 액션·인젝션·OAuth·파괴성)이 커
+계약/보안 모델 결정을 사용자에게 확인 후 착수(CLAUDE.md 3-4).**
 
 ## Phase 9 — 워크스페이스 코어 (블록 에디터) — T1·T2·T4·T5·T7 구현·배포 (2026-07-22 오후, `/loop` 자율)
 
