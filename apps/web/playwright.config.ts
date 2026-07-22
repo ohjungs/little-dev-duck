@@ -12,11 +12,14 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: `npx next dev -p ${PORT}`,
+    // dev 서버(`next dev`)는 요청 시점에 라우트를 Turbopack으로 컴파일하는데, 이 최초 컴파일이 느린
+    // 머신(부하·큰 의존성 그래프)에서 webServer 준비 타임아웃(구 120초)을 넘겨 매 실행이 실패했다.
+    // 프로덕션 서버(`next start`)는 요청 시 컴파일이 없어 즉시 응답하므로 머신 속도와 무관하게 안정적이다.
+    // 빌드는 e2e 스크립트(`next build && playwright test`)가 먼저 수행하므로 여기선 start만 띄운다.
+    command: `npx next start -p ${PORT}`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
-    // 개발 환경에서 Turbopack 최초 컴파일이 90초 넘게 걸리는 경우가 있어(특히 다른 dev 서버와
-    // 리소스를 공유할 때) 기존 60초 기본값은 타임아웃으로 실패했다. 여유를 두고 120초로 상향.
+    // next start는 즉시 바인딩되지만, 방금 끝난 빌드로 부하가 남아 있을 수 있어 여유를 둔다.
     timeout: 120_000,
   },
 });
