@@ -1,45 +1,39 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 9(워크스페이스 코어) 진행 — 백엔드/계약 층 완료·병합(a7a363e), T1 페이지 UI는
-브랜치 `phase9-t1-wip`(d3e7d38, 미검증)에 보존하고 사용자 요청으로 정지("다음 세션에서").** Phase 1~8 완료.
-**다음 세션 재개점: 아래 Phase 9 절의 T1 bullet "다음 세션 재개 순서" 참조.** main CI 완전 green 상태.
-Phase 9 백엔드(pages 마이그레이션 + core pageSchema/extractPlainText + api CRUD)는 다른 세션의 apps/web
-UI 리디자인과 파일이 안 겹쳐 병렬 진행. **apps/web 에디터 UI(T2~)는 리디자인 세션 종료 후 착수.**
-**다른 세션 현황: UI 전면 리디자인(shadcn/Tailwind) 배포 완료(e495bd8). 그 push가 깬 CI(lint·e2e)는 이
-세션이 green 복구(7f92ca9 ThemeToggle lint, 4358776 e2e env 폴백).**
-Phase 8 = AI 1단계(룰 대사→RAG Q&A). 사용자 "정지 말고 구현 가능한 것 전부 구현, 아침에 확인" 지시로
-Phase 7 선례대로 T0 게이트 기본값 확정 후 빌드(상세·게이트값은 phase_08.md "구현 진행" 절).
+현재 Phase: **Phase 9(워크스페이스 코어) 진행 — T1·T2·T4·T5·T7 구현·배포 완료(main green).** Phase 1~8 완료.
+**남은 Phase 9: T3(파일 업로드+이미지 블록), T5 버전 히스토리, T6(Markdown 내보내기+백업+템플릿), T8 실기
+검증(사용자).** 리디자인 세션 종료 확인 후 T1 WIP 브랜치부터 재개해 5개 슬라이스를 순차 구현.
+**인프라 대기(DB 자격증명 필요): `supabase db push` 2건 — 20260722030000_pages, 20260722040000_
+embeddings_source_page. 미적용 시 /pages 저장·페이지 RAG가 런타임 실패(코드·빌드·CI는 전부 GREEN).**
 계획 문서: docs/plans/phase_01~09.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
 docs/plans/notion-inventory-delta-2026-07-21.md.
-**다음 Phase 9(워크스페이스 코어=블록 에디터) 초안 작성됨**(docs/plans/phase_09.md) — 착수 전 T0 게이트
-7건(Phase 8 검증, pages jsonb 스키마, BlockNote 통합, extractPlainText, soft delete, 앱 셸, 파일 업로드)
-사용자 결정 필요. Phase 9 = Phase 8 이월 "pages jsonb" 게이트의 해소 지점.
 
-## Phase 9 — 워크스페이스 코어 (블록 에디터) — 백엔드/계약 층 구현 (2026-07-22 오후)
+## Phase 9 — 워크스페이스 코어 (블록 에디터) — T1·T2·T4·T5·T7 구현·배포 (2026-07-22 오후, `/loop` 자율)
 
-착수 승인: 사용자 "백엔드 가자"(게이트 기본값 확정). apps/web 에디터 UI는 다른 세션 리디자인과 충돌해
-그 종료 후 착수. 백엔드는 core/api/migrations로 disjoint라 병렬 진행. 계획: docs/plans/phase_09.md.
+착수 승인: 사용자 "백엔드 가자"(게이트 기본값 확정) + `/loop /next-step` "가능한 것 전부 구현". 계획:
+docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·push, CI 검증.
 
-- [x] DB 마이그레이션 `20260722030000_pages`: `pages`(id/user_id/parent_id 계층/title/content jsonb/
-  plain_text/icon/is_trashed/trashed_at/타임스탬프) + RLS 4정책(본인 한정) + pg_trgm GIN(title/plain_text
-  검색) + rollback. **`supabase db push` 필요(미적용).**
-- [x] core `page.ts`: `pageSchema`(content=z.unknown, BlockNote 구조는 BlockNote 소유) + `extractPlainText`
-  (블록 배열→텍스트, @blocknote 의존 없이 재귀 순회, RAG/검색 공용). 7 tests + tsc GREEN.
-- [x] api `pages.ts`: list/listTrashed/get/create/update/softDelete/restore/purge. plain_text는 저장 시
-  서버가 extractPlainText로 파생(클라 불신). 8 tests + tsc GREEN.
-- [ ] `supabase db push`(pages) — 사용자/세션.
-- [~] apps/web T1 페이지 워크스페이스 UI — **WIP, 브랜치 `phase9-t1-wip`(커밋 d3e7d38, 미검증)**.
-  리디자인 세션 종료·전권 위임 후 착수. 구현: `/pages` + `/pages/[id]` 라우트(`(app)` 그룹 내),
-  `PageWorkspace.tsx`(페이지 트리 사이드바 + 생성/soft삭제/네비, buildTree 재귀), `PageEditor.tsx`
-  (제목+textarea, 디바운스 자동저장, `textToBlocks`로 **BlockNote 호환 content 저장** — T2에서 에디터
-  내부만 교체), `AppNav.tsx`에 "페이지" nav 추가. **다음 세션 재개 순서: (1) 브랜치 checkout →
-  `pnpm --filter web build` 검증·오류 수정 → main 병합, (2) `supabase db push`(pages 마이그레이션),
-  (3) T2: `@blocknote/shadcn`(0.52.1, 존재 확인 — 리디자인 shadcn과 정합, Mantine 충돌 게이트 해소)로
-  PageEditor 내부를 BlockNote로 교체.** BlockNote MPL-2.0/React19 OK. 스택 Next16+React19+Tailwind4라
-  BlockNote 통합 시 SSR(next/dynamic ssr:false)·Tailwind4 호환 주의.
-- [ ] T4 Cmd+K 검색(pages.plain_text ilike), T5 휴지통/복원 UI + 버전, T3 파일 업로드, T7 RAG page 소스.
-- [ ] RAG "page" 소스(T7): `embeddingSourceSchema`에 "page" + DB source_type 제약 확장(계약 변경, 병렬 밖)
-  + 페이지 저장 시 `reindexSource('page', id, extractPlainText(content))`.
+- [x] 백엔드/계약 층(a7a363e): DB 마이그레이션 `20260722030000_pages`(id/user_id/parent_id 계층/title/
+  content jsonb/plain_text/icon/is_trashed/trashed_at + RLS 4정책 + pg_trgm GIN + rollback), core `page.ts`
+  (pageSchema+extractPlainText, 7 tests), api `pages.ts`(CRUD 8 함수). **`supabase db push` 필요(미적용).**
+- [x] T1 페이지 워크스페이스 UI(f6e7f36, CI success): `/pages`+`/pages/[id]` 라우트, PageWorkspace(트리
+  사이드바+생성/soft삭제/네비, buildTree 재귀), PageEditor(제목+본문 디바운스 자동저장), AppNav 페이지 nav.
+- [x] T2 BlockNote 에디터(f41985e, CI success): `@blocknote/core·react·shadcn` 0.52.1(React19+TW4 peer
+  정합, Mantine 충돌 게이트 해소). BlockEditor.tsx(useCreateBlockNote+BlockNoteView(shadcn), html.dark
+  관찰 테마 동기화, 빈 content→undefined). PageEditor textarea→next/dynamic ssr:false BlockEditor 교체.
+  content 스키마 T1과 동일이라 마이그레이션 불필요.
+- [x] T4 Cmd+K 검색(2206efe): api searchPages(title/plain_text ilike, pg_trgm 가속, or() 필터 인젝션 차단,
+  3 tests) + CommandPalette(전역 Cmd/Ctrl+K+CustomEvent, 200ms 디바운스, ↑↓+Enter 내비) + 사이드바 트리거.
+- [x] T5 휴지통/복원(a8983d0): `/pages/trash` 라우트+TrashView(listTrashed+복원+영구삭제 confirm) + 사이드바
+  링크. 영구삭제는 되돌리기 불가+하위 cascade라 window.confirm(안전 규칙). **버전 히스토리는 미구현(아래).**
+- [x] T7 RAG page 소스(fb6a49e, 계약 변경 병렬 밖): core embeddingSourceSchema에 'page' + 마이그레이션
+  `20260722040000_embeddings_source_page`(source_type CHECK 확장+rollback). 저장→reindex(서버 plainText),
+  soft delete→reindex(''), 복원→reindex(plainText), reindex-all 백필에 listPages. **`supabase db push` 필요.**
+- 검증 총계: core 96 / api 90 / ai 6 tests + web build GREEN(전 슬라이스), CI T1·T2 success.
+- [ ] **T3 파일 업로드 + 이미지 블록**(Supabase Storage 버킷+RLS+BlockNote uploadFile 핸들러).
+- [ ] **T5 버전 히스토리**(page_versions 테이블 스냅샷 + 저장 시/수동 + 복원 UI).
+- [ ] **T6 내보내기 + 백업 + 템플릿**(BlockNote blocksToMarkdownLossy → .md 내보내기, 템플릿 프리셋).
+- [ ] **T8 실기 검증**(사용자, 로그인 필요): 에디터 저장/복원, 검색, soft delete, 페이지 RAG 답변, Storage RLS.
 
 ## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현·리뷰·배포·검증 완료 (2026-07-22, `/loop` 자율+협업)
 

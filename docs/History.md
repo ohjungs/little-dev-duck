@@ -12,8 +12,9 @@
       완료, 마이그레이션 적용(사용자)·T4 실기 검증 대기 (아래 기록)
 - [x] Phase 8 AI 1단계 (룰 기반 대사 -> RAG Q&A) — 2026-07-22 실호출 검증 통과(사용자 "답변 잘 나와"),
       마이그레이션·GEMINI_API_KEY 배포 + 생성모델 404 픽스 + 완료-할일 인식 픽스 완료 (아래 기록)
-- [~] Phase 9 워크스페이스 코어(블록 에디터) — 2026-07-22 백엔드/계약 층 착수(pages 마이그레이션+core
-      pageSchema/extractPlainText+api CRUD). 에디터 UI(T2~)는 다른 세션 리디자인 종료 후 (아래 기록)
+- [~] Phase 9 워크스페이스 코어(블록 에디터) — 2026-07-22 백엔드/계약 층 + T1·T2·T4·T5·T7 구현·배포
+      (pages CRUD UI, BlockNote shadcn 에디터, Cmd+K 검색, 휴지통/복원, RAG page 소스). 남음: T3 파일
+      업로드, T5 버전 히스토리, T6 내보내기/템플릿, DB push 2건(pages·embeddings source) (아래 기록)
 - [ ] Phase 10 AI 2단계 (에이전트 액션: Figma/Gamma/Google/GitHub/Notion/Gmail)
 - [ ] Phase 11 DB 뷰 (표/보드)
 - [ ] Phase 12 공개 공유 + 알림 4채널 + 대시보드
@@ -288,3 +289,30 @@
   결과 미리보기 Artifact 게시(claude.ai/code/artifact/228c0a22). Figma는 새 파일 생성까진 됐으나
   Starter 플랜 MCP 호출 한도로 내용 채우기 실패(파일 L9VHOW4nS5bSDWXGW1yblO 빈 상태). **미커밋 —
   사용자 커밋 대기(main 직접 금지, 브랜치 권장).**
+- 2026-07-22 : Phase 9 T1·T2·T4·T5·T7 자율 구현·배포 (`/loop /next-step`, 사용자 부재 자율) - 리디자인
+  세션 종료 확인 후 T1 WIP 브랜치(phase9-t1-wip)부터 재개. **5개 슬라이스 순차 구현, 각 빌드 GREEN 확인
+  후 main 커밋·push, CI 검증**:
+  - **T1 페이지 UI 병합(f6e7f36, CI success)**: phase9-t1-wip(PageWorkspace 트리 사이드바+PageEditor
+    제목/textarea 디바운스 자동저장, /pages·/pages/[id] 라우트)을 빌드 검증 후 main 병합. 문서화된
+    재개 게이트는 빌드라 통과 즉시 병합, lint는 CI 위임(로컬 ESLint 병적 지연). CI가 lint+e2e green 확인.
+  - **T2 BlockNote 에디터(f41985e, CI success)**: `@blocknote/core·react·shadcn` 0.52.1 설치(peer 실측:
+    React ^19.0 + Tailwind ^4.1.12 정합 → 리디자인 shadcn/TW4와 맞물려 Phase 8이 남긴 Mantine 충돌
+    게이트 해소). BlockEditor.tsx(useCreateBlockNote+BlockNoteView(shadcn), html.dark MutationObserver로
+    테마 동기화, 빈 content→undefined로 BlockNote 예외 회피). PageEditor textarea→next/dynamic ssr:false
+    BlockEditor 교체, 최신 편집값 ref로 디바운스 stale 방지. content 스키마 T1과 동일이라 마이그레이션 불필요.
+  - **T4 Cmd+K 검색(2206efe)**: api searchPages(title/plain_text ilike, pg_trgm GIN 가속, PostgREST or()
+    예약문자+ilike 와일드카드 제거로 필터 인젝션 차단, 3 tests). CommandPalette.tsx(전역 Cmd/Ctrl+K 토글
+    +OPEN_SEARCH_EVENT, 200ms 디바운스, ↑↓+Enter 내비, 초기화는 이벤트 핸들러에서 set-state-in-effect
+    회피). (app) 레이아웃 상주 + 사이드바 검색 트리거(⌘K 힌트).
+  - **T5 휴지통/복원(a8983d0)**: /pages/trash 라우트(정적 세그먼트 우선)+TrashView(listTrashed+복원+
+    영구삭제). 영구삭제는 되돌리기 불가+하위 cascade라 window.confirm 확인(안전 규칙). 사이드바 휴지통 링크.
+  - **T7 RAG page 소스(fb6a49e, 계약 변경 병렬 밖)**: core embeddingSourceSchema에 'page' 추가 +
+    마이그레이션 20260722040000_embeddings_source_page(source_type CHECK 확장+rollback). 저장→reindex
+    (서버 파생 plainText), soft delete→reindex(''), 복원→reindex(plainText), reindex-all 백필에 listPages.
+    embedding.test.ts를 'page' 허용으로 갱신(Phase 8엔 거부 테스트였음).
+  - **검증 총계**: core 96 / api 90 / ai 6 tests, web build GREEN(전 슬라이스), CI T1·T2 success 확인.
+  - **인프라 대기(사용자/세션, DB 자격증명 필요)**: `supabase db push` 2건 — 20260722030000_pages(T1 이전
+    작성), 20260722040000_embeddings_source_page(T7). 미적용이면 /pages 저장·페이지 RAG가 런타임 실패하나
+    코드·빌드·CI는 전부 GREEN(마이그레이션은 배포 시 적용 패턴, Phase 7/8 선례).
+  - **남은 Phase 9**: T3(파일 업로드+이미지 블록, Storage 버킷), T5 버전 히스토리(page_versions),
+    T6(Markdown 내보내기+백업+템플릿), T8 실기 검증(로그인 필요, 사용자).
