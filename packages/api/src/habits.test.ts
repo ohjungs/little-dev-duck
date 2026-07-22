@@ -196,3 +196,75 @@ describe("deleteHabit", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+// 각 함수의 DB 에러 전파(`if (error) throw`) 브랜치. listHabits는 위에서 커버됨.
+describe("DB 에러 전파", () => {
+  it("createHabit은 insert 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({ data: null, error: { message: "create-boom" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      createHabit(supabase, { title: "x", frequency: "daily" }),
+    ).rejects.toThrow("create-boom");
+  });
+
+  it("deleteHabit은 delete 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        delete: () => ({
+          eq: async () => ({ error: { message: "delete-boom" } }),
+        }),
+      }),
+    });
+    await expect(deleteHabit(supabase, VALID_HABIT_ROW.id)).rejects.toThrow(
+      "delete-boom",
+    );
+  });
+
+  it("listHabitChecks는 조회 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          order: async () => ({ data: null, error: { message: "checks-boom" } }),
+        }),
+      }),
+    });
+    await expect(listHabitChecks(supabase)).rejects.toThrow("checks-boom");
+  });
+
+  it("checkHabit은 insert 에러면 XP 지급 전에 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({ data: null, error: { message: "check-boom" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      checkHabit(supabase, VALID_HABIT_ROW.id, "2026-07-21"),
+    ).rejects.toThrow("check-boom");
+  });
+
+  it("uncheckHabit은 delete 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        delete: () => ({
+          eq: () => ({
+            eq: async () => ({ error: { message: "uncheck-boom" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      uncheckHabit(supabase, VALID_HABIT_ROW.id, "2026-07-21"),
+    ).rejects.toThrow("uncheck-boom");
+  });
+});

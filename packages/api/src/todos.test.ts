@@ -111,3 +111,51 @@ describe("deleteTodo", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+// create/update/delete의 DB 에러 전파(`if (error) throw`) 브랜치. list는 위에서 커버됨.
+describe("DB 에러 전파", () => {
+  it("createTodo는 insert 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({ data: null, error: { message: "create-boom" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(createTodo(supabase, { title: "x" })).rejects.toThrow(
+      "create-boom",
+    );
+  });
+
+  it("updateTodo는 갱신 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        update: () => ({
+          eq: () => ({
+            select: () => ({
+              single: async () => ({ data: null, error: { message: "update-boom" } }),
+            }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      updateTodo(supabase, VALID_ROW.id, { isDone: true }),
+    ).rejects.toThrow("update-boom");
+  });
+
+  it("deleteTodo는 delete 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        delete: () => ({
+          eq: async () => ({ error: { message: "delete-boom" } }),
+        }),
+      }),
+    });
+    await expect(deleteTodo(supabase, VALID_ROW.id)).rejects.toThrow(
+      "delete-boom",
+    );
+  });
+});

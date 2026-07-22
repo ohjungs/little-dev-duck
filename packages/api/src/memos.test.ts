@@ -202,3 +202,63 @@ describe("deleteMemo", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+// 각 함수의 DB 에러 전파(`if (error) throw`) 브랜치. UI가 이 예외로 재시도 상태를 띄우므로
+// 조용히 삼키지 않는지 검증한다.
+describe("DB 에러 전파", () => {
+  it("listMemos는 조회 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          order: async () => ({ data: null, error: { message: "list-boom" } }),
+        }),
+      }),
+    });
+    await expect(listMemos(supabase)).rejects.toThrow("list-boom");
+  });
+
+  it("createMemo는 insert 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({ data: null, error: { message: "create-boom" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(createMemo(supabase, { content: "x" })).rejects.toThrow(
+      "create-boom",
+    );
+  });
+
+  it("updateMemo는 갱신 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        update: () => ({
+          eq: () => ({
+            select: () => ({
+              single: async () => ({ data: null, error: { message: "update-boom" } }),
+            }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      updateMemo(supabase, VALID_ROW.id, { content: "x" }),
+    ).rejects.toThrow("update-boom");
+  });
+
+  it("deleteMemo는 delete 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        delete: () => ({
+          eq: async () => ({ error: { message: "delete-boom" } }),
+        }),
+      }),
+    });
+    await expect(deleteMemo(supabase, VALID_ROW.id)).rejects.toThrow(
+      "delete-boom",
+    );
+  });
+});

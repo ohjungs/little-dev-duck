@@ -126,3 +126,54 @@ describe("deleteCalendarEvent", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+// create/update/delete의 DB 에러 전파(`if (error) throw`) 브랜치. list는 위에서 커버됨.
+describe("DB 에러 전파", () => {
+  it("createCalendarEvent는 insert 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({ data: null, error: { message: "create-boom" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      createCalendarEvent(supabase, {
+        title: "x",
+        startAt: "2026-07-25T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("create-boom");
+  });
+
+  it("updateCalendarEvent는 갱신 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        update: () => ({
+          eq: () => ({
+            select: () => ({
+              single: async () => ({ data: null, error: { message: "update-boom" } }),
+            }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      updateCalendarEvent(supabase, VALID_ROW.id, { title: "x" }),
+    ).rejects.toThrow("update-boom");
+  });
+
+  it("deleteCalendarEvent는 delete 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        delete: () => ({
+          eq: async () => ({ error: { message: "delete-boom" } }),
+        }),
+      }),
+    });
+    await expect(
+      deleteCalendarEvent(supabase, VALID_ROW.id),
+    ).rejects.toThrow("delete-boom");
+  });
+});
