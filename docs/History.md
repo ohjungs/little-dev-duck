@@ -10,9 +10,10 @@
 - [x] Phase 6 오리 2단계 (상태 반응, 자율 행동, 활보 모드) — 2026-07-21 완료 (T4 사용자 검증 완료, 아래 기록)
 - [~] Phase 7 게임화 (XP/먹이/코스튬) + 생산성 모듈 (뽀모도로/습관/캘린더) — 2026-07-21 구현+머신검증+리뷰
       완료, 마이그레이션 적용(사용자)·T4 실기 검증 대기 (아래 기록)
-- [~] Phase 8 AI 1단계 (룰 기반 대사 -> RAG Q&A) — 2026-07-21 코드 구현 완료(`/loop /next-step` 자율),
-      배포(마이그레이션·GEMINI_API_KEY)·실호출 검증 사용자 대기 (아래 기록)
-- [ ] Phase 9 블록 에디터
+- [x] Phase 8 AI 1단계 (룰 기반 대사 -> RAG Q&A) — 2026-07-22 실호출 검증 통과(사용자 "답변 잘 나와"),
+      마이그레이션·GEMINI_API_KEY 배포 + 생성모델 404 픽스 + 완료-할일 인식 픽스 완료 (아래 기록)
+- [~] Phase 9 워크스페이스 코어(블록 에디터) — 2026-07-22 백엔드/계약 층 착수(pages 마이그레이션+core
+      pageSchema/extractPlainText+api CRUD). 에디터 UI(T2~)는 다른 세션 리디자인 종료 후 (아래 기록)
 - [ ] Phase 10 AI 2단계 (에이전트 액션: Figma/Gamma/Google/GitHub/Notion/Gmail)
 - [ ] Phase 11 DB 뷰 (표/보드)
 - [ ] Phase 12 공개 공유 + 알림 4채널 + 대시보드
@@ -246,6 +247,19 @@
   api 79 tests + tsc GREEN(로컬 ESLint 성능 이슈로 린트는 CI 위임). push→Vercel 자동배포 READY(프로덕션
   별칭 web-sepia-one-88). **남은 사용자 몫 = 로그인 후 "기존 메모·할일 인덱싱" 클릭 + 질문으로 RAG
   실호출 확인(③) 하나. + 작업에 쓴 임시 Vercel 토큰 삭제 권장.**
+- 2026-07-22 오후 : Phase 8 종결 + CI 복구 + Phase 9 백엔드 착수 (`/loop /next-step`, 사용자 "전부 자율
+  처리, 백엔드 가자" 승인). (1) 사용자 RAG 실호출 검증 통과("답변 잘 나와") + 완료-할일 인식 결함 수정
+  (b73f68d). (2) **동시 세션이 UI 전면 리디자인(shadcn/Tailwind, e495bd8) 배포** — 그 push가 CI를 깸:
+  ThemeToggle의 set-state-in-effect lint(7f92ca9, 코드베이스 표준 disable 추가)와 오래된 e2e env 부재
+  (4358776, ci.yml에 공개 URL+더미 anon 폴백)를 이 세션이 green 복구. 리디자인 자체는 Vercel next build
+  통과로 이미 프로덕션 라이브. (3) **Phase 9 백엔드/계약 층 구현**(apps/web 리디자인과 파일 disjoint):
+  `supabase/migrations/20260722030000_pages.sql`(pages 계층 테이블+RLS 4정책+pg_trgm GIN 검색인덱스
+  +plain_text 컬럼) + rollback, core `page.ts`(pageSchema + extractPlainText 순수함수 — BlockNote 문서
+  jsonb→텍스트, RAG/검색 공용, @blocknote 의존 없이 방어적 순회), api `pages.ts`(list/listTrashed/get/
+  create/update/softDelete/restore/purge — plain_text는 저장 시 서버 파생). 검증 core 7 + api 8 신규
+  tests 통과, core/api tsc GREEN. **미착수(다음): pages 마이그레이션 `supabase db push`(사용자/세션),
+  apps/web 에디터 UI(T2, 리디자인 종료 후), RAG "page" 소스 확장(T7 — embeddingSource enum+DB 계약 변경).
+  BlockNote 실측: 0.52.1/MPL-2.0/React19 OK, 단 기본 UI가 Mantine이라 shadcn과 충돌 → T2 게이트에서 결정.**
 - 2026-07-22 : Phase 8 ③ 실호출 검증 통과 + 완료-할일 RAG 결함 수정 (`/loop /next-step`, 사용자 협업→퇴근
   후 자율) - 사용자가 로그인해 오리에 질문 "답변 잘 나와"로 RAG Q&A 실동작 확인(③ 통과). 이어 "완료 처리한
   할일을 오리가 못 알아먹는다" 관찰. 원인 2건: (1) `handleToggle`이 `reindexSource` 미호출(생성·수정·삭제엔

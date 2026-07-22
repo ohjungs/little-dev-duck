@@ -1,10 +1,11 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 8(AI 1단계) 실호출 검증 통과 — 사용자가 로그인 RAG 확인 "답변 잘 나와"(2026-07-22 11:2x).
-후속으로 "완료 처리한 할일을 오리가 못 알아먹음" 결함 발견 → 토글 재인덱싱 누락 + 임베딩에 완료상태 미포함이
-원인, 수정·배포 완료(b73f68d, READY). 재검증(재인덱싱 후 완료-할일 질문)만 사용자 대기.** Phase 1~7 완료.
-**주의(다른 세션): 작업트리에 미커밋 shadcn/Tailwind 도입 작업이 있고 pnpm-lock.yaml이 package.json과
-불일치(frozen-install 실패) — 이 세션은 건드리지 않았음. 그 세션이 lockfile 정리·커밋해야 함.**
+현재 Phase: **Phase 8(AI 1단계) 완료(실호출 검증 통과) → Phase 9(워크스페이스 코어) 착수 — 백엔드/계약 층
+구현 중(2026-07-22 오후, 사용자 "백엔드 가자" 승인).** Phase 1~8 완료.
+Phase 9 백엔드(pages 마이그레이션 + core pageSchema/extractPlainText + api CRUD)는 다른 세션의 apps/web
+UI 리디자인과 파일이 안 겹쳐 병렬 진행. **apps/web 에디터 UI(T2~)는 리디자인 세션 종료 후 착수.**
+**다른 세션 현황: UI 전면 리디자인(shadcn/Tailwind) 배포 완료(e495bd8). 그 push가 깬 CI(lint·e2e)는 이
+세션이 green 복구(7f92ca9 ThemeToggle lint, 4358776 e2e env 폴백).**
 Phase 8 = AI 1단계(룰 대사→RAG Q&A). 사용자 "정지 말고 구현 가능한 것 전부 구현, 아침에 확인" 지시로
 Phase 7 선례대로 T0 게이트 기본값 확정 후 빌드(상세·게이트값은 phase_08.md "구현 진행" 절).
 계획 문서: docs/plans/phase_01~09.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
@@ -13,7 +14,26 @@ docs/plans/notion-inventory-delta-2026-07-21.md.
 7건(Phase 8 검증, pages jsonb 스키마, BlockNote 통합, extractPlainText, soft delete, 앱 셸, 파일 업로드)
 사용자 결정 필요. Phase 9 = Phase 8 이월 "pages jsonb" 게이트의 해소 지점.
 
-## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현·리뷰·배포 완료 (2026-07-22 새벽, `/loop` 밤샘 자율)
+## Phase 9 — 워크스페이스 코어 (블록 에디터) — 백엔드/계약 층 구현 (2026-07-22 오후)
+
+착수 승인: 사용자 "백엔드 가자"(게이트 기본값 확정). apps/web 에디터 UI는 다른 세션 리디자인과 충돌해
+그 종료 후 착수. 백엔드는 core/api/migrations로 disjoint라 병렬 진행. 계획: docs/plans/phase_09.md.
+
+- [x] DB 마이그레이션 `20260722030000_pages`: `pages`(id/user_id/parent_id 계층/title/content jsonb/
+  plain_text/icon/is_trashed/trashed_at/타임스탬프) + RLS 4정책(본인 한정) + pg_trgm GIN(title/plain_text
+  검색) + rollback. **`supabase db push` 필요(미적용).**
+- [x] core `page.ts`: `pageSchema`(content=z.unknown, BlockNote 구조는 BlockNote 소유) + `extractPlainText`
+  (블록 배열→텍스트, @blocknote 의존 없이 재귀 순회, RAG/검색 공용). 7 tests + tsc GREEN.
+- [x] api `pages.ts`: list/listTrashed/get/create/update/softDelete/restore/purge. plain_text는 저장 시
+  서버가 extractPlainText로 파생(클라 불신). 8 tests + tsc GREEN.
+- [ ] `supabase db push`(pages) — 사용자/세션.
+- [ ] apps/web 에디터 UI(T2~): 앱 셸/`/app/[pageId]`, BlockNote 에디터, 사이드바 트리, Cmd+K 검색, 휴지통.
+  **리디자인 세션 종료 후 착수.** BlockNote 0.52.1/MPL-2.0/React19 OK, 단 기본 UI=Mantine ↔ shadcn 충돌
+  → T2 게이트에서 "headless+Tailwind vs 에디터만 Mantine" 결정.
+- [ ] RAG "page" 소스(T7): `embeddingSourceSchema`에 "page" + DB source_type 제약 확장(계약 변경, 병렬 밖)
+  + 페이지 저장 시 `reindexSource('page', id, extractPlainText(content))`.
+
+## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현·리뷰·배포·검증 완료 (2026-07-22, `/loop` 자율+협업)
 
 Gemini 키(`GEMINI_API_KEY`)는 배포 시 주입(Phase 4 GITHUB_TOKEN 패턴)이라 코드는 전부 빌드 가능.
 커밋 48b27f9→99fda30(8건) main push 완료. 최종 검증 core 88 / api 79 / ai 6 / mascot 5 tests + next build GREEN.

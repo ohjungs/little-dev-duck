@@ -79,3 +79,4 @@ export {
   type ChatMessage,
   type UtteranceRoute,
 } from "./domain/ai-chat";
+export { pageSchema, extractPlainText, type Page } from "./domain/page";

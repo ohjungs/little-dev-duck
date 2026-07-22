@@ -68,3 +68,16 @@ export {
 export { answerQuestion, type AiAnswer } from "./aiChat";
 
 export { allowRequest } from "./rateLimit";
+
+export {
+  listPages,
+  listTrashedPages,
+  getPage,
+  createPage,
+  updatePage,
+  softDeletePage,
+  restorePage,
+  purgePage,
+  type CreatePageInput,
+  type UpdatePageInput,
+} from "./pages";
