@@ -246,3 +246,15 @@
   api 79 tests + tsc GREEN(로컬 ESLint 성능 이슈로 린트는 CI 위임). push→Vercel 자동배포 READY(프로덕션
   별칭 web-sepia-one-88). **남은 사용자 몫 = 로그인 후 "기존 메모·할일 인덱싱" 클릭 + 질문으로 RAG
   실호출 확인(③) 하나. + 작업에 쓴 임시 Vercel 토큰 삭제 권장.**
+- 2026-07-22 : Phase 8 ③ 실호출 검증 통과 + 완료-할일 RAG 결함 수정 (`/loop /next-step`, 사용자 협업→퇴근
+  후 자율) - 사용자가 로그인해 오리에 질문 "답변 잘 나와"로 RAG Q&A 실동작 확인(③ 통과). 이어 "완료 처리한
+  할일을 오리가 못 알아먹는다" 관찰. 원인 2건: (1) `handleToggle`이 `reindexSource` 미호출(생성·수정·삭제엔
+  있는데 토글만 누락) → 완료해도 임베딩이 생성 시점 텍스트(제목만), (2) 임베딩 텍스트에 완료 여부 부재.
+  수정: `apps/web/src/lib/embedText.ts` `todoEmbedText(제목+(완료/미완료))` 헬퍼로 생성·수정·토글·백필
+  4곳 통일 + 토글 재인덱싱 추가(커밋 b73f68d). CI lint-and-test success, Vercel READY(프로덕션 라이브).
+  로컬 빌드는 다른 세션의 미커밋 lockfile 불일치로 막혀 CI/Vercel로 검증. **재검증 대기: 사용자가
+  "기존 메모·할일 인덱싱" 재실행(기존 완료 할일에 상태 반영) 후 "완료한 할일 뭐야?" 질문.**
+  **동시 세션 주의: 작업트리에 미커밋 shadcn/ui+Tailwind 도입(components/ui/, utils.ts, globals.css,
+  postcss, deps 9개 + pnpm-lock.yaml)이 있고 frozen-install이 실패한다. TodoWidget.tsx도 그 세션이
+  shadcn으로 재작성(내 RAG 수정은 보존됨). 이 세션은 그 변경을 건드리지 않음 — 그 세션이 lockfile
+  정리·커밋 필요.**

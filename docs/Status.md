@@ -1,8 +1,10 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 8(AI 1단계) 배포 인프라 전건 반영 완료 — DB 마이그레이션·GEMINI_API_KEY·생성모델
-버그픽스까지 라이브. 남은 건 사용자 로그인 RAG 실호출 확인(③) 하나 (2026-07-22 10:57, `/loop /next-step`
-+ 사용자 협업).** Phase 1~7 완료.
+현재 Phase: **Phase 8(AI 1단계) 실호출 검증 통과 — 사용자가 로그인 RAG 확인 "답변 잘 나와"(2026-07-22 11:2x).
+후속으로 "완료 처리한 할일을 오리가 못 알아먹음" 결함 발견 → 토글 재인덱싱 누락 + 임베딩에 완료상태 미포함이
+원인, 수정·배포 완료(b73f68d, READY). 재검증(재인덱싱 후 완료-할일 질문)만 사용자 대기.** Phase 1~7 완료.
+**주의(다른 세션): 작업트리에 미커밋 shadcn/Tailwind 도입 작업이 있고 pnpm-lock.yaml이 package.json과
+불일치(frozen-install 실패) — 이 세션은 건드리지 않았음. 그 세션이 lockfile 정리·커밋해야 함.**
 Phase 8 = AI 1단계(룰 대사→RAG Q&A). 사용자 "정지 말고 구현 가능한 것 전부 구현, 아침에 확인" 지시로
 Phase 7 선례대로 T0 게이트 기본값 확정 후 빌드(상세·게이트값은 phase_08.md "구현 진행" 절).
 계획 문서: docs/plans/phase_01~09.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md, Notion 델타
