@@ -1,20 +1,15 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 9(워크스페이스 코어) 코드 완료 — T1~T7 전부 + 템플릿·백업 구현·배포 + 적대적 리뷰
-14결함 수정, main 전체 CI green.** Phase 1~8 완료. **남은 Phase 9 = 사용자 몫뿐: T8 실기 검증(로그인
-필요) + supabase db push 5건. 자율 구현 가능분은 전부 완료.**
-리디자인 세션 종료 확인 후 T1 WIP 브랜치부터 재개해 슬라이스를 순차 구현(각 빌드 검증→커밋→CI).
-**인프라 대기(DB 자격증명 필요): `supabase db push` 5건 — 20260722030000_pages, 20260722040000_
-embeddings_source_page, 20260722050000_page_attachments_bucket, 20260722060000_page_versions,
-20260722070000_pages_cleanup_embeddings. 미적용 시 /pages 저장·페이지 RAG·이미지 업로드·버전이 런타임
-실패(코드·빌드·CI는 전부 GREEN).**
+현재 Phase: **Phase 9(워크스페이스 코어) 완료 — 코드 T1~T7 + 적대적 리뷰 14결함 수정 + main CI green +
+`supabase db push` 5건 프로덕션 적용(2026-07-22, 사용자) + T8 로그인 실기 검증 완료(사용자).** Phase 1~9
+전부 완료. 남은 인프라·검증 게이트 없음.
 계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md,
 Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
 **Phase 10(AI 2단계=에이전트 액션) 착수** — 사용자 "phase 10 착수하자"(phase_10.md 기본값 승인).
 **T1 프레임워크 완료(보안 표면 없는 부분, 외부 호출 0)**: core 도구 계약 잠금(2f5d155) + api 에이전트
-루프(9e737f1, 목 검증). 계약 형태는 공식 문서 실측 확정(26be814). **다음 T2(승인 게이트 실행 배선
-+DuckChatPanel 승인 카드)·T3(첫 어댑터 Google Calendar)는 진행 예정이나, T3는 OAuth provider_token이
-필요해 Phase 9 supabase db push + 로그인이 선행돼야 함(사용자 몫).** 상세 계획 docs/plans/phase_10.md.
+루프(9e737f1, 목 검증). 계약 형태는 공식 문서 실측 확정(26be814). **선행 게이트(Phase 9 db push+로그인)
+2026-07-22 해소 → 다음 세션은 T3(첫 어댑터 Google Calendar: OAuth scope 추가+provider_token 캡처·저장+
+조회/생성)와 T2(승인 카드 UI+/api/ai/agent 라우트)를 end-to-end로 착수.** 상세 계획 docs/plans/phase_10.md.
 
 ## Phase 10 — AI 2단계 (에이전트 액션) — T1 프레임워크 완료 (2026-07-22, `/loop` 자율)
 
@@ -32,8 +27,8 @@ Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
   에러 회신. Adapter 인터페이스 + 목 어댑터·스크립트 fetch 7 시나리오(외부 호출 0). 7 tests + tsc GREEN.
 - [ ] **T2 승인 게이트**(진행 예정): mutating 승인 후 실행 재개(api) + DuckChatPanel 승인/취소 카드(web) +
   /api/ai/agent 라우트(서버 키+auth+레이트리밋, Phase 8 /chat 패턴 계승).
-- [ ] **T3 첫 어댑터 Google Calendar**(게이트 대기): OAuth scope 추가 동의 + provider_token 캡처·저장 +
-  calendar 조회(readonly)/생성(mutating). **Phase 9 supabase db push + 로그인 선행 필요(사용자 몫).**
+- [ ] **T3 첫 어댑터 Google Calendar**(착수 가능, 선행 게이트 해소): OAuth scope 추가 동의 + provider_token
+  캡처·저장 + calendar 조회(readonly)/생성(mutating). Phase 9 db push+로그인 완료(2026-07-22)로 착수 가능.
 - [ ] T4 인젝션 방어 하드닝 / T5 두 번째 어댑터 / T6 Gmail(격리) / T7 감사 로그 — phase_10.md 참조.
 
 ## Phase 9 — 워크스페이스 코어 (블록 에디터) — T1·T2·T4·T5·T7 구현·배포 (2026-07-22 오후, `/loop` 자율)
@@ -77,10 +72,8 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
 - 검증 총계: core 98 / api 95 / ai 6 tests + web build GREEN, 로컬 full eslint 선검증.
 - [x] T6 템플릿·백업: 새 페이지 템플릿 프리셋 4종(빈/회의록/일일 노트/할 일, `+` 드롭다운 피커,
   lib/pageTemplates.ts) + 전체 백업 내보내기(활성+휴지통 페이지를 JSON 다운로드, 사이드바 하단).
-- [ ] **인프라(사용자/세션, DB 자격증명)**: `supabase db push` 5건 — 20260722030000_pages,
-  20260722040000_embeddings_source_page, 20260722050000_page_attachments_bucket, 20260722060000_page_versions,
-  20260722070000_pages_cleanup_embeddings(삭제 트리거).
-- [ ] **T8 실기 검증**(사용자, 로그인 필요): 에디터 저장/복원, 검색, soft delete, 페이지 RAG 답변, Storage RLS.
+- [x] **인프라**: `supabase db push` 5건 프로덕션 적용 완료(2026-07-22, 사용자 `npx supabase db push`).
+- [x] **T8 실기 검증**(사용자): 로그인 후 에디터/검색/휴지통/페이지 RAG 동작 확인 완료(2026-07-22).
 
 ## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현·리뷰·배포·검증 완료 (2026-07-22, `/loop` 자율+협업)
 
