@@ -342,3 +342,11 @@
   `+` 드롭다운 피커(role=presentation 백드롭 닫기), 전체 백업(활성+휴지통 페이지를 JSON 다운로드,
   사이드바 하단 버튼). 검증: web build GREEN + 로컬 full eslint exit 0. 이로써 Phase 9 자율 구현 가능분
   전부 완료 — 남은 것은 사용자 몫(T8 로그인 실기 검증 + supabase db push 5건)뿐.
+- 2026-07-22 : E2E 파이프라인 startup 타임아웃 해소 — webServer를 `next dev`→`next start`로 전환
+  (`/loop /next-step` 자율, 커밋 19afba1 main push). 로컬에서 Playwright webServer가 `next dev`의 최초
+  Turbopack 컴파일(Phase 9 BlockNote 등으로 커진 의존성 그래프)에 120초 준비 타임아웃을 넘겨 매 실행이
+  실패하던 것을, 요청 시 컴파일이 없는 프로덕션 서버(`next start`)로 바꿔 머신 속도와 무관하게 안정화.
+  빌드는 e2e 스크립트가 `next build && playwright test`로 선행(package.json). CI e2e 잡은 이미
+  `pnpm --filter web e2e`를 돌므로 동일 경로로 수렴. **실측 검증**: 기존 빌드(.next 18:22) 대상 `next start`
+  webServer가 즉시 바인딩, 33 스펙 중 **12 passed / 21 skipped(인증 세션 없는 스펙 자동 스킵, 의도된 동작)
+  / exit 0** (2.3m). 이로써 로컬·CI 양쪽에서 비인증 E2E가 재현 가능하게 green.
