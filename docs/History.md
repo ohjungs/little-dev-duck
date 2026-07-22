@@ -235,3 +235,14 @@
   ai 6/mascot 5 tests + 전체 next build GREEN(/api/ai/* 라우트 확인). **미완(사용자 아침): `supabase
   db push`(embeddings) + Vercel `GEMINI_API_KEY` 등록 + 실호출 검증.** 상세·게이트값·알려진 한계는
   phase_08.md "구현 진행" 절.
+- 2026-07-22 : Phase 8 배포 인프라 반영 + 생성모델 버그픽스 (`/loop /next-step` 세션이 사용자 협업으로
+  실행) - (1) `supabase db push`로 `20260721020000_ai_embeddings` 프로덕션 적용(keyring 인증·DB 비번
+  캐시로 dry-run 검증 후 적용, 재확인 "Remote database is up to date"). (2) Vercel REST API로 env
+  `GEMINI_API_KEY` 등록(Production+Preview) + 재배포. (3) 키를 코드 호출 모델로 직접 실측 검증 중
+  **생성 모델 `gemini-2.5-flash`가 신규 키에 404(deprecated for new users)** 발견 → 답변 생성 실패
+  결함. CLAUDE.md 3-3대로 STOP·진단 후 `gemini-flash-latest`(자동 최신 별칭, 무료 티어 키 200 실측)로
+  1줄 교체(커밋 9442fae, gemini.ts의 명시적 "보정 지점"). 임베딩 768차원 정합은 이상 없음 확인(코드가
+  outputDimensionality=EMBEDDING_DIM 전달, core 768 ↔ 마이그레이션 vector(768) 일치, B는 오탐).
+  api 79 tests + tsc GREEN(로컬 ESLint 성능 이슈로 린트는 CI 위임). push→Vercel 자동배포 READY(프로덕션
+  별칭 web-sepia-one-88). **남은 사용자 몫 = 로그인 후 "기존 메모·할일 인덱싱" 클릭 + 질문으로 RAG
+  실호출 확인(③) 하나. + 작업에 쓴 임시 Vercel 토큰 삭제 권장.**
