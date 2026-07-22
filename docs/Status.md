@@ -1,7 +1,8 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 9(워크스페이스 코어) 거의 완료 — T1·T2·T3·T4·T5(휴지통+버전)·T6(내보내기)·T7 구현·배포,
-main 전체 CI green.** Phase 1~8 완료. **남은 Phase 9: T6 잔여(템플릿·백업, 선택), T8 실기 검증(사용자).**
+현재 Phase: **Phase 9(워크스페이스 코어) 코드 완료 — T1~T7 전부 + 템플릿·백업 구현·배포 + 적대적 리뷰
+14결함 수정, main 전체 CI green.** Phase 1~8 완료. **남은 Phase 9 = 사용자 몫뿐: T8 실기 검증(로그인
+필요) + supabase db push 5건. 자율 구현 가능분은 전부 완료.**
 리디자인 세션 종료 확인 후 T1 WIP 브랜치부터 재개해 슬라이스를 순차 구현(각 빌드 검증→커밋→CI).
 **인프라 대기(DB 자격증명 필요): `supabase db push` 5건 — 20260722030000_pages, 20260722040000_
 embeddings_source_page, 20260722050000_page_attachments_bucket, 20260722060000_page_versions,
@@ -49,7 +50,8 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
   - LOW 4: 버킷 mime 화이트리스트(이미지만)+파일크기 상한, createPageVersion 서버 스냅샷(소유권 강제),
     pages RLS (select auth.uid()) initplan, safeFileName 공백만 폴백.
 - 검증 총계: core 98 / api 95 / ai 6 tests + web build GREEN, 로컬 full eslint 선검증.
-- [ ] **T6 잔여**(선택): 내장 템플릿 프리셋, 전체 백업 내보내기(무료 원칙상 스케줄러 대신 수동).
+- [x] T6 템플릿·백업: 새 페이지 템플릿 프리셋 4종(빈/회의록/일일 노트/할 일, `+` 드롭다운 피커,
+  lib/pageTemplates.ts) + 전체 백업 내보내기(활성+휴지통 페이지를 JSON 다운로드, 사이드바 하단).
 - [ ] **인프라(사용자/세션, DB 자격증명)**: `supabase db push` 5건 — 20260722030000_pages,
   20260722040000_embeddings_source_page, 20260722050000_page_attachments_bucket, 20260722060000_page_versions,
   20260722070000_pages_cleanup_embeddings(삭제 트리거).

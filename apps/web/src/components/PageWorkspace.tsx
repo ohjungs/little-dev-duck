@@ -3,14 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Loader2, Plus, Trash, Trash2 } from "lucide-react";
-import { createPage, listPages, softDeletePage } from "@ldd/api";
+import { Download, FileText, Loader2, Plus, Trash, Trash2 } from "lucide-react";
+import {
+  createPage,
+  listPages,
+  listTrashedPages,
+  softDeletePage,
+} from "@ldd/api";
 import { reindexSource } from "@ldd/ai";
 import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PageEditor } from "@/components/PageEditor";
+import { PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 
 type TreeNode = Page & { children: TreeNode[] };
 
@@ -86,6 +92,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const router = useRouter();
   const [pages, setPages] = useState<Page[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
 
   useEffect(() => {
     listPages(supabase).then(
@@ -100,9 +107,13 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const tree = useMemo(() => buildTree(pages), [pages]);
   const current = pages.find((p) => p.id === pageId) ?? null;
 
-  const handleCreate = async () => {
+  const handleCreate = async (template?: PageTemplate) => {
+    setNewMenuOpen(false);
     try {
-      const created = await createPage(supabase, {});
+      const created = await createPage(supabase, {
+        title: template?.title ?? "",
+        content: template?.content ?? [],
+      });
       setPages((prev) => [...prev, created]);
       router.push(`/pages/${created.id}`);
     } catch {
@@ -127,6 +138,32 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
     }
   };
 
+  // 전체 페이지(휴지통 포함)를 JSON 파일로 내려받는 수동 백업(T6). 무료 원칙상 스케줄러 대신 수동.
+  const handleBackup = async () => {
+    try {
+      const [active, trashed] = await Promise.all([
+        listPages(supabase),
+        listTrashedPages(supabase),
+      ]);
+      const backup = {
+        exportedAt: new Date().toISOString(),
+        version: 1,
+        pages: [...active, ...trashed],
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ldd-pages-backup.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // 재시도 가능 — 조용히 무시
+    }
+  };
+
   const handleSaved = (
     id: string,
     patch: { title: string; content: unknown },
@@ -142,7 +179,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card/30 md:flex">
-        <div className="flex items-center justify-between px-3 py-3">
+        <div className="relative flex items-center justify-between px-3 py-3">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             페이지
           </span>
@@ -150,11 +187,33 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
             type="button"
             variant="ghost"
             size="icon-sm"
-            onClick={handleCreate}
+            onClick={() => setNewMenuOpen((v) => !v)}
             aria-label="새 페이지"
+            aria-expanded={newMenuOpen}
           >
             <Plus className="size-4" />
           </Button>
+          {newMenuOpen && (
+            <>
+              <div
+                role="presentation"
+                className="fixed inset-0 z-10"
+                onClick={() => setNewMenuOpen(false)}
+              />
+              <div className="absolute right-2 top-11 z-20 w-40 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg">
+                {PAGE_TEMPLATES.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => handleCreate(t)}
+                    className="flex w-full items-center px-3 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         <nav className="flex-1 overflow-y-auto px-2 pb-3">
           {state === "loading" && (
@@ -189,6 +248,13 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
           >
             <Trash className="size-3.5 opacity-70" /> 휴지통
           </Link>
+          <button
+            type="button"
+            onClick={handleBackup}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Download className="size-3.5 opacity-70" /> 백업 내보내기
+          </button>
         </div>
       </aside>
 
@@ -207,7 +273,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
                 ? "왼쪽에서 페이지를 선택하세요."
                 : "첫 페이지를 만들어 보세요."}
             </p>
-            <Button type="button" onClick={handleCreate}>
+            <Button type="button" onClick={() => handleCreate()}>
               <Plus className="size-4" /> 새 페이지
             </Button>
           </div>

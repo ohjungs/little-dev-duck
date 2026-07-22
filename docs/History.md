@@ -337,3 +337,8 @@
   - 검증: core 98 / api 95 / ai 6 tests + web build GREEN, 로컬 full eslint(apps/web) 선검증. 신규
     마이그레이션 1건(트리거)으로 db push 대기 5건. 리뷰가 오탐으로 판정한 항목(공개 버킷 self-XSS 등)은
     미반영. 남은 Phase 9: T6 템플릿·백업(선택), T8 실기 검증(로그인 필요, 사용자).
+- 2026-07-22 : Phase 9 T6 마무리 — 템플릿 프리셋 + 전체 백업 내보내기 (`/loop /next-step`, ultracode 자율).
+  새 페이지 템플릿 4종(빈/회의록/일일 노트/할 일, BlockNote 블록 프리셋 lib/pageTemplates.ts) + 사이드바
+  `+` 드롭다운 피커(role=presentation 백드롭 닫기), 전체 백업(활성+휴지통 페이지를 JSON 다운로드,
+  사이드바 하단 버튼). 검증: web build GREEN + 로컬 full eslint exit 0. 이로써 Phase 9 자율 구현 가능분
+  전부 완료 — 남은 것은 사용자 몫(T8 로그인 실기 검증 + supabase db push 5건)뿐.
