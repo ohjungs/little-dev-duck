@@ -26,9 +26,12 @@ export function CommandPalette() {
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 전역 리스너(마운트 시 1회 등록)가 항상 최신 open을 읽도록 ref에 동기화.
+  // 전역 리스너(마운트 시 1회 등록)가 항상 최신 open을 읽도록 ref에 동기화(렌더 중 ref 변경 금지 —
+  // effect에서 반영).
   const openRef = useRef(open);
-  openRef.current = open;
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   const reset = () => {
     if (timer.current) clearTimeout(timer.current);

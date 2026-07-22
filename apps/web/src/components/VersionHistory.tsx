@@ -28,7 +28,6 @@ export function VersionHistory({
   const [restoringId, setRestoringId] = useState<string | null>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     listPageVersions(supabase, pageId).then(
       (v) => {
         setVersions(v);

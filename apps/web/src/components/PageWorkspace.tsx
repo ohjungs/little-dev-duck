@@ -88,7 +88,6 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     listPages(supabase).then(
       (data) => {
         setPages(data);

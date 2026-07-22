@@ -24,7 +24,6 @@ export function TrashView() {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     listTrashedPages(supabase).then(
       (data) => {
         setPages(data);
