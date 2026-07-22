@@ -39,8 +39,11 @@ jobs:
       - run: pnpm --filter web exec playwright install --with-deps chromium
       - run: pnpm --filter web e2e
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # 저장소 변수 미설정 시 폴백: 공개 프로젝트 URL(config.toml에 이미 공개) + 더미 anon 키.
+          # 비인증 스펙만 CI에서 도므로 실제 인증이 불필요하고, 더미 키라 세션이 없어
+          # "미인증 → /login 리다이렉트"가 오히려 보장된다. 실제 값을 쓰려면 저장소 변수를 설정.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://iupprzfmlyfrdcctdupn.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-e2e-noauth-placeholder' }}
         # 로그인 세션 파일(e2e/.auth/user.json)이 CI에는 없어 인증 필요 스펙은 전부 자동 스킵된다
         # (실패 아님, 의도된 동작). auth-redirect.spec.ts 등 비인증 스펙만 실제로 실행된다.
         # 인증 필요 스펙까지 CI에서 돌리려면 apps/web/e2e/README.md "CI에서 실행" 절 참고.
