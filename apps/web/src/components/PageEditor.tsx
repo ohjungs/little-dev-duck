@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { Download } from "lucide-react";
 import type { Block } from "@blocknote/core";
 import { type Page } from "@ldd/core";
 import { updatePage } from "@ldd/api";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+
+// 파일명에 못 쓰는 문자를 -로 치환.
+function safeFileName(name: string): string {
+  return (name || "page").replace(/[/\\?%*:|"<>]/g, "-").slice(0, 100);
+}
 
 // BlockNote는 브라우저 전용(window/document 의존)이라 SSR 비활성 동적 로드. 로딩 중엔 스켈레톤.
 const BlockEditor = dynamic(
@@ -40,6 +47,26 @@ export function PageEditor({
     title: page.title,
     content: page.content,
   });
+  // BlockEditor가 넘겨주는 "현재 문서→Markdown" 변환 함수(에디터 인스턴스는 BlockEditor 소유).
+  const toMarkdown = useRef<(() => string) | null>(null);
+  const handleExportReady = useCallback((fn: () => string) => {
+    toMarkdown.current = fn;
+  }, []);
+
+  // 현재 페이지를 Markdown(.md)으로 내보낸다(T6). 제목을 H1로 앞에 붙인다.
+  const handleExport = () => {
+    const convert = toMarkdown.current;
+    if (!convert) return;
+    const body = convert();
+    const md = `# ${latest.current.title || "제목 없음"}\n\n${body}`;
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeFileName(latest.current.title)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // 언마운트 시 대기 중 저장 타이머 정리.
   useEffect(
@@ -74,6 +101,17 @@ export function PageEditor({
 
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 px-2 py-10">
+      <div className="flex justify-end px-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleExport}
+          className="text-muted-foreground"
+        >
+          <Download className="size-3.5" /> Markdown 내보내기
+        </Button>
+      </div>
       <input
         value={title}
         onChange={(e) => {
@@ -91,6 +129,7 @@ export function PageEditor({
           latest.current = { ...latest.current, content: document };
           scheduleSave();
         }}
+        onExportReady={handleExportReady}
       />
       <p
         className="px-4 text-xs text-muted-foreground"

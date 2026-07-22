@@ -34,18 +34,25 @@ function useDarkTheme(): "light" | "dark" {
 
 // BlockNote(shadcn 변형) 에디터. content 스키마는 T1과 동일한 BlockNote 블록 배열이라 데이터 마이그레이션
 // 불필요. BlockNote는 브라우저 전용이므로 상위(PageEditor)에서 next/dynamic ssr:false로만 로드한다.
-// onChange는 현재 문서를 상위 디바운스 저장으로 전달(서버가 plain_text를 파생).
+// onChange는 현재 문서를 상위 디바운스 저장으로 전달(서버가 plain_text를 파생). onExportReady는 현재 문서를
+// Markdown으로 변환하는 함수를 상위에 넘겨 내보내기(T6)에 쓰게 한다 — 에디터 인스턴스가 여기 있으므로.
 export function BlockEditor({
   initialContent,
   onChange,
+  onExportReady,
 }: {
   initialContent: unknown;
   onChange: (document: Block[]) => void;
+  onExportReady?: (toMarkdown: () => string) => void;
 }) {
   const theme = useDarkTheme();
   const editor = useCreateBlockNote({
     initialContent: toInitialContent(initialContent),
   });
+
+  useEffect(() => {
+    onExportReady?.(() => editor.blocksToMarkdownLossy());
+  }, [editor, onExportReady]);
 
   return (
     <BlockNoteView
