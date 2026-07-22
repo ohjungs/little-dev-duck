@@ -5,6 +5,7 @@ import {
   listPages,
   purgePage,
   restorePage,
+  searchPages,
   softDeletePage,
   updatePage,
 } from "./pages";
@@ -79,6 +80,46 @@ describe("listPages", () => {
       }),
     });
     await expect(listPages(supabase)).rejects.toThrow("boom");
+  });
+});
+
+describe("searchPages", () => {
+  // .or().order().limit() 체인을 흉내내고, or() 필터 문자열을 캡처한다.
+  function searchSupabase(rows: unknown[], sink?: { filter?: string }) {
+    return {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            or: (filter: string) => {
+              if (sink) sink.filter = filter;
+              return {
+                order: () => ({
+                  limit: async () => ({ data: rows, error: null }),
+                }),
+              };
+            },
+          }),
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  }
+
+  it("빈/공백 쿼리는 DB 조회 없이 빈 배열을 반환한다", async () => {
+    expect(await searchPages(searchSupabase([VALID_ROW]), "   ")).toEqual([]);
+  });
+
+  it("제목/본문 ilike 결과를 Page[]로 변환한다", async () => {
+    const result = await searchPages(searchSupabase([VALID_ROW]), "문서");
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("문서");
+  });
+
+  it("PostgREST or() 예약문자와 ilike 와일드카드를 제거해 필터 인젝션을 막는다", async () => {
+    const sink: { filter?: string } = {};
+    await searchPages(searchSupabase([], sink), 'a,b(c)"d\\e%f_g');
+    // 예약문자는 공백→단일 공백으로 정규화되어 title/plain_text 두 절에만 삽입된다.
+    expect(sink.filter).toBe("title.ilike.%a b c d e f g%,plain_text.ilike.%a b c d e f g%");
   });
 });
 

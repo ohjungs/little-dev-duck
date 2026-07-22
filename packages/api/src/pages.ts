@@ -42,6 +42,31 @@ export async function listPages(supabase: SupabaseClient): Promise<Page[]> {
   return (data as PageRow[]).map(fromRow);
 }
 
+// 제목/본문 부분일치 검색(휴지통 제외). Cmd+K 팔레트용. plain_text는 저장 시 서버가 파생했고
+// 마이그레이션의 pg_trgm GIN이 ilike를 가속한다. PostgREST or() 필터는 콤마/괄호/따옴표/역슬래시가
+// 구문 예약문자라 사용자 입력을 그대로 넣으면 필터 인젝션이 되므로, ilike 와일드카드(%,_)까지 포함해
+// 예약문자를 공백으로 치환·정규화한다(개인 워크스페이스 검색엔 리터럴 %/_ 검색 수요가 없음 — ponytail).
+export async function searchPages(
+  supabase: SupabaseClient,
+  query: string,
+  limit = 20,
+): Promise<Page[]> {
+  const safe = query
+    .replace(/[,()"\\%_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!safe) return [];
+  const { data, error } = await supabase
+    .from("pages")
+    .select("*")
+    .eq("is_trashed", false)
+    .or(`title.ilike.%${safe}%,plain_text.ilike.%${safe}%`)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data as PageRow[]).map(fromRow);
+}
+
 // 휴지통 뷰.
 export async function listTrashedPages(supabase: SupabaseClient): Promise<Page[]> {
   const { data, error } = await supabase

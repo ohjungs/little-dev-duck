@@ -71,6 +71,7 @@ export { allowRequest } from "./rateLimit";
 
 export {
   listPages,
+  searchPages,
   listTrashedPages,
   getPage,
   createPage,

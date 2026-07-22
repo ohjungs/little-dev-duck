@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar, AppMobileBar } from "@/components/AppNav";
 import { DesktopCollectorSync } from "@/components/DesktopCollectorSync";
+import { CommandPalette } from "@/components/CommandPalette";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export default async function AppLayout({
         <main className="flex-1">{children}</main>
       </div>
       <DesktopCollectorSync />
+      <CommandPalette />
     </div>
   );
 }

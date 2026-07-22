@@ -3,11 +3,35 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, LayoutDashboard, Settings, ShieldCheck } from "lucide-react";
+import {
+  FileText,
+  LayoutDashboard,
+  Search,
+  Settings,
+  ShieldCheck,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { WalkingModeToggle } from "@/components/WalkingModeToggle";
+import { OPEN_SEARCH_EVENT } from "@/components/CommandPalette";
+
+// 사이드바 검색 버튼: Cmd+K 팔레트를 CustomEvent로 연다(팔레트가 전역에서 수신).
+function SearchTrigger() {
+  return (
+    <button
+      type="button"
+      onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))}
+      className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+    >
+      <Search className="size-4" />
+      <span className="flex-1 text-left">검색</span>
+      <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+        ⌘K
+      </kbd>
+    </button>
+  );
+}
 
 // 개인화/관리 메뉴 탭. 항목을 늘리려면 여기만 고치면 사이드바·모바일바 양쪽에 반영된다.
 const NAV = [
@@ -52,6 +76,10 @@ export function AppSidebar({
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-1 border-r border-border bg-card/40 p-3 md:flex">
       <div className="py-2">
         <Brand />
+      </div>
+
+      <div className="mt-2 px-0.5">
+        <SearchTrigger />
       </div>
 
       <nav className="mt-2 flex flex-col gap-0.5">
