@@ -403,3 +403,22 @@
   - 검증: core 117(+4) / api 140(+2) tests + web build GREEN + core·api·web 로컬 full eslint 전부 exit 0.
   - Phase 10 T1~T4·T7 전부 코드 완료. 남은 것: T3 실기 검증(사용자, Google OAuth 로컬 재현 불가) +
     db push 2건 + T5(두 번째 어댑터)/T6(Gmail, 격리).
+- 2026-07-22 밤(계속2) : Phase 10 T2~T4·T7 code+security 병렬 리뷰 + HIGH 2건 수정 (`/loop /next-step`,
+  자율). CLAUDE.md 3-2 Check 단계를 이번 세션 신규 코드(OAuth 토큰 처리+승인 게이트, 보안 표면 큼)에
+  적용 — code-reviewer + security-reviewer 병렬 실행.
+  - security-reviewer: CRITICAL/HIGH 0건. RLS(user_google_tokens/action_log), 승인 재검증
+    (executeApprovedCalls 카탈로그 판정), args zod 재검증, provider_token 저장 격리, 레이트리밋 적용
+    전부 "안전" 판정. 신규 발견 MEDIUM 1건(action_log id 매칭, find 대신 인덱스로 — 즉시 수정·커밋
+    b61b228).
+  - code-reviewer: HIGH 2건. (1) `executeApprovedCalls`가 배치 중 하나 실패 시 전체 throw → 이미 성공한
+    호출 결과·감사 로그가 통째로 유실. per-call try/catch로 격리, 회귀 테스트 추가. (2) Google
+    access_token 만료(~1시간, 갱신 미구현)가 매번 일반 502로만 응답 — `googleCalendar.ts`가 401을
+    `unauthorized`로 구분해 던지고 양쪽 라우트가 기존 "재연동 필요" 메시지로 매핑, 회귀 테스트 추가.
+    MEDIUM(mixed-turn 도구 유실)은 ponytail 주석으로 명시, LOW(오래된 주석)는 정정.
+  - 검토 결과 access_token 자동 갱신(refresh flow)은 이 아키텍처에서 구조적으로 불가능함을 재확인 —
+    Google OAuth client_id/secret은 Supabase가 소유해 서버에 노출 안 되고, provider_token은 phase_10.md가
+    이미 실측한 대로 최초 로그인 시점에만 얻을 수 있다. 재연동 안내로의 우아한 저하가 실제로 옳은
+    스코프였다(자체 Google Cloud OAuth 앱 등록 없이는 재로그인 없는 자동 갱신 불가).
+  - 검증: core 117 / api 142(+4) / ai 9 tests + web build GREEN + core·api·web 로컬 eslint 전부 exit 0.
+  - Phase 10 T1~T4·T7 코드+리뷰 완료. 자율 구현 가능분 소진 — 남은 것은 사용자 몫(T3 실기 검증, db push
+    2건)과 보안 민감 확장(T5 GitHub scope, T6 Gmail)뿐, 둘 다 사용자 확인 없이 진행하지 않기로 판단.
