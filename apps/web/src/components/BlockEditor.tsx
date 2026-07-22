@@ -1,0 +1,58 @@
+"use client";
+
+import "@blocknote/shadcn/style.css";
+import { useEffect, useState } from "react";
+import { useCreateBlockNote } from "@blocknote/react";
+import { BlockNoteView } from "@blocknote/shadcn";
+import type { Block, PartialBlock } from "@blocknote/core";
+
+// 저장된 content(unknown)를 BlockNote 초기값으로 변환. BlockNote는 빈 배열을 거부하므로(비어 있으면
+// 예외) undefined로 넘겨 기본 빈 문단으로 시작하게 한다.
+function toInitialContent(content: unknown): PartialBlock[] | undefined {
+  return Array.isArray(content) && content.length > 0
+    ? (content as PartialBlock[])
+    : undefined;
+}
+
+// html.dark 클래스를 관찰해 BlockNote 테마를 앱 테마와 동기화(ThemeToggle이 이 클래스를 토글).
+// 초기값은 마운트 시점 클래스에서 지연 초기화(이 컴포넌트는 ssr:false라 document가 항상 존재) —
+// setState-in-effect 규칙을 피한다. 이후 토글은 MutationObserver가 반영.
+function useDarkTheme(): "light" | "dark" {
+  const [dark, setDark] = useState(() =>
+    document.documentElement.classList.contains("dark"),
+  );
+  useEffect(() => {
+    const el = document.documentElement;
+    const observer = new MutationObserver(() =>
+      setDark(el.classList.contains("dark")),
+    );
+    observer.observe(el, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  return dark ? "dark" : "light";
+}
+
+// BlockNote(shadcn 변형) 에디터. content 스키마는 T1과 동일한 BlockNote 블록 배열이라 데이터 마이그레이션
+// 불필요. BlockNote는 브라우저 전용이므로 상위(PageEditor)에서 next/dynamic ssr:false로만 로드한다.
+// onChange는 현재 문서를 상위 디바운스 저장으로 전달(서버가 plain_text를 파생).
+export function BlockEditor({
+  initialContent,
+  onChange,
+}: {
+  initialContent: unknown;
+  onChange: (document: Block[]) => void;
+}) {
+  const theme = useDarkTheme();
+  const editor = useCreateBlockNote({
+    initialContent: toInitialContent(initialContent),
+  });
+
+  return (
+    <BlockNoteView
+      editor={editor}
+      theme={theme}
+      onChange={() => onChange(editor.document)}
+      className="min-h-[55vh] flex-1"
+    />
+  );
+}
