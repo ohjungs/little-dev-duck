@@ -17,6 +17,17 @@ export const pageSchema = z.object({
 });
 export type Page = z.infer<typeof pageSchema>;
 
+// 페이지 버전 스냅샷(T5). 그 시점 title+content를 통짜 보관 — 불변 레코드라 update 없음.
+export const pageVersionSchema = z.object({
+  id: z.string().uuid(),
+  pageId: z.string().uuid(),
+  userId: z.string().uuid(),
+  title: z.string().max(200),
+  content: z.unknown(),
+  createdAt: z.string().datetime({ offset: true }),
+});
+export type PageVersion = z.infer<typeof pageVersionSchema>;
+
 // 인라인 콘텐츠(text 노드 배열, 또는 링크 등 중첩 content)에서 text 문자열만 이어붙인다.
 function inlineText(content: unknown): string {
   if (typeof content === "string") return content;

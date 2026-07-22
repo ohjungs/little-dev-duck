@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Download } from "lucide-react";
+import { Download, History, Save } from "lucide-react";
 import type { Block } from "@blocknote/core";
 import { type Page } from "@ldd/core";
-import { updatePage } from "@ldd/api";
+import { createPageVersion, updatePage } from "@ldd/api";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { VersionHistory } from "@/components/VersionHistory";
 
 // 파일명에 못 쓰는 문자를 -로 치환.
 function safeFileName(name: string): string {
@@ -41,6 +42,8 @@ export function PageEditor({
   const supabase = useMemo(() => createClient(), []);
   const [title, setTitle] = useState(page.title);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [showVersions, setShowVersions] = useState(false);
+  const [versionMsg, setVersionMsg] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 최신 편집값(제목/본문)을 저장 시점에 읽는다 — 디바운스 타이머 클로저가 오래된 값을 잡지 않도록 ref로 보관.
   const latest = useRef<{ title: string; content: unknown }>({
@@ -66,6 +69,21 @@ export function PageEditor({
     a.download = `${safeFileName(latest.current.title)}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // 현재 상태를 버전 스냅샷으로 저장(T5). 성공 시 잠깐 피드백을 띄운다.
+  const handleSaveVersion = async () => {
+    try {
+      await createPageVersion(supabase, {
+        pageId: page.id,
+        title: latest.current.title,
+        content: latest.current.content,
+      });
+      setVersionMsg("버전이 저장되었습니다.");
+    } catch {
+      setVersionMsg("버전 저장에 실패했습니다.");
+    }
+    setTimeout(() => setVersionMsg(null), 2500);
   };
 
   // 언마운트 시 대기 중 저장 타이머 정리.
@@ -101,7 +119,30 @@ export function PageEditor({
 
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 px-2 py-10">
-      <div className="flex justify-end px-4">
+      <div className="flex items-center justify-end gap-1 px-4">
+        {versionMsg && (
+          <span className="mr-auto text-xs text-muted-foreground" role="status">
+            {versionMsg}
+          </span>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleSaveVersion}
+          className="text-muted-foreground"
+        >
+          <Save className="size-3.5" /> 버전 저장
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowVersions(true)}
+          className="text-muted-foreground"
+        >
+          <History className="size-3.5" /> 버전 기록
+        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -112,6 +153,12 @@ export function PageEditor({
           <Download className="size-3.5" /> Markdown 내보내기
         </Button>
       </div>
+      {showVersions && (
+        <VersionHistory
+          pageId={page.id}
+          onClose={() => setShowVersions(false)}
+        />
+      )}
       <input
         value={title}
         onChange={(e) => {

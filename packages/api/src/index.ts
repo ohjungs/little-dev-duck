@@ -82,3 +82,9 @@ export {
   type CreatePageInput,
   type UpdatePageInput,
 } from "./pages";
+
+export {
+  createPageVersion,
+  listPageVersions,
+  type CreatePageVersionInput,
+} from "./pageVersions";
