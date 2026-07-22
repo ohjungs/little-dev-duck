@@ -3,6 +3,7 @@ import {
   createPage,
   getPage,
   listPages,
+  listTrashedPages,
   purgePage,
   restorePage,
   searchPages,
@@ -204,5 +205,118 @@ describe("soft delete lifecycle", () => {
     await expect(
       purgePage(fakeSupabase(), VALID_ROW.id),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("listTrashedPages", () => {
+  const TRASHED_ROW = {
+    ...VALID_ROW,
+    is_trashed: true,
+    trashed_at: "2026-07-21T00:00:00.000Z",
+  };
+
+  it("휴지통 페이지를 trashed_at 내림차순으로 Page[]로 변환한다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            order: async () => ({ data: [TRASHED_ROW], error: null }),
+          }),
+        }),
+      }),
+    });
+    const result = await listTrashedPages(supabase);
+    expect(result).toHaveLength(1);
+    expect(result[0].isTrashed).toBe(true);
+    expect(result[0].trashedAt).toBe(TRASHED_ROW.trashed_at);
+  });
+
+  it("DB 에러면 예외를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            order: async () => ({ data: null, error: { message: "trash-boom" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(listTrashedPages(supabase)).rejects.toThrow("trash-boom");
+  });
+});
+
+// 각 함수의 `if (error) throw` 브랜치(에러 전파)를 호출 체인 형태에 맞춰 커버한다.
+describe("DB 에러 전파", () => {
+  it("searchPages는 limit 단계 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            or: () => ({
+              order: () => ({
+                limit: async () => ({ data: null, error: { message: "search-boom" } }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    });
+    await expect(searchPages(supabase, "문서")).rejects.toThrow("search-boom");
+  });
+
+  it("getPage는 조회 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: null, error: { message: "get-boom" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(getPage(supabase, VALID_ROW.id)).rejects.toThrow("get-boom");
+  });
+
+  it("updatePage는 갱신 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        update: () => ({
+          eq: () => ({
+            select: () => ({
+              single: async () => ({ data: null, error: { message: "update-boom" } }),
+            }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      updatePage(supabase, VALID_ROW.id, { title: "x" }),
+    ).rejects.toThrow("update-boom");
+  });
+
+  it("softDeletePage/restorePage는 update 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        update: () => ({
+          eq: () => ({
+            then: (resolve: (v: { error: { message: string } }) => void) =>
+              resolve({ error: { message: "soft-boom" } }),
+          }),
+        }),
+      }),
+    });
+    await expect(softDeletePage(supabase, VALID_ROW.id)).rejects.toThrow("soft-boom");
+    await expect(restorePage(supabase, VALID_ROW.id)).rejects.toThrow("soft-boom");
+  });
+
+  it("purgePage는 delete 에러를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        delete: () => ({
+          eq: async () => ({ error: { message: "purge-boom" } }),
+        }),
+      }),
+    });
+    await expect(purgePage(supabase, VALID_ROW.id)).rejects.toThrow("purge-boom");
   });
 });
