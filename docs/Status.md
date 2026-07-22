@@ -1,15 +1,15 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T1~T3 코드 완료(2026-07-22 밤, `/loop` 자율).**
+현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T1~T4~T7 코드 완료(2026-07-22 밤, `/loop` 자율).**
 Phase 1~9 전부 완료(인프라·검증 게이트 없음). Google Calendar 어댑터 end-to-end 배선(계약→어댑터→토큰
-캡처→라우트→UI 승인카드)까지 코드 완료, core/api/ai 전 테스트 + web build GREEN.
+캡처→라우트→UI 승인카드→감사 로그)까지 코드 완료, core/api/ai 전 테스트 + web build GREEN.
 계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md,
 Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
 **다음 세션: 사용자 실기 검증 필요(Google 재로그인→Calendar scope 동의→"내일 회의 잡아줘" 시도) — 로컬은
-진짜 Google OAuth consent/토큰 발급을 재현할 수 없어 이 부분만 사람이 확인해야 한다. 검증 후 T4(인젝션
-방어 하드닝) 또는 T5(두 번째 어댑터)로 진행.**
+진짜 Google OAuth consent/토큰 발급을 재현할 수 없어 이 부분만 사람이 확인해야 한다. `supabase db push`
+2건 대기. 검증 후 T5(두 번째 어댑터) 또는 T6(Gmail, 격리)로 진행.**
 
-## Phase 10 — AI 2단계 (에이전트 액션) — T1~T3 코드 완료 (2026-07-22, `/loop` 자율)
+## Phase 10 — AI 2단계 (에이전트 액션) — T1~T4·T7 코드 완료 (2026-07-22, `/loop` 자율)
 
 착수 승인: 사용자 "phase 10 착수하자"(phase_10.md T0 기본값 승인). 계약 API 형태는 공식 문서 실측으로
 확정(26be814). T1(외부 호출 0) → T2(승인 실행) → T3(첫 어댑터 end-to-end) 순으로 STDD 구현·검증.
@@ -39,10 +39,17 @@ Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
   결과 텍스트=데이터, 지시 아님 — 호출부 누락 방지로 한 곳에 고정) + 승인 카드가 제목뿐 아니라 시작/종료
   시각까지 전부 노출(사용자가 정확히 뭘 승인하는지 투명하게, args는 React 텍스트 렌더링이라 HTML 삽입 없음).
   **외부 텍스트(이메일 등) 구획화는 아직 해당 소스가 없어 대상 없음 — T6 Gmail 착수 시 재검토.**
-- 검증: core 113 / api 138 / ai 9 tests + web build GREEN + core·api·web 로컬 full eslint 선검증.
+- [x] T7 감사 로그: core `actionLogEntrySchema`+`summarizeForLog`(args/response 원문 대신 200자 요약,
+  토큰/PII 노출 최소화) + 마이그레이션 `20260722090000_action_log`(RLS select+insert only, 불변 레코드+
+  rollback) + api `logAction` + `/api/ai/agent/approve`에서 실행 결과별 기록(best-effort, 실패해도 응답
+  안 막음). **db push 필요.**
+- 검증: core 117(+4) / api 140(+2) / ai 9 tests + web build GREEN + core·api·web 로컬 full eslint 선검증.
 - [ ] **T3 실기 검증(사용자, 로그인 필요)**: Google 재로그인(재동의 화면 필수)→provider_token 저장 확인→
-  AgentChatPanel에서 "일정 만들어줘" 시도→승인 카드→승인 후 실제 Google Calendar에 반영되는지.
-  `gemini-flash-latest`의 function calling 실동작도 이 시점에 실측(phase_10.md 미검증 절).
+  AgentChatPanel에서 "일정 만들어줘" 시도→승인 카드→승인 후 실제 Google Calendar에 반영되는지 +
+  action_log에 기록되는지. `gemini-flash-latest`의 function calling 실동작도 이 시점에 실측(phase_10.md
+  미검증 절).
+- [ ] **인프라(사용자/세션, DB 자격증명)**: `supabase db push` 2건 — 20260722080000_user_google_tokens,
+  20260722090000_action_log.
 - [ ] T4 인젝션 방어 하드닝 / T5 두 번째 어댑터 / T6 Gmail(격리) / T7 감사 로그 — phase_10.md 참조.
 
 ## Phase 9 — 워크스페이스 코어 (블록 에디터) — T1·T2·T4·T5·T7 구현·배포 (2026-07-22 오후, `/loop` 자율)

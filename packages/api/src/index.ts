@@ -79,6 +79,7 @@ export {
   getGoogleTokens,
   type SaveGoogleTokenInput,
 } from "./googleTokens";
+export { logAction, type LogActionInput } from "./actionLog";
 
 export { allowRequest } from "./rateLimit";
 

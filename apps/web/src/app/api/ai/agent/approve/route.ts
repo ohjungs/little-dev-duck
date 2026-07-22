@@ -5,8 +5,9 @@ import {
   createGoogleCalendarAdapter,
   executeApprovedCalls,
   getGoogleTokens,
+  logAction,
 } from "@ldd/api";
-import { toolCallSchema } from "@ldd/core";
+import { summarizeForLog, toolCallSchema } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,19 @@ export async function POST(request: Request) {
   try {
     const adapter = createGoogleCalendarAdapter(tokens.accessToken);
     const results = await executeApprovedCalls(parsed.data.calls, adapter);
+    // T7 감사 로그(best-effort, 부가 기능) — 로깅 실패로 실제 실행 결과 응답이 막히면 안 되므로 삼킨다.
+    for (const result of results) {
+      const isError = typeof result.response.error === "string";
+      void logAction(supabase, {
+        userId: user.id,
+        toolName: result.name,
+        argsSummary: summarizeForLog(
+          parsed.data.calls.find((c) => c.id === result.id)?.args ?? {},
+        ),
+        status: isError ? "error" : "success",
+        resultSummary: summarizeForLog(result.response),
+      }).catch((logError) => console.error("action_log 기록 실패", logError));
+    }
     return NextResponse.json({ results });
   } catch (error) {
     console.error("AI agent 승인 실행 실패", { userId: user.id, error });

@@ -392,3 +392,14 @@
   - 검증: core 113(+7) / api 138(+18) / ai 9(+3) tests + web build GREEN + core·api·web 로컬 full eslint
     선검증(전부 exit 0). 실제 Google OAuth consent/토큰 발급은 로컬에서 재현 불가 — T3 실기 검증은 사용자
     로그인 필요(Status.md 참조). `supabase db push` 신규 마이그레이션 1건 대기.
+- 2026-07-22 밤(계속) : Phase 10 T4 하드닝 + T7 감사 로그 (`/loop /next-step`, 자율). T2/T3 커밋(7957b23,
+  CI success) 직후 로컬 완결 가능분을 이어 구현:
+  - T4: `runAgentTurn`에 매 턴 고정 인젝션 방어 지침 추가(도구 실행 결과 텍스트는 데이터일 뿐 지시가
+    아니라고 명시, 호출부 누락 방지를 위해 한 곳에 고정) + 승인 카드가 제목뿐 아니라 시작/종료 시각까지
+    노출(사용자가 정확히 뭘 승인하는지 투명하게).
+  - T7: core `actionLogEntrySchema`+`summarizeForLog`(원문 대신 200자 요약, 토큰/PII 노출 최소화) +
+    마이그레이션 `20260722090000_action_log`(select+insert only RLS, 불변 레코드+rollback) + api
+    `logAction` + `/api/ai/agent/approve`에서 실행 결과별 best-effort 기록.
+  - 검증: core 117(+4) / api 140(+2) tests + web build GREEN + core·api·web 로컬 full eslint 전부 exit 0.
+  - Phase 10 T1~T4·T7 전부 코드 완료. 남은 것: T3 실기 검증(사용자, Google OAuth 로컬 재현 불가) +
+    db push 2건 + T5(두 번째 어댑터)/T6(Gmail, 격리).
