@@ -4,7 +4,8 @@ import { EMBEDDING_DIM, LddError } from "@ldd/core";
 // env에서 주입한다. 모델명은 상수(무료 티어 기준, 변동 시 여기만 교체 — ponytail 보정 지점).
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 export const GEMINI_EMBED_MODEL = "gemini-embedding-001";
-export const GEMINI_GEN_MODEL = "gemini-2.5-flash";
+// 2026-07-22 : AI - Gemini - gemini-2.5-flash가 신규 키에 404(deprecated for new users)라 자동 최신 별칭으로 교체
+export const GEMINI_GEN_MODEL = "gemini-flash-latest";
 
 async function safeBody(res: Response): Promise<string> {
   try {
