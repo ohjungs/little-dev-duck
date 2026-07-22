@@ -39,10 +39,10 @@ test.describe("로그인 페이지 반응형 (인증 불필요)", () => {
       await page.goto("/login");
 
       const googleButton = page.getByRole("button", {
-        name: "Google로 로그인",
+        name: "Google로 계속하기",
       });
       const githubButton = page.getByRole("button", {
-        name: "GitHub로 로그인",
+        name: "GitHub로 계속하기",
       });
       await expect(googleButton).toBeVisible();
       await expect(githubButton).toBeVisible();
