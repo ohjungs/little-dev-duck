@@ -67,6 +67,8 @@ export {
 
 export { answerQuestion, type AiAnswer } from "./aiChat";
 
+export { runAgentTurn, type Adapter, type AgentResult } from "./agent";
+
 export { allowRequest } from "./rateLimit";
 
 export {

@@ -7,7 +7,7 @@ export const GEMINI_EMBED_MODEL = "gemini-embedding-001";
 // 2026-07-22 : AI - Gemini - gemini-2.5-flash가 신규 키에 404(deprecated for new users)라 자동 최신 별칭으로 교체
 export const GEMINI_GEN_MODEL = "gemini-flash-latest";
 
-async function safeBody(res: Response): Promise<string> {
+export async function safeBody(res: Response): Promise<string> {
   try {
     return (await res.text()).slice(0, 200);
   } catch {
@@ -16,7 +16,7 @@ async function safeBody(res: Response): Promise<string> {
 }
 
 // 429 = 무료 티어 쿼터/레이트 → quota_exceeded(폴백 트리거). 그 외 실패 = upstream.
-function upstreamError(status: number, body: string): LddError {
+export function upstreamError(status: number, body: string): LddError {
   if (status === 429) return new LddError("quota_exceeded", `gemini 429: ${body}`);
   return new LddError("upstream", `gemini ${status}: ${body}`);
 }
