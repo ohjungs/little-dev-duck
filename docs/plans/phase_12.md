@@ -30,7 +30,7 @@ phase-mapping-proposal 2절에 배정된 6항목:
 profiles(또는 신규 settings)에 quiet_hours(시작/종료 시각). 오리 자율 혼잣말·알림을 그 시간대엔 정지.
 현재 알림은 오리 idle 혼잣말(mascot)뿐이라 그 억제부터. 알림 4채널은 T4에서.
 
-### T3 헬스체크 화면 (self-contained)
+### T3 헬스체크 화면 (self-contained) — [x] 코드 완료 2026-07-24
 설정/관리자 페이지에 서비스 상태 카드: Supabase(간단 select 1), Gemini(키 존재·핑), 무료 한도 감지.
 `/api/health` 라우트(서버에서 각 핑, 캐시). 외부 의존 최소.
 

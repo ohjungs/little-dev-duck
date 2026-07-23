@@ -1,5 +1,13 @@
 import Image from "next/image";
-import { CalendarClock, LogOut, Mail, Moon, Palette, User } from "lucide-react";
+import {
+  Activity,
+  CalendarClock,
+  LogOut,
+  Mail,
+  Moon,
+  Palette,
+  User,
+} from "lucide-react";
 import { getGithubTokens, getGmailTokens, getGoogleTokens } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -12,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { AppearanceSetting } from "@/components/AppearanceSetting";
 import { QuietHoursSetting } from "@/components/QuietHoursSetting";
+import { HealthStatus } from "@/components/HealthStatus";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
 import { GitHubMark } from "@/components/ui/github-mark";
@@ -142,6 +151,21 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <GmailLink linked={gmailLinked} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Activity className="size-4 text-primary-accent" />
+              서비스 상태
+            </CardTitle>
+            <CardDescription>
+              연결된 서비스가 정상인지 확인합니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <HealthStatus />
           </CardContent>
         </Card>
 
