@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { LogOut, Palette, User } from "lucide-react";
+import { CalendarClock, LogOut, Palette, User } from "lucide-react";
+import { getGoogleTokens } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
 import {
   Card,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AppearanceSetting } from "@/components/AppearanceSetting";
+import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,7 @@ export default async function SettingsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const googleLinked = user ? !!(await getGoogleTokens(supabase, user.id)) : false;
 
   const displayName =
     (user?.user_metadata.full_name as string | undefined) ??
@@ -72,6 +75,21 @@ export default async function SettingsPage() {
               <p className="truncate font-medium">{displayName}</p>
               <p className="truncate text-sm text-muted-foreground">{email}</p>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <CalendarClock className="size-4 text-primary-accent" />
+              Google Calendar 연동
+            </CardTitle>
+            <CardDescription>
+              로그인 방법과 무관하게 오리가 캘린더 일정을 조회·생성할 수 있게 합니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GoogleCalendarLink linked={googleLinked} />
           </CardContent>
         </Card>
 

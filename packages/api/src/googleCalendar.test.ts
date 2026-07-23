@@ -92,6 +92,52 @@ describe("createGoogleCalendarAdapter", () => {
     expect(result.response).toEqual({ created: { id: "new1", title: "스탠드업" } });
   });
 
+  it("종료 시각이 없으면 시작+1시간을 기본값으로 사용한다", async () => {
+    let capturedBody: unknown;
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(init?.body as string);
+      return jsonRes(200, { id: "new2", summary: "집가기" });
+    }) as unknown as typeof fetch;
+
+    const adapter = createGoogleCalendarAdapter("token", fetchImpl);
+    await adapter.execute({
+      id: "c1",
+      name: "createCalendarEvent",
+      args: { title: "집가기", start: "2026-07-24T09:00:00+09:00" },
+    });
+
+    expect(capturedBody).toEqual({
+      summary: "집가기",
+      start: { dateTime: "2026-07-24T09:00:00+09:00" },
+      end: { dateTime: "2026-07-24T01:00:00.000Z" }, // = 07-24T10:00+09:00, 같은 시각의 UTC 표기
+    });
+  });
+
+  it("종료 시각이 시작 이후가 아니면(0초 일정 등) 시작+1시간으로 보정한다", async () => {
+    let capturedBody: unknown;
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(init?.body as string);
+      return jsonRes(200, { id: "new3", summary: "집가기" });
+    }) as unknown as typeof fetch;
+
+    const adapter = createGoogleCalendarAdapter("token", fetchImpl);
+    await adapter.execute({
+      id: "c1",
+      name: "createCalendarEvent",
+      args: {
+        title: "집가기",
+        start: "2026-08-03T09:00:00+09:00",
+        end: "2026-08-03T09:00:00+09:00",
+      },
+    });
+
+    expect(capturedBody).toEqual({
+      summary: "집가기",
+      start: { dateTime: "2026-08-03T09:00:00+09:00" },
+      end: { dateTime: "2026-08-03T01:00:00.000Z" }, // = 08-03T10:00+09:00, 같은 시각의 UTC 표기
+    });
+  });
+
   it("Google이 401을 주면 unauthorized로 구분해 던진다(access_token 만료 → 재연동 안내용)", async () => {
     const fetchImpl = (async () => jsonRes(401, { error: "invalid_token" })) as unknown as typeof fetch;
     const adapter = createGoogleCalendarAdapter("expired", fetchImpl);

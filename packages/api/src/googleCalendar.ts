@@ -25,15 +25,17 @@ const listDecl: ToolDeclaration = {
 
 const createDecl: ToolDeclaration = {
   name: "createCalendarEvent",
-  description: "새 캘린더 일정을 만든다. 시작/종료는 ISO 8601(예: 2026-07-23T10:00:00+09:00).",
+  description:
+    "새 캘린더 일정을 만든다. 시작/종료는 ISO 8601(예: 2026-07-23T10:00:00+09:00). " +
+    "종료 시각을 모르면 생략해도 된다(시작 시각 기준 1시간짜리 일정으로 자동 처리됨).",
   parameters: {
     type: "object",
     properties: {
       title: { type: "string", description: "일정 제목" },
       start: { type: "string", description: "시작 시각(ISO 8601)" },
-      end: { type: "string", description: "종료 시각(ISO 8601)" },
+      end: { type: "string", description: "종료 시각(ISO 8601, 선택 — 없으면 시작+1시간)" },
     },
-    required: ["title", "start", "end"],
+    required: ["title", "start"],
   },
   kind: "mutating",
 };
@@ -43,8 +45,22 @@ const listArgs = z.object({ maxResults: z.number().int().min(1).max(50).optional
 const createArgs = z.object({
   title: z.string().min(1),
   start: z.string().min(1),
-  end: z.string().min(1),
+  end: z.string().min(1).optional(),
 });
+
+const DEFAULT_DURATION_MS = 60 * 60 * 1000;
+
+// 종료 시각이 없거나 시작 이후가 아니면(모델이 start=end로 채우는 실사용 버그 확인, 2026-07-23) 시작+1시간을
+// 기본값으로 쓴다 — 프롬프트 안내만으론 모델 준수를 보장 못 해 서버에서 결정론적으로 보정한다.
+function resolveEnd(start: string, end: string | undefined): string {
+  const startMs = new Date(start).getTime();
+  if (end && !Number.isNaN(startMs)) {
+    const endMs = new Date(end).getTime();
+    if (!Number.isNaN(endMs) && endMs > startMs) return end;
+  }
+  if (Number.isNaN(startMs)) return end ?? start; // 파싱 불가면 원본 그대로 둬 Google API가 검증하게 한다.
+  return new Date(startMs + DEFAULT_DURATION_MS).toISOString();
+}
 
 // Google Calendar 이벤트 응답 중 우리가 모델에 되먹일 최소 필드만 추린다.
 type GCalEvent = {
@@ -116,7 +132,7 @@ export function createGoogleCalendarAdapter(
           body: JSON.stringify({
             summary: title,
             start: { dateTime: start },
-            end: { dateTime: end },
+            end: { dateTime: resolveEnd(start, end) },
           }),
         })) as GCalEvent;
         return {

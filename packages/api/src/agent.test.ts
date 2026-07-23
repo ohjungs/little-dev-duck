@@ -66,6 +66,19 @@ function mockAdapter(
   };
 }
 
+// 요청 body(특히 첫 턴 프롬프트)를 캡처해 preamble 조립을 검증할 때 쓴다.
+function capturingFetch(response: Response): {
+  fetchImpl: typeof fetch;
+  bodies: string[];
+} {
+  const bodies: string[] = [];
+  const fetchImpl = (async (_url: string, init?: RequestInit) => {
+    bodies.push(String(init?.body ?? ""));
+    return response;
+  }) as unknown as typeof fetch;
+  return { fetchImpl, bodies };
+}
+
 describe("runAgentTurn", () => {
   it("도구 없이 바로 답하면 final을 반환한다", async () => {
     const { fetchImpl } = scriptedFetch([ok([{ text: "안녕하세요!" }])]);
@@ -147,6 +160,26 @@ describe("runAgentTurn", () => {
     await expect(
       runAgentTurn("q", mockAdapter(), "key", fetchImpl),
     ).rejects.toThrow("429");
+  });
+
+  it("도구 카탈로그가 있으면 액션 요청 시 도구를 우선하라는 지침을 프롬프트에 포함한다", async () => {
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    await runAgentTurn("일정 잡아줘", mockAdapter(), "key", fetchImpl, "[사용자 자료]\n(관련 자료 없음)");
+    expect(bodies[0]).toContain("사용해 처리하라");
+  });
+
+  it("도구 카탈로그가 비어 있으면(NO_TOOLS_ADAPTER) 그 지침을 넣지 않는다", async () => {
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    const noTools: Adapter = { catalog: [], execute: async (call) => ({ id: call.id, name: call.name, response: {} }) };
+    await runAgentTurn("아무 질문", noTools, "key", fetchImpl);
+    expect(bodies[0]).not.toContain("사용해 처리하라");
+  });
+
+  it("오늘 날짜(KST)를 프롬프트에 명시해 상대 날짜 계산 근거를 준다", async () => {
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    const fixedNow = () => new Date("2026-07-23T00:00:00+09:00");
+    await runAgentTurn("q", mockAdapter(), "key", fetchImpl, undefined, fixedNow);
+    expect(bodies[0]).toContain("2026년 7월 23일");
   });
 });
 
