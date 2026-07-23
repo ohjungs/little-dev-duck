@@ -92,6 +92,11 @@ export {
 export { pageStats, type PageStats } from "./domain/page-stats";
 export { rowsToCsv } from "./domain/db-export";
 export {
+  dashboardSummary,
+  type DashboardInput,
+  type DashboardSummary,
+} from "./domain/dashboard";
+export {
   PROPERTY_TYPES,
   VIEW_TYPES,
   SELECT_COLORS,

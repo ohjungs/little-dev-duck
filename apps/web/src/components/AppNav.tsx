@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   Building2,
   FileText,
   LayoutDashboard,
@@ -39,6 +40,7 @@ function SearchTrigger() {
 const NAV = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
   { href: "/pages", label: "페이지", icon: FileText },
+  { href: "/insights", label: "통계", icon: BarChart3 },
   { href: "/news", label: "뉴스", icon: Newspaper },
   { href: "/office", label: "오피스", icon: Building2 },
   { href: "/settings", label: "설정", icon: Settings },
