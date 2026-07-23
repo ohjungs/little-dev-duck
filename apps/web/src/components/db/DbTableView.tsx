@@ -1,20 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, SquareArrowOutUpRight } from "lucide-react";
+import { Plus, SquareArrowOutUpRight, Trash2 } from "lucide-react";
 import type { Page, PropertyDef, RowPropValue } from "@ldd/core";
 import { PropertyCell } from "./PropertyCell";
 import { DbPropertyMenu } from "./DbPropertyMenu";
 
-// 행 제목 인라인 편집(blur/Enter 커밋) + 열기 버튼. 표 첫 열 전용.
+// 행 제목 인라인 편집(blur/Enter 커밋) + 열기·삭제 버튼. 표 첫 열 전용.
 function RowTitleCell({
   row,
   onTitleChange,
   onOpen,
+  onDelete,
 }: {
   row: Page;
   onTitleChange: (title: string) => void;
   onOpen: () => void;
+  onDelete: () => void;
 }) {
   const [draft, setDraft] = useState(row.title);
   const [focused, setFocused] = useState(false);
@@ -49,6 +51,14 @@ function RowTitleCell({
       >
         <SquareArrowOutUpRight className="size-3.5" />
       </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`${row.title || "제목 없음"} 행 삭제`}
+        className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/title:opacity-100"
+      >
+        <Trash2 className="size-3.5" />
+      </button>
     </div>
   );
 }
@@ -60,6 +70,7 @@ export function DbTableView({
   onTitleChange,
   onRowPropChange,
   onAddRow,
+  onDeleteRow,
   onEditProperty,
 }: {
   rows: Page[];
@@ -68,6 +79,7 @@ export function DbTableView({
   onTitleChange: (rowId: string, title: string) => void;
   onRowPropChange: (rowId: string, propId: string, value: RowPropValue) => void;
   onAddRow: () => void;
+  onDeleteRow: (rowId: string) => void;
   onEditProperty: (propId: string, next: PropertyDef | null) => void;
 }) {
   const [menuPropId, setMenuPropId] = useState<string | null>(null);
@@ -115,6 +127,7 @@ export function DbTableView({
                   row={row}
                   onTitleChange={(t) => onTitleChange(row.id, t)}
                   onOpen={() => onOpenRow(row.id)}
+                  onDelete={() => onDeleteRow(row.id)}
                 />
               </td>
               {properties.map((p) => (

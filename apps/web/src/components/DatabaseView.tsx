@@ -6,6 +6,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
   createPage,
   listChildPages,
+  softDeletePage,
   updatePage,
 } from "@ldd/api";
 import {
@@ -137,6 +138,20 @@ export function DatabaseView({
     } catch {
       showError("행 추가에 실패했습니다. 다시 시도해 주세요.");
     }
+  };
+
+  // 행(자식 페이지) 삭제 = softDeletePage(휴지통, 복구 가능) — PageWorkspace 트리 삭제와 동일 패턴
+  // (무확인 낙관적, 실패 시 함수형 롤백으로 그 항목만 되살림).
+  const handleDeleteRow = (rowId: string) => {
+    const removed = rows?.find((r) => r.id === rowId);
+    if (!removed) return;
+    setRows((rs) => (rs ?? []).filter((r) => r.id !== rowId));
+    softDeletePage(supabase, rowId).catch(() => {
+      setRows((rs) =>
+        (rs ?? []).some((r) => r.id === rowId) ? (rs ?? []) : [...(rs ?? []), removed],
+      );
+      showError("행 삭제에 실패했습니다. 다시 시도해 주세요.");
+    });
   };
 
   const handleMoveRow = (rowId: string, optionId: string | null) => {
@@ -372,6 +387,7 @@ export function DatabaseView({
           groupProp={groupProp}
           onOpenRow={openRow}
           onMoveRow={handleMoveRow}
+          onDeleteRow={handleDeleteRow}
           onAddRow={(optionId) =>
             handleAddRow(optionId ? { [groupProp.id]: optionId } : {})
           }
@@ -384,6 +400,7 @@ export function DatabaseView({
           onTitleChange={handleTitleChange}
           onRowPropChange={handleRowPropChange}
           onAddRow={() => handleAddRow()}
+          onDeleteRow={handleDeleteRow}
           onEditProperty={handleEditProperty}
         />
       )}

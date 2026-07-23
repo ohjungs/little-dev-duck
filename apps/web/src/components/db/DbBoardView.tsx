@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   groupRowsByProperty,
   type Page,
@@ -16,6 +16,7 @@ export function DbBoardView({
   groupProp,
   onOpenRow,
   onMoveRow,
+  onDeleteRow,
   onAddRow,
 }: {
   rows: Page[];
@@ -23,6 +24,7 @@ export function DbBoardView({
   onOpenRow: (id: string) => void;
   // optionId=null 은 "없음" 그룹(속성값 제거).
   onMoveRow: (rowId: string, optionId: string | null) => void;
+  onDeleteRow: (rowId: string) => void;
   onAddRow: (optionId: string | null) => void;
 }) {
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -67,20 +69,32 @@ export function DbBoardView({
               <span className="tabular-nums opacity-60">{group.rows.length}</span>
             </div>
             {group.rows.map((row) => (
-              <button
+              <div
                 key={row.id}
-                type="button"
                 draggable
                 onDragStart={(e) =>
                   e.dataTransfer.setData("text/row-id", row.id)
                 }
                 // 드롭 성공/취소와 무관하게 항상 발화 — 하이라이트 잔상 방지(코드 리뷰 MEDIUM).
                 onDragEnd={() => setDragOver(null)}
-                onClick={() => onOpenRow(row.id)}
-                className="cursor-grab rounded-md border border-border bg-card px-3 py-2 text-left text-sm shadow-sm transition-colors hover:border-primary/40 active:cursor-grabbing"
+                className="group/card flex cursor-grab items-center gap-1 rounded-md border border-border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-primary/40 active:cursor-grabbing"
               >
-                {row.title || "제목 없음"}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenRow(row.id)}
+                  className="min-w-0 flex-1 truncate text-left"
+                >
+                  {row.title || "제목 없음"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteRow(row.id)}
+                  aria-label={`${row.title || "제목 없음"} 행 삭제`}
+                  className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/card:opacity-100"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
             ))}
             <button
               type="button"
