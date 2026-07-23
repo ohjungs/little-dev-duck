@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import {
+  ChevronRight,
   Download,
   Globe,
   History,
@@ -53,9 +55,12 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 export function PageEditor({
   page,
   onSaved,
+  breadcrumb,
 }: {
   page: Page;
   onSaved?: (patch: { title: string; content: unknown }) => void;
+  // 상위 페이지 체인(root→parent). 중첩 페이지 내비게이션. 없으면 렌더 안 함.
+  breadcrumb?: Page[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [title, setTitle] = useState(page.title);
@@ -312,6 +317,27 @@ export function PageEditor({
             }
           }}
         />
+      )}
+      {breadcrumb && breadcrumb.length > 0 && (
+        <nav
+          aria-label="상위 페이지"
+          className="flex flex-wrap items-center gap-0.5 px-4 text-xs text-muted-foreground"
+        >
+          {breadcrumb.map((b) => (
+            <span key={b.id} className="flex items-center gap-0.5">
+              <Link
+                href={`/pages/${b.id}`}
+                className="flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {b.icon && <span className="leading-none">{b.icon}</span>}
+                <span className="max-w-[10rem] truncate">
+                  {b.title || "제목 없음"}
+                </span>
+              </Link>
+              <ChevronRight className="size-3 shrink-0 opacity-50" />
+            </span>
+          ))}
+        </nav>
       )}
       <div className="relative px-4">
         {icon ? (

@@ -156,6 +156,20 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
 
   const tree = useMemo(() => buildTree(pages), [pages]);
   const current = pages.find((p) => p.id === pageId) ?? null;
+  // 현재 페이지의 상위 체인(root→parent). 순환/누락 방어(guard). 브레드크럼 내비게이션에 사용.
+  const breadcrumb = useMemo(() => {
+    if (!current) return [];
+    const byId = new Map(pages.map((p) => [p.id, p]));
+    const chain: Page[] = [];
+    let node = current.parentId ? byId.get(current.parentId) : undefined;
+    let guard = 0;
+    while (node && guard < 50) {
+      chain.unshift(node);
+      node = node.parentId ? byId.get(node.parentId) : undefined;
+      guard += 1;
+    }
+    return chain;
+  }, [current, pages]);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
   // 즐겨찾기 순서 유지, 삭제/휴지통으로 사라진 id는 제외.
   const favoritePages = useMemo(
@@ -365,6 +379,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
           <PageEditor
             key={current.id}
             page={current}
+            breadcrumb={breadcrumb}
             onSaved={(patch) => handleSaved(current.id, patch)}
           />
         ) : (
