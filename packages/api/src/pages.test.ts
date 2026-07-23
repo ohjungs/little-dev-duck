@@ -276,7 +276,16 @@ describe("Phase 11 DB 뷰", () => {
     });
     const dbSchema = {
       properties: [{ id: "status", name: "상태", type: "select" as const, options: [] }],
-      views: [{ id: "table", name: "표", type: "table" as const, groupByPropId: null }],
+      views: [
+        {
+          id: "table",
+          name: "표",
+          type: "table" as const,
+          groupByPropId: null,
+          sort: null,
+          filters: [],
+        },
+      ],
     };
     await updatePage(supabase, VALID_ROW.id, {
       dbSchema,
