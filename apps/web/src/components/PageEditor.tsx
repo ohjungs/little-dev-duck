@@ -13,6 +13,7 @@ import {
   Smile,
   Star,
   Table2,
+  Upload,
 } from "lucide-react";
 import type { Block } from "@blocknote/core";
 import {
@@ -183,6 +184,27 @@ export function PageEditor({
   const handleExportReady = useCallback((fn: () => string) => {
     toMarkdown.current = fn;
   }, []);
+  // BlockEditor의 "Markdown 파싱 → 현재 문서 대체" 함수(가져오기).
+  const importMd = useRef<((md: string) => Promise<void>) | null>(null);
+  const handleImportReady = useCallback(
+    (fn: (md: string) => Promise<void>) => {
+      importMd.current = fn;
+    },
+    [],
+  );
+
+  // .md 파일을 읽어 본문으로 가져온다(현재 문서 대체). replaceBlocks가 onChange를 발화해 자동 저장된다.
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 같은 파일 재선택 허용
+    if (!file || !importMd.current) return;
+    try {
+      await importMd.current(await file.text());
+      flashMsg("Markdown을 가져왔습니다.");
+    } catch {
+      flashMsg("가져오기에 실패했습니다.");
+    }
+  };
 
   // 실제 저장 1회: 서버가 content에서 plainText를 파생하므로 그 값으로 RAG 재인덱싱하고 상위 스냅샷도 갱신한다.
   const runSave = useCallback(
@@ -308,6 +330,15 @@ export function PageEditor({
         >
           <Download className="size-3.5" /> Markdown 내보내기
         </Button>
+        <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+          <Upload className="size-3.5" /> 가져오기
+          <input
+            type="file"
+            accept=".md,.markdown,text/markdown"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+        </label>
         {!dbSchema && (
           <Button
             type="button"
@@ -432,6 +463,7 @@ export function PageEditor({
           scheduleSave();
         }}
         onExportReady={handleExportReady}
+        onImportReady={handleImportReady}
       />
       <div className="flex flex-wrap items-center gap-x-3 px-4 text-xs text-muted-foreground">
         <p role="status" aria-live="polite">

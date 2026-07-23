@@ -46,11 +46,14 @@ export function BlockEditor({
   initialContent,
   onChange,
   onExportReady,
+  onImportReady,
   editable = true,
 }: {
   initialContent: unknown;
   onChange?: (document: Block[]) => void;
   onExportReady?: (toMarkdown: () => string) => void;
+  // Markdown을 파싱해 현재 문서를 대체하는 함수를 상위에 넘긴다(가져오기 — 에디터 인스턴스가 여기 있으므로).
+  onImportReady?: (importMarkdown: (md: string) => Promise<void>) => void;
   // 공개 페이지(/p/[slug])는 읽기 전용으로 같은 렌더러를 재사용(ponytail).
   editable?: boolean;
 }) {
@@ -88,6 +91,13 @@ export function BlockEditor({
   useEffect(() => {
     onExportReady?.(() => editor.blocksToMarkdownLossy());
   }, [editor, onExportReady]);
+
+  useEffect(() => {
+    onImportReady?.(async (md: string) => {
+      const blocks = await editor.tryParseMarkdownToBlocks(md);
+      editor.replaceBlocks(editor.document, blocks);
+    });
+  }, [editor, onImportReady]);
 
   return (
     <BlockNoteView

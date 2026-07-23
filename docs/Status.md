@@ -424,6 +424,9 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
   +본인 폴더 RLS+rollback) + BlockEditor uploadFile 핸들러(본인 폴더 <uuid>.<ext>→public URL). **db push 필요.**
 - [x] T6 Markdown 내보내기(308d518): BlockEditor onExportReady(blocksToMarkdownLossy, 0.52.1 동기 string)
   + PageEditor 툴바 '.md 내보내기'(제목 H1+Blob 다운로드). **백업/템플릿은 미구현(선택).**
+- [x] **후속 — Markdown 가져오기**(2026-07-24, `/loop` 자율, 노션 격차 P1): BlockEditor `onImportReady`
+  (tryParseMarkdownToBlocks → replaceBlocks, onChange 발화로 자동 저장) + PageEditor 툴바 '가져오기'
+  (.md 파일 선택 → 본문 대체). 내보내기/가져오기 왕복 완성. 순수 web. 검증 web tsc GREEN.
 - [x] T5 버전 히스토리(b288f75): 마이그레이션 `20260722060000_page_versions`(스냅샷+RLS 3정책+rollback) +
   core pageVersionSchema + api createPageVersion/listPageVersions(4 tests) + VersionHistory 모달(복원=updatePage
   +reload) + PageEditor '버전 저장'/'버전 기록'. **db push 필요.**
