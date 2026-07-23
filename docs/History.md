@@ -15,7 +15,9 @@
 - [~] Phase 9 워크스페이스 코어(블록 에디터) — 2026-07-22 백엔드/계약 층 + T1·T2·T4·T5·T7 구현·배포
       (pages CRUD UI, BlockNote shadcn 에디터, Cmd+K 검색, 휴지통/복원, RAG page 소스). 남음: T3 파일
       업로드, T5 버전 히스토리, T6 내보내기/템플릿, DB push 2건(pages·embeddings source) (아래 기록)
-- [ ] Phase 10 AI 2단계 (에이전트 액션: Figma/Gamma/Google/GitHub/Notion/Gmail)
+- [~] Phase 10 AI 2단계 (에이전트 액션) — 2026-07-23 T1~T7 코드 완료(Google Calendar/GitHub 이슈/Gmail
+      3개 어댑터 + composeAdapters 합성 + 승인 게이트 + 인젝션 방어 + 감사 로그). T3 실기 검증 통과,
+      T5/T6은 db push(2건) + 실기 검증 대기 (아래 기록)
 - [ ] Phase 11 DB 뷰 (표/보드)
 - [ ] Phase 12 공개 공유 + 알림 4채널 + 대시보드
 - [ ] Phase 13 상용 마감 (랜딩, 온보딩, i18n, Sentry/Analytics)
@@ -422,3 +424,33 @@
   - 검증: core 117 / api 142(+4) / ai 9 tests + web build GREEN + core·api·web 로컬 eslint 전부 exit 0.
   - Phase 10 T1~T4·T7 코드+리뷰 완료. 자율 구현 가능분 소진 — 남은 것은 사용자 몫(T3 실기 검증, db push
     2건)과 보안 민감 확장(T5 GitHub scope, T6 Gmail)뿐, 둘 다 사용자 확인 없이 진행하지 않기로 판단.
+- 2026-07-23 : Phase 10 T3 실기 검증 통과(사용자 "잘됐다") 후, 사용자가 `/loop /next-step` 자율 진행 +
+  3시간 단위 커밋/푸시/배포 자동화를 명시 지시 — T5(GitHub 이슈)·T6(Gmail) 두 어댑터를 이어서 구현.
+  - T5 GitHub 이슈 어댑터(39b907e): Google Calendar와 동일 구조(listGithubIssues readonly +
+    createGithubIssue mutating). code+security 병렬 리뷰 반영 — owner/repo가 URL 경로에 그대로 삽입되던
+    confused-deputy 경로를 GitHub 명명규칙 화이트리스트로 차단, `upstreamError`의 서비스 오라벨링("gemini"
+    로 고정 표시되던 문제) 수정. GitHub 기본 로그인은 이슈 쓰기 scope를 요청하지 않는다는 점에 착안해
+    `link=github` 명시적 동의로만 토큰을 캡처하도록 설계(Google의 `provider==="github"` 자동 캡처
+    분기와 다른 판단).
+  - `composeAdapters`(agent.ts) 신설 — 여러 어댑터의 카탈로그를 병합하고 도구명으로 올바른 어댑터에
+    실행을 위임. `/api/ai/agent`·`/api/ai/agent/approve`가 단일 어댑터 가정에서 다중 어댑터 합성으로
+    확장됨(이후 T6에서 세 번째 어댑터 추가 시 코드 변경 없이 배열에 push만 하면 되는 것으로 실증).
+  - T6 Gmail 어댑터: 공식 Gmail API v1 문서(WebFetch 실측) 확인 후 착수. **범위 데스코프 판단** — 초안의
+    "1시간 자동 폴링·분류"는 자율 다단계 워크플로라 phase_10.md의 "하지 않는 것"과 충돌해 제외,
+    Calendar/GitHub과 동일하게 사용자 발화당 단순 도구 호출(listRecentEmails readonly + trashEmail
+    mutating)로 좁힘. 영구삭제 엔드포인트는 설계상 아예 구현하지 않음(trash만). **어댑터별 토큰 테이블
+    분리 원칙 확립** — Calendar와 Gmail은 같은 Google 로그인이지만 서로 다른 scope를 별도 시점에
+    동의받으므로 `user_google_tokens`를 공유하면 안 됨을 깨닫고 `user_gmail_tokens`를 신설(GitHub과
+    동일 원리, 프로바이더 단위가 아니라 어댑터=scope 단위로 테이블 분리). code+security 리뷰에서 발견된
+    N+1 fan-out(list 후 각 메시지 get) 부분 실패 문제를 `Promise.allSettled`로 격리.
+  - **동시 작업 충돌 발견**: T6 커밋 시도 중 다른 세션(사용자로 추정)이 같은 작업 디렉토리에서 오리 3D
+    GLB 모델 교체 작업을 직접 커밋·푸시(`1b8d067`)하면서, 스테이징돼 있던 T6 파일들이 그 커밋에 함께
+    쓸려 들어감(git worktree 미분리로 인한 알려진 위험, CLAUDE.md에 기 문서화). 데이터 유실은 없음(CI
+    green, Vercel production READY 확인) — 커밋 메시지가 Gmail 작업을 언급하지 않는 불일치만 남음,
+    히스토리 재작성은 하지 않고 이 기록으로 갈음.
+  - 검증: core 126 / api 183 tests + web(core/api 격리 검증, mascot 동시편집으로 web 전체 build는
+    일시적 방해받음—Duck.tsx만 stash 후 확인) build GREEN + core·api·web 로컬 full eslint 선검증.
+  - Phase 10 T1~T7 전부 코드 완료. 남은 것: T5/T6 db push(user_github_tokens/user_gmail_tokens) +
+    실기 검증(GitHub 이슈 생성, Gmail 조회·휴지통 이동, GitHub/Gmail 재동의 흐름이 실제로 넓은 scope를
+    재발급하는지). gstack `/review`는 이 프로젝트가 항상 main에 직접 커밋하는 워크플로라(별도 브랜치
+    없음) "base 브랜치라 diff 없음"으로 스킵 — code-reviewer+security-reviewer 병렬 리뷰로 갈음.
