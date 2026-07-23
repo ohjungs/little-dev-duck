@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
   createPage,
   listChildPages,
@@ -11,6 +11,7 @@ import {
 import {
   filterRows,
   sortRows,
+  MAX_VIEWS,
   type DbSchema,
   type FilterSpec,
   type Page,
@@ -19,6 +20,7 @@ import {
   type RowProps,
   type RowPropValue,
   type SortSpec,
+  type ViewType,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -63,6 +65,7 @@ export function DatabaseView({
   const [error, setError] = useState<string | null>(null);
   const [activeViewId, setActiveViewId] = useState(dbSchema.views[0]?.id);
   const [addingProp, setAddingProp] = useState(false);
+  const [addingView, setAddingView] = useState(false);
 
   // 저장 실패를 조용히 삼키지 않고 잠깐 표시(코드 리뷰 HIGH). 3초 후 자동 해제.
   const showError = (msg: string) => {
@@ -191,6 +194,48 @@ export function DatabaseView({
     });
   };
 
+  const selectProps = dbSchema.properties.filter((p) => p.type === "select");
+
+  // 뷰 추가. board는 첫 select 속성으로 그룹(없으면 groupBy=null → 표처럼 렌더). MAX_VIEWS 상한.
+  const handleAddView = (name: string, type: ViewType) => {
+    setAddingView(false);
+    if (dbSchema.views.length >= MAX_VIEWS) return;
+    const id = crypto.randomUUID();
+    onSchemaChange({
+      ...dbSchema,
+      views: [
+        ...dbSchema.views,
+        {
+          id,
+          name: name.trim() || (type === "board" ? "보드" : "표"),
+          type,
+          groupByPropId: type === "board" ? (selectProps[0]?.id ?? null) : null,
+          sort: null,
+          filters: [],
+        },
+      ],
+    });
+    setActiveViewId(id);
+  };
+
+  // 뷰 삭제(최소 1개 유지 — dbSchemaSchema가 강제). 활성 뷰를 지우면 첫 뷰로 이동.
+  const handleDeleteView = (viewId: string) => {
+    if (dbSchema.views.length <= 1) return;
+    const remaining = dbSchema.views.filter((v) => v.id !== viewId);
+    onSchemaChange({ ...dbSchema, views: remaining });
+    if (activeViewId === viewId) setActiveViewId(remaining[0]?.id);
+  };
+
+  // board 그룹 기준(select 속성) 변경. null=그룹 해제(표처럼 렌더).
+  const handleChangeGroupBy = (propId: string | null) => {
+    onSchemaChange({
+      ...dbSchema,
+      views: dbSchema.views.map((v) =>
+        v.id === view.id ? { ...v, groupByPropId: propId } : v,
+      ),
+    });
+  };
+
   const groupProp = view.groupByPropId
     ? dbSchema.properties.find((p) => p.id === view.groupByPropId)
     : undefined;
@@ -225,22 +270,76 @@ export function DatabaseView({
             {v.name}
           </button>
         ))}
-        <div className="relative ml-auto">
-          <button
-            type="button"
-            onClick={() => setAddingProp((o) => !o)}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <Plus className="size-3.5" /> 속성
-          </button>
-          {addingProp && (
-            <AddPropertyForm
-              onCancel={() => setAddingProp(false)}
-              onAdd={handleAddProperty}
-            />
-          )}
+        <div className="ml-auto flex items-center">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setAddingView((o) => !o)}
+              disabled={dbSchema.views.length >= MAX_VIEWS}
+              className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+            >
+              <Plus className="size-3.5" /> 뷰
+            </button>
+            {addingView && (
+              <AddViewForm
+                canBoard={selectProps.length > 0}
+                onCancel={() => setAddingView(false)}
+                onAdd={handleAddView}
+              />
+            )}
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setAddingProp((o) => !o)}
+              className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Plus className="size-3.5" /> 속성
+            </button>
+            {addingProp && (
+              <AddPropertyForm
+                onCancel={() => setAddingProp(false)}
+                onAdd={handleAddProperty}
+              />
+            )}
+          </div>
         </div>
       </div>
+
+      {/* 활성 뷰 설정: board 그룹 기준 변경 + 뷰 삭제(2개 이상일 때). */}
+      {(view.type === "board" || dbSchema.views.length > 1) && (
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          {view.type === "board" && (
+            <label className="flex items-center gap-1.5">
+              그룹 기준
+              <select
+                value={view.groupByPropId ?? ""}
+                onChange={(e) =>
+                  handleChangeGroupBy(e.target.value === "" ? null : e.target.value)
+                }
+                aria-label="보드 그룹 기준"
+                className="rounded border border-border bg-transparent px-1.5 py-1 outline-none focus:ring-1 focus:ring-primary/40"
+              >
+                <option value="">없음</option>
+                {selectProps.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {dbSchema.views.length > 1 && (
+            <button
+              type="button"
+              onClick={() => handleDeleteView(view.id)}
+              className="flex items-center gap-1 transition-colors hover:text-destructive"
+            >
+              <Trash2 className="size-3.5" /> 이 뷰 삭제
+            </button>
+          )}
+        </div>
+      )}
 
       <DbViewToolbar
         properties={dbSchema.properties}
@@ -331,6 +430,59 @@ function AddPropertyForm({
               {t.label}
             </option>
           ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => onAdd(name, type)}
+          className="rounded bg-primary px-2 py-1 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          추가
+        </button>
+      </div>
+    </>
+  );
+}
+
+function AddViewForm({
+  canBoard,
+  onAdd,
+  onCancel,
+}: {
+  canBoard: boolean;
+  onAdd: (name: string, type: ViewType) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [type, setType] = useState<ViewType>("table");
+  return (
+    <>
+      <div
+        role="presentation"
+        className="fixed inset-0 z-10"
+        onClick={onCancel}
+      />
+      <div className="absolute right-0 top-9 z-20 flex w-52 flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-lg">
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onAdd(name, type);
+          }}
+          placeholder="뷰 이름"
+          aria-label="뷰 이름"
+          className="rounded border border-border bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary/40"
+        />
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as ViewType)}
+          aria-label="뷰 종류"
+          className="rounded border border-border bg-transparent px-2 py-1 text-sm outline-none"
+        >
+          <option value="table">표</option>
+          <option value="board" disabled={!canBoard}>
+            보드{canBoard ? "" : " (선택 속성 필요)"}
+          </option>
         </select>
         <button
           type="button"
