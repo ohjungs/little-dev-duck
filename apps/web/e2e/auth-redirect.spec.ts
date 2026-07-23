@@ -2,11 +2,12 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 
-test("비로그인 사용자가 /에 접근하면 /login으로 리다이렉트된다", async ({
+// Phase 13 T4: 비로그인 접근은 마케팅 랜딩(/welcome)으로 보낸다(로그인 폼은 랜딩 CTA로 도달).
+test("비로그인 사용자가 /에 접근하면 /welcome(랜딩)으로 리다이렉트된다", async ({
   page,
 }) => {
   const response = await page.goto("/");
-  expect(new URL(page.url()).pathname).toBe("/login");
+  expect(new URL(page.url()).pathname).toBe("/welcome");
   expect(response?.status()).toBeLessThan(400);
 });
 
@@ -30,9 +31,9 @@ test("/login에 Google/GitHub 로그인 버튼이 보인다", async ({ page }) =
 // 구분하지 못하므로 이 파일에서는 정확한 303 값을 확인한다.
 
 test.describe("미인증 리다이렉트 상태 코드 (proxy.ts)", () => {
-  test("GET / 요청은 303으로 /login에 리다이렉트된다", async ({ request }) => {
+  test("GET / 요청은 303으로 /welcome에 리다이렉트된다", async ({ request }) => {
     // maxRedirects: 0으로 리다이렉트를 따라가지 않아야 응답 자체의 status code를 볼 수
-    // 있다. 따라가면 최종 목적지(/login, 200)만 보여 307/303 차이가 가려진다.
+    // 있다. 따라가면 최종 목적지(/welcome, 200)만 보여 307/303 차이가 가려진다.
     const response = await request.get("/", { maxRedirects: 0 });
     expect(response.status()).toBe(303);
   });
@@ -41,7 +42,7 @@ test.describe("미인증 리다이렉트 상태 코드 (proxy.ts)", () => {
     request,
   }) => {
     // 회귀 재발 방지 테스트: proxy.ts의 미인증 리다이렉트가 기본값 307로 되돌아가면
-    // 브라우저는 /login에도 POST로 재요청하게 되고, /login은 GET만 처리하는 페이지
+    // 브라우저는 /welcome에도 POST로 재요청하게 되고, /welcome은 GET만 처리하는 페이지
     // 라우트라 405가 발생한다. 이게 과거 실제로 터졌던 버그(docs/anti-patterns/post-redirect-get.md)다.
     const response = await request.post("/", { maxRedirects: 0 });
     expect(response.status()).toBe(303);
