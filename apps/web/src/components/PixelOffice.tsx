@@ -1,75 +1,96 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { eventToState, type DuckWorkState, type OfficeRole } from "@ldd/core";
+import {
+  eventToState,
+  deskSlots,
+  describeActivity,
+  isAdjacent,
+  movePlayer,
+  type Dir,
+  type DuckWorkState,
+  type OfficeRole,
+  type Vec,
+} from "@ldd/core";
 
-// Phase 16: Canvas 2D 픽셀 오리 오피스. 캐릭터 바이블 색상(DECISIONS.md 4절)으로 오리를 절차적으로
-// 그린다(외부 스프라이트 에셋 없이). 실이벤트 소스(Claude Code hooks/Tauri sidecar)는 데스크톱
-// 인프라라 이월 — 지금은 데모 시뮬레이터가 @ldd/core OfficeEvent 계약대로 이벤트를 만든다.
+// Phase 16+17: Canvas 2D 픽셀 오리 오피스. 캐릭터 바이블 색상(DECISIONS.md 4절)으로 절차적 드로잉.
+// P16: 이벤트→상태 애니메이션, 유휴 퇴근, 클릭 말풍선. P17: 대장오리 키보드 조작(그리드 이동·충돌),
+// 근접 상호작용("지금 뭐 하는 중?"), 에이전트 수 동적 배치. 이동/인접/배치 로직은 @ldd/core 순수함수.
 const BODY = "#F6EFDD";
 const SHADOW = "#E3D3B9";
 const BEAK = "#A99C65";
 const OUTLINE = "#352116";
 
-const W = 480;
-const H = 300;
-const FRAME_MS = 90; // ~11fps (픽셀 아트는 60fps 불필요 = 리소스 예산)
-const IDLE_MS = 12_000; // 이 시간 이벤트 없으면 퇴근 모드
-const SIM_MS = 2200; // 데모 이벤트 주기
+const TILE = 32;
+const COLS = 15;
+const ROWS = 9;
+const W = COLS * TILE; // 480
+const H = ROWS * TILE; // 288
+const FRAME_MS = 90; // ~11fps (리소스 예산)
+const IDLE_MS = 12_000;
+const SIM_MS = 2200;
 
-type Role = OfficeRole;
-
-const ROLE_LABEL: Record<Role, string> = {
+const ROLE_LABEL: Record<OfficeRole, string> = {
   plan: "기획 오리",
   do: "개발 오리",
   check: "리뷰 오리",
   boss: "대장오리",
 };
-
-const STATE_LABEL: Record<DuckWorkState, string> = {
-  idle: "커피 한 잔",
-  typing: "코드 작성 중",
-  reading: "자료 읽는 중",
-  server: "빌드·테스트 중",
-  question: "에러 살펴보는 중",
-  offwork: "퇴근·수면",
-};
-
+const WORKER_ROLES: OfficeRole[] = ["plan", "do", "check"];
 const SIM_TOOLS = ["Edit", "Write", "Read", "Grep", "Bash", "Task"] as const;
+const SIM_FILES = ["Duck.tsx", "news.ts", "office.ts", "route.ts", "page.tsx"];
 
-type Desk = { role: Role; x: number; y: number };
-const DESKS: Desk[] = [
-  { role: "plan", x: 120, y: 110 },
-  { role: "do", x: 360, y: 110 },
-  { role: "check", x: 120, y: 235 },
-  { role: "boss", x: 360, y: 235 },
-];
-
-type Duck = {
-  role: Role;
+type Worker = {
+  role: OfficeRole;
+  tile: Vec;
   state: DuckWorkState;
-  label: string; // 현재 활동(도구/파일)
+  label: string;
   lastTs: number;
 };
 
+const tileCenter = (t: number) => t * TILE + TILE / 2;
+
+function buildWorkers(count: number): Worker[] {
+  return deskSlots(count, COLS, ROWS).map((tile, i) => ({
+    role: WORKER_ROLES[i % WORKER_ROLES.length],
+    tile,
+    state: "idle" as DuckWorkState,
+    label: "대기 중",
+    lastTs: 0,
+  }));
+}
+
+const KEY_DIR: Record<string, Dir> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  w: "up",
+  s: "down",
+  a: "left",
+  d: "right",
+  W: "up",
+  S: "down",
+  A: "left",
+  D: "right",
+};
+
 function drawFloor(ctx: CanvasRenderingContext2D) {
-  const tile = 30;
-  for (let y = 0; y < H; y += tile) {
-    for (let x = 0; x < W; x += tile) {
-      ctx.fillStyle = ((x / tile + y / tile) & 1) === 0 ? "#efe9dc" : "#e7e0cf";
-      ctx.fillRect(x, y, tile, tile);
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      ctx.fillStyle = (x + y) % 2 === 0 ? "#efe9dc" : "#e7e0cf";
+      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
     }
   }
 }
 
-function drawDesk(ctx: CanvasRenderingContext2D, x: number, y: number) {
+function drawDesk(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
   ctx.fillStyle = "#c9a36b";
-  ctx.fillRect(x - 34, y + 14, 68, 12);
+  ctx.fillRect(cx - 15, cy + 12, 30, 8);
   ctx.fillStyle = OUTLINE;
-  ctx.fillRect(x - 34, y + 24, 68, 3);
+  ctx.fillRect(cx - 15, cy + 19, 30, 2);
 }
 
-// 절차적 픽셀 오리. px = 픽셀 블록 크기. bob = 위아래 흔들림(애니메이션 프레임).
 function drawDuck(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -78,47 +99,31 @@ function drawDuck(
   frame: number,
   boss: boolean,
 ) {
-  const px = 4;
-  const bob = state === "typing" ? (frame % 2 === 0 ? 0 : px) : 0;
+  const px = 3;
+  const bob = state === "typing" && frame % 2 === 1 ? px : 0;
   const sleeping = state === "offwork";
-  const oy = cy - (sleeping ? -px * 2 : 0) + bob;
-
+  const oy = cy + bob;
   const rect = (gx: number, gy: number, gw: number, gh: number, color: string) => {
     ctx.fillStyle = color;
     ctx.fillRect(cx + gx * px, oy + gy * px, gw * px, gh * px);
   };
 
-  // 그림자
   ctx.fillStyle = "rgba(53,33,22,0.15)";
   ctx.fillRect(cx - 5 * px, cy + 5 * px, 10 * px, 2 * px);
 
-  // 몸통(둥근 사각) + 음영
   rect(-4, -1, 8, 5, OUTLINE);
   rect(-3, 0, 6, 4, BODY);
   rect(-3, 3, 6, 1, SHADOW);
-  // 머리
   rect(-3, -5, 6, 5, OUTLINE);
   rect(-2, -4, 4, 4, BODY);
-  // 부리
   rect(2, -3, 3, 2, BEAK);
-  // 발
   rect(-2, 4, 1, 1, BEAK);
   rect(1, 4, 1, 1, BEAK);
+  if (sleeping) rect(-1, -3, 2, 1, OUTLINE);
+  else rect(0, -3, 1, 1, OUTLINE);
+  if (boss) rect(-2, -3, 4, 1, OUTLINE); // 안경
 
-  // 눈 / 감은 눈(수면)
-  if (sleeping) {
-    rect(-1, -3, 2, 1, OUTLINE);
-  } else {
-    rect(0, -3, 1, 1, OUTLINE);
-  }
-
-  // 대장오리 표식(안경)
-  if (boss) {
-    rect(-2, -3, 4, 1, OUTLINE);
-  }
-
-  // 상태 오버레이(머리 위 아이콘)
-  ctx.font = "bold 16px system-ui";
+  ctx.font = "bold 14px system-ui";
   ctx.textAlign = "center";
   const icon: Record<DuckWorkState, string> = {
     idle: "☕",
@@ -128,80 +133,65 @@ function drawDuck(
     question: "❓",
     offwork: "💤",
   };
-  ctx.fillText(icon[state], cx, oy - 8 * px);
-}
-
-function drawBubble(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  text: string,
-) {
-  ctx.font = "11px system-ui";
-  ctx.textAlign = "left";
-  const padX = 8;
-  const w = ctx.measureText(text).width + padX * 2;
-  const h = 22;
-  let bx = cx - w / 2;
-  const by = cy - 78;
-  bx = Math.max(4, Math.min(bx, W - w - 4));
-  ctx.fillStyle = "#ffffff";
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 1.5;
-  const r = 6;
-  ctx.beginPath();
-  ctx.moveTo(bx + r, by);
-  ctx.arcTo(bx + w, by, bx + w, by + h, r);
-  ctx.arcTo(bx + w, by + h, bx, by + h, r);
-  ctx.arcTo(bx, by + h, bx, by, r);
-  ctx.arcTo(bx, by, bx + w, by, r);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = OUTLINE;
-  ctx.fillText(text, bx + padX, by + 15);
+  ctx.fillText(boss ? "👑" : icon[state], cx, oy - 7 * px);
 }
 
 export function PixelOffice() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const ducksRef = useRef<Map<Role, Duck>>(
-    new Map(
-      DESKS.map((d) => [
-        d.role,
-        { role: d.role, state: "idle" as DuckWorkState, label: "대기 중", lastTs: 0 },
-      ]),
-    ),
+  const [count, setCount] = useState(3);
+  const workersRef = useRef<Worker[]>(buildWorkers(3));
+  const playerRef = useRef<Vec>({ x: Math.floor(COLS / 2), y: ROWS - 2 });
+  const nearbyRef = useRef<OfficeRole | null>(null);
+  const [talking, setTalking] = useState<{ role: OfficeRole; text: string } | null>(
+    null,
   );
-  const selectedRef = useRef<Role | null>(null);
-  const [selected, setSelected] = useState<Role | null>(null);
   const [paused, setPaused] = useState(false);
   const pausedRef = useRef(false);
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
 
-  // 데모 이벤트 주입: 실 Claude Code 이벤트 대신 OfficeEvent 계약대로 랜덤 생성.
-  const applyEvent = useCallback(
-    (role: Role, tool: string, status: "ok" | "error", target: string, now: number) => {
-      const duck = ducksRef.current.get(role);
-      if (!duck) return;
-      duck.state = eventToState({ tool, status });
-      duck.label = `${tool}${target ? ` · ${target}` : ""}`;
-      duck.lastTs = now;
-    },
+  // 에이전트 수 변경 시 책상 재배치(플레이어 위치·카메라 유실 없음 — 워커 배열만 교체).
+  useEffect(() => {
+    workersRef.current = buildWorkers(count);
+  }, [count]);
+
+  const isBlocked = useCallback(
+    (x: number, y: number) =>
+      workersRef.current.some((w) => w.tile.x === x && w.tile.y === y),
     [],
   );
+
+  const talkToNearby = useCallback(() => {
+    const near = nearbyRef.current;
+    if (!near) return;
+    const worker = workersRef.current.find((w) => w.role === near);
+    if (!worker) return;
+    setTalking({ role: near, text: describeActivity(worker) });
+  }, []);
+
+  // 키 입력은 캔버스가 포커스일 때만(포커스 게이트) — 전역 단축키·페이지 스크롤과 충돌 방지.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
+    if (e.key === "e" || e.key === "E" || e.key === "Enter") {
+      e.preventDefault();
+      talkToNearby();
+      return;
+    }
+    const dir = KEY_DIR[e.key];
+    if (!dir) return;
+    e.preventDefault();
+    playerRef.current = movePlayer(playerRef.current, dir, COLS, ROWS, isBlocked);
+    setTalking(null); // 이동하면 대화창 닫기
+  };
 
   useEffect(() => {
     let raf = 0;
     let lastDraw = 0;
     let frame = 0;
     let simAt = 0;
-    let startPerf = 0;
     const reduce = window.matchMedia?.(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -212,104 +202,123 @@ export function PixelOffice() {
     ctx.scale(dpr, dpr);
     ctx.imageSmoothingEnabled = false;
 
-    // 데모 시뮬레이터: 시간 기반(Date.now 대신 performance.now 경과로 결정).
-    const SIM_FILES = ["Duck.tsx", "news.ts", "office.ts", "route.ts", "page.tsx"];
-    let simSeed = 7;
+    let seed = 7;
     const rand = () => {
-      simSeed = (simSeed * 1103515245 + 12345) & 0x7fffffff;
-      return simSeed / 0x7fffffff;
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
     };
 
     const tick = (t: number) => {
       raf = requestAnimationFrame(tick);
-      if (!startPerf) startPerf = t;
       const now = t;
+      const workers = workersRef.current;
 
-      // 데모 이벤트 주기(일시정지 아닐 때).
-      if (!pausedRef.current && now - simAt > SIM_MS) {
+      if (!pausedRef.current && now - simAt > SIM_MS && workers.length > 0) {
         simAt = now;
-        const role = DESKS[Math.floor(rand() * DESKS.length)].role;
+        const w = workers[Math.floor(rand() * workers.length)];
         const tool = SIM_TOOLS[Math.floor(rand() * SIM_TOOLS.length)];
         const status = rand() < 0.12 ? "error" : "ok";
-        const target = SIM_FILES[Math.floor(rand() * SIM_FILES.length)];
-        applyEvent(role, tool, status, target, now);
+        w.state = eventToState({ tool, status });
+        w.label = `${tool} · ${SIM_FILES[Math.floor(rand() * SIM_FILES.length)]}`;
+        w.lastTs = now;
       }
-
-      // 유휴 -> 퇴근 모드.
-      for (const duck of ducksRef.current.values()) {
-        if (duck.state !== "offwork" && now - duck.lastTs > IDLE_MS) {
-          duck.state = "offwork";
-          duck.label = "퇴근";
+      for (const w of workers) {
+        if (w.state !== "offwork" && w.lastTs > 0 && now - w.lastTs > IDLE_MS) {
+          w.state = "offwork";
+          w.label = "퇴근";
         }
       }
+
+      const player = playerRef.current;
+      nearbyRef.current =
+        workers.find((w) => isAdjacent(player, w.tile))?.role ?? null;
 
       if (now - lastDraw < FRAME_MS) return;
       lastDraw = now;
       if (!reduce) frame += 1;
 
       drawFloor(ctx);
-      for (const desk of DESKS) {
-        drawDesk(ctx, desk.x, desk.y);
-        const duck = ducksRef.current.get(desk.role)!;
-        drawDuck(ctx, desk.x, desk.y, duck.state, frame, desk.role === "boss");
-        // 역할 이름표
+      for (const w of workers) {
+        const cx = tileCenter(w.tile.x);
+        const cy = tileCenter(w.tile.y);
+        drawDesk(ctx, cx, cy);
+        drawDuck(ctx, cx, cy, w.state, frame, false);
+        ctx.font = "9px system-ui";
+        ctx.fillStyle = OUTLINE;
+        ctx.textAlign = "center";
+        ctx.fillText(ROLE_LABEL[w.role], cx, cy + 30);
+      }
+      // 플레이어(대장오리)
+      const px = tileCenter(player.x);
+      const py = tileCenter(player.y);
+      drawDuck(ctx, px, py, "idle", frame, true);
+
+      // 근접 프롬프트
+      const near = nearbyRef.current;
+      if (near) {
         ctx.font = "10px system-ui";
         ctx.fillStyle = OUTLINE;
         ctx.textAlign = "center";
-        ctx.fillText(ROLE_LABEL[desk.role], desk.x, desk.y + 40);
-      }
-
-      const sel = selectedRef.current;
-      if (sel) {
-        const desk = DESKS.find((d) => d.role === sel)!;
-        const duck = ducksRef.current.get(sel)!;
-        drawBubble(ctx, desk.x, desk.y, `${ROLE_LABEL[sel]}: ${duck.label}`);
+        ctx.fillText("E: 말 걸기", px, py - 34);
       }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [applyEvent]);
-
-  const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const r = canvas.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * W;
-    const y = ((e.clientY - r.top) / r.height) * H;
-    // 가장 가까운 책상 히트테스트(오리 주변 44px).
-    let hit: Role | null = null;
-    for (const desk of DESKS) {
-      if (Math.abs(x - desk.x) < 40 && Math.abs(y - desk.y) < 44) hit = desk.role;
-    }
-    selectedRef.current = hit;
-    setSelected(hit);
-  };
+  }, [isBlocked]);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <canvas
           ref={canvasRef}
-          onClick={onClick}
+          tabIndex={0}
+          onKeyDown={onKeyDown}
           role="img"
-          aria-label="픽셀 오리 오피스 — 기획·개발·리뷰·대장 오리가 작업 상태를 애니메이션으로 보여줍니다"
-          className="block w-full cursor-pointer"
+          aria-label="픽셀 오리 오피스 — 방향키/WASD로 대장오리를 움직이고, 직원 오리 옆에서 E로 말을 겁니다"
+          className="block w-full cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           style={{ aspectRatio: `${W} / ${H}`, imageRendering: "pixelated" }}
         />
       </div>
-      <div className="flex items-center justify-between">
+
+      {talking && (
+        <div className="rounded-xl border border-border bg-card p-3 text-sm">
+          <span className="font-semibold">{ROLE_LABEL[talking.role]}</span>
+          <span className="text-muted-foreground"> — {talking.text}</span>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {selected
-            ? `${ROLE_LABEL[selected]} — ${STATE_LABEL[ducksRef.current.get(selected)!.state]}`
-            : "오리를 클릭하면 지금 뭘 하는지 보여줘요. (데모: 실제 Claude Code 이벤트 연동은 데스크톱 앱에서)"}
+          캔버스를 클릭해 포커스한 뒤 방향키/WASD로 대장오리를 움직여요. 직원 오리 옆에서 E를 누르면
+          지금 뭐 하는지 물어봐요. (데모 구동 — 실 Claude Code 이벤트 연동은 데스크톱 앱)
         </p>
-        <button
-          type="button"
-          onClick={() => setPaused((p) => !p)}
-          className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {paused ? "데모 재생" : "데모 일시정지"}
-        </button>
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-muted-foreground">직원 오리</span>
+          <button
+            type="button"
+            onClick={() => setCount((c) => Math.max(1, c - 1))}
+            aria-label="직원 오리 줄이기"
+            className="rounded-md border border-border px-2 py-1 hover:bg-muted"
+          >
+            −
+          </button>
+          <span className="w-5 text-center tabular-nums">{count}</span>
+          <button
+            type="button"
+            onClick={() => setCount((c) => Math.min(6, c + 1))}
+            aria-label="직원 오리 늘리기"
+            className="rounded-md border border-border px-2 py-1 hover:bg-muted"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaused((p) => !p)}
+            className="ml-2 rounded-md border border-border px-2 py-1 text-muted-foreground hover:text-foreground"
+          >
+            {paused ? "데모 재생" : "데모 정지"}
+          </button>
+        </div>
       </div>
     </div>
   );

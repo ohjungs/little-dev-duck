@@ -10,7 +10,9 @@ Phase 완료분은 사용자 db push + 실기 검증만 남음(코드는 전부 
 
 **인계 경위(2026-07-24 01:00~)**: 먼저 돌던 `/loop` 세션이 Phase 13 T1 커밋(01:00) 후 27분간 정지 →
 두 번째 `/loop` 세션(사용자 새로 지시)의 워치독이 죽음으로 판단하고 개발 인계. 같은 폴더 공유(worktree
-격리 없음)라 병렬 편집 대신 단일 세션 인계로 진행. 목표: Phase 17까지.
+격리 없음)라 병렬 편집 대신 단일 세션 인계로 진행. **목표(Phase 17까지) 도달** — 인계 세션이 Phase 13
+T2~T4 + Phase 14 스코프 + Phase 15/16/17 코드 슬라이스를 순차 구현·커밋. 각 Phase의 인프라/기기/OAuth/
+DDL 필요분(db push 4건 등)은 이월(사용자 몫). 로드맵 Phase 1~17 전부 최소 1개 슬라이스 코드 완료 상태.
 Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabase MCP로 직접 재확인 완료 —
 마이그레이션 18개 전부 local==remote, `user_google_tokens`/`action_log` 테이블 RLS 켜진 채 존재).
 계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md.
@@ -44,6 +46,16 @@ Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabas
 Calendar 어댑터 end-to-end(계약→토큰→라우트→승인카드→실제 Google API 반영→감사로그) 전부 실사용 검증
 완료로 T3 종결. **다음 세션: T5(두 번째 어댑터) 또는 T6(Gmail, 격리) 착수** — phase_10.md Task 초안
 참조해 어댑터 후보 확정(GitHub 이슈/Notion 등) 후 계약 잠금·구현.
+
+## Phase 17 — 픽셀 오리 오피스 상호작용 — 플레이어 조작 슬라이스 (2026-07-24, `/loop` 인계)
+
+Phase 16 웹 오피스 위에 조작·상호작용·동적배치. 순수함수는 core, STDD 검증. 상세는 phase_17.md "구현 현황".
+
+- [x] T1 플레이어 조작: core `movePlayer`(그리드 스냅·충돌·경계) + 캔버스 포커스 게이트 키입력(방향키/WASD,
+  화살표 preventDefault). 카메라 팔로우는 맵=뷰포트라 불필요. 4방향 스프라이트 이월(절차 오리+👑).
+- [x] T2 상호작용: core `isAdjacent`+`describeActivity`(LLM 없이) → 근접 "E: 말 걸기" → 대화 패널.
+- [x] T3 동적 레이아웃: core `deskSlots`(한 줄 최대 3) → +/− 직원 1~6명, 위치·상태 유실 없이 재배치.
+- 검증: core office-play 12 tests + web build GREEN. 실기(조작 감·포커스)는 사용자 몫.
 
 ## Phase 16 — 픽셀 오리 오피스 기반 — 웹 렌더링 슬라이스 (2026-07-24, `/loop` 인계)
 

@@ -171,3 +171,11 @@ export {
   type OfficeRole,
   type DuckWorkState,
 } from "./domain/office-event";
+export {
+  movePlayer,
+  isAdjacent,
+  describeActivity,
+  deskSlots,
+  type Vec,
+  type Dir,
+} from "./domain/office-play";
