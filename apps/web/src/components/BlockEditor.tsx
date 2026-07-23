@@ -46,10 +46,13 @@ export function BlockEditor({
   initialContent,
   onChange,
   onExportReady,
+  editable = true,
 }: {
   initialContent: unknown;
-  onChange: (document: Block[]) => void;
+  onChange?: (document: Block[]) => void;
   onExportReady?: (toMarkdown: () => string) => void;
+  // 공개 페이지(/p/[slug])는 읽기 전용으로 같은 렌더러를 재사용(ponytail).
+  editable?: boolean;
 }) {
   const theme = useDarkTheme();
   const supabase = useMemo(() => createClient(), []);
@@ -89,8 +92,9 @@ export function BlockEditor({
   return (
     <BlockNoteView
       editor={editor}
+      editable={editable}
       theme={theme}
-      onChange={() => onChange(editor.document)}
+      onChange={onChange ? () => onChange(editor.document) : undefined}
       className="min-h-[55vh] flex-1"
     />
   );

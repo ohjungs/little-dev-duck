@@ -103,8 +103,12 @@ export {
   softDeletePage,
   restorePage,
   purgePage,
+  publishPage,
+  unpublishPage,
+  getPublicPage,
   type CreatePageInput,
   type UpdatePageInput,
+  type PublicPage,
 } from "./pages";
 
 export {

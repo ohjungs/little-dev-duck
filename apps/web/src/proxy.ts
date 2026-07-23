@@ -4,7 +4,15 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 
 // /api/keepalive는 Vercel Cron이 세션 없이 호출하므로 인증 게이트를 통과시킨다(무인증 no-op).
 // /walker는 데스크톱 활보 오버레이(사용자 데이터 미노출, 순수 표시용)라 공개 경로로 둔다.
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/api/keepalive", "/walker"];
+// /p는 공개 페이지 공유(Phase 12 T1) — 비로그인도 링크로 읽기 전용 조회(get_public_page RPC가
+// is_public=true 한 건만 반환, 열거 불가).
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth/callback",
+  "/api/keepalive",
+  "/walker",
+  "/p",
+];
 
 // Tauri WebView가 이 배포 URL을 그대로 로드하는 구조(옵션 A)라 Tauri 쪽 CSP 설정은
 // 무효하다(원격 https 콘텐츠에는 주입되지 않음, docs/plans/phase_05.md T2 참조) - 실질적인

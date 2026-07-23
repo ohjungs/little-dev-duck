@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Download, History, Save, Table2 } from "lucide-react";
+import { Download, Globe, History, Link2, Save, Table2 } from "lucide-react";
 import type { Block } from "@blocknote/core";
 import { createDefaultDbSchema, type DbSchema, type Page } from "@ldd/core";
-import { createPageVersion, updatePage } from "@ldd/api";
+import {
+  createPageVersion,
+  publishPage,
+  unpublishPage,
+  updatePage,
+} from "@ldd/api";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -74,6 +79,38 @@ export function PageEditor({
       setDbSchema(prev);
       flashMsg("변경 저장에 실패했습니다.");
     });
+  };
+
+  // Phase 12 T1 공개 공유. publicSlug=null이면 비공개. 공개 시 링크를 클립보드에 복사.
+  const [publicSlug, setPublicSlug] = useState<string | null>(page.publicSlug);
+
+  const copyPublicLink = (slug: string) => {
+    const link = `${window.location.origin}/p/${slug}`;
+    void navigator.clipboard?.writeText(link).then(
+      () => flashMsg("공개 링크가 복사되었습니다."),
+      () => flashMsg(`공개 링크: ${link}`),
+    );
+  };
+
+  const handlePublish = async () => {
+    try {
+      const { slug } = await publishPage(supabase, page.id);
+      setPublicSlug(slug);
+      copyPublicLink(slug);
+    } catch {
+      flashMsg("공개에 실패했습니다.");
+    }
+  };
+
+  const handleUnpublish = async () => {
+    setPublicSlug(null);
+    try {
+      await unpublishPage(supabase, page.id);
+      flashMsg("공개를 취소했습니다.");
+    } catch {
+      setPublicSlug(page.publicSlug);
+      flashMsg("공개 취소에 실패했습니다.");
+    }
   };
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 최신 편집값(제목/본문)을 저장 시점에 읽는다 — 디바운스 타이머 클로저가 오래된 값을 잡지 않도록 ref로 보관.
@@ -207,6 +244,38 @@ export function PageEditor({
             className="text-muted-foreground"
           >
             <Table2 className="size-3.5" /> 데이터베이스로 전환
+          </Button>
+        )}
+        {publicSlug ? (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => copyPublicLink(publicSlug)}
+              className="text-primary"
+            >
+              <Link2 className="size-3.5" /> 공개 링크 복사
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleUnpublish}
+              className="text-muted-foreground"
+            >
+              공개 취소
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handlePublish}
+            className="text-muted-foreground"
+          >
+            <Globe className="size-3.5" /> 웹에 공개
           </Button>
         )}
       </div>

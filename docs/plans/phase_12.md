@@ -11,7 +11,7 @@ phase-mapping-proposal 2절에 배정된 6항목:
 
 ## 슬라이스 순서 (자체 완결성·외부 의존 적은 것 우선 = ponytail)
 
-### T1 공개 페이지 공유 (self-contained, 최우선)
+### T1 공개 페이지 공유 (self-contained, 최우선) — [x] 코드 완료 2026-07-24
 노션식 "웹에 공개". 페이지를 공개로 표시하면 `/p/[slug]`에서 **비로그인**도 읽기 전용 조회.
 - **보안 설계(핵심)**: anon 키로 `pages`에 공개 SELECT 정책을 열면 누구나 `is_public=true` 행을
   전량 열거(enumeration)해 타인 공개 페이지를 덤프할 수 있다. service_role 클라이언트는 없음(새 env

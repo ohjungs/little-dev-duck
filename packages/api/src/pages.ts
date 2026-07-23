@@ -24,6 +24,9 @@ type PageRow = {
   // Phase 11: 마이그레이션 전(또는 목 테스트)에는 없을 수 있어 optional. fromRow가 null/{} 기본값 보정.
   db_schema?: unknown;
   row_props?: unknown;
+  // Phase 12 T1 공개 공유.
+  is_public?: boolean;
+  public_slug?: string | null;
 };
 
 function fromRow(row: PageRow): Page {
@@ -51,6 +54,8 @@ function fromRow(row: PageRow): Page {
     updatedAt: row.updated_at,
     dbSchema,
     rowProps,
+    isPublic: row.is_public ?? false,
+    publicSlug: row.public_slug ?? null,
   });
 }
 
@@ -238,4 +243,71 @@ export async function purgePage(
 ): Promise<void> {
   const { error } = await supabase.from("pages").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// Phase 12 T1 공개 공유. 공개 페이지를 slug로 조회한 read-only 뷰(본문 전체). 비로그인 접근.
+export type PublicPage = {
+  id: string;
+  title: string;
+  content: unknown;
+  icon: string | null;
+  updatedAt: string;
+};
+
+// 페이지를 공개로 전환. 추측 불가한 랜덤 slug를 생성해 링크를 발급한다(멱등 — 이미 공개면 기존 slug 재사용).
+export async function publishPage(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<{ slug: string }> {
+  const page = await getPage(supabase, id);
+  if (!page) throw new Error("페이지를 찾을 수 없습니다.");
+  if (page.isPublic && page.publicSlug) return { slug: page.publicSlug };
+  const slug = crypto.randomUUID().replace(/-/g, "");
+  const { error } = await supabase
+    .from("pages")
+    .update({ is_public: true, public_slug: slug })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  return { slug };
+}
+
+// 공개 취소. is_public=false로 내리고 slug도 지워 링크를 무효화(다시 공개하면 새 링크가 발급됨).
+export async function unpublishPage(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("pages")
+    .update({ is_public: false, public_slug: null })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// slug로 공개 페이지 조회. 열거 방지를 위해 anon SELECT 정책 대신 security-definer RPC로만 접근한다
+// (마이그레이션 20260724120000의 get_public_page — 요청한 slug 한 건만 반환). 없으면 null.
+export async function getPublicPage(
+  supabase: SupabaseClient,
+  slug: string,
+): Promise<PublicPage | null> {
+  const { data, error } = await supabase.rpc("get_public_page", {
+    p_slug: slug,
+  });
+  if (error) throw new Error(error.message);
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | {
+        id: string;
+        title: string;
+        content: unknown;
+        icon: string | null;
+        updated_at: string;
+      }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    icon: row.icon ?? null,
+    updatedAt: row.updated_at,
+  };
 }

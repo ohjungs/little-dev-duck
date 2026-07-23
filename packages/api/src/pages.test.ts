@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   createPage,
   getPage,
+  getPublicPage,
   listChildPages,
   listPages,
   listTrashedPages,
+  publishPage,
   purgePage,
   restorePage,
   searchPages,
   softDeletePage,
+  unpublishPage,
   updatePage,
 } from "./pages";
 
@@ -281,6 +284,91 @@ describe("Phase 11 DB 뷰", () => {
     });
     expect(captured?.db_schema).toEqual(dbSchema);
     expect(captured?.row_props).toEqual({ status: "done" });
+  });
+});
+
+describe("Phase 12 공개 공유", () => {
+  it("publishPage는 비공개 페이지에 slug를 생성하고 is_public=true로 저장한다", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      from: () => ({
+        // getPage → 비공개 VALID_ROW
+        select: () => ({ eq: () => ({ maybeSingle: okSingle }) }),
+        update: (payload: Record<string, unknown>) => {
+          captured = payload;
+          return { eq: async () => ({ error: null }) };
+        },
+      }),
+    });
+    const { slug } = await publishPage(supabase, VALID_ROW.id);
+    expect(captured?.is_public).toBe(true);
+    expect(typeof captured?.public_slug).toBe("string");
+    expect(slug).toBe(captured?.public_slug);
+  });
+
+  it("publishPage는 이미 공개면 기존 slug를 재사용하고 update하지 않는다", async () => {
+    const PUBLIC_ROW = { ...VALID_ROW, is_public: true, public_slug: "existing" };
+    let updateCalled = false;
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: PUBLIC_ROW, error: null }),
+          }),
+        }),
+        update: () => {
+          updateCalled = true;
+          return { eq: async () => ({ error: null }) };
+        },
+      }),
+    });
+    const { slug } = await publishPage(supabase, VALID_ROW.id);
+    expect(slug).toBe("existing");
+    expect(updateCalled).toBe(false);
+  });
+
+  it("unpublishPage는 is_public=false로 내리고 slug를 지운다", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      from: () => ({
+        update: (payload: Record<string, unknown>) => {
+          captured = payload;
+          return { eq: async () => ({ error: null }) };
+        },
+      }),
+    });
+    await unpublishPage(supabase, VALID_ROW.id);
+    expect(captured?.is_public).toBe(false);
+    expect(captured?.public_slug).toBeNull();
+  });
+
+  it("getPublicPage는 rpc 결과를 PublicPage로 매핑한다", async () => {
+    const supabase = {
+      rpc: async () => ({
+        data: [
+          {
+            id: "x",
+            title: "공개 문서",
+            content: [],
+            icon: null,
+            updated_at: "2026-07-24T00:00:00.000Z",
+          },
+        ],
+        error: null,
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    const page = await getPublicPage(supabase, "slug123");
+    expect(page?.title).toBe("공개 문서");
+    expect(page?.updatedAt).toBe("2026-07-24T00:00:00.000Z");
+  });
+
+  it("getPublicPage는 결과가 없으면 null을 반환한다", async () => {
+    const supabase = {
+      rpc: async () => ({ data: [], error: null }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    expect(await getPublicPage(supabase, "nope")).toBeNull();
   });
 });
 

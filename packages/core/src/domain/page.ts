@@ -19,6 +19,9 @@ export const pageSchema = z.object({
   updatedAt: z.string().datetime({ offset: true }),
   dbSchema: dbSchemaSchema.nullable().default(null),
   rowProps: rowPropsSchema.default({}),
+  // Phase 12 T1 공개 공유. isPublic=공개 여부, publicSlug=추측 불가한 랜덤 링크. 하위호환 기본값.
+  isPublic: z.boolean().default(false),
+  publicSlug: z.string().nullable().default(null),
 });
 export type Page = z.infer<typeof pageSchema>;
 
