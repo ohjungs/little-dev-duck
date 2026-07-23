@@ -11,6 +11,7 @@ import {
   Link2,
   Save,
   Smile,
+  Star,
   Table2,
 } from "lucide-react";
 import type { Block } from "@blocknote/core";
@@ -32,6 +33,11 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { VersionHistory } from "@/components/VersionHistory";
 import { DatabaseView } from "@/components/DatabaseView";
+import {
+  isFavorite,
+  subscribeFavorites,
+  toggleFavorite,
+} from "@/lib/favorites";
 
 // 파일명에 못 쓰는 문자·제어문자를 -로 치환하고 끝의 점/공백을 정리한다(공백은 중간에선 보존).
 // 결과가 비면(공백만 등) "page"로 폴백.
@@ -74,6 +80,14 @@ export function PageEditor({
   const [showIconPicker, setShowIconPicker] = useState(false);
   // 본문 통계용 plainText(편집 중 실시간). 저장 파생값과 별개로 에디터 content에서 즉시 계산.
   const [plainText, setPlainText] = useState(page.plainText);
+  const [favorited, setFavorited] = useState(false);
+
+  // 즐겨찾기 상태(localStorage) 동기화 — 사이드바 별 토글과 즉시 일관.
+  useEffect(() => {
+    const sync = () => setFavorited(isFavorite(page.id));
+    sync();
+    return subscribeFavorites(sync);
+  }, [page.id]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showVersions, setShowVersions] = useState(false);
   const [versionMsg, setVersionMsg] = useState<string | null>(null);
@@ -244,6 +258,17 @@ export function PageEditor({
             {versionMsg}
           </span>
         )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => toggleFavorite(page.id)}
+          aria-pressed={favorited}
+          className={favorited ? "text-yellow-500" : "text-muted-foreground"}
+        >
+          <Star className={`size-3.5 ${favorited ? "fill-current" : ""}`} />
+          {favorited ? "즐겨찾기됨" : "즐겨찾기"}
+        </Button>
         <Button
           type="button"
           variant="ghost"

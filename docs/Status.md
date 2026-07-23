@@ -414,7 +414,8 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
 - [x] **후속 — 즐겨찾기**(2026-07-24, `/loop` 자율): `lib/favorites.ts`(localStorage + 커스텀 이벤트로
   같은 탭 동기화 + storage 이벤트로 다른 탭 동기화, 순수 `toggleInList` 분리, 무료 원칙 — DB/마이그레이션
   없음). PageWorkspace 트리 행에 별 토글 + 상단 "즐겨찾기" 섹션(순서 유지, 삭제된 페이지 자동 제외).
-  다른 기기 동기화는 후속(프로필 서버). 검증 web tsc GREEN.
+  다른 기기 동기화는 후속(프로필 서버). 검증 web tsc GREEN. **추가(2026-07-24)**: PageEditor 헤더에도
+  현재 페이지 즐겨찾기 별 토글(같은 lib 구독으로 사이드바와 즉시 일관).
 - [x] **후속 — 브레드크럼 내비게이션**(2026-07-24, `/loop` 자율): PageWorkspace가 현재 페이지의 상위
   체인(root→parent, 순환/누락 guard)을 계산해 PageEditor에 전달 → 제목 위에 클릭 가능한 브레드크럼
   (아이콘+제목, ChevronRight 구분). 중첩 페이지에서 상위로 빠르게 이동. 검증 web tsc GREEN.
