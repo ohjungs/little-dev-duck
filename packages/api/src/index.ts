@@ -65,6 +65,7 @@ export { runDuckTurn, type DuckTurnResult } from "./aiChat";
 export {
   runAgentTurn,
   executeApprovedCalls,
+  composeAdapters,
   NO_TOOLS_ADAPTER,
   type Adapter,
   type AgentResult,
@@ -75,6 +76,12 @@ export {
   getGoogleTokens,
   type SaveGoogleTokenInput,
 } from "./googleTokens";
+export { createGitHubIssuesAdapter } from "./githubIssues";
+export {
+  saveGithubTokens,
+  getGithubTokens,
+  type SaveGithubTokenInput,
+} from "./githubTokens";
 export { logAction, type LogActionInput } from "./actionLog";
 
 export { allowRequest } from "./rateLimit";

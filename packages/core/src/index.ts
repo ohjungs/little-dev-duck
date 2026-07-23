@@ -109,6 +109,10 @@ export {
   type GoogleOAuthToken,
 } from "./domain/google-oauth-token";
 export {
+  githubOAuthTokenSchema,
+  type GithubOAuthToken,
+} from "./domain/github-oauth-token";
+export {
   actionLogEntrySchema,
   summarizeForLog,
   type ActionLogEntry,

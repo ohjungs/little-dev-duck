@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { geminiEmbed } from "./gemini";
+import { geminiEmbed, upstreamError } from "./gemini";
 
 function fakeFetch(response: unknown, ok = true, status = 200) {
   return vi.fn().mockResolvedValue({
@@ -38,5 +38,16 @@ describe("geminiEmbed", () => {
     await expect(geminiEmbed(["a"], "key", f)).rejects.toMatchObject({
       code: "quota_exceeded",
     });
+  });
+});
+
+describe("upstreamError", () => {
+  it("service를 지정하지 않으면 gemini로 표시한다(기본값, 하위 호환)", () => {
+    expect(upstreamError(500, "boom").message).toBe("gemini 500: boom");
+  });
+
+  it("service를 지정하면 그 출처로 표시한다(어댑터별 에러 오라벨링 방지)", () => {
+    expect(upstreamError(404, "not found", "github").message).toBe("github 404: not found");
+    expect(upstreamError(429, "rate", "github").code).toBe("quota_exceeded");
   });
 });

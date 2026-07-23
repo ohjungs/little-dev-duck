@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import {
   allowRequest,
+  composeAdapters,
+  createGitHubIssuesAdapter,
   createGoogleCalendarAdapter,
+  getGithubTokens,
   getGoogleTokens,
   runDuckTurn,
-  NO_TOOLS_ADAPTER,
+  type Adapter,
 } from "@ldd/api";
 import { isLddError } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
@@ -12,16 +15,19 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 const MAX_QUESTION_LEN = 1000;
-const RECONNECT_MESSAGE =
-  "Google Calendar가 연동되어 있지 않아요. Google 계정으로 다시 로그인하면 연동됩니다.";
 const NO_CALENDAR_NOTE =
   "구글 캘린더 도구는 아직 연동되지 않았다. 사용자가 캘린더/일정 관련 작업을 요청하면 실행하려 들지 말고 " +
-  '"Google 계정으로 다시 로그인하면 캘린더 연동이 돼요"라고 안내만 하라.';
+  '"설정 페이지에서 Google Calendar 연동을 하면 캘린더 일정을 시킬 수 있어요"라고 안내만 하라.';
+const NO_GITHUB_NOTE =
+  "GitHub 이슈 도구는 아직 연동되지 않았다. 사용자가 GitHub 이슈 생성/조회를 요청하면 실행하려 들지 말고 " +
+  '"설정 페이지에서 GitHub 이슈 연동을 하면 이슈를 만들 수 있어요"라고 안내만 하라.';
 
 // 오리 대화창(단일). Phase 8 RAG 질답과 Phase 10 에이전트 액션을 한 엔드포인트로 합쳤다 — runDuckTurn이
 // 룰 라우팅 → RAG 검색 → (도구가 있으면) 에이전트 루프까지 한 번에 처리해, Gemini가 "그냥 답할지 도구를
-// 부를지"를 스스로 고른다. Google 미연동이면 NO_TOOLS_ADAPTER로 순수 RAG 대화만 동작(캘린더 도구 숨김).
-// mutating 도구는 여기서 실행하지 않고 approval_pending을 그대로 반환 — 실제 실행은 /api/ai/agent/approve.
+// 부를지"를 스스로 고른다. T5: 어댑터가 둘 이상(Google Calendar + GitHub 등)이면 composeAdapters로 합쳐
+// 하나의 카탈로그로 넘긴다 — 아무것도 연동 안 됐으면 composeAdapters([])가 NO_TOOLS_ADAPTER를 반환해
+// 순수 RAG 대화만 동작(도구 숨김). mutating 도구는 여기서 실행하지 않고 approval_pending을 그대로 반환 —
+// 실제 실행은 /api/ai/agent/approve.
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -59,8 +65,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "질문이 너무 깁니다." }, { status: 400 });
   }
 
-  const tokens = await getGoogleTokens(supabase, user.id);
-  const adapter = tokens ? createGoogleCalendarAdapter(tokens.accessToken) : NO_TOOLS_ADAPTER;
+  const [googleTokens, githubTokens] = await Promise.all([
+    getGoogleTokens(supabase, user.id),
+    getGithubTokens(supabase, user.id),
+  ]);
+  const adapters: Adapter[] = [];
+  if (googleTokens) adapters.push(createGoogleCalendarAdapter(googleTokens.accessToken));
+  if (githubTokens) adapters.push(createGitHubIssuesAdapter(githubTokens.accessToken));
+  const adapter = composeAdapters(adapters);
+
+  const unavailableNote = [
+    googleTokens ? null : NO_CALENDAR_NOTE,
+    githubTokens ? null : NO_GITHUB_NOTE,
+  ]
+    .filter((note): note is string => note !== null)
+    .join("\n\n");
 
   try {
     const result = await runDuckTurn(
@@ -69,7 +88,7 @@ export async function POST(request: Request) {
       question,
       adapter,
       fetch,
-      tokens ? undefined : NO_CALENDAR_NOTE,
+      unavailableNote.length > 0 ? unavailableNote : undefined,
     );
     return NextResponse.json(result);
   } catch (error) {
@@ -83,10 +102,14 @@ export async function POST(request: Request) {
         message: "지금 요청이 많아서 잠시 답하기 어려워요. 1분 정도 후 다시 시도해주세요.",
       });
     }
-    // access_token 만료(~1시간, 갱신 미구현) 시 Google이 401을 주고 어댑터가 unauthorized로 표시한다.
-    // 일반 502 대신 실제로 도움이 되는 재연동 안내를 준다.
+    // access_token 만료/취소 시 어댑터가 unauthorized로 표시한다(Google ~1시간 만료, GitHub 연동 해제 등).
+    // 일반 502 대신 실제로 도움이 되는 재연동 안내를 준다 — 두 어댑터를 합쳤으므로 어느 쪽이 만료됐는지는
+    // 어댑터가 이미 담아 던진 error.message(서비스별로 다름, googleCalendar.ts/githubIssues.ts)를 그대로 쓴다.
     if (isLddError(error) && error.code === "unauthorized") {
-      return NextResponse.json({ status: "unavailable", message: RECONNECT_MESSAGE });
+      return NextResponse.json({
+        status: "unavailable",
+        message: `${error.message}. 설정 페이지에서 다시 연동해주세요.`,
+      });
     }
     console.error("AI agent 실패", { userId: user.id, error });
     return NextResponse.json(

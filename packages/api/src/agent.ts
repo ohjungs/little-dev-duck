@@ -32,6 +32,36 @@ export const NO_TOOLS_ADAPTER: Adapter = {
   },
 };
 
+// T5: 어댑터가 여러 개(Google Calendar + GitHub 등) 연동된 사용자를 위해 하나로 합친다. 미연동
+// 어댑터(catalog 비어있음)는 호출부가 애초에 배열에 넣지 않는 게 정상 경로이지만, 방어적으로 여기서도
+// 걸러낸다. 카탈로그는 순서대로 이어붙이고(도구명 중복 시 먼저 오는 어댑터가 우선 — 등록 순서 책임은
+// 호출부), execute는 call.name을 선언한 어댑터에게 위임한다.
+export function composeAdapters(adapters: Adapter[]): Adapter {
+  const active = adapters.filter((a) => a.catalog.length > 0);
+  if (active.length === 0) return NO_TOOLS_ADAPTER;
+  if (active.length === 1) return active[0];
+
+  const seen = new Set<string>();
+  const catalog = active
+    .flatMap((a) => a.catalog)
+    .filter((decl) => {
+      if (seen.has(decl.name)) return false;
+      seen.add(decl.name);
+      return true;
+    });
+
+  return {
+    catalog,
+    async execute(call: ToolCall): Promise<ToolResult> {
+      const owner = active.find((a) => a.catalog.some((decl) => decl.name === call.name));
+      if (!owner) {
+        return { id: call.id, name: call.name, response: { error: "지원하지 않는 도구입니다." } };
+      }
+      return owner.execute(call);
+    },
+  };
+}
+
 // Gemini content part는 이질적(text | functionCall | functionResponse)이라 전 필드 optional인 단일
 // 타입으로 느슨하게 받는다(파싱 편의 — 실제 값 검증은 toolCallSchema/어댑터가 담당).
 type GeminiPart = {

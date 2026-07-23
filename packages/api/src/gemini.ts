@@ -15,10 +15,12 @@ export async function safeBody(res: Response): Promise<string> {
   }
 }
 
-// 429 = 무료 티어 쿼터/레이트 → quota_exceeded(폴백 트리거). 그 외 실패 = upstream.
-export function upstreamError(status: number, body: string): LddError {
-  if (status === 429) return new LddError("quota_exceeded", `gemini 429: ${body}`);
-  return new LddError("upstream", `gemini ${status}: ${body}`);
+// 429 = 무료 티어 쿼터/레이트 → quota_exceeded(폴백 트리거). 그 외 실패 = upstream. googleCalendar.ts/
+// githubIssues.ts도 이 헬퍼를 재사용하므로 service로 출처를 표시한다(안 넣으면 GitHub 오류가 "gemini
+// 404"처럼 잘못된 출처로 보고돼 장애 대응 시 혼란을 준다, 보안 리뷰 지적 2026-07-23).
+export function upstreamError(status: number, body: string, service = "gemini"): LddError {
+  if (status === 429) return new LddError("quota_exceeded", `${service} 429: ${body}`);
+  return new LddError("upstream", `${service} ${status}: ${body}`);
 }
 
 type BatchEmbedResponse = { embeddings?: { values: number[] }[] };

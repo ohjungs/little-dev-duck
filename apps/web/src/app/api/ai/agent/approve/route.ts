@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   allowRequest,
+  composeAdapters,
+  createGitHubIssuesAdapter,
   createGoogleCalendarAdapter,
   executeApprovedCalls,
+  getGithubTokens,
   getGoogleTokens,
   logAction,
+  type Adapter,
 } from "@ldd/api";
 import { summarizeForLog, toolCallSchema } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
@@ -44,16 +48,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "요청 형식이 올바르지 않습니다." }, { status: 400 });
   }
 
-  const tokens = await getGoogleTokens(supabase, user.id);
-  if (!tokens) {
+  const [googleTokens, githubTokens] = await Promise.all([
+    getGoogleTokens(supabase, user.id),
+    getGithubTokens(supabase, user.id),
+  ]);
+  const adapters: Adapter[] = [];
+  if (googleTokens) adapters.push(createGoogleCalendarAdapter(googleTokens.accessToken));
+  if (githubTokens) adapters.push(createGitHubIssuesAdapter(githubTokens.accessToken));
+  if (adapters.length === 0) {
     return NextResponse.json(
-      { error: "Google Calendar가 연동되어 있지 않습니다." },
+      { error: "연동된 도구가 없습니다." },
       { status: 400 },
     );
   }
 
   try {
-    const adapter = createGoogleCalendarAdapter(tokens.accessToken);
+    const adapter = composeAdapters(adapters);
     const results = await executeApprovedCalls(parsed.data.calls, adapter);
     // T7 감사 로그(best-effort, 부가 기능) — 로깅 실패로 실제 실행 결과 응답이 막히면 안 되므로 삼킨다.
     // call.id는 optional(병렬 호출 없으면 비어 있을 수 있음)이라 id로 매칭하면 id 없는 호출이 2개 이상일

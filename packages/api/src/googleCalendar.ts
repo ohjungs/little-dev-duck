@@ -93,7 +93,7 @@ export function createGoogleCalendarAdapter(
       if (res.status === 401) {
         throw new LddError("unauthorized", "Google Calendar 인증이 만료되었습니다");
       }
-      throw upstreamError(res.status, await safeBody(res));
+      throw upstreamError(res.status, await safeBody(res), "google-calendar");
     }
     return res.json();
   }

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { CalendarClock, LogOut, Palette, User } from "lucide-react";
-import { getGoogleTokens } from "@ldd/api";
+import { getGithubTokens, getGoogleTokens } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
 import {
   Card,
@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { AppearanceSetting } from "@/components/AppearanceSetting";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
+import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
+import { GitHubMark } from "@/components/ui/github-mark";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const googleLinked = user ? !!(await getGoogleTokens(supabase, user.id)) : false;
+  const githubLinked = user ? !!(await getGithubTokens(supabase, user.id)) : false;
 
   const displayName =
     (user?.user_metadata.full_name as string | undefined) ??
@@ -90,6 +93,21 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <GoogleCalendarLink linked={googleLinked} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <GitHubMark className="size-4 text-primary-accent" />
+              GitHub 이슈 연동
+            </CardTitle>
+            <CardDescription>
+              로그인 방법과 무관하게 오리가 GitHub 이슈를 조회·생성할 수 있게 합니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GitHubIssuesLink linked={githubLinked} isPrimaryGithub={provider === "github"} />
           </CardContent>
         </Card>
 

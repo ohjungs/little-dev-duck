@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getGoogleTokens, saveGoogleTokens } from "@ldd/api";
+import { getGoogleTokens, saveGoogleTokens, saveGithubTokens } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -53,6 +53,30 @@ export async function GET(request: Request) {
           });
         } catch (tokenError) {
           console.error("Google Calendar 토큰 저장 실패", tokenError);
+        }
+      }
+
+      // Phase 10 T5: GitHub 이슈 어댑터도 같은 방식으로 provider_token을 즉시 캡처한다. 단 Google과 달리
+      // GitHub 기본 로그인 버튼(LoginForm.tsx)은 repo scope를 요청하지 않는다 — 로그인용 최소 권한을
+      // 유지하고, 이슈 쓰기 권한은 원하는 사용자만 설정에서 별도 동의하게 한다. 그래서 provider==="github"
+      // 여부로 판단하지 않고(그 경우 repo scope 없는 토큰을 "연동됨"으로 잘못 저장하게 됨), 설정 페이지의
+      // "GitHub 이슈 연동" 버튼이 redirectTo에 실어 보내는 `link=github`로만 판단한다.
+      const isGithubIssuesLink = searchParams.get("link") === "github";
+      if (isGithubIssuesLink && typeof providerToken === "string") {
+        try {
+          await saveGithubTokens(supabase, {
+            userId: session.user.id,
+            accessToken: providerToken,
+            // GitHub OAuth App은 refresh_token을 발급하지 않는다(기본 토큰은 만료도 없음).
+            refreshToken:
+              typeof session.provider_refresh_token === "string"
+                ? session.provider_refresh_token
+                : null,
+            scope: "repo",
+            expiresAt: null,
+          });
+        } catch (tokenError) {
+          console.error("GitHub 이슈 토큰 저장 실패", tokenError);
         }
       }
       return NextResponse.redirect(`${origin}${next}`);

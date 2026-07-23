@@ -5,7 +5,7 @@ import {
   type ToolDeclaration,
   type ToolResult,
 } from "@ldd/core";
-import { executeApprovedCalls, runAgentTurn, type Adapter } from "./agent";
+import { composeAdapters, executeApprovedCalls, runAgentTurn, type Adapter } from "./agent";
 
 const READONLY: ToolDeclaration = {
   name: "listEvents",
@@ -255,5 +255,86 @@ describe("executeApprovedCalls", () => {
     expect(results[0].response).toEqual({ ok: true });
     expect(results[1].response).toHaveProperty("error");
     expect(results[2].response).toEqual({ ok: true });
+  });
+});
+
+describe("composeAdapters", () => {
+  const OTHER_DECL: ToolDeclaration = {
+    name: "listIssues",
+    description: "이슈를 조회한다",
+    parameters: { type: "object", properties: {} },
+    kind: "readonly",
+  };
+
+  it("빈 배열이면 NO_TOOLS_ADAPTER(빈 catalog)를 반환한다", () => {
+    const composed = composeAdapters([]);
+    expect(composed.catalog).toEqual([]);
+  });
+
+  it("catalog가 비어 있는 어댑터는 걸러낸다", () => {
+    const empty: Adapter = { catalog: [], execute: async (c) => ({ id: c.id, name: c.name, response: {} }) };
+    const composed = composeAdapters([empty, mockAdapter()]);
+    expect(composed.catalog.map((d) => d.name)).toEqual(["listEvents", "createEvent"]);
+  });
+
+  it("여러 어댑터의 catalog를 이어붙이고 도구명으로 올바른 어댑터에 위임한다", async () => {
+    let calendarCalled = false;
+    let issuesCalled = false;
+    const calendar = mockAdapter(async (call) => {
+      calendarCalled = true;
+      return { id: call.id, name: call.name, response: { from: "calendar" } };
+    });
+    const issues: Adapter = {
+      catalog: [OTHER_DECL],
+      execute: async (call) => {
+        issuesCalled = true;
+        return { id: call.id, name: call.name, response: { from: "issues" } };
+      },
+    };
+    const composed = composeAdapters([calendar, issues]);
+
+    expect(composed.catalog.map((d) => d.name)).toEqual([
+      "listEvents",
+      "createEvent",
+      "listIssues",
+    ]);
+
+    const result = await composed.execute({ id: "c1", name: "listIssues", args: {} });
+    expect(issuesCalled).toBe(true);
+    expect(calendarCalled).toBe(false);
+    expect(result.response).toEqual({ from: "issues" });
+  });
+
+  it("두 어댑터가 같은 도구명을 선언하면 먼저 온 어댑터가 catalog와 execute 둘 다 우선한다", async () => {
+    const firstDecl: ToolDeclaration = { ...OTHER_DECL, description: "첫 번째" };
+    const secondDecl: ToolDeclaration = { ...OTHER_DECL, description: "두 번째" };
+    const first: Adapter = {
+      catalog: [firstDecl],
+      execute: async (c) => ({ id: c.id, name: c.name, response: { from: "first" } }),
+    };
+    const second: Adapter = {
+      catalog: [secondDecl],
+      execute: async (c) => ({ id: c.id, name: c.name, response: { from: "second" } }),
+    };
+    const composed = composeAdapters([first, second]);
+
+    // catalog에는 첫 어댑터의 선언만 남는다(dedup).
+    expect(composed.catalog).toEqual([firstDecl]);
+    // execute도 첫 어댑터로 위임된다(catalog 표시와 실제 실행 대상이 일치).
+    const result = await composed.execute({ id: "c1", name: OTHER_DECL.name, args: {} });
+    expect(result.response).toEqual({ from: "first" });
+  });
+
+  it("어느 어댑터에도 없는 도구명이면 에러 결과를 반환한다(어댑터 2개 이상 합성 시)", async () => {
+    // 어댑터가 1개뿐이면 composeAdapters가 그 어댑터를 그대로 반환한다(미등록 도구 처리는 어댑터 자신의
+    // 몫, googleCalendar.test.ts 등에서 이미 검증됨) — 여기서는 합성 자체의 위임 로직을 검증하기 위해
+    // 어댑터 2개로 구성한다.
+    const issues: Adapter = {
+      catalog: [OTHER_DECL],
+      execute: async (c) => ({ id: c.id, name: c.name, response: { from: "issues" } }),
+    };
+    const composed = composeAdapters([mockAdapter(), issues]);
+    const result = await composed.execute({ id: "c1", name: "deleteEverything", args: {} });
+    expect(result.response).toHaveProperty("error");
   });
 });

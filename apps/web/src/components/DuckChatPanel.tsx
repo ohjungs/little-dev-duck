@@ -29,6 +29,7 @@ const REINDEX_LABEL: Record<ReindexState, string> = {
 // Gemini 계약과 UI 표현을 분리).
 const TOOL_LABELS: Record<string, string> = {
   createCalendarEvent: "캘린더 일정 만들기",
+  createGithubIssue: "GitHub 이슈 만들기",
 };
 
 function formatWhen(value: unknown): string | null {
@@ -47,9 +48,14 @@ function describeCall(call: ToolCall): string {
   const title = typeof call.args.title === "string" ? call.args.title : null;
   const start = formatWhen(call.args.start);
   const end = formatWhen(call.args.end);
-  const parts = [title ? `"${title}"` : null, start && end ? `${start} ~ ${end}` : null].filter(
-    Boolean,
-  );
+  // GitHub 이슈 도구의 owner/repo — 어느 저장소에 만들지도 승인 판단에 필요한 정보(T5).
+  const owner = typeof call.args.owner === "string" ? call.args.owner : null;
+  const repo = typeof call.args.repo === "string" ? call.args.repo : null;
+  const parts = [
+    owner && repo ? `${owner}/${repo}` : null,
+    title ? `"${title}"` : null,
+    start && end ? `${start} ~ ${end}` : null,
+  ].filter(Boolean);
   return parts.length > 0 ? `${label}: ${parts.join(", ")}` : label;
 }
 
