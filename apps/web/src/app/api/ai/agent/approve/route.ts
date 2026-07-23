@@ -4,9 +4,11 @@ import {
   allowRequest,
   composeAdapters,
   createGitHubIssuesAdapter,
+  createGmailAdapter,
   createGoogleCalendarAdapter,
   executeApprovedCalls,
   getGithubTokens,
+  getGmailTokens,
   getGoogleTokens,
   logAction,
   type Adapter,
@@ -48,13 +50,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "요청 형식이 올바르지 않습니다." }, { status: 400 });
   }
 
-  const [googleTokens, githubTokens] = await Promise.all([
+  const [googleTokens, githubTokens, gmailTokens] = await Promise.all([
     getGoogleTokens(supabase, user.id),
     getGithubTokens(supabase, user.id),
+    getGmailTokens(supabase, user.id),
   ]);
   const adapters: Adapter[] = [];
   if (googleTokens) adapters.push(createGoogleCalendarAdapter(googleTokens.accessToken));
   if (githubTokens) adapters.push(createGitHubIssuesAdapter(githubTokens.accessToken));
+  if (gmailTokens) adapters.push(createGmailAdapter(gmailTokens.accessToken));
   if (adapters.length === 0) {
     return NextResponse.json(
       { error: "연동된 도구가 없습니다." },

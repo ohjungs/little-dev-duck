@@ -30,6 +30,7 @@ const REINDEX_LABEL: Record<ReindexState, string> = {
 const TOOL_LABELS: Record<string, string> = {
   createCalendarEvent: "캘린더 일정 만들기",
   createGithubIssue: "GitHub 이슈 만들기",
+  trashEmail: "이메일 휴지통으로 이동",
 };
 
 function formatWhen(value: unknown): string | null {
@@ -45,7 +46,12 @@ function formatWhen(value: unknown): string | null {
 // 표시(HTML 삽입 없음, React가 이스케이프) — 승인 카드 자체가 프롬프트 인젝션의 실행 표면이 되지 않게.
 function describeCall(call: ToolCall): string {
   const label = TOOL_LABELS[call.name] ?? call.name;
-  const title = typeof call.args.title === "string" ? call.args.title : null;
+  // title(캘린더/GitHub 이슈)과 subject(Gmail, T6 — messageId만으론 사람이 어느 메일인지 알 수 없어
+  // listRecentEmails에서 본 제목을 표시용으로만 되돌려 받는다)는 둘 다 "이 승인이 무엇에 대한 것인지"
+  // 보여주는 같은 역할이라 하나로 합쳐 표시한다.
+  const title =
+    (typeof call.args.title === "string" ? call.args.title : null) ??
+    (typeof call.args.subject === "string" ? call.args.subject : null);
   const start = formatWhen(call.args.start);
   const end = formatWhen(call.args.end);
   // GitHub 이슈 도구의 owner/repo — 어느 저장소에 만들지도 승인 판단에 필요한 정보(T5).

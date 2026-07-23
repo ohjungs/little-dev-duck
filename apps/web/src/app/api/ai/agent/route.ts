@@ -3,8 +3,10 @@ import {
   allowRequest,
   composeAdapters,
   createGitHubIssuesAdapter,
+  createGmailAdapter,
   createGoogleCalendarAdapter,
   getGithubTokens,
+  getGmailTokens,
   getGoogleTokens,
   runDuckTurn,
   type Adapter,
@@ -21,6 +23,9 @@ const NO_CALENDAR_NOTE =
 const NO_GITHUB_NOTE =
   "GitHub 이슈 도구는 아직 연동되지 않았다. 사용자가 GitHub 이슈 생성/조회를 요청하면 실행하려 들지 말고 " +
   '"설정 페이지에서 GitHub 이슈 연동을 하면 이슈를 만들 수 있어요"라고 안내만 하라.';
+const NO_GMAIL_NOTE =
+  "Gmail 도구는 아직 연동되지 않았다. 사용자가 이메일 조회/정리를 요청하면 실행하려 들지 말고 " +
+  '"설정 페이지에서 Gmail 연동을 하면 이메일을 확인할 수 있어요"라고 안내만 하라.';
 
 // 오리 대화창(단일). Phase 8 RAG 질답과 Phase 10 에이전트 액션을 한 엔드포인트로 합쳤다 — runDuckTurn이
 // 룰 라우팅 → RAG 검색 → (도구가 있으면) 에이전트 루프까지 한 번에 처리해, Gemini가 "그냥 답할지 도구를
@@ -65,18 +70,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "질문이 너무 깁니다." }, { status: 400 });
   }
 
-  const [googleTokens, githubTokens] = await Promise.all([
+  const [googleTokens, githubTokens, gmailTokens] = await Promise.all([
     getGoogleTokens(supabase, user.id),
     getGithubTokens(supabase, user.id),
+    getGmailTokens(supabase, user.id),
   ]);
   const adapters: Adapter[] = [];
   if (googleTokens) adapters.push(createGoogleCalendarAdapter(googleTokens.accessToken));
   if (githubTokens) adapters.push(createGitHubIssuesAdapter(githubTokens.accessToken));
+  if (gmailTokens) adapters.push(createGmailAdapter(gmailTokens.accessToken));
   const adapter = composeAdapters(adapters);
 
   const unavailableNote = [
     googleTokens ? null : NO_CALENDAR_NOTE,
     githubTokens ? null : NO_GITHUB_NOTE,
+    gmailTokens ? null : NO_GMAIL_NOTE,
   ]
     .filter((note): note is string => note !== null)
     .join("\n\n");

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getGoogleTokens, saveGoogleTokens, saveGithubTokens } from "@ldd/api";
+import { getGoogleTokens, saveGoogleTokens, saveGithubTokens, getGmailTokens, saveGmailTokens } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -77,6 +77,32 @@ export async function GET(request: Request) {
           });
         } catch (tokenError) {
           console.error("GitHub 이슈 토큰 저장 실패", tokenError);
+        }
+      }
+
+      // Phase 10 T6: Gmail도 Google 프로바이더를 쓰지만 Calendar와 별개 scope·별개 테이블(gmail-oauth-
+      // token.ts 주석 참조 — 한 테이블을 공유하면 나중에 연동한 쪽이 먼저 연동된 토큰을 덮어씀)이라
+      // `link=gmail`로 명시할 때만 캡처한다(provider==="google"만으론 Calendar 연동과 구분 불가).
+      const isGmailLink = searchParams.get("link") === "gmail";
+      if (isGmailLink && typeof providerToken === "string") {
+        try {
+          const newRefreshToken =
+            typeof session.provider_refresh_token === "string"
+              ? session.provider_refresh_token
+              : null;
+          const refreshToken =
+            newRefreshToken ??
+            (await getGmailTokens(supabase, session.user.id))?.refreshToken ??
+            null;
+          await saveGmailTokens(supabase, {
+            userId: session.user.id,
+            accessToken: providerToken,
+            refreshToken,
+            scope: "https://www.googleapis.com/auth/gmail.modify",
+            expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+          });
+        } catch (tokenError) {
+          console.error("Gmail 토큰 저장 실패", tokenError);
         }
       }
       return NextResponse.redirect(`${origin}${next}`);

@@ -113,6 +113,10 @@ export {
   type GithubOAuthToken,
 } from "./domain/github-oauth-token";
 export {
+  gmailOAuthTokenSchema,
+  type GmailOAuthToken,
+} from "./domain/gmail-oauth-token";
+export {
   actionLogEntrySchema,
   summarizeForLog,
   type ActionLogEntry,

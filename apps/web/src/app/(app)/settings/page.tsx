@@ -1,6 +1,6 @@
 import Image from "next/image";
-import { CalendarClock, LogOut, Palette, User } from "lucide-react";
-import { getGithubTokens, getGoogleTokens } from "@ldd/api";
+import { CalendarClock, LogOut, Mail, Palette, User } from "lucide-react";
+import { getGithubTokens, getGmailTokens, getGoogleTokens } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
 import {
   Card,
@@ -14,6 +14,7 @@ import { AppearanceSetting } from "@/components/AppearanceSetting";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
 import { GitHubMark } from "@/components/ui/github-mark";
+import { GmailLink } from "@/components/GmailLink";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
   const googleLinked = user ? !!(await getGoogleTokens(supabase, user.id)) : false;
   const githubLinked = user ? !!(await getGithubTokens(supabase, user.id)) : false;
+  const gmailLinked = user ? !!(await getGmailTokens(supabase, user.id)) : false;
 
   const displayName =
     (user?.user_metadata.full_name as string | undefined) ??
@@ -108,6 +110,22 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <GitHubIssuesLink linked={githubLinked} isPrimaryGithub={provider === "github"} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Mail className="size-4 text-primary-accent" />
+              Gmail 연동
+            </CardTitle>
+            <CardDescription>
+              오리가 최근 이메일을 조회하고 휴지통으로 이동할 수 있게 합니다. 영구삭제는 설계상
+              지원하지 않아요 — 항상 복구 가능한 휴지통 이동만 하고, 이동 전 승인을 거칩니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GmailLink linked={gmailLinked} />
           </CardContent>
         </Card>
 

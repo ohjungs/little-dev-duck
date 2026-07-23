@@ -82,6 +82,12 @@ export {
   getGithubTokens,
   type SaveGithubTokenInput,
 } from "./githubTokens";
+export { createGmailAdapter } from "./gmail";
+export {
+  saveGmailTokens,
+  getGmailTokens,
+  type SaveGmailTokenInput,
+} from "./gmailTokens";
 export { logAction, type LogActionInput } from "./actionLog";
 
 export { allowRequest } from "./rateLimit";

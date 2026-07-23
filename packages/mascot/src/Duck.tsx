@@ -1,19 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import { Html, useGLTF } from "@react-three/drei";
 import type { Group } from "three";
 import type { DuckMood } from "@ldd/core";
 import { pickIdlePhrase, pickPhrase } from "./phrases";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
-// ponytail: Meshy에서 model.glb를 아직 받지 못해 기본 도형(sphere/cone/torus)으로
-// 캐릭터 바이블(ducky-mascot repo docs/CHARACTER.md) 색상·비율만 맞춘 플레이스홀더.
-// GLB 준비되면 이 파일의 <DuckModel>을 useGLTF 로드로 교체.
-const COLOR_BODY = "#F6EFDD";
-const COLOR_BEAK = "#A99C65";
-const COLOR_OUTLINE = "#352116";
+// Meshy에서 받은 실제 모델(apps/web/public/little_dev_duck.glb, 배포된 웹 origin 루트에서 서빙 —
+// Tauri 위젯도 옵션 A라 같은 배포 URL을 로드하므로 동일 경로로 통한다). 49MB로 커서 로딩에 수 초
+// 걸릴 수 있어 Suspense fallback을 둔다. 스케일/위치는 실측 전 추정치라 실제로 보고 조정 필요할 수 있음.
+const MODEL_URL = "/little_dev_duck.glb";
 
 const SPEECH_BUBBLE_DURATION_MS = 2000;
 const SQUISH_DECAY_PER_SECOND = 4;
@@ -106,60 +104,31 @@ function DuckModel({
     onGreet();
   };
 
+  const { scene } = useGLTF(MODEL_URL);
+
   return (
     <group ref={groupRef} onClick={handleClick}>
-      {/* 몸통 */}
-      <mesh position={[0, -0.5, 0]}>
-        <sphereGeometry args={[0.6, 32, 32]} />
-        <meshStandardMaterial color={COLOR_BODY} />
-      </mesh>
-      {/* 머리 (치비 2등신 - 몸통과 비슷한 크기) */}
-      <mesh position={[0, 0.4, 0]}>
-        <sphereGeometry args={[0.55, 32, 32]} />
-        <meshStandardMaterial color={COLOR_BODY} />
-      </mesh>
-      {/* 부리 */}
-      <mesh position={[0, 0.35, 0.55]} rotation={[Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.15, 0.25, 16]} />
-        <meshStandardMaterial color={COLOR_BEAK} />
-      </mesh>
-      {/* 물갈퀴 (양쪽 발) */}
-      <mesh position={[-0.25, -1.05, 0.1]}>
-        <sphereGeometry args={[0.18, 16, 16]} />
-        <meshStandardMaterial color={COLOR_BEAK} />
-      </mesh>
-      <mesh position={[0.25, -1.05, 0.1]}>
-        <sphereGeometry args={[0.18, 16, 16]} />
-        <meshStandardMaterial color={COLOR_BEAK} />
-      </mesh>
-      {/* 안경 (렌즈 두 개 + 다리) */}
-      <mesh position={[-0.2, 0.42, 0.48]}>
-        <torusGeometry args={[0.16, 0.03, 16, 32]} />
-        <meshStandardMaterial color={COLOR_OUTLINE} />
-      </mesh>
-      <mesh position={[0.2, 0.42, 0.48]}>
-        <torusGeometry args={[0.16, 0.03, 16, 32]} />
-        <meshStandardMaterial color={COLOR_OUTLINE} />
-      </mesh>
-      <mesh position={[0, 0.42, 0.48]}>
-        <boxGeometry args={[0.1, 0.03, 0.03]} />
-        <meshStandardMaterial color={COLOR_OUTLINE} />
-      </mesh>
-      {/* 눈 (안경 렌즈 안쪽) */}
-      <mesh position={[-0.2, 0.42, 0.5]}>
-        <sphereGeometry args={[0.07, 16, 16]} />
-        <meshStandardMaterial color={COLOR_OUTLINE} />
-      </mesh>
-      <mesh position={[0.2, 0.42, 0.5]}>
-        <sphereGeometry args={[0.07, 16, 16]} />
-        <meshStandardMaterial color={COLOR_OUTLINE} />
-      </mesh>
-      {/* 정수리 곱슬 깃털 한 가닥 */}
-      <mesh position={[0, 1.0, 0]} rotation={[0, 0, -0.4]}>
-        <coneGeometry args={[0.04, 0.25, 8]} />
-        <meshStandardMaterial color={COLOR_BEAK} />
-      </mesh>
+      <primitive object={scene} />
     </group>
+  );
+}
+
+useGLTF.preload(MODEL_URL);
+
+// 모델 로딩 중(수 초 소요 가능) 빈 캔버스 대신 보여줄 최소 표시.
+function DuckLoadingFallback() {
+  return (
+    <Html center>
+      <div
+        style={{
+          color: "var(--ldd-color-text, #352116)",
+          fontSize: "0.85rem",
+          whiteSpace: "nowrap",
+        }}
+      >
+        오리 불러오는 중...
+      </div>
+    </Html>
   );
 }
 
@@ -236,12 +205,14 @@ export function Duck({
       <Canvas camera={{ position: [0, 0, 4], fov: 40 }}>
         <ambientLight intensity={0.8} />
         <directionalLight position={[2, 3, 4]} intensity={1} />
-        <DuckModel
-          mood={mood}
-          reducedMotion={reducedMotion}
-          celebrate={celebrate}
-          onGreet={handleGreet}
-        />
+        <Suspense fallback={<DuckLoadingFallback />}>
+          <DuckModel
+            mood={mood}
+            reducedMotion={reducedMotion}
+            celebrate={celebrate}
+            onGreet={handleGreet}
+          />
+        </Suspense>
         {showBubble && (
           <Html position={[0, 1.4, 0]} center distanceFactor={8}>
             <div
