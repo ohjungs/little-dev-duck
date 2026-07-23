@@ -25,6 +25,11 @@ describe("routeUtterance", () => {
   it("길고 서술적이면 LLM", () => {
     expect(routeUtterance("어제 적어둔 회의 메모 좀 다시 보고 싶은데")).toBe("llm");
   });
+
+  it("짧은 명령문(~줘)은 키워드/길이와 무관하게 LLM(에이전트 액션 의도)", () => {
+    expect(routeUtterance("내일 회의잡아줘")).toBe("llm");
+    expect(routeUtterance("취소해줘")).toBe("llm");
+  });
 });
 
 describe("buildRagPrompt", () => {

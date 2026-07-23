@@ -15,8 +15,10 @@ export type UtteranceRoute = "rule" | "llm";
 // 짧은 인사·감탄은 룰 대사(Phase 6 pickIdlePhrase)로, 질문형/데이터 조회로 보이면 LLM(RAG)으로.
 // 결정론적 — 룰 대사(무료·즉시)와 Gemini 호출(쿼터 소모)의 경계를 core에서 고정한다.
 const GREETING = /^(안녕|하이|hi|hello|헤이|hey|반가|잘\s?가|바이|bye|고마|thx|thanks|사랑|좋아|귀여)/i;
+// "줘"는 "해줘/잡아줘/예약해줘"류 명령문의 공통 어미 — Phase 10 에이전트 액션 병합 후 "회의 잡아줘"
+// 같은 짧은 명령이 키워드 매칭 없이 길이<=12로 rule에 걸러지던 걸 방지(길이 무관하게 명령 의도 포착).
 const QUESTION_HINT =
-  /[?？]|뭐|무엇|어디|언제|얼마|몇|누구|왜|어때|어떻게|알려|찾아|정리|요약|보여|추천|일정|할\s?일|언제까지|마감/;
+  /[?？]|뭐|무엇|어디|언제|얼마|몇|누구|왜|어때|어떻게|알려|찾아|정리|요약|보여|추천|일정|할\s?일|언제까지|마감|줘/;
 
 export function routeUtterance(input: string): UtteranceRoute {
   const text = input.trim();
