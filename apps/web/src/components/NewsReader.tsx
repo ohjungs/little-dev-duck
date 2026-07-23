@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BookmarkPlus,
   ExternalLink,
   Layers,
   Loader2,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   addFeed,
+  createPage,
   deleteFeed,
   listArticles,
   listFeeds,
@@ -30,21 +32,54 @@ function timeLabel(iso: string | null): string {
   });
 }
 
-// 기사 1건 카드. 목록/군집 양쪽에서 재사용(마크업 중복 제거).
-function ArticleCard({ a }: { a: Article }) {
+// 기사를 노트(페이지) 본문으로. BlockNote는 최소 PartialBlock을 받아 id/props를 채운다.
+// 요약(없으면 스니펫) 문단 + 원문 링크 문단. 서버가 content에서 plain_text를 파생한다.
+function scrapContent(a: Article): unknown[] {
+  const para = (text: string) => ({
+    type: "paragraph",
+    content: [{ type: "text", text, styles: {} }],
+  });
+  const blocks: unknown[] = [];
+  const body = a.summary ?? a.snippet;
+  if (body) blocks.push(para(body));
+  blocks.push(para(`원문: ${a.link}`));
+  return blocks;
+}
+
+// 기사 1건 카드. 목록/군집 양쪽에서 재사용(마크업 중복 제거). onScrap이 있으면 스크랩 버튼 노출.
+function ArticleCard({
+  a,
+  onScrap,
+}: {
+  a: Article;
+  onScrap?: (a: Article) => void;
+}) {
   return (
     <div className="rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-sm font-semibold leading-snug">{a.title}</h3>
-        <a
-          href={a.link}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="원문 보기"
-          className="shrink-0 text-muted-foreground hover:text-primary-accent"
-        >
-          <ExternalLink className="size-4" />
-        </a>
+        <div className="flex shrink-0 items-center gap-2">
+          {onScrap && (
+            <button
+              type="button"
+              onClick={() => onScrap(a)}
+              aria-label="노트로 스크랩"
+              title="노트로 스크랩"
+              className="text-muted-foreground transition-colors hover:text-primary-accent"
+            >
+              <BookmarkPlus className="size-4" />
+            </button>
+          )}
+          <a
+            href={a.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="원문 보기"
+            className="text-muted-foreground hover:text-primary-accent"
+          >
+            <ExternalLink className="size-4" />
+          </a>
+        </div>
       </div>
       {a.summary ? (
         <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
@@ -133,6 +168,20 @@ export function NewsReader() {
       return;
     await deleteFeed(createClient(), feed.id);
     await load();
+  };
+
+  const onScrap = async (a: Article) => {
+    setNote(null);
+    try {
+      await createPage(createClient(), {
+        title: a.title,
+        content: scrapContent(a),
+        icon: "📰",
+      });
+      setNote(`"${a.title}"을(를) 노트로 저장했어요. 워크스페이스에서 확인하세요.`);
+    } catch {
+      setNote("노트 저장에 실패했어요.");
+    }
   };
 
   const onCollect = async () => {
@@ -269,19 +318,23 @@ export function NewsReader() {
                 </p>
                 <div className="flex flex-col gap-2">
                   {cluster.articles.map((a) => (
-                    <ArticleCard key={a.id} a={a} />
+                    <ArticleCard key={a.id} a={a} onScrap={onScrap} />
                   ))}
                 </div>
               </div>
             ) : (
-              <ArticleCard key={cluster.key} a={cluster.articles[0]} />
+              <ArticleCard
+                key={cluster.key}
+                a={cluster.articles[0]}
+                onScrap={onScrap}
+              />
             ),
           )}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           {articles.map((a) => (
-            <ArticleCard key={a.id} a={a} />
+            <ArticleCard key={a.id} a={a} onScrap={onScrap} />
           ))}
         </div>
       )}
