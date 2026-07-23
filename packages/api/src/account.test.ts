@@ -25,7 +25,7 @@ function fakeSupabase(opts: FakeOpts = {}) {
           },
         }),
       },
-      rpc: async (_name: string) => {
+      rpc: async () => {
         calls.rpc += 1;
         return { error: opts.rpcError ? { message: opts.rpcError } : null };
       },
