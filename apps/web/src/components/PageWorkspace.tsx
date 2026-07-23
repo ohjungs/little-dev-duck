@@ -3,7 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, FileText, Loader2, Plus, Trash, Trash2 } from "lucide-react";
+import {
+  Download,
+  FileText,
+  Loader2,
+  Plus,
+  Star,
+  Trash,
+  Trash2,
+} from "lucide-react";
 import {
   createPage,
   listPages,
@@ -17,6 +25,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PageEditor } from "@/components/PageEditor";
 import { PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
+import {
+  getFavorites,
+  subscribeFavorites,
+  toggleFavorite,
+} from "@/lib/favorites";
 
 type TreeNode = Page & { children: TreeNode[] };
 
@@ -37,14 +50,19 @@ function TreeRow({
   node,
   depth,
   activeId,
+  favoriteIds,
   onDelete,
+  onToggleFavorite,
 }: {
   node: TreeNode;
   depth: number;
   activeId: string | null;
+  favoriteIds: Set<string>;
   onDelete: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
 }) {
   const active = node.id === activeId;
+  const favorited = favoriteIds.has(node.id);
   return (
     <div>
       <div
@@ -70,6 +88,24 @@ function TreeRow({
         </Link>
         <button
           type="button"
+          onClick={() => onToggleFavorite(node.id)}
+          aria-label={
+            favorited
+              ? `${node.title || "제목 없음"} 즐겨찾기 해제`
+              : `${node.title || "제목 없음"} 즐겨찾기`
+          }
+          aria-pressed={favorited}
+          className={cn(
+            "shrink-0 rounded p-1 transition-opacity hover:text-yellow-500",
+            favorited
+              ? "text-yellow-500 opacity-100"
+              : "text-muted-foreground opacity-0 group-hover:opacity-100",
+          )}
+        >
+          <Star className={cn("size-3.5", favorited && "fill-current")} />
+        </button>
+        <button
+          type="button"
           onClick={() => onDelete(node.id)}
           aria-label={`${node.title || "제목 없음"} 삭제`}
           className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
@@ -83,7 +119,9 @@ function TreeRow({
           node={child}
           depth={depth + 1}
           activeId={activeId}
+          favoriteIds={favoriteIds}
           onDelete={onDelete}
+          onToggleFavorite={onToggleFavorite}
         />
       ))}
     </div>
@@ -97,6 +135,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const [pages, setPages] = useState<Page[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   useEffect(() => {
     listPages(supabase).then(
@@ -108,8 +147,24 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
     );
   }, [supabase]);
 
+  // 즐겨찾기: 마운트 시 localStorage 초기 동기화(SSR 안전) + 변경 구독.
+  useEffect(() => {
+    const sync = () => setFavorites(getFavorites());
+    sync();
+    return subscribeFavorites(sync);
+  }, []);
+
   const tree = useMemo(() => buildTree(pages), [pages]);
   const current = pages.find((p) => p.id === pageId) ?? null;
+  const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
+  // 즐겨찾기 순서 유지, 삭제/휴지통으로 사라진 id는 제외.
+  const favoritePages = useMemo(
+    () =>
+      favorites
+        .map((id) => pages.find((p) => p.id === id))
+        .filter((p): p is Page => p != null),
+    [favorites, pages],
+  );
 
   const handleCreate = async (template?: PageTemplate) => {
     setNewMenuOpen(false);
@@ -220,6 +275,47 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
           )}
         </div>
         <nav className="flex-1 overflow-y-auto px-2 pb-3">
+          {favoritePages.length > 0 && (
+            <div className="mb-2 border-b border-border/60 pb-2">
+              <span className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+                즐겨찾기
+              </span>
+              {favoritePages.map((p) => (
+                <div
+                  key={p.id}
+                  className={cn(
+                    "group flex items-center gap-1 rounded-lg pr-1 text-sm transition-colors",
+                    p.id === pageId
+                      ? "bg-secondary font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Link
+                    href={`/pages/${p.id}`}
+                    aria-current={p.id === pageId ? "page" : undefined}
+                    className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-2"
+                  >
+                    {p.icon ? (
+                      <span className="shrink-0 text-sm leading-none">
+                        {p.icon}
+                      </span>
+                    ) : (
+                      <Star className="size-3.5 shrink-0 fill-current text-yellow-500" />
+                    )}
+                    <span className="truncate">{p.title || "제목 없음"}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => toggleFavorite(p.id)}
+                    aria-label={`${p.title || "제목 없음"} 즐겨찾기 해제`}
+                    className="shrink-0 rounded p-1 text-yellow-500 transition-opacity hover:opacity-70"
+                  >
+                    <Star className="size-3.5 fill-current" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           {state === "loading" && (
             <p className="flex items-center gap-2 px-2 py-2 text-sm text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" /> 불러오는 중...
@@ -241,7 +337,9 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
               node={node}
               depth={0}
               activeId={pageId}
+              favoriteIds={favoriteIds}
               onDelete={handleDelete}
+              onToggleFavorite={toggleFavorite}
             />
           ))}
         </nav>
