@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppSidebar, AppMobileBar } from "@/components/AppNav";
 import { DesktopCollectorSync } from "@/components/DesktopCollectorSync";
 import { CommandPalette } from "@/components/CommandPalette";
+import { ShortcutsHelp } from "@/components/ShortcutsHelp";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default async function AppLayout({
       </div>
       <DesktopCollectorSync />
       <CommandPalette />
+      <ShortcutsHelp />
     </div>
   );
 }

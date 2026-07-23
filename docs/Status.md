@@ -434,6 +434,9 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
 - [x] **후속 — 최근 페이지(팔레트)**(2026-07-24, `/loop` 자율): `lib/recentPages.ts`(localStorage MRU 8개,
   제목/아이콘 스냅샷, 순수 `pushEntry` 분리, SSR 가드+안전 파싱). PageEditor 열람 시 기록 → 팔레트를 빈
   검색어로 열면 최근 페이지가 액션 아래 표시(빠른 재접근). 검증 web tsc GREEN.
+- [x] **후속 — 단축키 도움말**(2026-07-24, `/loop` 자율): `ShortcutsHelp`(app 레이아웃 상주) — `?` 키로
+  전역 단축키 목록 오버레이(입력 필드 타이핑 중엔 미가로챔). 기능이 늘어난 앱의 단축키(Cmd+K, 오피스
+  WASD/E/더블클릭, Ctrl+Enter 메모 등) 발견성 향상. 순수 web. 검증 web tsc GREEN.
 - [x] **후속 — 즐겨찾기**(2026-07-24, `/loop` 자율): `lib/favorites.ts`(localStorage + 커스텀 이벤트로
   같은 탭 동기화 + storage 이벤트로 다른 탭 동기화, 순수 `toggleInList` 분리, 무료 원칙 — DB/마이그레이션
   없음). PageWorkspace 트리 행에 별 토글 + 상단 "즐겨찾기" 섹션(순서 유지, 삭제된 페이지 자동 제외).
