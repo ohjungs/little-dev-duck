@@ -1,6 +1,6 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T3 실기 검증 중 회귀 다수 발견·수정(2026-07-23).**
+현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T3 실기 검증 통과(2026-07-23, 사용자 확인 "잘됐다").**
 Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabase MCP로 직접 재확인 완료 —
 마이그레이션 18개 전부 local==remote, `user_google_tokens`/`action_log` 테이블 RLS 켜진 채 존재).
 계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md.
@@ -23,10 +23,17 @@ Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabas
    매 턴 오늘 날짜(KST) 명시 + 종료시각 선택화·서버가 시작+1시간 기본값 결정론적 보정으로 수정(a8a8e05).
 6. **부가 기능(사용자 요청)**: GitHub 로그인 사용자도 Google Calendar 별도 연동 가능하도록 Supabase
    Identity Linking(`linkIdentity`) 적용 — 설정 페이지에 연동 버튼 추가(a8a8e05).
+7. **쿼터 소진이 "명령 이해 못함"으로 위장**: quota_exceeded를 status:"rule"로 매핑하던 Phase 8 원칙이
+   액션 요청까지 덮으면서, 실제로는 llm 라우팅됐는데도 매번 rule 캔 답변만 나가 원인 파악이 어려웠음
+   (routeUtterance 직접 재테스트로 로직 자체는 정상임을 먼저 확인, Vercel 런타임 로그로 200+무로그 패턴
+   확인 후 특정). status:"unavailable"으로 분리해 실제 원인을 안내하도록 수정(32fe5e2).
+8. **불명확한 요청에 값을 지어내 바로 실행**: 시각·제목 등을 명시하지 않아도 오리가 임의값(예: "10시")을
+   채워 바로 도구를 호출함 — TOOL_PREFERENCE_GUARD에 "정보가 불명확하면 먼저 되물어라" 지침 추가(efbe9b1).
 
-**다음 세션**: 위 수정 반영 후 사용자 재시도 결과 확인 대기 — "내일 회의 잡아줘"가 실제로 내일 날짜·정상
-길이로 등록되는지, GitHub 로그인 계정에서 설정 페이지 연동 버튼이 실제로 동작하는지. 전부 통과하면 T3
-완전히 닫고 T5(두 번째 어댑터) 또는 T6(Gmail, 격리)로 진행.
+**T3 검증 통과 확인(2026-07-23, 사용자)**: 위 8건 전부 수정 반영 후 사용자가 "잘됐다"고 확인. Google
+Calendar 어댑터 end-to-end(계약→토큰→라우트→승인카드→실제 Google API 반영→감사로그) 전부 실사용 검증
+완료로 T3 종결. **다음 세션: T5(두 번째 어댑터) 또는 T6(Gmail, 격리) 착수** — phase_10.md Task 초안
+참조해 어댑터 후보 확정(GitHub 이슈/Notion 등) 후 계약 잠금·구현.
 
 ## Phase 10 — AI 2단계 (에이전트 액션) — T1~T4·T7 코드 완료 (2026-07-22, `/loop` 자율)
 
@@ -88,14 +95,15 @@ Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabas
   - web `DuckChatPanel.tsx` 1개로 병합(재인덱싱 버튼 + 승인 카드 모두 포함), `AgentChatPanel.tsx` 삭제,
     홈 대시보드 그리드에서 중복 슬롯 제거.
   - 검증: core 119 / api 141 / ai 10 tests + web build GREEN + core·api·ai·web 로컬 full eslint 선검증.
-- [ ] **T3 실기 검증(사용자, 로그인 필요)**: Google 재로그인(재동의 화면 필수)→provider_token 저장 확인→
-  통합된 오리 대화창에서 "일정 만들어줘" 시도→승인 카드→승인 후 실제 Google Calendar에 반영되는지 +
-  action_log에 기록되는지. `gemini-flash-latest`의 function calling 실동작도 이 시점에 실측(phase_10.md
-  미검증 절). **Google OAuth 동의 화면이 "테스트 사용자만 접근 가능" 403으로 막혔던 이력 있음(2026-07-23,
-  Google Cloud Console 설정 문제 — 코드와 무관) — 테스트 사용자 등록 후 재시도 필요.**
-- [x] **인프라(사용자)**: `supabase db push` 2건 사용자 적용 완료 보고(2026-07-23) — 20260722080000_user_google_tokens,
-  20260722090000_action_log. (이 세션은 Supabase MCP가 read-only라 직접 재확인은 못 함.)
-- [ ] T5 두 번째 어댑터 / T6 Gmail(격리) — phase_10.md 참조. T3 실기 검증 통과 후 진행 권장(계획 원칙).
+- [x] **T3 실기 검증(2026-07-23, 사용자+세션)**: Google 재로그인(신규 OAuth 클라이언트 발급 필요했음)→
+  provider_token 저장→통합된 오리 대화창에서 일정 생성 시도→승인 카드→실제 Google Calendar 반영까지
+  전부 확인(Google Calendar MCP로 세션이 직접 대조). `gemini-flash-latest` function calling 실동작 실측
+  완료(phase_10.md 미검증 절 해소) — thoughtSignature 요구 등 실측으로만 드러난 사항 확인·반영.
+  과정에서 발견·수정한 8건은 위 "T3 실기 검증 경과" 절 참조.
+- [x] **인프라(사용자)**: `supabase db push` 2건 적용을 Supabase MCP(claude.ai 연결)로 직접 재확인 완료
+  (2026-07-23) — 20260722080000_user_google_tokens, 20260722090000_action_log 마이그레이션 모두
+  local==remote, 테이블 RLS 켜진 채 존재.
+- [ ] T5 두 번째 어댑터 / T6 Gmail(격리) — phase_10.md Task 초안 참조, 다음 세션 착수 대상.
 
 ## Phase 9 — 워크스페이스 코어 (블록 에디터) — T1·T2·T4·T5·T7 구현·배포 (2026-07-22 오후, `/loop` 자율)
 
