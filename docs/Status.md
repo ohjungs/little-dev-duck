@@ -1,15 +1,32 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T1~T4~T7 코드 완료 + 대화창 UX 통합(2026-07-23, `/loop` 자율).**
-Phase 1~9 전부 완료(인프라·검증 게이트 없음). Google Calendar 어댑터 end-to-end 배선(계약→어댑터→토큰
-캡처→라우트→UI 승인카드→감사 로그)까지 코드 완료, core/api/ai 전 테스트 + web build GREEN. `supabase db
-push` 2건은 사용자가 직접 적용 완료(2026-07-23 보고 — 이 세션은 MCP가 read-only라 직접 검증은 못 함).
-계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md,
-Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
-**다음 세션: 사용자 실기 검증 필요(Google 재로그인 시 Google Cloud Console OAuth 동의 화면 "테스트 사용자"
-403으로 막혔던 문제 — 테스트 사용자 등록 확인 후 재시도). 통합된 오리 대화창(DuckChatPanel 1개)에서
-RAG 질문과 "내일 회의 잡아줘" 같은 액션이 모두 자연스럽게 되는지 확인. 검증 후 T5(두 번째 어댑터) 또는
-T6(Gmail, 격리)로 진행.**
+현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T3 실기 검증 중 회귀 다수 발견·수정(2026-07-23).**
+Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabase MCP로 직접 재확인 완료 —
+마이그레이션 18개 전부 local==remote, `user_google_tokens`/`action_log` 테이블 RLS 켜진 채 존재).
+계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md.
+
+**T3 실기 검증 경과(2026-07-23, 사용자+세션 협업)**: 오리 대화창 통합(단일 DuckChatPanel) 배포 후 사용자가
+직접 시도하며 실회귀 4건을 순차 발견 → 전부 그 자리에서 수정·배포. Google Calendar MCP로 사용자 실제
+캘린더를 직접 조회해 "코드는 성공을 반환했는데 실제로 반영 안 됨" 부류의 버그까지 검증 가능했던 게 큰 도움.
+1. **Google Cloud OAuth 재설정**: 기존 클라이언트를 찾지 못해 사용자가 새 GCP 프로젝트에 OAuth 클라이언트
+   신규 발급 → Supabase Google 프로바이더 Client ID/Secret 교체. **캘린더 API 활성화 누락**으로 403 발생
+   → 사용자가 활성화.
+2. **routeUtterance 버그**: "내일 회의잡아줘"류 짧은 명령문이 키워드 매칭 없이 길이<=12 폴백에 걸려 rule로
+   분류돼 Gemini 호출 자체가 안 됨 → "~줘" 어미를 QUESTION_HINT에 추가(8b1d8b1).
+3. **thoughtSignature 유실**: gemini-flash-latest가 함수 호출 응답에 얹는 thoughtSignature를 우리 코드가
+   모델 turn을 재구성하며 빠뜨려 도구 루프 2회차에서 400 → 파싱 재조립 대신 Gemini가 준 parts를 그대로
+   되먹이도록 수정(d42a9fa).
+4. **RAG 지침이 액션을 억누름**: buildRagContext의 "[사용자 자료]에 없으면 모른다고 답하라"가 도구 카탈로그가
+   있어도 액션 요청을 거절하게 만듦 → 카탈로그가 있을 때만 "액션 요청엔 도구 우선" 지침 추가(a8a8e05).
+5. **날짜/지속시간 버그(Google Calendar API 직접 조회로 발견)**: "내일" 요청이 실제로 11일 뒤 날짜에,
+   시작=종료(0초) 일정으로 생성됨 — LLM이 오늘 날짜를 모름 + 종료시각 필수라 모델이 start로 채움.
+   매 턴 오늘 날짜(KST) 명시 + 종료시각 선택화·서버가 시작+1시간 기본값 결정론적 보정으로 수정(a8a8e05).
+6. **부가 기능(사용자 요청)**: GitHub 로그인 사용자도 Google Calendar 별도 연동 가능하도록 Supabase
+   Identity Linking(`linkIdentity`) 적용 — 설정 페이지에 연동 버튼 추가(a8a8e05).
+
+**다음 세션**: 위 수정 반영 후 사용자 재시도 결과 확인 대기 — "내일 회의 잡아줘"가 실제로 내일 날짜·정상
+길이로 등록되는지, GitHub 로그인 계정에서 설정 페이지 연동 버튼이 실제로 동작하는지. 전부 통과하면 T3
+완전히 닫고 T5(두 번째 어댑터) 또는 T6(Gmail, 격리)로 진행.
 
 ## Phase 10 — AI 2단계 (에이전트 액션) — T1~T4·T7 코드 완료 (2026-07-22, `/loop` 자율)
 
