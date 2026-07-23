@@ -472,6 +472,9 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
 - [x] **후속 — 페이지 통계**(2026-07-24, `/loop` 자율): core `page-stats.ts`(pageStats 순수함수 — 공백 제외
   글자 수·단어 수·읽기 시간 500자/분, +5 tests). PageEditor가 편집 중 content에서 extractPlainText로
   실시간 계산해 하단에 "N자 · 약 M분" 표시. 검증 core +5 tests·tsc + web tsc GREEN.
+- [x] **후속 — 오리 작성 축하**(2026-07-24, `/loop` 자율, 격차 문서 3절 P1 차별화 "노션+다마고치"): 편집 중
+  글자 수 마일스톤(200/500/1000/2000/5000) 돌파 시 오리가 축하 토스트("🦆 N자 돌파!"). 초기 콘텐츠가
+  이미 넘긴 마일스톤은 celebratedRef 초기값으로 제외(로드 시 오발화 방지). page-stats 재사용. 검증 web tsc GREEN.
 
 ## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현·리뷰·배포·검증 완료 (2026-07-22, `/loop` 자율+협업)
 

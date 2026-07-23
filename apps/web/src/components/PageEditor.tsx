@@ -64,6 +64,14 @@ const BlockEditor = dynamic(
 
 const SAVE_DEBOUNCE_MS = 800;
 
+// 글자 수 마일스톤 — 편집 중 돌파하면 오리가 축하한다("노션 + 다마고치" 차별화, 격차 문서 P1).
+const WRITE_MILESTONES = [200, 500, 1000, 2000, 5000] as const;
+function highestMilestone(chars: number): number {
+  let reached = 0;
+  for (const m of WRITE_MILESTONES) if (chars >= m) reached = m;
+  return reached;
+}
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 // 페이지 1개 편집(제목 + BlockNote 본문, 디바운스 자동저장). 페이지 전환은 상위에서 key={page.id}로 리마운트.
@@ -84,6 +92,10 @@ export function PageEditor({
   // 본문 통계용 plainText(편집 중 실시간). 저장 파생값과 별개로 에디터 content에서 즉시 계산.
   const [plainText, setPlainText] = useState(page.plainText);
   const [favorited, setFavorited] = useState(false);
+  // 오리 축하: 이미 초기 콘텐츠가 넘긴 마일스톤은 celebratedRef 초기값으로 잡아, 편집 중 "새로" 넘긴 것만 축하.
+  const [celebration, setCelebration] = useState<string | null>(null);
+  const celebratedRef = useRef(highestMilestone(pageStats(page.plainText).chars));
+  const celebrationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 즐겨찾기 상태(localStorage) 동기화 — 사이드바 별 토글과 즉시 일관.
   useEffect(() => {
@@ -459,7 +471,18 @@ export function PageEditor({
         initialContent={page.content}
         onChange={(document: Block[]) => {
           latest.current = { ...latest.current, content: document };
-          setPlainText(extractPlainText(document));
+          const pt = extractPlainText(document);
+          setPlainText(pt);
+          const reached = highestMilestone(pageStats(pt).chars);
+          if (reached > celebratedRef.current) {
+            celebratedRef.current = reached;
+            if (celebrationTimer.current) clearTimeout(celebrationTimer.current);
+            setCelebration(`🦆 ${reached.toLocaleString()}자 돌파! 잘하고 있어요`);
+            celebrationTimer.current = setTimeout(
+              () => setCelebration(null),
+              3500,
+            );
+          }
           scheduleSave();
         }}
         onExportReady={handleExportReady}
@@ -484,6 +507,14 @@ export function PageEditor({
           dbSchema={dbSchema}
           onSchemaChange={handleSchemaChange}
         />
+      )}
+      {celebration && (
+        <div
+          role="status"
+          className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-primary/30 bg-card px-4 py-2 text-sm font-medium shadow-lg"
+        >
+          {celebration}
+        </div>
       )}
     </div>
   );
