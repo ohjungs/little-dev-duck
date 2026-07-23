@@ -98,6 +98,12 @@ export const filterSpecSchema = z.object({
 });
 export type FilterSpec = z.infer<typeof filterSpecSchema>;
 
+// 열/뷰/행속성 개수 상한(저장소 남용 방어). viewDefSchema.hiddenPropIds가 MAX_PROPERTIES를 참조하므로
+// 뷰 스키마보다 먼저 정의한다.
+export const MAX_PROPERTIES = 50;
+export const MAX_VIEWS = 20;
+export const MAX_ROW_PROPS = 200;
+
 // 뷰 정의. board는 groupByPropId(select 속성)로 카드를 열로 나눈다. table은 groupBy 무시.
 // sort/filters는 하위호환 기본값(기존 db_schema jsonb에는 없으므로 null/[]로 채움 — 마이그레이션 불필요).
 export const viewDefSchema = z.object({
@@ -107,13 +113,10 @@ export const viewDefSchema = z.object({
   groupByPropId: z.string().max(64).nullable().default(null),
   sort: sortSpecSchema.nullable().default(null),
   filters: z.array(filterSpecSchema).max(MAX_FILTERS).default([]),
+  // 표 뷰에서 숨길 속성 id 목록(열 표시/숨김). 하위호환 기본값 []. board 뷰는 무시.
+  hiddenPropIds: z.array(z.string().max(64)).max(MAX_PROPERTIES).default([]),
 });
 export type ViewDef = z.infer<typeof viewDefSchema>;
-
-// 열/뷰/행속성 개수 상한(저장소 남용 방어).
-export const MAX_PROPERTIES = 50;
-export const MAX_VIEWS = 20;
-export const MAX_ROW_PROPS = 200;
 
 // 데이터베이스 스키마(페이지의 db_schema). properties=열, views=뷰 목록(최소 1개).
 export const dbSchemaSchema = z.object({
@@ -155,6 +158,7 @@ export function createDefaultDbSchema(): DbSchema {
         groupByPropId: null,
         sort: null,
         filters: [],
+        hiddenPropIds: [],
       },
       {
         id: "board",
@@ -163,6 +167,7 @@ export function createDefaultDbSchema(): DbSchema {
         groupByPropId: "status",
         sort: null,
         filters: [],
+        hiddenPropIds: [],
       },
     ],
   };

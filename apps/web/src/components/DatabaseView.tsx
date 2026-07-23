@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Loader2, Plus, Trash2 } from "lucide-react";
+import { Columns3, Download, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   createPage,
   listChildPages,
@@ -68,6 +68,7 @@ export function DatabaseView({
   const [activeViewId, setActiveViewId] = useState(dbSchema.views[0]?.id);
   const [addingProp, setAddingProp] = useState(false);
   const [addingView, setAddingView] = useState(false);
+  const [showColumns, setShowColumns] = useState(false);
 
   // 저장 실패를 조용히 삼키지 않고 잠깐 표시(코드 리뷰 HIGH). 3초 후 자동 해제.
   // 이전 타이머를 취소해 연속 오류가 서로를 조기 종료하지 않게 한다(리뷰 MEDIUM).
@@ -237,6 +238,7 @@ export function DatabaseView({
           groupByPropId: type === "board" ? (selectProps[0]?.id ?? null) : null,
           sort: null,
           filters: [],
+          hiddenPropIds: [],
         },
       ],
     });
@@ -260,6 +262,24 @@ export function DatabaseView({
       ),
     });
   };
+
+  // 표 열 표시/숨김: 활성 뷰의 hiddenPropIds에서 해당 속성을 토글.
+  const toggleColumn = (propId: string) => {
+    const hidden = view.hiddenPropIds ?? [];
+    const next = hidden.includes(propId)
+      ? hidden.filter((id) => id !== propId)
+      : [...hidden, propId];
+    onSchemaChange({
+      ...dbSchema,
+      views: dbSchema.views.map((v) =>
+        v.id === view.id ? { ...v, hiddenPropIds: next } : v,
+      ),
+    });
+  };
+  // 표 뷰에 실제로 렌더할 속성(숨김 제외). board는 열 개념이 없어 hiddenPropIds 무시.
+  const visibleProperties = dbSchema.properties.filter(
+    (p) => !(view.hiddenPropIds ?? []).includes(p.id),
+  );
 
   const groupProp = view.groupByPropId
     ? dbSchema.properties.find((p) => p.id === view.groupByPropId)
@@ -388,14 +408,58 @@ export function DatabaseView({
           onSortChange={setActiveViewSort}
           onFiltersChange={setActiveViewFilters}
         />
-        <button
-          type="button"
-          onClick={handleExportCsv}
-          disabled={visibleRows.length === 0}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
-        >
-          <Download className="size-3.5" /> CSV
-        </button>
+        <div className="flex items-center gap-1">
+          {view.type === "table" && dbSchema.properties.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowColumns((o) => !o)}
+                className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              >
+                <Columns3 className="size-3.5" /> 열
+              </button>
+              {showColumns && (
+                <>
+                  <div
+                    role="presentation"
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowColumns(false)}
+                  />
+                  <div className="absolute right-0 top-8 z-20 flex w-52 flex-col gap-1 rounded-lg border border-border bg-card p-2 shadow-lg">
+                    <span className="px-1 text-xs font-medium text-muted-foreground">
+                      표시할 열
+                    </span>
+                    {dbSchema.properties.map((p) => {
+                      const hidden = (view.hiddenPropIds ?? []).includes(p.id);
+                      return (
+                        <label
+                          key={p.id}
+                          className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/60"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!hidden}
+                            onChange={() => toggleColumn(p.id)}
+                            className="size-3.5 accent-primary"
+                          />
+                          <span className="truncate">{p.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={visibleRows.length === 0}
+            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
+          >
+            <Download className="size-3.5" /> CSV
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -429,7 +493,7 @@ export function DatabaseView({
       ) : (
         <DbTableView
           rows={visibleRows}
-          properties={dbSchema.properties}
+          properties={visibleProperties}
           onOpenRow={openRow}
           onTitleChange={handleTitleChange}
           onRowPropChange={handleRowPropChange}

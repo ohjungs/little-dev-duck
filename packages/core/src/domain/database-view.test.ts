@@ -273,13 +273,15 @@ describe("viewDefSchema 하위호환", () => {
     });
     expect(parsed.sort).toBeNull();
     expect(parsed.filters).toEqual([]);
+    expect(parsed.hiddenPropIds).toEqual([]);
   });
 
-  it("createDefaultDbSchema의 뷰도 sort/filters 기본값을 가진다", () => {
+  it("createDefaultDbSchema의 뷰도 sort/filters/hiddenPropIds 기본값을 가진다", () => {
     const schema = dbSchemaSchema.parse(createDefaultDbSchema());
     for (const v of schema.views) {
       expect(v.sort).toBeNull();
       expect(v.filters).toEqual([]);
+      expect(v.hiddenPropIds).toEqual([]);
     }
   });
 });

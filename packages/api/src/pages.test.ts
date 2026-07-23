@@ -284,6 +284,7 @@ describe("Phase 11 DB 뷰", () => {
           groupByPropId: null,
           sort: null,
           filters: [],
+          hiddenPropIds: [],
         },
       ],
     };
