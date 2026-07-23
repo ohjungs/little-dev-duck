@@ -6,10 +6,14 @@
 > 전건 수정) + 테스트 + web tsc + 전체 eslint + next build GREEN. push 직후 CI red(api 빌드 tsc가 테스트 파일
 > 포함 — pages.test 뷰 픽스처 sort/filters 누락) 발견·즉시 수정 → CI green. **교훈: core 계약 변경 시 전 패키지
 > tsc 필수**(메모리 기록).
-> **2차 배포(~07:35 KST)**: DB 열숨기기·팔레트 최근페이지·보드 select 칩·단축키 도움말 4개. 검증=전 패키지 tsc
-> (core/api/ai/mascot) + 테스트 423(core 197/api 211/ai 10/mascot 5) + web tsc + eslint + 프로덕션 next build GREEN.
-> **누적 25개 기능 배포.** 이후 배포는 **6시간 간격 또는 검증된 배치가 쌓일 때**. cron 워치독(1분)이 세션 중단 시
-> /next-step으로 재개. 완료 기능 요약은 아래 각 Phase "후속" 항목 및 커밋 로그(git log) 참조.
+> **2차 배포(~07:35 KST)**: DB 열숨기기·팔레트 최근페이지·보드 select 칩·단축키 도움말 4개.
+> **3차 배포(~07:50 KST)**: 뉴스 읽음상태·모두읽음·표 행개수 3개. 전 배포 전 패키지 tsc + 테스트 423 + web
+> tsc/eslint/next build 검증, CI(lint-and-test + e2e Playwright) 전부 green. **누적 28개 기능 배포.**
+> **자율 한계 도달**: 코드로 완결 가능한 고가치 노션-격차/이월 기능 대부분 소진. 남은 로드맵 항목은 사용자
+> 인프라 필요(아래 목록). 과잉 기능은 자제. cron 워치독(1분)이 루프를 살려두며, 사용자가 인프라를 열거나
+> 새 요구가 생기면 재개. **[사용자 결정/입력 대기]**: ① `supabase db push`(pages_db_view·pages_public_share·
+> delete_all_my_data·news 마이그레이션) ② OAuth 기기 실기검증(Calendar/GitHub/Gmail) ③ Sentry 계정(13 T5)
+> ④ i18n 착수 승인(13 T6, 대규모) ⑤ Tauri/RN(기기). 완료 기능은 아래 각 Phase "후속" 및 git log 참조.
 > **중간 리뷰(2026-07-24, 20커밋 누적 diff)**: code-reviewer + security-reviewer 병렬 실행. **CRITICAL/배포차단 0건.**
 > HIGH 1건(낙관적 업데이트 stale rollback — 실패 응답이 그 사이 성공한 최신 편집을 덮어씀) + MEDIUM 3건
 > (에러 타이머 미취소, addFilter MAX_FILTERS 미가드, CSV 수식 인젝션) + 보안 선택 1건(RSS href 스킴) **전부 수정**.
