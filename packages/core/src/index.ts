@@ -151,3 +151,13 @@ export {
   summarizeForLog,
   type ActionLogEntry,
 } from "./domain/action-log";
+export {
+  feedSchema,
+  articleSchema,
+  normalizeUrl,
+  parseRssItems,
+  FEED_FAIL_THRESHOLD,
+  type Feed,
+  type Article,
+  type RssItem,
+} from "./domain/news";

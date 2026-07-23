@@ -8,6 +8,26 @@
 저작권 리스크로 설계 전 구간에서 금지한다(articles 테이블은 3줄 요약+원문 링크만 저장, 전문 미저장).
 픽셀 오리 오피스(로드맵 Phase 16/17)는 이 Phase의 범위가 아니다.
 
+## 구현 현황 (2026-07-24, `/loop` 인계 세션) — 수집·요약·리더 슬라이스 완료
+
+무인 실행 제약상 **외부 인프라(Gmail 발송·GitHub Actions 스케줄러)와 기기 검증이 필요한 T4/T5의
+발송·알림·아침브리핑은 이월**하고, 코드로 완결·검증 가능한 **수집(T1)+요약(T2)+리더/피드관리(T6 일부)**
+수직 슬라이스를 구현했다:
+- **T1 수집(완료)**: 마이그레이션 `20260724140000_news`(feeds/articles + RLS 8정책 + articles
+  UNIQUE(user_id,url_hash) 중복차단 + delete_all_my_data에 두 테이블 추가 + rollback). core
+  `domain/news.ts`(normalizeUrl=추적파라미터 제거·정렬·해시입력 결정화, parseRssItems=RSS2.0/Atom
+  최소 파서, feed/article 스키마, FEED_FAIL_THRESHOLD). api `news.ts` `collectFeed`(fetch→파싱→
+  정규화·SHA-256→중복(23505) 스킵 insert, 실패 시 fail_count++·임계 도달 자동 paused, 성공 시 리셋).
+  저작권: 본문 전문 미저장, snippet은 RSS description(≤500자 발행자 요약)만. core 6 tests + api 6 tests.
+- **T2 요약(완료)**: api `summarizeArticle`(Gemini 3줄, 클릭베이트 배제) + `setArticleSummary`. 수집
+  라우트가 summary=null 기사를 실행당 최대 8건 요약(무료 쿼터 보호, 쿼터 소진 시 부분 성공 후 다음 실행).
+- **T6 피드관리 UI 일부(완료)**: `/news` 리더(NewsReader) — 피드 추가/일시정지/재개/삭제 + "지금 수집"
+  버튼 + 기사 목록(3줄 요약/미리보기/원문 링크/발행일). AppNav에 뉴스 탭 추가. `/api/news/collect` 라우트.
+- **이월(사용자 인프라·기기 필요)**: T3 클러스터링(pgvector — 임베딩 누적 정책 선결), T4 Gmail 발송(
+  gmail.send scope·본인 계정 실발송 검증), T4 GitHub Actions 스케줄러(리포 시크릿·워크플로 설정), T5
+  발송 위젯 알림·오리 아침 브리핑(발송 선행), T6 관심사 온보딩·RSS 폴더·키워드 음소거, T7 스크랩→노트.
+- **db push 필요(news)** + 사용자 실기 검증(실제 RSS 피드 등록→수집→요약 확인).
+
 ## 대상 항목 (docs/plans/phase-mapping-proposal-2026-07-20.md 배정, 13건 전부 반영)
 
 | # | 기능명 | 카테고리 | 태그 | 반영 Task |

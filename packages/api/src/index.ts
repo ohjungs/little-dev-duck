@@ -118,3 +118,15 @@ export {
 } from "./pageVersions";
 
 export { deleteAllMyData } from "./account";
+
+export {
+  addFeed,
+  listFeeds,
+  setFeedStatus,
+  deleteFeed,
+  listArticles,
+  collectFeed,
+  summarizeArticle,
+  setArticleSummary,
+  type CollectDeps,
+} from "./news";

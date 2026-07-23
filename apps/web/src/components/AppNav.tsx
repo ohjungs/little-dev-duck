@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   FileText,
   LayoutDashboard,
+  Newspaper,
   Search,
   Settings,
   ShieldCheck,
@@ -37,6 +38,7 @@ function SearchTrigger() {
 const NAV = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
   { href: "/pages", label: "페이지", icon: FileText },
+  { href: "/news", label: "뉴스", icon: Newspaper },
   { href: "/settings", label: "설정", icon: Settings },
   { href: "/admin", label: "관리자", icon: ShieldCheck },
 ];
