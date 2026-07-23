@@ -8,6 +8,11 @@ import { levelProgress, type DuckState } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { onXpChanged } from "@/lib/xpSignal";
 import {
+  readQuietHours,
+  QUIET_HOURS_EVENT,
+  type QuietHours,
+} from "@/lib/quietHours";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -30,8 +35,21 @@ export function DuckWidget() {
   const mood = useDuckMood();
   const [duckState, setDuckState] = useState<DuckState | null>(null);
   const [celebrate, setCelebrate] = useState(false);
+  const [quietHours, setQuietHours] = useState<QuietHours | null>(null);
   const levelRef = useRef<number | null>(null);
   const celebrateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 방해금지(DND) 설정을 localStorage에서 읽고, 설정 페이지에서 바뀌면(커스텀/다른탭 storage 이벤트) 반영.
+  useEffect(() => {
+    const sync = () => setQuietHours(readQuietHours());
+    sync();
+    window.addEventListener(QUIET_HOURS_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(QUIET_HOURS_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -85,7 +103,12 @@ export function DuckWidget() {
 
       <CardContent className="flex flex-col items-center gap-4">
         <div className="flex w-full items-center justify-center rounded-xl bg-gradient-to-b from-secondary/60 to-secondary/20">
-          <Duck height={DUCK_HEIGHT} mood={mood} celebrate={celebrate} />
+          <Duck
+            height={DUCK_HEIGHT}
+            mood={mood}
+            celebrate={celebrate}
+            quietHours={quietHours}
+          />
         </div>
 
         {duckState && (

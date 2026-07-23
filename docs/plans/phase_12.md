@@ -26,7 +26,7 @@ phase-mapping-proposal 2절에 배정된 6항목:
 - web: PageEditor "웹에 공개" 토글(공개 시 링크 복사) + `/p/[slug]` 공개 라우트(read-only 렌더,
   BlockNote 읽기 전용 + DB 뷰는 후속). 6번(공개 발행 필터)을 여기 결합: 공개 전 확인 문구.
 
-### T2 방해금지 시간대 (DND, self-contained)
+### T2 방해금지 시간대 (DND, self-contained) — [x] 코드 완료 2026-07-24
 profiles(또는 신규 settings)에 quiet_hours(시작/종료 시각). 오리 자율 혼잣말·알림을 그 시간대엔 정지.
 현재 알림은 오리 idle 혼잣말(mascot)뿐이라 그 억제부터. 알림 4채널은 T4에서.
 

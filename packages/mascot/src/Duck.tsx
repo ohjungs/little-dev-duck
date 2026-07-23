@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html, useGLTF } from "@react-three/drei";
 import type { Group } from "three";
-import type { DuckMood } from "@ldd/core";
+import { isQuietHour, type DuckMood } from "@ldd/core";
 import { pickIdlePhrase, pickPhrase } from "./phrases";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
@@ -137,12 +137,15 @@ export interface DuckProps {
   mood?: DuckMood;
   // true가 되는 순간 짧은 레벨업 축하 연출(회전+도약)을 재생한다. 기본 false(하위호환).
   celebrate?: boolean;
+  // Phase 12 T2 방해금지(DND). 이 시간대(로컬)엔 유휴 혼잣말을 억제한다(밤엔 오리도 잔다). null=끔.
+  quietHours?: { start: number; end: number } | null;
 }
 
 export function Duck({
   height = 220,
   mood = "neutral",
   celebrate = false,
+  quietHours = null,
 }: DuckProps) {
   const reducedMotion = usePrefersReducedMotion();
   const clickCountRef = useRef(0);
@@ -151,6 +154,9 @@ export function Duck({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 마지막 상호작용 시각. 유휴 판정(T2)의 기준이며, 클릭 때마다 갱신된다.
   const lastInteractionRef = useRef(0);
+  // 방해금지 설정을 매 렌더 최신값으로 보관 — idle 타이머 콜백이 재구독 없이 현재 값을 읽는다.
+  const quietHoursRef = useRef(quietHours);
+  quietHoursRef.current = quietHours;
 
   const speak = (next: string) => {
     setPhrase(next);
@@ -178,7 +184,10 @@ export function Duck({
       const wait = IDLE_MIN_MS + Math.random() * (IDLE_MAX_MS - IDLE_MIN_MS);
       timer = setTimeout(() => {
         const idleFor = Date.now() - lastInteractionRef.current;
-        if (idleFor >= IDLE_MIN_MS) {
+        // 방해금지 시간대(로컬 시각 기준)엔 혼잣말을 건너뛴다(밤엔 오리도 잔다 — Phase 12 T2).
+        const q = quietHoursRef.current;
+        const quiet = q ? isQuietHour(new Date().getHours(), q.start, q.end) : false;
+        if (idleFor >= IDLE_MIN_MS && !quiet) {
           speak(pickIdlePhrase(mood));
         }
         scheduleIdle();

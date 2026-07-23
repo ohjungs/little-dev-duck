@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { CalendarClock, LogOut, Mail, Palette, User } from "lucide-react";
+import { CalendarClock, LogOut, Mail, Moon, Palette, User } from "lucide-react";
 import { getGithubTokens, getGmailTokens, getGoogleTokens } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AppearanceSetting } from "@/components/AppearanceSetting";
+import { QuietHoursSetting } from "@/components/QuietHoursSetting";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
 import { GitHubMark } from "@/components/ui/github-mark";
@@ -55,6 +56,21 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <AppearanceSetting />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Moon className="size-4 text-primary-accent" />
+              방해금지 시간대
+            </CardTitle>
+            <CardDescription>
+              지정한 시간대엔 오리가 혼잣말을 하지 않고 조용히 있습니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <QuietHoursSetting />
           </CardContent>
         </Card>
 

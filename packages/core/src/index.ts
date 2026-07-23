@@ -24,6 +24,7 @@ export {
   type TodayTodoTally,
 } from "./domain/duck-mood";
 export { epochDay } from "./domain/date-util";
+export { isQuietHour } from "./domain/quiet-hours";
 export {
   XP_REWARDS,
   XP_PER_LEVEL_BASE,
