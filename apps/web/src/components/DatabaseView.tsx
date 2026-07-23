@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Download, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   createPage,
   listChildPages,
@@ -11,6 +11,7 @@ import {
 } from "@ldd/api";
 import {
   filterRows,
+  rowsToCsv,
   sortRows,
   MAX_VIEWS,
   type DbSchema,
@@ -267,6 +268,20 @@ export function DatabaseView({
     [rows, view.filters, view.sort, dbSchema.properties],
   );
 
+  // 현재 뷰(필터·정렬 반영)의 행을 CSV로 내보낸다. 엑셀 한글 깨짐 방지 BOM(U+FEFF) 추가.
+  const handleExportCsv = () => {
+    // BOM(U+FEFF)로 시작해 엑셀에서 한글이 깨지지 않게 한다.
+    const bom = String.fromCharCode(0xfeff);
+    const csv = bom + rowsToCsv(visibleRows, dbSchema.properties);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${view.name || "database"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="mt-6 flex flex-col gap-3 px-4">
       <div className="flex items-center gap-1 border-b border-border">
@@ -356,13 +371,23 @@ export function DatabaseView({
         </div>
       )}
 
-      <DbViewToolbar
-        properties={dbSchema.properties}
-        sort={view.sort ?? null}
-        filters={view.filters ?? []}
-        onSortChange={setActiveViewSort}
-        onFiltersChange={setActiveViewFilters}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <DbViewToolbar
+          properties={dbSchema.properties}
+          sort={view.sort ?? null}
+          filters={view.filters ?? []}
+          onSortChange={setActiveViewSort}
+          onFiltersChange={setActiveViewFilters}
+        />
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          disabled={visibleRows.length === 0}
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
+        >
+          <Download className="size-3.5" /> CSV
+        </button>
+      </div>
 
       {error && (
         <p

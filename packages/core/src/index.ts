@@ -90,6 +90,7 @@ export {
   type PageVersion,
 } from "./domain/page";
 export { pageStats, type PageStats } from "./domain/page-stats";
+export { rowsToCsv } from "./domain/db-export";
 export {
   PROPERTY_TYPES,
   VIEW_TYPES,
