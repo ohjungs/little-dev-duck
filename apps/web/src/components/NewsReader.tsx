@@ -10,6 +10,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
   Trash2,
 } from "lucide-react";
 import {
@@ -108,9 +109,21 @@ export function NewsReader() {
   const [collecting, setCollecting] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [grouped, setGrouped] = useState(false);
+  const [query, setQuery] = useState("");
+
+  // 제목/요약/스니펫 부분일치로 표시 기사를 좁힌다(클라이언트 필터). 군집·목록 모두 이 결과 기준.
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return articles;
+    return articles.filter((a) =>
+      `${a.title} ${a.summary ?? ""} ${a.snippet ?? ""}`
+        .toLowerCase()
+        .includes(needle),
+    );
+  }, [articles, query]);
 
   // Phase 15 T3: 제목/스니펫 유사도로 관련 기사 군집화(무의존성 순수함수). 다중 멤버 군집만 시각적으로 묶는다.
-  const clusters = useMemo(() => clusterArticles(articles), [articles]);
+  const clusters = useMemo(() => clusterArticles(shown), [shown]);
   const hasRelated = clusters.some((c) => c.articles.length > 1);
 
   const load = useCallback(async () => {
@@ -226,7 +239,11 @@ export function NewsReader() {
         </form>
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
-            {feeds.length}개 피드 · {articles.length}개 기사
+            {feeds.length}개 피드 ·{" "}
+            {query.trim()
+              ? `${shown.length}/${articles.length}`
+              : articles.length}
+            개 기사
           </span>
           <div className="flex items-center gap-2">
             {hasRelated && (
@@ -248,6 +265,20 @@ export function NewsReader() {
         </div>
         {note && <p className="text-xs text-primary-accent">{note}</p>}
       </div>
+
+      {/* 기사 검색(클라이언트 필터) */}
+      {articles.length > 0 && (
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3">
+          <Search className="size-4 shrink-0 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="기사 검색 (제목·요약)"
+            aria-label="기사 검색"
+            className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+      )}
 
       {/* 피드 목록 */}
       {feeds.length > 0 && (
@@ -305,6 +336,11 @@ export function NewsReader() {
           아직 기사가 없어요. RSS 피드를 추가하고 &quot;지금 수집&quot;을 눌러보세요.
         </p>
       )}
+      {state === "ready" && articles.length > 0 && shown.length === 0 && (
+        <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          검색어와 일치하는 기사가 없어요.
+        </p>
+      )}
       {grouped ? (
         <div className="flex flex-col gap-3">
           {clusters.map((cluster) =>
@@ -333,7 +369,7 @@ export function NewsReader() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {articles.map((a) => (
+          {shown.map((a) => (
             <ArticleCard key={a.id} a={a} onScrap={onScrap} />
           ))}
         </div>
