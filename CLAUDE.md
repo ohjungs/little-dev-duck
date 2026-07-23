@@ -28,7 +28,11 @@
 - ponytail (full 모드 상시): 코드를 쓰기 전 7단계 사다리를 탄다.
   필요한가 - 코드베이스에 있나 - 표준 라이브러리 - 플랫폼 네이티브 - 설치된 의존성 - 한 줄 - 최소 구현.
   검증, 에러 처리, 보안, 접근성은 절대 깎지 않는다.
-- gstack: 계획은 /office-hours - /autoplan, 리뷰는 /review, 배포는 /ship, 회고는 /retro.
+- gstack: 계획은 /office-hours - /autoplan, 개발 중 QA/브라우저 테스트는 /qa(또는 리포트만 필요하면
+  /qa-only), 리뷰는 /review, 배포는 /ship, 회고는 /retro. **"어떻게 짤지"는 ponytail, "이 단계에서 뭘
+  실행할지"는 gstack** — bash로 즉흥적으로 pnpm build/lint/test를 반복 실행하기 전에 해당 단계에 맞는
+  gstack 커맨드가 있는지 먼저 확인한다(단, 패키지 단위 vitest/tsc/eslint 실행 자체는 gstack 영역 밖이라
+  계속 pnpm으로 직접 돌린다 — gstack은 QA/리뷰/배포처럼 더 상위 워크플로 게이트를 대체한다).
 
 ### 3-2. PDCA 에이전트 팀
 - Plan: Planner가 docs/plans/phase_xx.md와 Task 의존성 그래프를 만든다.
