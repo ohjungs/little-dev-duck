@@ -12,6 +12,7 @@ import {
   type OfficeRole,
   type Vec,
 } from "@ldd/core";
+import { cn } from "@/lib/utils";
 
 // Phase 16+17: Canvas 2D 픽셀 오리 오피스. 캐릭터 바이블 색상(DECISIONS.md 4절)으로 절차적 드로잉.
 // P16: 이벤트→상태 애니메이션, 유휴 퇴근, 클릭 말풍선. P17: 대장오리 키보드 조작(그리드 이동·충돌),
@@ -39,6 +40,16 @@ const ROLE_LABEL: Record<OfficeRole, string> = {
 const WORKER_ROLES: OfficeRole[] = ["plan", "do", "check"];
 const SIM_TOOLS = ["Edit", "Write", "Read", "Grep", "Bash", "Task"] as const;
 const SIM_FILES = ["Duck.tsx", "news.ts", "office.ts", "route.ts", "page.tsx"];
+const LOG_MAX = 30; // 활동 로그 링버퍼 상한(더블클릭 패널).
+
+type LogEntry = {
+  id: number;
+  role: OfficeRole;
+  tool: string;
+  file: string;
+  status: "ok" | "error";
+  ts: number; // performance.now() 기준
+};
 
 type Worker = {
   role: OfficeRole;
@@ -49,6 +60,14 @@ type Worker = {
 };
 
 const tileCenter = (t: number) => t * TILE + TILE / 2;
+
+// 활동 로그 상대시간(performance.now 기준). 새 이벤트마다 리렌더돼 갱신된다.
+function agoLabel(ts: number): string {
+  const s = Math.max(0, Math.round((performance.now() - ts) / 1000));
+  if (s < 5) return "방금";
+  if (s < 60) return `${s}초 전`;
+  return `${Math.floor(s / 60)}분 전`;
+}
 
 function buildWorkers(count: number): Worker[] {
   return deskSlots(count, COLS, ROWS).map((tile, i) => ({
@@ -146,6 +165,9 @@ export function PixelOffice() {
     null,
   );
   const [paused, setPaused] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const logIdRef = useRef(0);
   const pausedRef = useRef(false);
   useEffect(() => {
     pausedRef.current = paused;
@@ -217,10 +239,21 @@ export function PixelOffice() {
         simAt = now;
         const w = workers[Math.floor(rand() * workers.length)];
         const tool = SIM_TOOLS[Math.floor(rand() * SIM_TOOLS.length)];
-        const status = rand() < 0.12 ? "error" : "ok";
+        const file = SIM_FILES[Math.floor(rand() * SIM_FILES.length)];
+        const status: "ok" | "error" = rand() < 0.12 ? "error" : "ok";
         w.state = eventToState({ tool, status });
-        w.label = `${tool} · ${SIM_FILES[Math.floor(rand() * SIM_FILES.length)]}`;
+        w.label = `${tool} · ${file}`;
         w.lastTs = now;
+        // 활동 로그 누적(최신이 앞, 상한 유지). 더블클릭 패널에서 본다.
+        const entry: LogEntry = {
+          id: (logIdRef.current += 1),
+          role: w.role,
+          tool,
+          file,
+          status,
+          ts: now,
+        };
+        setLog((prev) => [entry, ...prev].slice(0, LOG_MAX));
       }
       for (const w of workers) {
         if (w.state !== "offwork" && w.lastTs > 0 && now - w.lastTs > IDLE_MS) {
@@ -273,8 +306,9 @@ export function PixelOffice() {
           ref={canvasRef}
           tabIndex={0}
           onKeyDown={onKeyDown}
+          onDoubleClick={() => setShowLog((s) => !s)}
           role="img"
-          aria-label="픽셀 오리 오피스 — 방향키/WASD로 대장오리를 움직이고, 직원 오리 옆에서 E로 말을 겁니다"
+          aria-label="픽셀 오리 오피스 — 방향키/WASD로 대장오리를 움직이고, 직원 오리 옆에서 E로 말을 겁니다. 더블클릭하면 활동 로그가 열립니다"
           className="block w-full cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           style={{ aspectRatio: `${W} / ${H}`, imageRendering: "pixelated" }}
         />
@@ -287,10 +321,57 @@ export function PixelOffice() {
         </div>
       )}
 
+      {showLog && (
+        <div className="rounded-xl border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2">
+            <span className="text-xs font-semibold">활동 로그</span>
+            <button
+              type="button"
+              onClick={() => setShowLog(false)}
+              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              닫기
+            </button>
+          </div>
+          {log.length === 0 ? (
+            <p className="px-3 py-4 text-xs text-muted-foreground">
+              아직 기록된 활동이 없어요. 데모가 재생되면 쌓여요.
+            </p>
+          ) : (
+            <ul className="max-h-52 overflow-y-auto">
+              {log.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex items-center gap-2 border-b border-border/40 px-3 py-1.5 text-xs last:border-0"
+                >
+                  <span
+                    className={cn(
+                      "size-1.5 shrink-0 rounded-full",
+                      e.status === "error" ? "bg-destructive" : "bg-primary/60",
+                    )}
+                  />
+                  <span className="font-medium">{ROLE_LABEL[e.role]}</span>
+                  <span className="min-w-0 truncate text-muted-foreground">
+                    {e.tool} · {e.file}
+                  </span>
+                  {e.status === "error" && (
+                    <span className="text-destructive">오류</span>
+                  )}
+                  <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">
+                    {agoLabel(e.ts)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           캔버스를 클릭해 포커스한 뒤 방향키/WASD로 대장오리를 움직여요. 직원 오리 옆에서 E를 누르면
-          지금 뭐 하는지 물어봐요. (데모 구동 — 실 Claude Code 이벤트 연동은 데스크톱 앱)
+          지금 뭐 하는지 물어보고, 캔버스를 더블클릭하면 활동 로그가 열려요. (데모 구동 — 실 Claude
+          Code 이벤트 연동은 데스크톱 앱)
         </p>
         <div className="flex items-center gap-1 text-xs">
           <span className="text-muted-foreground">직원 오리</span>
