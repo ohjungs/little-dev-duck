@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Keyboard, X } from "lucide-react";
+import { useModalA11y } from "@/hooks/useModalA11y";
 
 // 앱 전역 키보드 단축키 목록. 기능이 늘며 단축키가 많아져 발견성을 위해 "?"로 여는 도움말을 둔다.
 const SHORTCUTS: { group: string; items: { keys: string; desc: string }[] }[] = [
@@ -29,14 +30,12 @@ const SHORTCUTS: { group: string; items: { keys: string; desc: string }[] }[] = 
 // "?"로 여는 단축키 도움말 오버레이. (app) 레이아웃에 상주(CommandPalette와 동일 패턴).
 export function ShortcutsHelp() {
   const [open, setOpen] = useState(false);
+  // 모달 접근성(Esc 닫기 + 포커스 진입/트랩/복원). "?" 토글은 아래 전역 리스너가 담당.
+  const dialogRef = useModalA11y<HTMLDivElement>(open, () => setOpen(false));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        return;
-      }
-      // "?"(Shift+/)로 토글. 단, 입력 필드에서 타이핑 중이면 가로채지 않는다.
+      // "?"(Shift+/)로 토글. 단, 입력 필드에서 타이핑 중이면 가로채지 않는다. (Esc는 useModalA11y가 처리)
       if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const t = e.target as HTMLElement | null;
         const tag = t?.tagName;
@@ -58,11 +57,13 @@ export function ShortcutsHelp() {
       onClick={() => setOpen(false)}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="키보드 단축키"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+        className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card shadow-2xl outline-none"
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <span className="flex items-center gap-2 text-sm font-semibold">
