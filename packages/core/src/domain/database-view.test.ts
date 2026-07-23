@@ -3,7 +3,12 @@ import {
   coerceRowPropValue,
   createDefaultDbSchema,
   dbSchemaSchema,
+  filterRows,
   groupRowsByProperty,
+  sortRows,
+  TITLE_PROP_ID,
+  viewDefSchema,
+  type FilterSpec,
   type PropertyDef,
   type RowProps,
 } from "./database-view";
@@ -103,5 +108,178 @@ describe("groupRowsByProperty", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].option).toBeNull();
     expect(groups[0].rows.map((r) => r.id)).toEqual(["a"]);
+  });
+});
+
+// 정렬/필터 테스트용 속성과 행 팩토리.
+const PROPS: PropertyDef[] = [
+  { id: "score", name: "점수", type: "number", options: [] },
+  { id: "done", name: "완료", type: "checkbox", options: [] },
+  {
+    id: "status",
+    name: "상태",
+    type: "select",
+    options: [
+      { id: "todo", name: "할 일", color: "gray" },
+      { id: "done", name: "완료", color: "green" },
+    ],
+  },
+  { id: "note", name: "메모", type: "text", options: [] },
+];
+const dbRow = (id: string, title: string, rowProps: RowProps) => ({
+  id,
+  title,
+  rowProps,
+});
+
+describe("sortRows", () => {
+  it("정렬 스펙이 null이면 원본 순서의 새 배열을 반환하고 입력을 변형하지 않는다", () => {
+    const rows = [dbRow("a", "A", {}), dbRow("b", "B", {})];
+    const out = sortRows(rows, null, PROPS);
+    expect(out.map((r) => r.id)).toEqual(["a", "b"]);
+    expect(out).not.toBe(rows);
+  });
+
+  it("숫자 오름차순/내림차순으로 정렬하고 빈 값은 항상 맨 뒤로 보낸다", () => {
+    const rows = [
+      dbRow("a", "", { score: 30 }),
+      dbRow("b", "", {}),
+      dbRow("c", "", { score: 10 }),
+      dbRow("d", "", { score: 20 }),
+    ];
+    const asc = sortRows(rows, { propId: "score", direction: "asc" }, PROPS);
+    expect(asc.map((r) => r.id)).toEqual(["c", "d", "a", "b"]); // b(빈값) 맨 뒤
+    const desc = sortRows(rows, { propId: "score", direction: "desc" }, PROPS);
+    expect(desc.map((r) => r.id)).toEqual(["a", "d", "c", "b"]); // 빈값은 desc에서도 맨 뒤
+  });
+
+  it("텍스트/제목을 로케일 비교로 정렬한다(TITLE_PROP_ID)", () => {
+    const rows = [
+      dbRow("a", "바나나", {}),
+      dbRow("b", "가지", {}),
+      dbRow("c", "사과", {}),
+    ];
+    const out = sortRows(
+      rows,
+      { propId: TITLE_PROP_ID, direction: "asc" },
+      PROPS,
+    );
+    // 한글 자모순: 가지(b) < 바나나(a) < 사과(c)
+    expect(out.map((r) => r.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("동일 값에 대해 안정 정렬을 유지한다", () => {
+    const rows = [
+      dbRow("a", "", { score: 5 }),
+      dbRow("b", "", { score: 5 }),
+      dbRow("c", "", { score: 5 }),
+    ];
+    const out = sortRows(rows, { propId: "score", direction: "asc" }, PROPS);
+    expect(out.map((r) => r.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("filterRows", () => {
+  const rows = [
+    dbRow("a", "회의 준비", { status: "todo", score: 10, note: "긴급" }),
+    dbRow("b", "코드 리뷰", { status: "done", score: 30, done: true }),
+    dbRow("c", "점심 약속", { status: "todo", score: 20 }),
+  ];
+
+  it("빈 필터 배열이면 모든 행을 통과시킨다", () => {
+    expect(filterRows(rows, [], PROPS).map((r) => r.id)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+
+  it("select equals/not_equals", () => {
+    const eq: FilterSpec = { propId: "status", op: "equals", value: "todo" };
+    expect(filterRows(rows, [eq], PROPS).map((r) => r.id)).toEqual(["a", "c"]);
+    const ne: FilterSpec = {
+      propId: "status",
+      op: "not_equals",
+      value: "todo",
+    };
+    expect(filterRows(rows, [ne], PROPS).map((r) => r.id)).toEqual(["b"]);
+  });
+
+  it("text contains(대소문자 무시)", () => {
+    const f: FilterSpec = { propId: "note", op: "contains", value: "긴급" };
+    expect(filterRows(rows, [f], PROPS).map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("is_empty/is_not_empty", () => {
+    const empty: FilterSpec = { propId: "note", op: "is_empty", value: null };
+    expect(filterRows(rows, [empty], PROPS).map((r) => r.id)).toEqual([
+      "b",
+      "c",
+    ]);
+    const notEmpty: FilterSpec = {
+      propId: "note",
+      op: "is_not_empty",
+      value: null,
+    };
+    expect(filterRows(rows, [notEmpty], PROPS).map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("number gt/lt", () => {
+    const gt: FilterSpec = { propId: "score", op: "gt", value: 15 };
+    expect(filterRows(rows, [gt], PROPS).map((r) => r.id)).toEqual(["b", "c"]);
+    const lt: FilterSpec = { propId: "score", op: "lt", value: 15 };
+    expect(filterRows(rows, [lt], PROPS).map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("checkbox equals — 미설정은 false로 취급", () => {
+    const checked: FilterSpec = { propId: "done", op: "equals", value: true };
+    expect(filterRows(rows, [checked], PROPS).map((r) => r.id)).toEqual(["b"]);
+    const unchecked: FilterSpec = {
+      propId: "done",
+      op: "equals",
+      value: false,
+    };
+    expect(filterRows(rows, [unchecked], PROPS).map((r) => r.id)).toEqual([
+      "a",
+      "c",
+    ]);
+  });
+
+  it("여러 필터는 AND로 결합된다", () => {
+    const filters: FilterSpec[] = [
+      { propId: "status", op: "equals", value: "todo" },
+      { propId: "score", op: "gt", value: 15 },
+    ];
+    expect(filterRows(rows, filters, PROPS).map((r) => r.id)).toEqual(["c"]);
+  });
+
+  it("제목으로 필터한다(TITLE_PROP_ID contains)", () => {
+    const f: FilterSpec = {
+      propId: TITLE_PROP_ID,
+      op: "contains",
+      value: "약속",
+    };
+    expect(filterRows(rows, [f], PROPS).map((r) => r.id)).toEqual(["c"]);
+  });
+});
+
+describe("viewDefSchema 하위호환", () => {
+  it("sort/filters 없는 기존 뷰도 파싱되며 기본값이 채워진다", () => {
+    const parsed = viewDefSchema.parse({
+      id: "table",
+      name: "표",
+      type: "table",
+      groupByPropId: null,
+    });
+    expect(parsed.sort).toBeNull();
+    expect(parsed.filters).toEqual([]);
+  });
+
+  it("createDefaultDbSchema의 뷰도 sort/filters 기본값을 가진다", () => {
+    const schema = dbSchemaSchema.parse(createDefaultDbSchema());
+    for (const v of schema.views) {
+      expect(v.sort).toBeNull();
+      expect(v.filters).toEqual([]);
+    }
   });
 });

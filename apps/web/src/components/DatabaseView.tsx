@@ -8,18 +8,23 @@ import {
   listChildPages,
   updatePage,
 } from "@ldd/api";
-import type {
-  DbSchema,
-  Page,
-  PropertyDef,
-  PropertyType,
-  RowProps,
-  RowPropValue,
+import {
+  filterRows,
+  sortRows,
+  type DbSchema,
+  type FilterSpec,
+  type Page,
+  type PropertyDef,
+  type PropertyType,
+  type RowProps,
+  type RowPropValue,
+  type SortSpec,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { DbTableView } from "@/components/db/DbTableView";
 import { DbBoardView } from "@/components/db/DbBoardView";
+import { DbViewToolbar } from "@/components/db/DbViewToolbar";
 
 const NEW_PROP_TYPES: { type: PropertyType; label: string }[] = [
   { type: "text", label: "텍스트" },
@@ -170,9 +175,37 @@ export function DatabaseView({
     });
   };
 
+  // 활성 뷰의 정렬/필터만 갱신(다른 뷰는 그대로). Phase 11 후속.
+  const setActiveViewSort = (sort: SortSpec | null) => {
+    onSchemaChange({
+      ...dbSchema,
+      views: dbSchema.views.map((v) => (v.id === view.id ? { ...v, sort } : v)),
+    });
+  };
+  const setActiveViewFilters = (filters: FilterSpec[]) => {
+    onSchemaChange({
+      ...dbSchema,
+      views: dbSchema.views.map((v) =>
+        v.id === view.id ? { ...v, filters } : v,
+      ),
+    });
+  };
+
   const groupProp = view.groupByPropId
     ? dbSchema.properties.find((p) => p.id === view.groupByPropId)
     : undefined;
+
+  // 필터 → 정렬 순으로 적용한 표시용 행(원본 rows는 불변). 저장된 스키마가 구버전이면
+  // sort/filters가 없을 수 있어 방어적 기본값(?? null / ?? []).
+  const visibleRows = useMemo(
+    () =>
+      sortRows(
+        filterRows(rows ?? [], view.filters ?? [], dbSchema.properties),
+        view.sort ?? null,
+        dbSchema.properties,
+      ),
+    [rows, view.filters, view.sort, dbSchema.properties],
+  );
 
   return (
     <div className="mt-6 flex flex-col gap-3 px-4">
@@ -209,6 +242,14 @@ export function DatabaseView({
         </div>
       </div>
 
+      <DbViewToolbar
+        properties={dbSchema.properties}
+        sort={view.sort ?? null}
+        filters={view.filters ?? []}
+        onSortChange={setActiveViewSort}
+        onFiltersChange={setActiveViewFilters}
+      />
+
       {error && (
         <p
           className="rounded-md bg-destructive/10 px-3 py-1.5 text-sm text-destructive"
@@ -228,7 +269,7 @@ export function DatabaseView({
         </p>
       ) : view.type === "board" && groupProp ? (
         <DbBoardView
-          rows={rows}
+          rows={visibleRows}
           groupProp={groupProp}
           onOpenRow={openRow}
           onMoveRow={handleMoveRow}
@@ -238,7 +279,7 @@ export function DatabaseView({
         />
       ) : (
         <DbTableView
-          rows={rows}
+          rows={visibleRows}
           properties={dbSchema.properties}
           onOpenRow={openRow}
           onTitleChange={handleTitleChange}
