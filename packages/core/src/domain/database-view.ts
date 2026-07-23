@@ -13,6 +13,21 @@ export const PROPERTY_TYPES = [
 export const propertyTypeSchema = z.enum(PROPERTY_TYPES);
 export type PropertyType = z.infer<typeof propertyTypeSchema>;
 
+// select 옵션 색상 팔레트(고정 이름). 실제 CSS 클래스 매핑은 UI 층에 둔다(core는 플랫폼 중립).
+// 스키마는 하위호환·전방호환 위해 color를 자유 문자열로 두고(기존 데이터·미지의 색 허용),
+// UI가 미지의 색을 gray로 폴백한다. 첫 값은 기본색.
+export const SELECT_COLORS = [
+  "gray",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "purple",
+  "pink",
+] as const;
+export type SelectColor = (typeof SELECT_COLORS)[number];
+
 // select 속성의 선택지. id로 row_props가 참조, name/color는 표시용.
 export const selectOptionSchema = z.object({
   id: z.string().min(1).max(64),

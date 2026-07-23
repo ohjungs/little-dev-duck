@@ -92,6 +92,7 @@ export {
 export {
   PROPERTY_TYPES,
   VIEW_TYPES,
+  SELECT_COLORS,
   ROW_VALUE_MAX,
   MAX_PROPERTIES,
   MAX_VIEWS,
@@ -116,6 +117,7 @@ export {
   sortRows,
   filterRows,
   type PropertyType,
+  type SelectColor,
   type SelectOption,
   type PropertyDef,
   type ViewType,

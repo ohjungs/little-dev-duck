@@ -8,6 +8,7 @@ import {
   type PropertyDef,
 } from "@ldd/core";
 import { cn } from "@/lib/utils";
+import { selectChipClass } from "@/lib/selectColors";
 
 // 보드(kanban): select 속성으로 그룹된 열 + 카드. 카드 드래그로 열 간 이동(HTML5 DnD, 라이브러리 없음).
 export function DbBoardView({
@@ -51,7 +52,18 @@ export function DbBoardView({
             )}
           >
             <div className="flex items-center justify-between px-1 text-xs font-semibold text-muted-foreground">
-              <span>{group.option?.name ?? "없음"}</span>
+              {group.option ? (
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5",
+                    selectChipClass(group.option.color),
+                  )}
+                >
+                  {group.option.name}
+                </span>
+              ) : (
+                <span>없음</span>
+              )}
               <span className="tabular-nums opacity-60">{group.rows.length}</span>
             </div>
             {group.rows.map((row) => (

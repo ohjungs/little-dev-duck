@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import type { PropertyDef, PropertyType, SelectOption } from "@ldd/core";
+import {
+  SELECT_COLORS,
+  type PropertyDef,
+  type PropertyType,
+  type SelectOption,
+} from "@ldd/core";
+import { cn } from "@/lib/utils";
+import { selectDotClass } from "@/lib/selectColors";
 
 const TYPE_LABELS: { type: PropertyType; label: string }[] = [
   { type: "text", label: "텍스트" },
@@ -27,12 +34,20 @@ export function DbPropertyMenu({
   const [type, setType] = useState<PropertyType>(prop.type);
   const [options, setOptions] = useState<SelectOption[]>(prop.options);
   const [newOption, setNewOption] = useState("");
+  const [colorPickerFor, setColorPickerFor] = useState<string | null>(null);
 
   const addOption = () => {
     const n = newOption.trim();
     if (!n) return;
     setOptions((o) => [...o, { id: crypto.randomUUID(), name: n, color: "gray" }]);
     setNewOption("");
+  };
+
+  const setOptionColor = (id: string, color: string) => {
+    setOptions((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, color } : o)),
+    );
+    setColorPickerFor(null);
   };
 
   const apply = () => {
@@ -78,18 +93,51 @@ export function DbPropertyMenu({
           <div className="flex flex-col gap-1 rounded border border-border/60 p-2">
             <span className="text-xs font-medium text-muted-foreground">선택지</span>
             {options.map((o) => (
-              <div key={o.id} className="flex items-center gap-1">
-                <span className="min-w-0 flex-1 truncate text-sm">{o.name}</span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOptions((prev) => prev.filter((x) => x.id !== o.id))
-                  }
-                  aria-label={`${o.name} 선택지 제거`}
-                  className="rounded p-0.5 text-muted-foreground hover:text-destructive"
-                >
-                  <X className="size-3" />
-                </button>
+              <div key={o.id} className="flex flex-col gap-1">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setColorPickerFor((c) => (c === o.id ? null : o.id))
+                    }
+                    aria-label={`${o.name} 색상 선택`}
+                    className={cn(
+                      "size-3.5 shrink-0 rounded-full ring-1 ring-border transition-transform hover:scale-110",
+                      selectDotClass(o.color),
+                    )}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {o.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOptions((prev) => prev.filter((x) => x.id !== o.id))
+                    }
+                    aria-label={`${o.name} 선택지 제거`}
+                    className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+                {colorPickerFor === o.id && (
+                  <div className="flex flex-wrap gap-1 pl-4">
+                    {SELECT_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setOptionColor(o.id, c)}
+                        aria-label={`색상 ${c}`}
+                        aria-pressed={o.color === c}
+                        className={cn(
+                          "size-4 rounded-full ring-1 ring-border transition-transform hover:scale-110",
+                          selectDotClass(c),
+                          o.color === c && "ring-2 ring-primary",
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             <div className="flex items-center gap-1">

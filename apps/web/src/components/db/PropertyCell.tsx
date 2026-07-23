@@ -8,6 +8,7 @@ import {
   type RowPropValue,
 } from "@ldd/core";
 import { cn } from "@/lib/utils";
+import { selectDotClass } from "@/lib/selectColors";
 
 const INPUT_CLASS =
   "w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-primary/40 rounded px-1 py-0.5";
@@ -76,22 +77,38 @@ export function PropertyCell({
           className="size-4 accent-primary"
         />
       );
-    case "select":
+    case "select": {
+      const selected =
+        typeof value === "string"
+          ? prop.options.find((o) => o.id === value)
+          : undefined;
       return (
-        <select
-          value={typeof value === "string" ? value : ""}
-          aria-label={prop.name}
-          onChange={(e) => commit(e.target.value)}
-          className={cn(INPUT_CLASS, "cursor-pointer")}
-        >
-          <option value="">—</option>
-          {prop.options.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {selected && (
+            <span
+              aria-hidden
+              className={cn(
+                "size-2.5 shrink-0 rounded-full",
+                selectDotClass(selected.color),
+              )}
+            />
+          )}
+          <select
+            value={typeof value === "string" ? value : ""}
+            aria-label={prop.name}
+            onChange={(e) => commit(e.target.value)}
+            className={cn(INPUT_CLASS, "cursor-pointer")}
+          >
+            <option value="">—</option>
+            {prop.options.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        </div>
       );
+    }
     case "date":
       return (
         <input
