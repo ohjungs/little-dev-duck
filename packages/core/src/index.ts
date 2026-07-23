@@ -161,3 +161,13 @@ export {
   type Article,
   type RssItem,
 } from "./domain/news";
+export {
+  officeEventSchema,
+  eventToState,
+  parseOfficeEvents,
+  OFFICE_ROLES,
+  DUCK_STATES,
+  type OfficeEvent,
+  type OfficeRole,
+  type DuckWorkState,
+} from "./domain/office-event";

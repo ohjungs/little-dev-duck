@@ -10,6 +10,30 @@
 순서" (a)~(g) 7단계를 T1~T7 뼈대로 그대로 사용한다. (h)플레이어조작 (i)상호작용시스템 (j)동적레이아웃은
 Phase 17로 명시적으로 미룬다.
 
+## 구현 현황 (2026-07-24, `/loop` 인계 세션) — 웹 오피스 렌더링 슬라이스
+
+원래 이 Phase는 apps/desktop(Tauri 위젯 셸) 위에서 동작하도록 설계됐으나, Tauri sidecar WebSocket·
+Claude Code hooks·스프라이트 에셋 생성(Adobe/Canva MCP)은 데스크톱/기기/MCP가 필요해 무인 실행에서
+검증 불가다. 대신 **웹 앱에서 완결·검증 가능한 렌더링/상호작용/계약 부분**을 구현하고, 실이벤트 소스와
+데스크톱 중계는 이월했다:
+- **T1 사전조사(완료·결론)**: Canvas 2D + 절차적 스프라이트로 충분히 자체 구현 가능 — 외부 OSS 포크
+  불필요(라이선스/아키텍처 결합 리스크 회피). PixiJS 미도입(YAGNI, phase_16 원칙).
+- **T2 이벤트 계약(완료)**: core `office-event.ts` — `officeEventSchema`(agentId/role/tool/targetFile/
+  status/ts), `parseOfficeEvents`(JSONL, malformed 줄 스킵). 계약 잠금. core 5 tests.
+- **T6 상태 매핑(완료)**: core `eventToState`(Edit/Write=typing, Read/Grep=reading, Bash=server,
+  error=question, 미지 도구=idle 폴백). 코드 분기 아닌 데이터 테이블. (phase_16은 apps/desktop에 두라
+  했으나 웹 구현이라 core에 둠 — 계약이자 테스트 대상.)
+- **T4 렌더링(완료)**: web `PixelOffice.tsx` — Canvas 2D 오피스(타일 바닥+책상), 캐릭터 바이블 색상
+  (#F6EFDD/#E3D3B9/#A99C65/#352116)으로 오리 절차적 드로잉(외부 스프라이트 에셋 없이), 상태별 아이콘/
+  타이핑 bob, 유휴 12초 초과 시 퇴근(offwork) 모드, ~11fps 캡(리소스 예산), prefers-reduced-motion 준수.
+- **T7 배치+클릭(완료)**: PDCA 4오리(기획/개발/리뷰/대장) 고정 책상, 오리 클릭 히트테스트→말풍선 활동
+  요약(LLM 없이 이벤트 데이터 템플릿). 더블클릭 로그 패널은 이월.
+- **데모 구동**: 실 Claude Code 이벤트 대신 시뮬레이터가 OfficeEvent 계약대로 랜덤 이벤트를 만들어
+  구동 — 실이벤트는 같은 스키마로 꽂으면 됨. `/office` 라우트 + 네비 추가.
+- **이월(데스크톱·기기·MCP)**: T2 실 hooks/JSONL tail 소스, T3 Tauri sidecar WebSocket 중계·토큰
+  보안·스로틀링(apps/desktop 필요), T5 스프라이트 시트 에셋(절차적 드로잉으로 대체), T7 더블클릭 로그
+  패널, 리소스 예산 자동 프레임레이트 하향의 실측 통합(Phase 5 위젯 예산 확정 후).
+
 ## 대상 항목 (docs/plans/phase-mapping-proposal-2026-07-20.md 배정, 12건 전부 반영)
 
 | # | 기능명 | 카테고리 | 태그 | 반영 Task |
