@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
+  Layers,
   Loader2,
   Pause,
   Play,
@@ -17,7 +18,7 @@ import {
   listFeeds,
   setFeedStatus,
 } from "@ldd/api";
-import type { Article, Feed } from "@ldd/core";
+import { clusterArticles, type Article, type Feed } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
@@ -29,6 +30,40 @@ function timeLabel(iso: string | null): string {
   });
 }
 
+// 기사 1건 카드. 목록/군집 양쪽에서 재사용(마크업 중복 제거).
+function ArticleCard({ a }: { a: Article }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-sm font-semibold leading-snug">{a.title}</h3>
+        <a
+          href={a.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="원문 보기"
+          className="shrink-0 text-muted-foreground hover:text-primary-accent"
+        >
+          <ExternalLink className="size-4" />
+        </a>
+      </div>
+      {a.summary ? (
+        <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+          {a.summary}
+        </p>
+      ) : a.snippet ? (
+        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground/80">
+          {a.snippet}
+        </p>
+      ) : null}
+      {a.publishedAt && (
+        <p className="mt-2 text-xs text-muted-foreground/60">
+          {timeLabel(a.publishedAt)}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Phase 15: 뉴스 리더 — 피드 관리(추가/일시정지/삭제) + 수동 수집 + 기사 목록(3줄 요약).
 export function NewsReader() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
@@ -37,6 +72,11 @@ export function NewsReader() {
   const [url, setUrl] = useState("");
   const [collecting, setCollecting] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [grouped, setGrouped] = useState(false);
+
+  // Phase 15 T3: 제목/스니펫 유사도로 관련 기사 군집화(무의존성 순수함수). 다중 멤버 군집만 시각적으로 묶는다.
+  const clusters = useMemo(() => clusterArticles(articles), [articles]);
+  const hasRelated = clusters.some((c) => c.articles.length > 1);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -139,10 +179,23 @@ export function NewsReader() {
           <span className="text-xs text-muted-foreground">
             {feeds.length}개 피드 · {articles.length}개 기사
           </span>
-          <Button size="sm" onClick={onCollect} disabled={collecting}>
-            {collecting ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-            지금 수집
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasRelated && (
+              <Button
+                size="sm"
+                variant={grouped ? "default" : "outline"}
+                onClick={() => setGrouped((g) => !g)}
+                aria-pressed={grouped}
+              >
+                <Layers />
+                관련 기사 묶기
+              </Button>
+            )}
+            <Button size="sm" onClick={onCollect} disabled={collecting}>
+              {collecting ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+              지금 수집
+            </Button>
+          </div>
         </div>
         {note && <p className="text-xs text-primary-accent">{note}</p>}
       </div>
@@ -203,41 +256,35 @@ export function NewsReader() {
           아직 기사가 없어요. RSS 피드를 추가하고 &quot;지금 수집&quot;을 눌러보세요.
         </p>
       )}
-      <ul className="flex flex-col gap-3">
-        {articles.map((a) => (
-          <li
-            key={a.id}
-            className="rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-sm font-semibold leading-snug">{a.title}</h3>
-              <a
-                href={a.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="원문 보기"
-                className="shrink-0 text-muted-foreground hover:text-primary-accent"
+      {grouped ? (
+        <div className="flex flex-col gap-3">
+          {clusters.map((cluster) =>
+            cluster.articles.length > 1 ? (
+              <div
+                key={cluster.key}
+                className="rounded-2xl border border-primary/30 bg-primary/[0.03] p-2"
               >
-                <ExternalLink className="size-4" />
-              </a>
-            </div>
-            {a.summary ? (
-              <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
-                {a.summary}
-              </p>
-            ) : a.snippet ? (
-              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground/80">
-                {a.snippet}
-              </p>
-            ) : null}
-            {a.publishedAt && (
-              <p className="mt-2 text-xs text-muted-foreground/60">
-                {timeLabel(a.publishedAt)}
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
+                <p className="px-2 py-1 text-xs font-medium text-primary-accent">
+                  관련 기사 {cluster.articles.length}건
+                </p>
+                <div className="flex flex-col gap-2">
+                  {cluster.articles.map((a) => (
+                    <ArticleCard key={a.id} a={a} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <ArticleCard key={cluster.key} a={cluster.articles[0]} />
+            ),
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {articles.map((a) => (
+            <ArticleCard key={a.id} a={a} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
