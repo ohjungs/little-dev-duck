@@ -1,5 +1,20 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ⏭ 다음 세션 이어서 하기 (2026-07-24 ~08:2x 인계)
+> **이번 `/loop` 자율 세션 결과: 33개 커밋(기능 32 + a11y 1)을 6회에 걸쳐 origin/main 배포, CI 6회 전부 green,
+> 미푸시 0.** 코드로 완결 가능한 노션-격차 고가치 기능(프로젝트 자체 gap-analysis + FEATURES.md 146항 전수
+> 대조)을 사실상 소진.
+> **재개 방법**: 새 세션에서 `/next-step` 또는 `/loop /next-step`. (워치독 cron `7dc122ee`는 세션 전용이라
+> 세션 종료 시 소멸 — 다음 세션에서 재설정 필요.)
+> **다음 세션 최우선(사용자 인프라가 열려야 진행 가능)**:
+> 1. `supabase db push` 미적용 4건 — pages_db_view(11)·pages_public_share(12)·delete_all_my_data(13)·news(15).
+>    적용 후 DB 뷰/공개공유/계정삭제/뉴스 실기 검증.
+> 2. OAuth 기기 실기검증(Google Calendar/GitHub/Gmail 어댑터), Gemini 키가 `/api/ai/write`에도 필요(이미 등록됨).
+> 3. 인프라 열리면 코드-완결 가능한 다음 차수: Realtime 멀티서피스 동기화(publication 마이그레이션+subscribeTable),
+>    백링크(page_links 테이블), 페이지 커버(cover_url 컬럼) — 전부 마이그레이션 선행.
+> 4. 새 의존성 P2(자율 보류): 코드블록 하이라이팅(@blocknote/code-block), 수식/컬럼 — lockfile·CI frozen 위험.
+> **이번 세션 신규 기능은 아래 각 Phase "후속" 항목과 git log 참조.**
+
 > **`/loop` 자율 세션(2026-07-24 04:2x~ 시작) 진행 중**: 코드 완결 가능한 노션-격차/이월 기능을 STDD+ponytail로
 > 연속 구현·커밋(각 tsc+eslint+테스트 GREEN). **푸시·배포 정책: 6시간 간격.**
 > **1차 배포(~06:55 KST)**: 21개 기능 + 리뷰 수정 배치. 검증=리뷰(code+security, CRITICAL 0, HIGH/MEDIUM
