@@ -34,6 +34,7 @@ export function TodoWidget() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [onlyToday, setOnlyToday] = useState(false);
+  const [hideDone, setHideDone] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
 
@@ -158,10 +159,14 @@ export function TodoWidget() {
   };
 
   const today = todayIso();
-  const visibleTodos = onlyToday
+  const baseTodos = onlyToday
     ? todos.filter((t) => t.dueDate?.slice(0, 10) === today)
     : todos;
-  const remaining = visibleTodos.filter((t) => !t.isDone).length;
+  const visibleTodos = hideDone
+    ? baseTodos.filter((t) => !t.isDone)
+    : baseTodos;
+  const remaining = baseTodos.filter((t) => !t.isDone).length;
+  const doneCount = baseTodos.length - remaining;
 
   return (
     <Card data-testid="todo-widget" className="h-full">
@@ -173,14 +178,27 @@ export function TodoWidget() {
             <Badge variant="muted">{remaining}개 남음</Badge>
           )}
         </CardTitle>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setOnlyToday((v) => !v)}
-        >
-          {onlyToday ? "전체" : "오늘만"}
-        </Button>
+        <div className="flex items-center gap-1">
+          {state === "ready" && doneCount > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setHideDone((v) => !v)}
+              aria-pressed={hideDone}
+            >
+              {hideDone ? `완료 표시(${doneCount})` : "완료 숨기기"}
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setOnlyToday((v) => !v)}
+          >
+            {onlyToday ? "전체" : "오늘만"}
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-3">
