@@ -1,9 +1,11 @@
 # Status.md — 현재 Phase 진행 현황
 
 > **`/loop` 자율 세션(2026-07-24 04:2x~ 시작) 진행 중**: 코드 완결 가능한 노션-격차/이월 기능을 STDD+ponytail로
-> 연속 구현·커밋 중(로컬 커밋 다수, 각 tsc+eslint+테스트 GREEN). **푸시·배포 정책: 6시간 간격.** 첫 푸시·배포
-> 예정 ~10:00~10:29 KST(전체 검증 + /review 후). cron 워치독(1분)이 세션 중단 시 /next-step으로 재개.
-> 이 세션 완료 기능 요약은 아래 각 Phase "후속" 항목 및 커밋 로그(git log) 참조.
+> 연속 구현·커밋(각 tsc+eslint+테스트 GREEN). **푸시·배포 정책: 6시간 간격.**
+> **1차 배포(~06:55 KST)**: 21개 기능 + 리뷰 수정 배치를 전체 검증 후 push. 검증=리뷰(code+security, CRITICAL 0,
+> HIGH/MEDIUM 전건 수정) + 테스트 422 GREEN(core 197/api 211/ai 10/mascot 5) + web tsc + 전체 eslint + 프로덕션
+> next build GREEN(/insights 라우트 등록 확인). **다음 배포: +6시간(~12:55 KST).** cron 워치독(1분)이 세션 중단 시
+> /next-step으로 재개. 이 세션 완료 기능 요약은 아래 각 Phase "후속" 항목 및 커밋 로그(git log) 참조.
 > **중간 리뷰(2026-07-24, 20커밋 누적 diff)**: code-reviewer + security-reviewer 병렬 실행. **CRITICAL/배포차단 0건.**
 > HIGH 1건(낙관적 업데이트 stale rollback — 실패 응답이 그 사이 성공한 최신 편집을 덮어씀) + MEDIUM 3건
 > (에러 타이머 미취소, addFilter MAX_FILTERS 미가드, CSV 수식 인젝션) + 보안 선택 1건(RSS href 스킴) **전부 수정**.
