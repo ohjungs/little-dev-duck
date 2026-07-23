@@ -7,6 +7,7 @@ import { CalendarWidget } from "@/components/CalendarWidget";
 import { HabitWidget } from "@/components/HabitWidget";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
+import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6 lg:px-8">
+      <OnboardingOverlay />
       <div className="mb-6 flex flex-col gap-1">
         <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
           {dateLabel}

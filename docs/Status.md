@@ -1,7 +1,8 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 12(공개 공유+알림+대시보드) 진행 — T1 공개 페이지 공유 + T2 방해금지 시간대 코드 완료
-(2026-07-24, `/loop` 자율). Phase 11(DB 뷰) T1~T5 완료·배포(리뷰 HIGH 3건 수정). Phase 10은 코드 완료.
+현재 Phase: **Phase 13(상용 마감) 착수 — T1 온보딩 튜토리얼 코드 완료(2026-07-24, `/loop` 자율, 세션 중단
+커밋). Phase 12(공개 공유+알림+대시보드) T1~T5 코드 완료(사실상 완료, T6 대시보드 이월). Phase 12 최종
+code+security 리뷰는 다음 세션 대기. Phase 11(DB 뷰) T1~T5 완료·배포(리뷰 HIGH 3건 수정). Phase 10은 코드 완료.
 미적용 마이그레이션 2건 db push 대기: pages_db_view(11), pages_public_share(12 T1). T2는 localStorage라
 마이그레이션 없음. Phase 완료분은 사용자 db push + 실기 검증만 남음(코드는 전부 배포됨).**
 Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabase MCP로 직접 재확인 완료 —
