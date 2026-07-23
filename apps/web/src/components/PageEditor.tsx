@@ -14,7 +14,13 @@ import {
   Table2,
 } from "lucide-react";
 import type { Block } from "@blocknote/core";
-import { createDefaultDbSchema, type DbSchema, type Page } from "@ldd/core";
+import {
+  createDefaultDbSchema,
+  extractPlainText,
+  pageStats,
+  type DbSchema,
+  type Page,
+} from "@ldd/core";
 import {
   createPageVersion,
   publishPage,
@@ -66,6 +72,8 @@ export function PageEditor({
   const [title, setTitle] = useState(page.title);
   const [icon, setIcon] = useState<string | null>(page.icon);
   const [showIconPicker, setShowIconPicker] = useState(false);
+  // 본문 통계용 plainText(편집 중 실시간). 저장 파생값과 별개로 에디터 content에서 즉시 계산.
+  const [plainText, setPlainText] = useState(page.plainText);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showVersions, setShowVersions] = useState(false);
   const [versionMsg, setVersionMsg] = useState<string | null>(null);
@@ -212,6 +220,8 @@ export function PageEditor({
     },
     [flushPendingSave],
   );
+
+  const stats = pageStats(plainText);
 
   const scheduleSave = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -381,19 +391,23 @@ export function PageEditor({
         initialContent={page.content}
         onChange={(document: Block[]) => {
           latest.current = { ...latest.current, content: document };
+          setPlainText(extractPlainText(document));
           scheduleSave();
         }}
         onExportReady={handleExportReady}
       />
-      <p
-        className="px-4 text-xs text-muted-foreground"
-        role="status"
-        aria-live="polite"
-      >
-        {saveState === "saving" && "저장 중..."}
-        {saveState === "saved" && "저장됨"}
-        {saveState === "error" && "저장 실패 — 잠시 후 다시 시도하세요"}
-      </p>
+      <div className="flex flex-wrap items-center gap-x-3 px-4 text-xs text-muted-foreground">
+        <p role="status" aria-live="polite">
+          {saveState === "saving" && "저장 중..."}
+          {saveState === "saved" && "저장됨"}
+          {saveState === "error" && "저장 실패 — 잠시 후 다시 시도하세요"}
+        </p>
+        {stats.chars > 0 && (
+          <span className="opacity-70">
+            {stats.chars.toLocaleString()}자 · 약 {stats.readMinutes}분
+          </span>
+        )}
+      </div>
       {dbSchema && (
         <DatabaseView
           dbId={page.id}

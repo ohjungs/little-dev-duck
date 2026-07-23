@@ -416,6 +416,9 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
 - [x] **후속 — 페이지 복제**(2026-07-24, `/loop` 자율): 트리 행 hover 시 복제 버튼 → 제목("(사본)")·본문·
   아이콘·부모를 복사해 새 페이지 생성 후 이동. db_schema는 createPage 계약 미포함이라 데이터베이스
   페이지는 일반 페이지로 복제(알려진 제약). 검증 web tsc GREEN.
+- [x] **후속 — 페이지 통계**(2026-07-24, `/loop` 자율): core `page-stats.ts`(pageStats 순수함수 — 공백 제외
+  글자 수·단어 수·읽기 시간 500자/분, +5 tests). PageEditor가 편집 중 content에서 extractPlainText로
+  실시간 계산해 하단에 "N자 · 약 M분" 표시. 검증 core +5 tests·tsc + web tsc GREEN.
 
 ## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현·리뷰·배포·검증 완료 (2026-07-22, `/loop` 자율+협업)
 

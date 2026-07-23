@@ -89,6 +89,7 @@ export {
   type Page,
   type PageVersion,
 } from "./domain/page";
+export { pageStats, type PageStats } from "./domain/page-stats";
 export {
   PROPERTY_TYPES,
   VIEW_TYPES,
