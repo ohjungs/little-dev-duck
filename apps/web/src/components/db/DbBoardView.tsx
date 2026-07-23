@@ -6,6 +6,7 @@ import {
   groupRowsByProperty,
   type Page,
   type PropertyDef,
+  type SelectOption,
 } from "@ldd/core";
 import { cn } from "@/lib/utils";
 import { selectChipClass } from "@/lib/selectColors";
@@ -14,6 +15,7 @@ import { selectChipClass } from "@/lib/selectColors";
 export function DbBoardView({
   rows,
   groupProp,
+  properties,
   onOpenRow,
   onMoveRow,
   onDeleteRow,
@@ -21,6 +23,7 @@ export function DbBoardView({
 }: {
   rows: Page[];
   groupProp: PropertyDef;
+  properties: PropertyDef[];
   onOpenRow: (id: string) => void;
   // optionId=null 은 "없음" 그룹(속성값 제거).
   onMoveRow: (rowId: string, optionId: string | null) => void;
@@ -29,6 +32,10 @@ export function DbBoardView({
 }) {
   const [dragOver, setDragOver] = useState<string | null>(null);
   const groups = groupRowsByProperty(rows, groupProp);
+  // 카드에 표시할 select 속성(그룹 기준 속성은 이미 열로 나뉘어 있으므로 제외).
+  const chipProps = properties.filter(
+    (p) => p.type === "select" && p.id !== groupProp.id,
+  );
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
@@ -77,23 +84,53 @@ export function DbBoardView({
                 }
                 // 드롭 성공/취소와 무관하게 항상 발화 — 하이라이트 잔상 방지(코드 리뷰 MEDIUM).
                 onDragEnd={() => setDragOver(null)}
-                className="group/card flex cursor-grab items-center gap-1 rounded-md border border-border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-primary/40 active:cursor-grabbing"
+                className="group/card flex cursor-grab flex-col gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-primary/40 active:cursor-grabbing"
               >
-                <button
-                  type="button"
-                  onClick={() => onOpenRow(row.id)}
-                  className="min-w-0 flex-1 truncate text-left"
-                >
-                  {row.title || "제목 없음"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDeleteRow(row.id)}
-                  aria-label={`${row.title || "제목 없음"} 행 삭제`}
-                  className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/card:opacity-100"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onOpenRow(row.id)}
+                    className="min-w-0 flex-1 truncate text-left"
+                  >
+                    {row.title || "제목 없음"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteRow(row.id)}
+                    aria-label={`${row.title || "제목 없음"} 행 삭제`}
+                    className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/card:opacity-100"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+                {chipProps.length > 0 &&
+                  (() => {
+                    const chips = chipProps
+                      .map((p) => {
+                        const v = row.rowProps[p.id];
+                        const opt =
+                          typeof v === "string"
+                            ? p.options.find((o) => o.id === v)
+                            : undefined;
+                        return opt ? { key: p.id, opt } : null;
+                      })
+                      .filter((c): c is { key: string; opt: SelectOption } => c !== null);
+                    return chips.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {chips.map(({ key, opt }) => (
+                          <span
+                            key={key}
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-xs",
+                              selectChipClass(opt.color),
+                            )}
+                          >
+                            {opt.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
               </div>
             ))}
             <button

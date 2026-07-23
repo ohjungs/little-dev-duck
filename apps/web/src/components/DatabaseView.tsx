@@ -483,6 +483,7 @@ export function DatabaseView({
         <DbBoardView
           rows={visibleRows}
           groupProp={groupProp}
+          properties={dbSchema.properties}
           onOpenRow={openRow}
           onMoveRow={handleMoveRow}
           onDeleteRow={handleDeleteRow}
