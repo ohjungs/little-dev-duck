@@ -6,8 +6,10 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 // /walker는 데스크톱 활보 오버레이(사용자 데이터 미노출, 순수 표시용)라 공개 경로로 둔다.
 // /p는 공개 페이지 공유(Phase 12 T1) — 비로그인도 링크로 읽기 전용 조회(get_public_page RPC가
 // is_public=true 한 건만 반환, 열거 불가).
+// /welcome은 비로그인 방문자용 공개 랜딩(Phase 13 T4) — 인증 없이 보이고, CTA가 /login으로 잇는다.
 const PUBLIC_PATHS = [
   "/login",
+  "/welcome",
   "/auth/callback",
   "/api/keepalive",
   "/walker",
@@ -104,9 +106,10 @@ export async function proxy(request: NextRequest) {
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 
+  // 비로그인 접근은 마케팅 랜딩(/welcome)으로 — 로그인 폼은 랜딩 CTA로 도달한다.
   if (!user && !isPublicPath) {
     return withSecurityHeaders(
-      NextResponse.redirect(new URL("/login", request.url), 303),
+      NextResponse.redirect(new URL("/welcome", request.url), 303),
       csp,
     );
   }

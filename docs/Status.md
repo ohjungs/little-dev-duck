@@ -1,10 +1,16 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 13(상용 마감) 착수 — T1 온보딩 튜토리얼 코드 완료(2026-07-24, `/loop` 자율, 세션 중단
-커밋). Phase 12(공개 공유+알림+대시보드) T1~T5 코드 완료(사실상 완료, T6 대시보드 이월). Phase 12 최종
-code+security 리뷰는 다음 세션 대기. Phase 11(DB 뷰) T1~T5 완료·배포(리뷰 HIGH 3건 수정). Phase 10은 코드 완료.
-미적용 마이그레이션 2건 db push 대기: pages_db_view(11), pages_public_share(12 T1). T2는 localStorage라
-마이그레이션 없음. Phase 완료분은 사용자 db push + 실기 검증만 남음(코드는 전부 배포됨).**
+현재 Phase: **Phase 13(상용 마감) — T1~T4 코드 완료(2026-07-24, `/loop` 인계 세션). T1 온보딩 튜토리얼,
+T2 키보드 접근성(전역 focus 링+공용 모달 훅+스킵 링크), T3 계정 데이터 파기 1단계(security-definer RPC
++위험구역 UI, 강한 확인 게이트), T4 공개 랜딩(/welcome, 비로그인 리다이렉트 대상). T5 Sentry·T6 i18n은
+인프라·범위로 이월. Phase 12(공개 공유+알림+대시보드) T1~T5 코드 완료(T6 대시보드 이월, 최종 리뷰 대기).
+Phase 11(DB 뷰) T1~T5 완료·배포. Phase 10은 코드 완료.
+미적용 마이그레이션 db push 대기: pages_db_view(11), pages_public_share(12 T1), delete_all_my_data(13 T3).
+Phase 완료분은 사용자 db push + 실기 검증만 남음(코드는 전부 배포됨).**
+
+**인계 경위(2026-07-24 01:00~)**: 먼저 돌던 `/loop` 세션이 Phase 13 T1 커밋(01:00) 후 27분간 정지 →
+두 번째 `/loop` 세션(사용자 새로 지시)의 워치독이 죽음으로 판단하고 개발 인계. 같은 폴더 공유(worktree
+격리 없음)라 병렬 편집 대신 단일 세션 인계로 진행. 목표: Phase 17까지.
 Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabase MCP로 직접 재확인 완료 —
 마이그레이션 18개 전부 local==remote, `user_google_tokens`/`action_log` 테이블 RLS 켜진 채 존재).
 계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md.
@@ -38,6 +44,24 @@ Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabas
 Calendar 어댑터 end-to-end(계약→토큰→라우트→승인카드→실제 Google API 반영→감사로그) 전부 실사용 검증
 완료로 T3 종결. **다음 세션: T5(두 번째 어댑터) 또는 T6(Gmail, 격리) 착수** — phase_10.md Task 초안
 참조해 어댑터 후보 확정(GitHub 이슈/Notion 등) 후 계약 잠금·구현.
+
+## Phase 13 — 상용 마감 (랜딩, 온보딩, 접근성, 계정) — T1~T4 코드 완료 (2026-07-24, `/loop` 인계)
+
+계획: docs/plans/phase_13.md. 인프라 선행 없는 self-contained 순서로 T1→T2→T3→T4.
+
+- [x] T1 온보딩 튜토리얼(원 세션, 01:00): 최초 방문 오리 안내 오버레이 + 샘플 데이터 생성, localStorage 1회.
+- [x] T2 키보드 접근성: globals.css 전역 `:focus-visible` 링(--ring, shadcn ring과 비충돌) + 공용 훅
+  `useModalA11y`(Esc 닫기·포커스 진입/복원·Tab 트랩)를 VersionHistory·OnboardingOverlay에 연결
+  (CommandPalette는 이미 처리돼 미변경) + (app) 레이아웃 스킵 링크. 검증 web tsc GREEN.
+- [x] T3 계정 데이터 파기 1단계: 마이그레이션 `20260724130000_delete_all_my_data`(security-definer 함수,
+  15개 데이터 테이블 원자 삭제, profiles 보존=계정 유지) + api `deleteAllMyData`(스토리지 첨부 best-effort
+  정리+RPC, +4 tests) + web `DangerZone`(설정 위험구역, `삭제합니다` 타이핑 강한 확인→삭제→로그아웃).
+  **db push 필요** + 실기 검증 필요.
+- [x] T4 공개 랜딩: `/welcome`(비대칭 히어로+기능 베이토+CTA 밴드, 오리 로고, design-quality 준수) +
+  proxy.ts 비로그인 리다이렉트 `/login`→`/welcome`(로그인은 랜딩 CTA로) + PUBLIC_PATHS에 `/welcome`.
+- [ ] T5 Sentry PII 스크러빙 — Sentry 계정 미생성이라 이월(사용자 인프라).
+- [ ] T6 i18n — 범위 큼, 로드맵 후반 이월.
+- 검증: core 126 / api 198 tests + web tsc·build GREEN. **db push 1건(delete_all_my_data) + 실기 검증(사용자).**
 
 ## Phase 12 — 공개 공유 + 알림 4채널 + 대시보드 — T1 코드 완료 (2026-07-24, `/loop` 자율)
 

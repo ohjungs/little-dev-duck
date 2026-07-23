@@ -116,3 +116,5 @@ export {
   listPageVersions,
   type CreatePageVersionInput,
 } from "./pageVersions";
+
+export { deleteAllMyData } from "./account";

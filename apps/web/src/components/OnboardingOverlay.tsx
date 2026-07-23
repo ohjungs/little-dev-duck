@@ -7,6 +7,7 @@ import { createMemo, createPage, createTodo } from "@ldd/api";
 import { createClient } from "@/lib/supabase/client";
 import { isOnboarded, setOnboarded } from "@/lib/onboarding";
 import { Button } from "@/components/ui/button";
+import { useModalA11y } from "@/hooks/useModalA11y";
 
 const SAMPLE_PAGE_CONTENT = [
   {
@@ -34,6 +35,9 @@ export function OnboardingOverlay() {
     setOnboarded();
     setShow(false);
   };
+
+  // Esc = 건너뛰기(finish: 온보딩 완료 표시 후 닫아 재안내 방지) + 포커스 진입/트랩/복원.
+  const dialogRef = useModalA11y<HTMLDivElement>(show, finish);
 
   const createSamples = async () => {
     setCreating(true);
@@ -67,7 +71,11 @@ export function OnboardingOverlay() {
       aria-modal="true"
       aria-label="시작 안내"
     >
-      <div className="flex w-full max-w-md flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-xl">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="flex w-full max-w-md flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-xl outline-none"
+      >
         <div className="flex items-center gap-3">
           <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary ring-1 ring-border">
             <Image

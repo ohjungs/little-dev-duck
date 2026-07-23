@@ -30,10 +30,19 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Phase 13 T2: 키보드 사용자가 사이드바를 건너뛰고 본문으로 바로 가는 스킵 링크(포커스 시에만 노출). */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg"
+      >
+        본문으로 건너뛰기
+      </a>
       <AppSidebar displayName={displayName} email={email} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppMobileBar />
-        <main className="flex-1">{children}</main>
+        <main id="main" className="flex-1">
+          {children}
+        </main>
       </div>
       <DesktopCollectorSync />
       <CommandPalette />

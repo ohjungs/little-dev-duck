@@ -7,6 +7,7 @@ import { reindexSource } from "@ldd/ai";
 import type { PageVersion } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { useModalA11y } from "@/hooks/useModalA11y";
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleString("ko-KR", {
@@ -30,6 +31,8 @@ export function VersionHistory({
   const [versions, setVersions] = useState<PageVersion[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  // 마운트되면 항상 열린 모달 — Esc 닫기 + 포커스 트랩/복원.
+  const dialogRef = useModalA11y<HTMLDivElement>(true, onClose);
 
   useEffect(() => {
     listPageVersions(supabase, pageId).then(
@@ -75,7 +78,9 @@ export function VersionHistory({
       role="presentation"
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card shadow-2xl outline-none"
         role="dialog"
         aria-modal="true"
         aria-label="버전 기록"

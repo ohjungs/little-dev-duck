@@ -7,6 +7,7 @@ import {
   Mail,
   Moon,
   Palette,
+  Trash2,
   User,
 } from "lucide-react";
 import { getGithubTokens, getGmailTokens, getGoogleTokens } from "@ldd/api";
@@ -27,6 +28,7 @@ import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
 import { GitHubMark } from "@/components/ui/github-mark";
 import { GmailLink } from "@/components/GmailLink";
+import { DangerZone } from "@/components/DangerZone";
 
 export const dynamic = "force-dynamic";
 
@@ -205,6 +207,23 @@ export default async function SettingsPage() {
             </form>
           </CardContent>
         </Card>
+
+        {user && (
+          <Card className="border-destructive/30">
+            <CardHeader className="flex-col items-start gap-1">
+              <CardTitle>
+                <Trash2 className="size-4 text-destructive" />
+                위험 구역
+              </CardTitle>
+              <CardDescription>
+                내 모든 콘텐츠를 영구 삭제합니다. 되돌릴 수 없어요.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DangerZone userId={user.id} />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

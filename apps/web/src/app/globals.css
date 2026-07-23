@@ -159,6 +159,14 @@
   ::selection {
     background: color-mix(in oklch, var(--primary) 22%, transparent);
   }
+
+  /* Phase 13 T2: 키보드 포커스 링 통일. shadcn 컴포넌트는 자체 outline-none+focus-visible:ring을
+     쓰고 utility가 base보다 우선하므로 그대로 유지되고, 자체 링이 없는 raw 요소(a/사이드바 버튼/
+     리스트 항목 등)만 이 --ring 색 outline을 받아 색·두께가 통일된다. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
 
 @media (prefers-color-scheme: dark) {

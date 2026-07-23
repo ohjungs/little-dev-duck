@@ -18,9 +18,9 @@
 - [~] Phase 10 AI 2단계 (에이전트 액션) — 2026-07-23 T1~T7 코드 완료(Google Calendar/GitHub 이슈/Gmail
       3개 어댑터 + composeAdapters 합성 + 승인 게이트 + 인젝션 방어 + 감사 로그). T3 실기 검증 통과,
       T5/T6은 db push(2건) + 실기 검증 대기 (아래 기록)
-- [ ] Phase 11 DB 뷰 (표/보드)
-- [ ] Phase 12 공개 공유 + 알림 4채널 + 대시보드
-- [ ] Phase 13 상용 마감 (랜딩, 온보딩, i18n, Sentry/Analytics)
+- [~] Phase 11 DB 뷰 (표/보드) — 2026-07-24 T1~T5 코드 완료·리뷰(HIGH 3건 수정). db push(pages_db_view)·실기 검증 대기
+- [~] Phase 12 공개 공유 + 알림 4채널 + 대시보드 — 2026-07-24 T1~T5 코드 완료(T6 대시보드 이월). db push(pages_public_share)·최종 리뷰·실기 검증 대기
+- [~] Phase 13 상용 마감 (랜딩, 온보딩, i18n, Sentry/Analytics) — 2026-07-24 T1~T4 코드 완료(T5 Sentry·T6 i18n 이월). db push(delete_all_my_data)·실기 검증 대기
 - [ ] Phase 14 React Native
 - [ ] Phase 15 뉴스 브리핑 파이프라인 (수집·요약·발행) — 2026-07-20 백로그에서 신규 추가, 상세 계획 초안 대기
 - [ ] Phase 16 픽셀 오리 오피스 기반 (이벤트·렌더링) — 2026-07-20 백로그에서 신규 추가, 상세 계획 초안 대기
@@ -454,3 +454,15 @@
     실기 검증(GitHub 이슈 생성, Gmail 조회·휴지통 이동, GitHub/Gmail 재동의 흐름이 실제로 넓은 scope를
     재발급하는지). gstack `/review`는 이 프로젝트가 항상 main에 직접 커밋하는 워크플로라(별도 브랜치
     없음) "base 브랜치라 diff 없음"으로 스킵 — code-reviewer+security-reviewer 병렬 리뷰로 갈음.
+- 2026-07-24 : Phase 11~13 야간 `/loop` 자율 진행 — 두 세션 인계. **원 세션**(23:32~01:00)이 Phase 11(DB
+  표/보드 뷰), Phase 12(공개 페이지 공유 /p/[slug]·방해금지 DND·헬스체크·브라우저 알림·성과 카드 PNG),
+  Phase 13 T1(온보딩 튜토리얼)을 약 10분 간격으로 커밋. 01:00 커밋 후 27분 정지 → **두 번째 세션**(사용자가
+  새 `/loop` 지시)의 워치독이 죽음으로 판단하고 인계. worktree 격리 없는 공유 폴더라 병렬 편집 대신 단일
+  인계로 전환(충돌·편집유실 방지). 인계 세션이 Phase 13 T2~T4 구현:
+  - T2 키보드 접근성: 전역 `:focus-visible` 링(--ring) + 공용 훅 `useModalA11y`(Esc·포커스 트랩·복원) →
+    VersionHistory/OnboardingOverlay 연결 + (app) 스킵 링크. CommandPalette는 이미 처리돼 미변경.
+  - T3 계정 데이터 파기 1단계: security-definer RPC `delete_all_my_data`(15개 테이블 원자 삭제, profiles
+    보존) + api `deleteAllMyData`(스토리지 첨부 정리 포함, +4 tests) + 설정 위험구역 UI(문구 타이핑 확인).
+  - T4 공개 랜딩 `/welcome`(편집형 히어로+베이토+CTA) + 미들웨어 비로그인 리다이렉트 대상 변경.
+  - T5 Sentry·T6 i18n은 인프라·범위로 이월. 검증 core 126 / api 198 tests + web tsc·build GREEN.
+  - db push 3건 대기(pages_db_view·pages_public_share·delete_all_my_data)는 사용자 몫(DDL 안전 규칙).
