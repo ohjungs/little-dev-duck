@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
+  BarChart3,
   Building2,
   FileText,
   Loader2,
@@ -146,6 +147,12 @@ export function CommandPalette() {
       label: "새 페이지 만들기",
       icon: <Plus className="size-3.5 shrink-0 opacity-70" />,
       run: createAndOpen,
+    },
+    {
+      id: "go-insights",
+      label: "통계 열기",
+      icon: <BarChart3 className="size-3.5 shrink-0 opacity-70" />,
+      run: () => go("/insights"),
     },
     {
       id: "go-news",
