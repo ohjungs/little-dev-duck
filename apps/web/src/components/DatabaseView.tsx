@@ -11,6 +11,7 @@ import {
 import type {
   DbSchema,
   Page,
+  PropertyDef,
   PropertyType,
   RowProps,
   RowPropValue,
@@ -125,6 +126,24 @@ export function DatabaseView({
     });
   };
 
+  // 속성 편집(이름/타입/옵션) 또는 삭제(next=null). 삭제 시 그 속성으로 그룹하던 보드 뷰의 groupBy도 해제.
+  const handleEditProperty = (propId: string, next: PropertyDef | null) => {
+    if (next === null) {
+      onSchemaChange({
+        ...dbSchema,
+        properties: dbSchema.properties.filter((p) => p.id !== propId),
+        views: dbSchema.views.map((v) =>
+          v.groupByPropId === propId ? { ...v, groupByPropId: null } : v,
+        ),
+      });
+      return;
+    }
+    onSchemaChange({
+      ...dbSchema,
+      properties: dbSchema.properties.map((p) => (p.id === propId ? next : p)),
+    });
+  };
+
   const groupProp = view.groupByPropId
     ? dbSchema.properties.find((p) => p.id === view.groupByPropId)
     : undefined;
@@ -186,6 +205,7 @@ export function DatabaseView({
           onTitleChange={handleTitleChange}
           onRowPropChange={handleRowPropChange}
           onAddRow={() => handleAddRow()}
+          onEditProperty={handleEditProperty}
         />
       )}
     </div>

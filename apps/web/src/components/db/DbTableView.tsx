@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, SquareArrowOutUpRight } from "lucide-react";
 import type { Page, PropertyDef, RowPropValue } from "@ldd/core";
 import { PropertyCell } from "./PropertyCell";
+import { DbPropertyMenu } from "./DbPropertyMenu";
 
 // 행 제목 인라인 편집(blur/Enter 커밋) + 열기 버튼. 표 첫 열 전용.
 function RowTitleCell({
@@ -59,6 +60,7 @@ export function DbTableView({
   onTitleChange,
   onRowPropChange,
   onAddRow,
+  onEditProperty,
 }: {
   rows: Page[];
   properties: PropertyDef[];
@@ -66,7 +68,9 @@ export function DbTableView({
   onTitleChange: (rowId: string, title: string) => void;
   onRowPropChange: (rowId: string, propId: string, value: RowPropValue) => void;
   onAddRow: () => void;
+  onEditProperty: (propId: string, next: PropertyDef | null) => void;
 }) {
+  const [menuPropId, setMenuPropId] = useState<string | null>(null);
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full border-collapse text-sm">
@@ -78,9 +82,24 @@ export function DbTableView({
             {properties.map((p) => (
               <th
                 key={p.id}
-                className="min-w-[8rem] px-3 py-2 font-medium text-muted-foreground"
+                className="relative min-w-[8rem] px-1 py-1 font-medium text-muted-foreground"
               >
-                {p.name}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMenuPropId((cur) => (cur === p.id ? null : p.id))
+                  }
+                  className="w-full rounded px-2 py-1 text-left transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  {p.name}
+                </button>
+                {menuPropId === p.id && (
+                  <DbPropertyMenu
+                    prop={p}
+                    onEdit={(next) => onEditProperty(p.id, next)}
+                    onClose={() => setMenuPropId(null)}
+                  />
+                )}
               </th>
             ))}
           </tr>
