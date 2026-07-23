@@ -23,7 +23,13 @@ import {
 } from "@ldd/api";
 import { clusterArticles, type Article, type Feed } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  getReadArticles,
+  markArticleRead,
+  subscribeReadArticles,
+} from "@/lib/readArticles";
 
 function timeLabel(iso: string | null): string {
   if (!iso) return "";
@@ -55,13 +61,22 @@ function scrapContent(a: Article): unknown[] {
 // 기사 1건 카드. 목록/군집 양쪽에서 재사용(마크업 중복 제거). onScrap이 있으면 스크랩 버튼 노출.
 function ArticleCard({
   a,
+  read,
   onScrap,
+  onRead,
 }: {
   a: Article;
+  read?: boolean;
   onScrap?: (a: Article) => void;
+  onRead?: (a: Article) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
+    <div
+      className={cn(
+        "rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40",
+        read && "opacity-55",
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-sm font-semibold leading-snug">{a.title}</h3>
         <div className="flex shrink-0 items-center gap-2">
@@ -81,6 +96,7 @@ function ArticleCard({
             target="_blank"
             rel="noopener noreferrer"
             aria-label="원문 보기"
+            onClick={() => onRead?.(a)}
             className="text-muted-foreground hover:text-primary-accent"
           >
             <ExternalLink className="size-4" />
@@ -115,17 +131,28 @@ export function NewsReader() {
   const [note, setNote] = useState<string | null>(null);
   const [grouped, setGrouped] = useState(false);
   const [query, setQuery] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [readIds, setReadIds] = useState<string[]>([]);
 
-  // 제목/요약/스니펫 부분일치로 표시 기사를 좁힌다(클라이언트 필터). 군집·목록 모두 이 결과 기준.
+  // 읽음 상태(localStorage) 동기화 — 링크 클릭/스크랩 시 즉시 반영.
+  useEffect(() => {
+    const sync = () => setReadIds(getReadArticles());
+    sync();
+    return subscribeReadArticles(sync);
+  }, []);
+  const readSet = useMemo(() => new Set(readIds), [readIds]);
+
+  // 검색어 부분일치 + (안 읽음만 토글 시) 읽은 기사 제외. 군집·목록 모두 이 결과 기준.
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return articles;
-    return articles.filter((a) =>
-      `${a.title} ${a.summary ?? ""} ${a.snippet ?? ""}`
+    return articles.filter((a) => {
+      if (unreadOnly && readSet.has(a.id)) return false;
+      if (!needle) return true;
+      return `${a.title} ${a.summary ?? ""} ${a.snippet ?? ""}`
         .toLowerCase()
-        .includes(needle),
-    );
-  }, [articles, query]);
+        .includes(needle);
+    });
+  }, [articles, query, unreadOnly, readSet]);
 
   // Phase 15 T3: 제목/스니펫 유사도로 관련 기사 군집화(무의존성 순수함수). 다중 멤버 군집만 시각적으로 묶는다.
   const clusters = useMemo(() => clusterArticles(shown), [shown]);
@@ -190,6 +217,7 @@ export function NewsReader() {
 
   const onScrap = async (a: Article) => {
     setNote(null);
+    markArticleRead(a.id);
     try {
       await createPage(createClient(), {
         title: a.title,
@@ -201,6 +229,7 @@ export function NewsReader() {
       setNote("노트 저장에 실패했어요.");
     }
   };
+  const onRead = (a: Article) => markArticleRead(a.id);
 
   const onCollect = async () => {
     setCollecting(true);
@@ -251,6 +280,16 @@ export function NewsReader() {
             개 기사
           </span>
           <div className="flex items-center gap-2">
+            {readIds.length > 0 && (
+              <Button
+                size="sm"
+                variant={unreadOnly ? "default" : "outline"}
+                onClick={() => setUnreadOnly((v) => !v)}
+                aria-pressed={unreadOnly}
+              >
+                안 읽음만
+              </Button>
+            )}
             {hasRelated && (
               <Button
                 size="sm"
@@ -343,7 +382,7 @@ export function NewsReader() {
       )}
       {state === "ready" && articles.length > 0 && shown.length === 0 && (
         <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          검색어와 일치하는 기사가 없어요.
+          {unreadOnly ? "안 읽은 기사가 없어요." : "검색어와 일치하는 기사가 없어요."}
         </p>
       )}
       {grouped ? (
@@ -359,7 +398,13 @@ export function NewsReader() {
                 </p>
                 <div className="flex flex-col gap-2">
                   {cluster.articles.map((a) => (
-                    <ArticleCard key={a.id} a={a} onScrap={onScrap} />
+                    <ArticleCard
+                      key={a.id}
+                      a={a}
+                      read={readSet.has(a.id)}
+                      onScrap={onScrap}
+                      onRead={onRead}
+                    />
                   ))}
                 </div>
               </div>
@@ -367,7 +412,9 @@ export function NewsReader() {
               <ArticleCard
                 key={cluster.key}
                 a={cluster.articles[0]}
+                read={readSet.has(cluster.articles[0].id)}
                 onScrap={onScrap}
+                onRead={onRead}
               />
             ),
           )}
@@ -375,7 +422,13 @@ export function NewsReader() {
       ) : (
         <div className="flex flex-col gap-3">
           {shown.map((a) => (
-            <ArticleCard key={a.id} a={a} onScrap={onScrap} />
+            <ArticleCard
+              key={a.id}
+              a={a}
+              read={readSet.has(a.id)}
+              onScrap={onScrap}
+              onRead={onRead}
+            />
           ))}
         </div>
       )}
