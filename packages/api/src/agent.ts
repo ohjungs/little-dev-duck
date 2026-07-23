@@ -133,13 +133,11 @@ export async function runAgentTurn(
       return { status: "approval_pending", calls: approval };
     }
 
-    // 모델의 함수 호출 turn을 대화에 기록.
-    contents.push({
-      role: "model",
-      parts: calls.map((c) => ({
-        functionCall: { name: c.name, args: c.args, id: c.id },
-      })),
-    });
+    // 모델의 함수 호출 turn을 대화에 기록 — parts를 우리가 파싱한 값(name/args/id)으로 재구성하지 않고
+    // Gemini가 준 원본 그대로 되먹인다. 실측: gemini-flash-latest는 functionCall part에 thoughtSignature
+    // 같은 필드를 더 얹어 보내고, 다음 턴에 이걸 그대로 안 돌려주면 400("missing thought_signature")으로
+    // 거부한다. 우리 타입이 모르는 필드라도 원본 객체엔 실제로 들어있어 그대로 넘기면 보존된다.
+    contents.push({ role: "model", parts });
 
     // readonly 자동 실행 + 카탈로그 밖 도구는 에러 결과로 회신(모델이 인지·복구하도록, 실행은 안 함).
     const results: ToolResult[] = [];
