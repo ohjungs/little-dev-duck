@@ -168,6 +168,12 @@ describe("runAgentTurn", () => {
     expect(bodies[0]).toContain("사용해 처리하라");
   });
 
+  it("필요한 정보가 불명확하면 임의로 채우지 말고 되물으라는 지침도 함께 포함한다", async () => {
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    await runAgentTurn("일정 잡아줘", mockAdapter(), "key", fetchImpl);
+    expect(bodies[0]).toContain("먼저 무엇이 필요한지 되물어라");
+  });
+
   it("도구 카탈로그가 비어 있으면(NO_TOOLS_ADAPTER) 그 지침을 넣지 않는다", async () => {
     const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
     const noTools: Adapter = { catalog: [], execute: async (call) => ({ id: call.id, name: call.name, response: {} }) };
