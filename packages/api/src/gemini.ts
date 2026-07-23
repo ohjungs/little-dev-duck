@@ -56,3 +56,33 @@ export async function geminiEmbed(
   }
   return json.embeddings.map((e) => e.values);
 }
+
+type GenerateResponse = {
+  candidates?: { content?: { parts?: { text?: string }[] } }[];
+};
+
+// 단일 턴 텍스트 생성(프롬프트 in → 텍스트 out). 도구/RAG 없는 단순 생성용(작문 보조 등).
+// geminiEmbed와 동일한 키/fetch 주입식 — 키는 호출측(API Route)이 서버 env에서 주입한다.
+export async function geminiGenerate(
+  prompt: string,
+  apiKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const res = await fetchImpl(
+    `${GEMINI_BASE}/models/${GEMINI_GEN_MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      }),
+    },
+  );
+  if (!res.ok) throw upstreamError(res.status, await safeBody(res));
+  const json = (await res.json()) as GenerateResponse;
+  const text =
+    json.candidates?.[0]?.content?.parts
+      ?.map((p) => p.text ?? "")
+      .join("") ?? "";
+  return text.trim();
+}

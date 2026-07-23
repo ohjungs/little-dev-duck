@@ -50,7 +50,13 @@ export {
   completePomodoro,
 } from "./pomodoro";
 
-export { geminiEmbed, GEMINI_EMBED_MODEL, GEMINI_GEN_MODEL } from "./gemini";
+export {
+  geminiEmbed,
+  geminiGenerate,
+  GEMINI_EMBED_MODEL,
+  GEMINI_GEN_MODEL,
+} from "./gemini";
+export { assistWrite } from "./aiWrite";
 
 export {
   upsertEmbedding,

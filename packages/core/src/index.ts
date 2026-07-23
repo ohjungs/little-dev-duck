@@ -97,6 +97,13 @@ export {
   type DashboardSummary,
 } from "./domain/dashboard";
 export {
+  WRITE_ACTIONS,
+  WRITE_INPUT_MAX,
+  writeActionSchema,
+  buildWriteAssistPrompt,
+  type WriteAction,
+} from "./domain/ai-write";
+export {
   PROPERTY_TYPES,
   VIEW_TYPES,
   SELECT_COLORS,

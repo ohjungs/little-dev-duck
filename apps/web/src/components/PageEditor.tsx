@@ -33,6 +33,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { VersionHistory } from "@/components/VersionHistory";
 import { DatabaseView } from "@/components/DatabaseView";
+import { AiWriteAssistant } from "@/components/AiWriteAssistant";
 import {
   isFavorite,
   subscribeFavorites,
@@ -444,6 +445,7 @@ export function PageEditor({
           </span>
         )}
       </div>
+      <AiWriteAssistant />
       {dbSchema && (
         <DatabaseView
           dbId={page.id}
