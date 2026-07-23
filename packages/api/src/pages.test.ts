@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createPage,
   getPage,
+  listChildPages,
   listPages,
   listTrashedPages,
   purgePage,
@@ -191,6 +192,64 @@ describe("updatePage", () => {
       content: [{ type: "paragraph", content: [{ type: "text", text: "본문" }] }],
     });
     expect(captured?.plain_text).toBe("본문");
+  });
+});
+
+describe("Phase 11 DB 뷰", () => {
+  // listChildPages는 select().eq(parent).eq(trashed).order() 2단 eq 체인이라 전용 목이 필요.
+  function childSupabase(rows: unknown[]) {
+    return {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              order: async () => ({ data: rows, error: null }),
+            }),
+          }),
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  }
+
+  it("listChildPages는 자식 행 목록을 Page[]로 변환한다", async () => {
+    const dbRow = {
+      ...VALID_ROW,
+      id: "33333333-3333-4333-8333-333333333333",
+      parent_id: VALID_ROW.id,
+      row_props: { status: "todo" },
+    };
+    const result = await listChildPages(childSupabase([dbRow]), VALID_ROW.id);
+    expect(result).toHaveLength(1);
+    expect(result[0].rowProps).toEqual({ status: "todo" });
+  });
+
+  it("db_schema/row_props 없는 행은 기본값(null/{})으로 파싱된다(하위호환)", async () => {
+    const result = await listPages(fakeSupabase());
+    expect(result[0].dbSchema).toBeNull();
+    expect(result[0].rowProps).toEqual({});
+  });
+
+  it("updatePage가 dbSchema를 db_schema로, rowProps를 row_props로 저장한다", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      from: () => ({
+        update: (payload: Record<string, unknown>) => {
+          captured = payload;
+          return { eq: () => ({ select: () => ({ single: okSingle }) }) };
+        },
+      }),
+    });
+    const dbSchema = {
+      properties: [{ id: "status", name: "상태", type: "select" as const, options: [] }],
+      views: [{ id: "table", name: "표", type: "table" as const, groupByPropId: null }],
+    };
+    await updatePage(supabase, VALID_ROW.id, {
+      dbSchema,
+      rowProps: { status: "done" },
+    });
+    expect(captured?.db_schema).toEqual(dbSchema);
+    expect(captured?.row_props).toEqual({ status: "done" });
   });
 });
 

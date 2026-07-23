@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pageSchema, extractPlainText, type Page } from "@ldd/core";
+import {
+  pageSchema,
+  extractPlainText,
+  type Page,
+  type DbSchema,
+  type RowProps,
+} from "@ldd/core";
 
 type PageRow = {
   id: string;
@@ -13,6 +19,9 @@ type PageRow = {
   trashed_at: string | null;
   created_at: string;
   updated_at: string;
+  // Phase 11: 마이그레이션 전(또는 목 테스트)에는 없을 수 있어 optional. fromRow가 null/{} 기본값 보정.
+  db_schema?: unknown;
+  row_props?: unknown;
 };
 
 function fromRow(row: PageRow): Page {
@@ -28,6 +37,8 @@ function fromRow(row: PageRow): Page {
     trashedAt: row.trashed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    dbSchema: row.db_schema ?? null,
+    rowProps: row.row_props ?? {},
   });
 }
 
@@ -67,6 +78,21 @@ export async function searchPages(
   return (data as PageRow[]).map(fromRow);
 }
 
+// 데이터베이스의 행 목록 = 그 페이지의 자식(휴지통 제외). 표/보드 뷰가 렌더할 행.
+export async function listChildPages(
+  supabase: SupabaseClient,
+  parentId: string,
+): Promise<Page[]> {
+  const { data, error } = await supabase
+    .from("pages")
+    .select("*")
+    .eq("parent_id", parentId)
+    .eq("is_trashed", false)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as PageRow[]).map(fromRow);
+}
+
 // 휴지통 뷰.
 export async function listTrashedPages(supabase: SupabaseClient): Promise<Page[]> {
   const { data, error } = await supabase
@@ -96,6 +122,8 @@ export type CreatePageInput = {
   parentId?: string | null;
   content?: unknown;
   icon?: string | null;
+  // Phase 11: 보드에서 "+ 새 행"이 그룹값을 프리셋해 행(자식 페이지)을 만들 때 사용.
+  rowProps?: RowProps;
 };
 
 export async function createPage(
@@ -118,6 +146,7 @@ export async function createPage(
       // plain_text는 저장 시 서버가 파생(검색/RAG 공용). 클라이언트 신뢰 안 함.
       plain_text: extractPlainText(content),
       icon: input.icon ?? null,
+      ...(input.rowProps !== undefined ? { row_props: input.rowProps } : {}),
     })
     .select()
     .single();
@@ -130,6 +159,9 @@ export type UpdatePageInput = Partial<{
   content: unknown;
   parentId: string | null;
   icon: string | null;
+  // Phase 11: dbSchema=이 페이지를 데이터베이스로 만들거나 열/뷰를 편집, rowProps=행의 속성값 갱신.
+  dbSchema: DbSchema | null;
+  rowProps: RowProps;
 }>;
 
 export async function updatePage(
@@ -147,6 +179,8 @@ export async function updatePage(
         : {}),
       ...(patch.parentId !== undefined ? { parent_id: patch.parentId } : {}),
       ...(patch.icon !== undefined ? { icon: patch.icon } : {}),
+      ...(patch.dbSchema !== undefined ? { db_schema: patch.dbSchema } : {}),
+      ...(patch.rowProps !== undefined ? { row_props: patch.rowProps } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

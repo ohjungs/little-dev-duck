@@ -1,8 +1,9 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T3 실기 검증 통과 + T5(GitHub 이슈)·T6(Gmail)
-어댑터 코드 완료(2026-07-23, `/loop` 자율). `user_github_tokens`/`user_gmail_tokens` db push + 두
-어댑터 실기 검증 대기. 세 어댑터(Calendar/GitHub/Gmail) 동시 연동·합성 구조 완성.**
+현재 Phase: **Phase 11(DB 뷰=표/보드) 진행 — T1 계약 잠금 + T2 표 뷰 + T3 보드 뷰 코드 완료
+(2026-07-23, `/loop` 자율). Phase 10은 코드상 완료(T1~T7), 남은 건 사용자 몫(db push + OAuth
+실기 검증)이라 지시대로 뒤로 미루고 Phase 11 착수. `pages`에 db_schema/row_props 컬럼 add 마이그레이션
+db push 대기.**
 Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabase MCP로 직접 재확인 완료 —
 마이그레이션 18개 전부 local==remote, `user_google_tokens`/`action_log` 테이블 RLS 켜진 채 존재).
 계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md.
@@ -36,6 +37,32 @@ Phase 1~9 전부 완료. `supabase db push` 2건 사용자 적용 확인(Supabas
 Calendar 어댑터 end-to-end(계약→토큰→라우트→승인카드→실제 Google API 반영→감사로그) 전부 실사용 검증
 완료로 T3 종결. **다음 세션: T5(두 번째 어댑터) 또는 T6(Gmail, 격리) 착수** — phase_10.md Task 초안
 참조해 어댑터 후보 확정(GitHub 이슈/Notion 등) 후 계약 잠금·구현.
+
+## Phase 11 — DB 뷰 (표/보드) — T1~T3 코드 완료 (2026-07-23, `/loop` 자율)
+
+착수: 사용자 `/loop /next-step` "현재 Phase 완료 시 다음 Phase 스코프해 Phase 17까지 진행". Phase 10은
+코드 완료(남은 건 사용자 db push·OAuth 실기 검증 = 대신 못 함)라 뒤로 미루고 다음 순번 Phase 11 착수.
+계획: docs/plans/phase_11.md. **설계 판단(ponytail): 데이터베이스를 새 테이블로 만들지 않고 `pages`에
+얹는다** — db_schema가 설정된 페이지=데이터베이스(열+뷰), 그 자식 페이지=행, row_props=행 속성값.
+행이 곧 페이지라 트리·검색·휴지통·RAG(Phase 9)를 전부 물려받는다.
+
+- [x] T1 계약 잠금(직렬): core `database-view.ts`(propertyType/selectOption/propertyDef/viewDef/dbSchema/
+  rowProps 스키마 + 순수함수 `createDefaultDbSchema`/`coerceRowPropValue`/`groupRowsByProperty`) +
+  마이그레이션 `20260723110000_pages_db_view`(pages에 db_schema jsonb·row_props jsonb 컬럼 add + rollback)
+  + core `pageSchema`에 dbSchema(nullable default null)/rowProps(default {}) 추가(하위호환 — 기존
+  페이지·테스트 그대로 파싱) + api pages.ts 확장(`listChildPages`=행 목록, createPage/updatePage에
+  rowProps/dbSchema). STDD: core +9 tests(coerce 타입별·board 그룹핑·기본스키마), api +3 tests.
+- [x] T2 표 뷰: `DbTableView`(열 헤더=속성명, 행=자식 페이지, 셀 인라인 편집=`PropertyCell` 타입별
+  에디터, 제목 인라인 편집+열기 버튼, "+ 새 행"). PageEditor에 "데이터베이스로 전환" 버튼(db_schema
+  null일 때) + db_schema 있으면 본문 아래 `DatabaseView` 렌더 + "+ 속성"(열 추가, 이름+타입).
+- [x] T3 보드 뷰: `DbBoardView`(select 속성으로 그룹된 열 + 카드 + **HTML5 드래그로 열 간 이동**, 라이브러리
+  없음 + 열별 "+ 새 행"=그 그룹값 프리셋). core `groupRowsByProperty`가 옵션 순서 유지 + "없음" 그룹.
+- 검증: core 135 / api 186 tests + core·api tsc GREEN + web build·eslint(진행 중). **db push 필요
+  (pages_db_view)** + **사용자 실기 검증 필요**(페이지→데이터베이스 전환→표/보드에서 행 추가·속성 편집·
+  드래그 이동 확인).
+- [ ] T4 속성 편집 확장: 열 이름변경/타입변경, select 옵션 추가 UI(현재는 열 추가만 — 기본 스키마의
+  상태 3옵션으로 보드는 바로 동작). [이월]
+- [ ] T5 검증·리뷰: gstack /qa 실기 + /review + code/security 리뷰. [이월]
 
 ## Phase 10 — AI 2단계 (에이전트 액션) — T1~T4·T7 코드 완료 (2026-07-22, `/loop` 자율)
 

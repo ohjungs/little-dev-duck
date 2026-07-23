@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Download, History, Save } from "lucide-react";
+import { Download, History, Save, Table2 } from "lucide-react";
 import type { Block } from "@blocknote/core";
-import { type Page } from "@ldd/core";
+import { createDefaultDbSchema, type DbSchema, type Page } from "@ldd/core";
 import { createPageVersion, updatePage } from "@ldd/api";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { VersionHistory } from "@/components/VersionHistory";
+import { DatabaseView } from "@/components/DatabaseView";
 
 // 파일명에 못 쓰는 문자·제어문자를 -로 치환하고 끝의 점/공백을 정리한다(공백은 중간에선 보존).
 // 결과가 비면(공백만 등) "page"로 폴백.
@@ -48,6 +49,19 @@ export function PageEditor({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showVersions, setShowVersions] = useState(false);
   const [versionMsg, setVersionMsg] = useState<string | null>(null);
+  // Phase 11: 이 페이지가 데이터베이스면 dbSchema 설정. 전환/스키마편집은 로컬 상태 + db_schema 저장.
+  const [dbSchema, setDbSchema] = useState<DbSchema | null>(page.dbSchema);
+
+  const handleConvertToDatabase = () => {
+    const schema = createDefaultDbSchema();
+    setDbSchema(schema);
+    void updatePage(supabase, page.id, { dbSchema: schema });
+  };
+
+  const handleSchemaChange = (schema: DbSchema) => {
+    setDbSchema(schema);
+    void updatePage(supabase, page.id, { dbSchema: schema });
+  };
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 최신 편집값(제목/본문)을 저장 시점에 읽는다 — 디바운스 타이머 클로저가 오래된 값을 잡지 않도록 ref로 보관.
   const latest = useRef<{ title: string; content: unknown }>({
@@ -171,6 +185,17 @@ export function PageEditor({
         >
           <Download className="size-3.5" /> Markdown 내보내기
         </Button>
+        {!dbSchema && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleConvertToDatabase}
+            className="text-muted-foreground"
+          >
+            <Table2 className="size-3.5" /> 데이터베이스로 전환
+          </Button>
+        )}
       </div>
       {showVersions && (
         <VersionHistory
@@ -213,6 +238,13 @@ export function PageEditor({
         {saveState === "saved" && "저장됨"}
         {saveState === "error" && "저장 실패 — 잠시 후 다시 시도하세요"}
       </p>
+      {dbSchema && (
+        <DatabaseView
+          dbId={page.id}
+          dbSchema={dbSchema}
+          onSchemaChange={handleSchemaChange}
+        />
+      )}
     </div>
   );
 }

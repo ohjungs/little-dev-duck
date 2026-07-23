@@ -1,7 +1,10 @@
 import { z } from "zod";
+import { dbSchemaSchema, rowPropsSchema } from "./database-view";
 
 // Phase 9 워크스페이스 코어. 페이지 = 계층 문서. content는 BlockNote 문서(jsonb) — 구조는 BlockNote가
 // 소유하므로 core는 느슨하게(z.unknown) 받고, 텍스트 추출만 extractPlainText가 계약으로 담당한다.
+// Phase 11: dbSchema가 설정되면 이 페이지는 데이터베이스(자식 페이지=행), rowProps는 이 페이지가
+// 어떤 데이터베이스의 행일 때의 속성값. 기존 페이지·데이터 하위호환 위해 둘 다 기본값을 준다.
 export const pageSchema = z.object({
   id: z.string().uuid(),
   userId: z.string().uuid(),
@@ -14,6 +17,8 @@ export const pageSchema = z.object({
   trashedAt: z.string().datetime({ offset: true }).nullable(),
   createdAt: z.string().datetime({ offset: true }),
   updatedAt: z.string().datetime({ offset: true }),
+  dbSchema: dbSchemaSchema.nullable().default(null),
+  rowProps: rowPropsSchema.default({}),
 });
 export type Page = z.infer<typeof pageSchema>;
 
