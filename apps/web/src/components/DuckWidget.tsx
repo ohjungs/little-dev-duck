@@ -12,6 +12,7 @@ import {
   QUIET_HOURS_EVENT,
   type QuietHours,
 } from "@/lib/quietHours";
+import { notifyDuck } from "@/lib/notify";
 import {
   Card,
   CardContent,
@@ -67,6 +68,8 @@ export function DuckWidget() {
               () => setCelebrate(false),
               CELEBRATE_MS,
             );
+            // 브라우저 알림(T4) — 권한/방해금지/일일 상한은 notifyDuck이 처리.
+            notifyDuck("레벨 업!", `오리가 레벨 ${next.level}이 되었어요!`);
           }
           levelRef.current = next.level;
           setDuckState(next);

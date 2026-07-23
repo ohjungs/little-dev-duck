@@ -1,6 +1,7 @@
 import Image from "next/image";
 import {
   Activity,
+  Bell,
   CalendarClock,
   LogOut,
   Mail,
@@ -20,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { AppearanceSetting } from "@/components/AppearanceSetting";
 import { QuietHoursSetting } from "@/components/QuietHoursSetting";
+import { NotifySetting } from "@/components/NotifySetting";
 import { HealthStatus } from "@/components/HealthStatus";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
@@ -80,6 +82,21 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <QuietHoursSetting />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Bell className="size-4 text-primary-accent" />
+              브라우저 알림
+            </CardTitle>
+            <CardDescription>
+              레벨 업 같은 순간을 브라우저 알림으로 받습니다(방해금지 시간대엔 조용, 하루 상한 있음).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <NotifySetting />
           </CardContent>
         </Card>
 

@@ -25,6 +25,7 @@ export {
 } from "./domain/duck-mood";
 export { epochDay } from "./domain/date-util";
 export { isQuietHour } from "./domain/quiet-hours";
+export { nextDailyCount, type DailyCount } from "./domain/notify-budget";
 export {
   XP_REWARDS,
   XP_PER_LEVEL_BASE,
