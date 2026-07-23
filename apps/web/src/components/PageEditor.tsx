@@ -38,6 +38,7 @@ import {
   subscribeFavorites,
   toggleFavorite,
 } from "@/lib/favorites";
+import { recordRecentPage } from "@/lib/recentPages";
 
 // 파일명에 못 쓰는 문자·제어문자를 -로 치환하고 끝의 점/공백을 정리한다(공백은 중간에선 보존).
 // 결과가 비면(공백만 등) "page"로 폴백.
@@ -88,6 +89,11 @@ export function PageEditor({
     sync();
     return subscribeFavorites(sync);
   }, [page.id]);
+
+  // 페이지 열람 시 최근 목록(localStorage MRU)에 기록 — 명령 팔레트 빠른 재접근용.
+  useEffect(() => {
+    recordRecentPage({ id: page.id, title: page.title, icon: page.icon });
+  }, [page.id, page.title, page.icon]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showVersions, setShowVersions] = useState(false);
   const [versionMsg, setVersionMsg] = useState<string | null>(null);

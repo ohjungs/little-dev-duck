@@ -16,6 +16,7 @@ import { createPage, searchPages } from "@ldd/api";
 import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { getRecentPages, type RecentPage } from "@/lib/recentPages";
 
 type QuickAction = {
   id: string;
@@ -178,12 +179,17 @@ export function CommandPalette() {
     ? allActions.filter((a) => a.label.toLowerCase().includes(q))
     : allActions;
 
-  // 액션 + 페이지 결과를 하나의 내비게이션 목록으로. Enter/↑↓가 통합 인덱스로 동작.
+  // 검색어가 없을 때만 최근 연 페이지(localStorage MRU)를 노출.
+  const recent = q ? [] : getRecentPages();
+
+  // 액션 + 최근 + 페이지 결과를 하나의 내비게이션 목록으로. Enter/↑↓가 통합 인덱스로 동작.
   type Item =
     | { kind: "action"; action: QuickAction }
+    | { kind: "recent"; page: RecentPage }
     | { kind: "page"; page: Page };
   const items: Item[] = [
     ...actions.map((action) => ({ kind: "action" as const, action })),
+    ...recent.map((page) => ({ kind: "recent" as const, page })),
     ...results.map((page) => ({ kind: "page" as const, page })),
   ];
 

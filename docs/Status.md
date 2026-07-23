@@ -426,8 +426,11 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
   updatePage 저장·롤백) + "아이콘 제거". PageWorkspace 트리도 아이콘 표시(없으면 FileText 폴백).
   뉴스 스크랩(📰)과 일관. 검증 web tsc GREEN.
 - [x] **후속 — 명령 팔레트(T4 확장)**(2026-07-24, `/loop` 자율): Cmd/Ctrl+K 팔레트에 빠른 동작 추가
-  (새 페이지 만들기, 뉴스/오피스/설정 이동) — 검색어로 액션도 필터, 액션+페이지를 단일 목록으로
+  (새 페이지 만들기, 뉴스/오피스/설정/통계 이동) — 검색어로 액션도 필터, 액션+최근+페이지를 단일 목록으로
   통합해 ↑↓/Enter 내비게이션. 결과에 페이지 아이콘 표시. 순수 web(스키마·DB 무변경). 검증 web tsc GREEN.
+- [x] **후속 — 최근 페이지(팔레트)**(2026-07-24, `/loop` 자율): `lib/recentPages.ts`(localStorage MRU 8개,
+  제목/아이콘 스냅샷, 순수 `pushEntry` 분리, SSR 가드+안전 파싱). PageEditor 열람 시 기록 → 팔레트를 빈
+  검색어로 열면 최근 페이지가 액션 아래 표시(빠른 재접근). 검증 web tsc GREEN.
 - [x] **후속 — 즐겨찾기**(2026-07-24, `/loop` 자율): `lib/favorites.ts`(localStorage + 커스텀 이벤트로
   같은 탭 동기화 + storage 이벤트로 다른 탭 동기화, 순수 `toggleInList` 분리, 무료 원칙 — DB/마이그레이션
   없음). PageWorkspace 트리 행에 별 토글 + 상단 "즐겨찾기" 섹션(순서 유지, 삭제된 페이지 자동 제외).
