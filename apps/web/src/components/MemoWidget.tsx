@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { Check, Pencil, Plus, StickyNote, X } from "lucide-react";
+import { Check, Pencil, Plus, Search, StickyNote, X } from "lucide-react";
 import { createMemo, deleteMemo, listMemos, updateMemo } from "@ldd/api";
 import type { Memo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
@@ -30,8 +30,15 @@ export function MemoWidget() {
   const [newContent, setNewContent] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [query, setQuery] = useState("");
 
   const supabase = createClient();
+
+  // 내용 부분일치 필터(메모가 많을 때만 검색창 노출).
+  const q = query.trim().toLowerCase();
+  const visibleMemos = q
+    ? memos.filter((m) => m.content.toLowerCase().includes(q))
+    : memos;
 
   const fetchMemos = async () => {
     try {
@@ -141,6 +148,19 @@ export function MemoWidget() {
           </Button>
         </div>
 
+        {state === "ready" && memos.length > 5 && (
+          <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-2.5">
+            <Search className="size-3.5 shrink-0 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="메모 검색"
+              aria-label="메모 검색"
+              className="h-8 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+        )}
+
         {actionError && (
           <p role="alert" className="text-xs text-destructive">
             {actionError}
@@ -168,9 +188,14 @@ export function MemoWidget() {
             메모가 없습니다.
           </p>
         )}
-        {state === "ready" && memos.length > 0 && (
+        {state === "ready" && memos.length > 0 && visibleMemos.length === 0 && (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            검색어와 일치하는 메모가 없습니다.
+          </p>
+        )}
+        {state === "ready" && visibleMemos.length > 0 && (
           <div className="flex flex-wrap gap-3">
-            {memos.map((memo, index) =>
+            {visibleMemos.map((memo, index) =>
               editingId === memo.id ? (
                 <div
                   key={memo.id}
