@@ -33,6 +33,11 @@ function timeLabel(iso: string | null): string {
   });
 }
 
+// RSS 피드가 준 외부 링크는 http(s)만 허용(zod .url()이 javascript: 스킴을 통과시키므로 렌더 시 화이트리스트 — 보안 리뷰).
+function safeHref(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : "#";
+}
+
 // 기사를 노트(페이지) 본문으로. BlockNote는 최소 PartialBlock을 받아 id/props를 채운다.
 // 요약(없으면 스니펫) 문단 + 원문 링크 문단. 서버가 content에서 plain_text를 파생한다.
 function scrapContent(a: Article): unknown[] {
@@ -72,7 +77,7 @@ function ArticleCard({
             </button>
           )}
           <a
-            href={a.link}
+            href={safeHref(a.link)}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="원문 보기"

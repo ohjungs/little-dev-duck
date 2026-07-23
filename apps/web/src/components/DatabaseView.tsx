@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Loader2, Plus, Trash2 } from "lucide-react";
 import {
@@ -70,9 +70,12 @@ export function DatabaseView({
   const [addingView, setAddingView] = useState(false);
 
   // 저장 실패를 조용히 삼키지 않고 잠깐 표시(코드 리뷰 HIGH). 3초 후 자동 해제.
+  // 이전 타이머를 취소해 연속 오류가 서로를 조기 종료하지 않게 한다(리뷰 MEDIUM).
+  const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showError = (msg: string) => {
+    if (errorTimer.current) clearTimeout(errorTimer.current);
     setError(msg);
-    setTimeout(() => setError(null), 3000);
+    errorTimer.current = setTimeout(() => setError(null), 3000);
   };
 
   useEffect(() => {
@@ -92,6 +95,7 @@ export function DatabaseView({
   const openRow = (id: string) => router.push(`/pages/${id}`);
 
   // 낙관적 반영 후 저장. 실패 시 이전 값으로 롤백 + 에러 표시(코드 리뷰 HIGH — 조용한 유실 방지).
+  // 롤백은 그 행의 값이 아직 내가 낙관적으로 설정한 next일 때만(그 사이 성공한 최신 편집을 덮지 않게 — 리뷰 HIGH).
   const persistRowProps = (row: Page, next: RowProps) => {
     const prev = row.rowProps;
     setRows((rs) =>
@@ -99,7 +103,9 @@ export function DatabaseView({
     );
     updatePage(supabase, row.id, { rowProps: next }).catch(() => {
       setRows((rs) =>
-        (rs ?? []).map((r) => (r.id === row.id ? { ...r, rowProps: prev } : r)),
+        (rs ?? []).map((r) =>
+          r.id === row.id && r.rowProps === next ? { ...r, rowProps: prev } : r,
+        ),
       );
       showError("저장에 실패했습니다. 다시 시도해 주세요.");
     });
@@ -121,8 +127,11 @@ export function DatabaseView({
       (rs ?? []).map((r) => (r.id === rowId ? { ...r, title } : r)),
     );
     updatePage(supabase, rowId, { title }).catch(() => {
+      // 그 행 제목이 아직 내가 설정한 title일 때만 롤백(최신 성공 편집 보존 — 리뷰 HIGH).
       setRows((rs) =>
-        (rs ?? []).map((r) => (r.id === rowId ? { ...r, title: prevTitle } : r)),
+        (rs ?? []).map((r) =>
+          r.id === rowId && r.title === title ? { ...r, title: prevTitle } : r,
+        ),
       );
       showError("저장에 실패했습니다. 다시 시도해 주세요.");
     });

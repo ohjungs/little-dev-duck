@@ -95,36 +95,41 @@ export function PageEditor({
   const [dbSchema, setDbSchema] = useState<DbSchema | null>(page.dbSchema);
 
   // 데이터베이스 전환/스키마 편집. 실패 시 이전 상태로 롤백 + 상태줄 표시(조용한 유실 방지 — 리뷰 HIGH).
+  // 이전 타이머를 취소해 연속 메시지가 서로를 조기 종료하지 않게 한다(리뷰 MEDIUM).
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashMsg = (msg: string) => {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
     setVersionMsg(msg);
-    setTimeout(() => setVersionMsg(null), 2500);
+    flashTimer.current = setTimeout(() => setVersionMsg(null), 2500);
   };
 
   const handleConvertToDatabase = () => {
     const schema = createDefaultDbSchema();
     setDbSchema(schema);
     updatePage(supabase, page.id, { dbSchema: schema }).catch(() => {
-      setDbSchema(null);
+      setDbSchema((cur) => (cur === schema ? null : cur));
       flashMsg("데이터베이스 전환에 실패했습니다.");
     });
   };
 
+  // 롤백은 "그 사이 더 최신 편집이 성공했는지"를 함수형 업데이터로 확인해, 현재 값이 아직 내가 낙관적으로
+  // 설정한 값일 때만 되돌린다(stale rollback로 최신 성공 상태를 덮어쓰지 않게 — 리뷰 HIGH).
   const handleSchemaChange = (schema: DbSchema) => {
     const prev = dbSchema;
     setDbSchema(schema);
     updatePage(supabase, page.id, { dbSchema: schema }).catch(() => {
-      setDbSchema(prev);
+      setDbSchema((cur) => (cur === schema ? prev : cur));
       flashMsg("변경 저장에 실패했습니다.");
     });
   };
 
-  // 아이콘(이모지) 즉시 저장 — 디바운스 자동저장과 별개로 선택 즉시 반영. 실패 시 이전 값 롤백.
+  // 아이콘(이모지) 즉시 저장 — 디바운스 자동저장과 별개로 선택 즉시 반영. 실패 시 (여전히 그 값이면) 롤백.
   const handleSetIcon = (next: string | null) => {
     setShowIconPicker(false);
     const prev = icon;
     setIcon(next);
     updatePage(supabase, page.id, { icon: next }).catch(() => {
-      setIcon(prev);
+      setIcon((cur) => (cur === next ? prev : cur));
       flashMsg("아이콘 저장에 실패했습니다.");
     });
   };

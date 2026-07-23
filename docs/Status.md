@@ -4,6 +4,11 @@
 > 연속 구현·커밋 중(로컬 커밋 다수, 각 tsc+eslint+테스트 GREEN). **푸시·배포 정책: 6시간 간격.** 첫 푸시·배포
 > 예정 ~10:00~10:29 KST(전체 검증 + /review 후). cron 워치독(1분)이 세션 중단 시 /next-step으로 재개.
 > 이 세션 완료 기능 요약은 아래 각 Phase "후속" 항목 및 커밋 로그(git log) 참조.
+> **중간 리뷰(2026-07-24, 20커밋 누적 diff)**: code-reviewer + security-reviewer 병렬 실행. **CRITICAL/배포차단 0건.**
+> HIGH 1건(낙관적 업데이트 stale rollback — 실패 응답이 그 사이 성공한 최신 편집을 덮어씀) + MEDIUM 3건
+> (에러 타이머 미취소, addFilter MAX_FILTERS 미가드, CSV 수식 인젝션) + 보안 선택 1건(RSS href 스킴) **전부 수정**.
+> stale rollback은 함수형 업데이터로 "현재값==내가 설정한 값일 때만 롤백"으로 해소. 전체 테스트 422 GREEN
+> (core 196/api 211/ai 10/mascot 5) + web tsc + 전체 eslint GREEN.
 
 현재 Phase: **Phase 13(상용 마감) — T1~T4 코드 완료(2026-07-24, `/loop` 인계 세션). T1 온보딩 튜토리얼,
 T2 키보드 접근성(전역 focus 링+공용 모달 훅+스킵 링크), T3 계정 데이터 파기 1단계(security-definer RPC

@@ -46,4 +46,17 @@ describe("rowsToCsv", () => {
     // 제목만 있는 스키마(속성 0): 헤더 "제목", 값은 이스케이프된 제목
     expect(csv).toBe('제목\n"a,b ""c""\nd"');
   });
+
+  it("수식 인젝션 방어: =,+,@로 시작하면 작은따옴표 접두", () => {
+    expect(rowsToCsv([{ title: "=SUM(A1)", rowProps: {} }], []).split("\n")[1]).toBe(
+      "'=SUM(A1)",
+    );
+    expect(rowsToCsv([{ title: "@cmd", rowProps: {} }], []).split("\n")[1]).toBe(
+      "'@cmd",
+    );
+    // 음수(-)는 오탐이 잦아 접두하지 않는다
+    expect(rowsToCsv([{ title: "-5", rowProps: {} }], []).split("\n")[1]).toBe(
+      "-5",
+    );
+  });
 });

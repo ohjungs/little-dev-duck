@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowDownUp, Filter, Plus, X } from "lucide-react";
 import {
+  MAX_FILTERS,
   TITLE_PROP_ID,
   type FilterOp,
   type FilterSpec,
@@ -237,7 +238,9 @@ export function DbViewToolbar({
   const toggle = (which: "sort" | "filter") =>
     setOpen((cur) => (cur === which ? null : which));
 
+  const atFilterLimit = filters.length >= MAX_FILTERS;
   const addFilter = () => {
+    if (atFilterLimit) return; // 상한 초과는 스키마 parse에서 던져 조용히 롤백되므로 UI에서 선제 차단(리뷰 MEDIUM).
     const field = fields[0];
     onFiltersChange([
       ...filters,
@@ -355,9 +358,11 @@ export function DbViewToolbar({
               <button
                 type="button"
                 onClick={addFilter}
-                className="mt-1 flex items-center gap-1 self-start rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                disabled={atFilterLimit}
+                className="mt-1 flex items-center gap-1 self-start rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
               >
-                <Plus className="size-3.5" /> 필터 추가
+                <Plus className="size-3.5" />{" "}
+                {atFilterLimit ? `최대 ${MAX_FILTERS}개` : "필터 추가"}
               </button>
             </div>
           </>
