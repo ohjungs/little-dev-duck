@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Copy,
   Download,
   FileText,
   Loader2,
@@ -52,6 +53,7 @@ function TreeRow({
   activeId,
   favoriteIds,
   onDelete,
+  onDuplicate,
   onToggleFavorite,
 }: {
   node: TreeNode;
@@ -59,6 +61,7 @@ function TreeRow({
   activeId: string | null;
   favoriteIds: Set<string>;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onToggleFavorite: (id: string) => void;
 }) {
   const active = node.id === activeId;
@@ -106,6 +109,14 @@ function TreeRow({
         </button>
         <button
           type="button"
+          onClick={() => onDuplicate(node.id)}
+          aria-label={`${node.title || "제목 없음"} 복제`}
+          className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+        >
+          <Copy className="size-3.5" />
+        </button>
+        <button
+          type="button"
           onClick={() => onDelete(node.id)}
           aria-label={`${node.title || "제목 없음"} 삭제`}
           className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
@@ -121,6 +132,7 @@ function TreeRow({
           activeId={activeId}
           favoriteIds={favoriteIds}
           onDelete={onDelete}
+          onDuplicate={onDuplicate}
           onToggleFavorite={onToggleFavorite}
         />
       ))}
@@ -186,6 +198,25 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
       const created = await createPage(supabase, {
         title: template?.title ?? "",
         content: template?.content ?? [],
+      });
+      setPages((prev) => [...prev, created]);
+      router.push(`/pages/${created.id}`);
+    } catch {
+      // 재시도 가능 — 조용히 무시
+    }
+  };
+
+  // 페이지 복제: 제목/본문/아이콘/부모를 복사해 새 페이지 생성 후 이동. db_schema는 createPage 계약상
+  // 미포함이라 데이터베이스 페이지는 일반 페이지로 복제됨(자식·스키마 미복사 — 알려진 제약).
+  const handleDuplicate = async (id: string) => {
+    const src = pages.find((p) => p.id === id);
+    if (!src) return;
+    try {
+      const created = await createPage(supabase, {
+        title: `${src.title || "제목 없음"} (사본)`,
+        content: src.content,
+        icon: src.icon,
+        parentId: src.parentId,
       });
       setPages((prev) => [...prev, created]);
       router.push(`/pages/${created.id}`);
@@ -353,6 +384,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
               activeId={pageId}
               favoriteIds={favoriteIds}
               onDelete={handleDelete}
+              onDuplicate={handleDuplicate}
               onToggleFavorite={toggleFavorite}
             />
           ))}
