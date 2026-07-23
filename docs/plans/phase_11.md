@@ -40,7 +40,9 @@ cascade를 새로 설계해야 해 과설계.
 - [ ] T3 보드 뷰: select 속성으로 그룹된 열 + 카드 + HTML5 드래그로 열 간 이동(라이브러리 없음) +
       열별 "+ 새 행"(그 그룹값 프리셋).
 - [x] T4 속성 편집: 열 추가/이름변경/타입변경/삭제 + select 옵션 추가·제거(`DbPropertyMenu`). 최소 UI.
-- [ ] T5 검증·리뷰: gstack /qa(실기) + /review, code+security 리뷰, Status/History 갱신.
+- [x] T5 code+security 리뷰(병렬) + 수정: CRITICAL 0, HIGH 3 전부 수정(쓰기검증/읽기강등, 낙관적
+      업데이트 에러·롤백, 타입변경 groupBy 해제), MEDIUM/LOW 수정 또는 알려진 제약 문서화. 회귀 테스트 추가.
+      gstack /qa 실기는 OAuth 로그인 필요라 사용자 몫으로 이월.
 
 ## 안전·계약 메모
 

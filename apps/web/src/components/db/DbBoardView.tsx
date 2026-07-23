@@ -62,6 +62,8 @@ export function DbBoardView({
                 onDragStart={(e) =>
                   e.dataTransfer.setData("text/row-id", row.id)
                 }
+                // 드롭 성공/취소와 무관하게 항상 발화 — 하이라이트 잔상 방지(코드 리뷰 MEDIUM).
+                onDragEnd={() => setDragOver(null)}
                 onClick={() => onOpenRow(row.id)}
                 className="cursor-grab rounded-md border border-border bg-card px-3 py-2 text-left text-sm shadow-sm transition-colors hover:border-primary/40 active:cursor-grabbing"
               >

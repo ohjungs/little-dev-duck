@@ -52,15 +52,28 @@ export function PageEditor({
   // Phase 11: 이 페이지가 데이터베이스면 dbSchema 설정. 전환/스키마편집은 로컬 상태 + db_schema 저장.
   const [dbSchema, setDbSchema] = useState<DbSchema | null>(page.dbSchema);
 
+  // 데이터베이스 전환/스키마 편집. 실패 시 이전 상태로 롤백 + 상태줄 표시(조용한 유실 방지 — 리뷰 HIGH).
+  const flashMsg = (msg: string) => {
+    setVersionMsg(msg);
+    setTimeout(() => setVersionMsg(null), 2500);
+  };
+
   const handleConvertToDatabase = () => {
     const schema = createDefaultDbSchema();
     setDbSchema(schema);
-    void updatePage(supabase, page.id, { dbSchema: schema });
+    updatePage(supabase, page.id, { dbSchema: schema }).catch(() => {
+      setDbSchema(null);
+      flashMsg("데이터베이스 전환에 실패했습니다.");
+    });
   };
 
   const handleSchemaChange = (schema: DbSchema) => {
+    const prev = dbSchema;
     setDbSchema(schema);
-    void updatePage(supabase, page.id, { dbSchema: schema });
+    updatePage(supabase, page.id, { dbSchema: schema }).catch(() => {
+      setDbSchema(prev);
+      flashMsg("변경 저장에 실패했습니다.");
+    });
   };
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 최신 편집값(제목/본문)을 저장 시점에 읽는다 — 디바운스 타이머 클로저가 오래된 값을 잡지 않도록 ref로 보관.

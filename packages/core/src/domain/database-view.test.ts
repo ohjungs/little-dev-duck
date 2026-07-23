@@ -36,6 +36,8 @@ describe("coerceRowPropValue", () => {
     expect(coerceRowPropValue("number", "")).toBeNull();
     expect(coerceRowPropValue("number", "abc")).toBeNull();
     expect(coerceRowPropValue("number", null)).toBeNull();
+    // 공백만 있는 문자열은 Number()가 0으로 만들지만 빈 값으로 취급해야 한다(코드 리뷰 LOW).
+    expect(coerceRowPropValue("number", "   ")).toBeNull();
   });
 
   it("date: YYYY-MM-DD만 통과, 그 외 null", () => {

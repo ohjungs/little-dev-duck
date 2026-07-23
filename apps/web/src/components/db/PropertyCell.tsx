@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   coerceRowPropValue,
+  ROW_VALUE_MAX,
   type PropertyDef,
   type RowPropValue,
 } from "@ldd/core";
@@ -37,6 +38,7 @@ function TextishInput({
       type={type}
       value={draft}
       aria-label={label}
+      maxLength={type === "text" ? ROW_VALUE_MAX : undefined}
       onFocus={() => setFocused(true)}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {

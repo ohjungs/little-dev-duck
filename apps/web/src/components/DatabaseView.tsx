@@ -54,13 +54,25 @@ export function DatabaseView({
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [rows, setRows] = useState<Page[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeViewId, setActiveViewId] = useState(dbSchema.views[0]?.id);
   const [addingProp, setAddingProp] = useState(false);
+
+  // 저장 실패를 조용히 삼키지 않고 잠깐 표시(코드 리뷰 HIGH). 3초 후 자동 해제.
+  const showError = (msg: string) => {
+    setError(msg);
+    setTimeout(() => setError(null), 3000);
+  };
 
   useEffect(() => {
     listChildPages(supabase, dbId).then(
       (data) => setRows(data),
-      () => setRows([]),
+      // 조회 실패는 "행 0개"와 구분(코드 리뷰 HIGH) — 빈 목록으로 오인해 중복 생성하는 걸 막는다.
+      () => {
+        setRows([]);
+        setLoadError(true);
+      },
     );
   }, [supabase, dbId]);
 
@@ -69,11 +81,18 @@ export function DatabaseView({
 
   const openRow = (id: string) => router.push(`/pages/${id}`);
 
+  // 낙관적 반영 후 저장. 실패 시 이전 값으로 롤백 + 에러 표시(코드 리뷰 HIGH — 조용한 유실 방지).
   const persistRowProps = (row: Page, next: RowProps) => {
-    setRows((prev) =>
-      (prev ?? []).map((r) => (r.id === row.id ? { ...r, rowProps: next } : r)),
+    const prev = row.rowProps;
+    setRows((rs) =>
+      (rs ?? []).map((r) => (r.id === row.id ? { ...r, rowProps: next } : r)),
     );
-    void updatePage(supabase, row.id, { rowProps: next });
+    updatePage(supabase, row.id, { rowProps: next }).catch(() => {
+      setRows((rs) =>
+        (rs ?? []).map((r) => (r.id === row.id ? { ...r, rowProps: prev } : r)),
+      );
+      showError("저장에 실패했습니다. 다시 시도해 주세요.");
+    });
   };
 
   const handleRowPropChange = (
@@ -87,10 +106,16 @@ export function DatabaseView({
   };
 
   const handleTitleChange = (rowId: string, title: string) => {
-    setRows((prev) =>
-      (prev ?? []).map((r) => (r.id === rowId ? { ...r, title } : r)),
+    const prevTitle = rows?.find((r) => r.id === rowId)?.title ?? "";
+    setRows((rs) =>
+      (rs ?? []).map((r) => (r.id === rowId ? { ...r, title } : r)),
     );
-    void updatePage(supabase, rowId, { title });
+    updatePage(supabase, rowId, { title }).catch(() => {
+      setRows((rs) =>
+        (rs ?? []).map((r) => (r.id === rowId ? { ...r, title: prevTitle } : r)),
+      );
+      showError("저장에 실패했습니다. 다시 시도해 주세요.");
+    });
   };
 
   const handleAddRow = async (preset: RowProps = {}) => {
@@ -102,7 +127,7 @@ export function DatabaseView({
       });
       setRows((prev) => [...(prev ?? []), created]);
     } catch {
-      // 재시도 가능 — 조용히 무시
+      showError("행 추가에 실패했습니다. 다시 시도해 주세요.");
     }
   };
 
@@ -126,21 +151,22 @@ export function DatabaseView({
     });
   };
 
-  // 속성 편집(이름/타입/옵션) 또는 삭제(next=null). 삭제 시 그 속성으로 그룹하던 보드 뷰의 groupBy도 해제.
+  // 속성 편집(이름/타입/옵션) 또는 삭제(next=null). 삭제 시, 또는 select가 아니게 타입 변경 시,
+  // 그 속성으로 그룹하던 보드 뷰의 groupBy를 해제한다(코드 리뷰 HIGH — 기본 스키마에서 상태 속성을
+  // 비-select로 바꾸면 보드가 "없음" 한 열로 붕괴하던 버그).
   const handleEditProperty = (propId: string, next: PropertyDef | null) => {
-    if (next === null) {
-      onSchemaChange({
-        ...dbSchema,
-        properties: dbSchema.properties.filter((p) => p.id !== propId),
-        views: dbSchema.views.map((v) =>
-          v.groupByPropId === propId ? { ...v, groupByPropId: null } : v,
-        ),
-      });
-      return;
-    }
+    const dropGroupBy = next === null || next.type !== "select";
     onSchemaChange({
       ...dbSchema,
-      properties: dbSchema.properties.map((p) => (p.id === propId ? next : p)),
+      properties:
+        next === null
+          ? dbSchema.properties.filter((p) => p.id !== propId)
+          : dbSchema.properties.map((p) => (p.id === propId ? next : p)),
+      views: dropGroupBy
+        ? dbSchema.views.map((v) =>
+            v.groupByPropId === propId ? { ...v, groupByPropId: null } : v,
+          )
+        : dbSchema.views,
     });
   };
 
@@ -183,7 +209,20 @@ export function DatabaseView({
         </div>
       </div>
 
-      {rows === null ? (
+      {error && (
+        <p
+          className="rounded-md bg-destructive/10 px-3 py-1.5 text-sm text-destructive"
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
+
+      {loadError ? (
+        <p className="py-6 text-sm text-destructive" role="alert">
+          행을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.
+        </p>
+      ) : rows === null ? (
         <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" /> 행을 불러오는 중...
         </p>

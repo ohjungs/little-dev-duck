@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   pageSchema,
+  dbSchemaSchema,
+  rowPropsSchema,
   extractPlainText,
   type Page,
   type DbSchema,
@@ -25,6 +27,16 @@ type PageRow = {
 };
 
 function fromRow(row: PageRow): Page {
+  // db_schema/row_props는 pageSchema에서 엄격 파싱된다. 만약 저장소에 어떤 경로로든(콘솔/직접 REST 등)
+  // 잘못된 모양이 들어와 있으면, 여기서 통짜로 throw하면 이 행 하나가 listPages 전체(.map)를 죽여
+  // 워크스페이스 목록이 아예 안 뜨는 자가-DoS가 된다(보안 리뷰 HIGH). 읽기 경로는 관대하게 —
+  // 파싱 실패 시 그 필드만 기본값(null/{})으로 강등해 목록은 항상 뜨게 한다(쓰기 경로에서 검증은 별도).
+  const dbSchema = dbSchemaSchema.safeParse(row.db_schema).success
+    ? (row.db_schema as DbSchema)
+    : null;
+  const rowProps = rowPropsSchema.safeParse(row.row_props).success
+    ? (row.row_props as RowProps)
+    : {};
   return pageSchema.parse({
     id: row.id,
     userId: row.user_id,
@@ -37,8 +49,8 @@ function fromRow(row: PageRow): Page {
     trashedAt: row.trashed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    dbSchema: row.db_schema ?? null,
-    rowProps: row.row_props ?? {},
+    dbSchema,
+    rowProps,
   });
 }
 
@@ -136,6 +148,9 @@ export async function createPage(
   if (!user) throw new Error("로그인이 필요합니다.");
 
   const content = input.content ?? [];
+  // 쓰기 전 검증: 잘못된 모양이 저장되면 읽기 경로가 그 필드를 기본값으로 강등해 데이터가 조용히
+  // 유실되므로, 애초에 저장 시점에 막는다(신뢰 경계 — 보안 리뷰 HIGH). 실패 시 zod가 throw.
+  if (input.rowProps !== undefined) rowPropsSchema.parse(input.rowProps);
   const { data, error } = await supabase
     .from("pages")
     .insert({
@@ -169,6 +184,9 @@ export async function updatePage(
   id: string,
   patch: UpdatePageInput,
 ): Promise<Page> {
+  // 쓰기 전 검증(신뢰 경계 — 보안 리뷰 HIGH). null=데이터베이스 해제라 검증 대상 아님.
+  if (patch.dbSchema != null) dbSchemaSchema.parse(patch.dbSchema);
+  if (patch.rowProps !== undefined) rowPropsSchema.parse(patch.rowProps);
   const { data, error } = await supabase
     .from("pages")
     .update({

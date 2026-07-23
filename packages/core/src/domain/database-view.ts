@@ -22,11 +22,12 @@ export const selectOptionSchema = z.object({
 export type SelectOption = z.infer<typeof selectOptionSchema>;
 
 // 속성 정의(열). options는 select 타입에서만 의미 — 그 외 타입은 빈 배열.
+// 옵션 100개 상한(저장소 남용 방어 — 보안 리뷰 MEDIUM).
 export const propertyDefSchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(100),
   type: propertyTypeSchema,
-  options: z.array(selectOptionSchema).default([]),
+  options: z.array(selectOptionSchema).max(100).default([]),
 });
 export type PropertyDef = z.infer<typeof propertyDefSchema>;
 
@@ -43,23 +44,36 @@ export const viewDefSchema = z.object({
 });
 export type ViewDef = z.infer<typeof viewDefSchema>;
 
+// 셀 값 문자열 상한(저장소 남용 방어 — 보안 리뷰 MEDIUM). 셀은 짧은 속성값용 —
+// 긴 글은 행 자체가 페이지이므로 본문에 쓴다. UI 입력에도 동일 maxLength.
+export const ROW_VALUE_MAX = 2000;
+// 열/뷰/행속성 개수 상한(저장소 남용 방어).
+export const MAX_PROPERTIES = 50;
+export const MAX_VIEWS = 20;
+export const MAX_ROW_PROPS = 200;
+
 // 데이터베이스 스키마(페이지의 db_schema). properties=열, views=뷰 목록(최소 1개).
 export const dbSchemaSchema = z.object({
-  properties: z.array(propertyDefSchema),
-  views: z.array(viewDefSchema).min(1),
+  properties: z.array(propertyDefSchema).max(MAX_PROPERTIES),
+  views: z.array(viewDefSchema).min(1).max(MAX_VIEWS),
 });
 export type DbSchema = z.infer<typeof dbSchemaSchema>;
 
 // 행의 속성값. propId -> 값. select는 optionId(문자열), checkbox는 불리언, date는 'YYYY-MM-DD'.
 export const rowPropValueSchema = z.union([
-  z.string(),
+  z.string().max(ROW_VALUE_MAX),
   z.number(),
   z.boolean(),
   z.null(),
 ]);
 export type RowPropValue = z.infer<typeof rowPropValueSchema>;
 // Zod v4는 z.record(valueSchema) 단일 인자를 키 스키마로 해석하므로(값=unknown) 반드시 (key, value) 두 인자.
-export const rowPropsSchema = z.record(z.string(), rowPropValueSchema);
+// 키 개수 상한으로 저장소 남용 방어.
+export const rowPropsSchema = z
+  .record(z.string(), rowPropValueSchema)
+  .refine((o) => Object.keys(o).length <= MAX_ROW_PROPS, {
+    message: `행 속성은 최대 ${MAX_ROW_PROPS}개까지입니다.`,
+  });
 export type RowProps = z.infer<typeof rowPropsSchema>;
 
 // 새 데이터베이스의 기본 스키마: "상태" select 1열 + 표·보드 뷰. 보드는 상태로 그룹돼 바로 kanban.
@@ -95,8 +109,10 @@ export function coerceRowPropValue(
     case "checkbox":
       return raw === true || raw === "true";
     case "number": {
-      if (raw === "" || raw == null) return null;
-      const n = typeof raw === "number" ? raw : Number(raw);
+      // 공백만 있는 문자열도 빈 값으로 취급(Number("  ")는 0이라 트림 후 판정 — 코드 리뷰 LOW).
+      const trimmed = typeof raw === "string" ? raw.trim() : raw;
+      if (trimmed === "" || trimmed == null) return null;
+      const n = typeof trimmed === "number" ? trimmed : Number(trimmed);
       return Number.isFinite(n) ? n : null;
     }
     case "date": {

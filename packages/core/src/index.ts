@@ -90,6 +90,10 @@ export {
 export {
   PROPERTY_TYPES,
   VIEW_TYPES,
+  ROW_VALUE_MAX,
+  MAX_PROPERTIES,
+  MAX_VIEWS,
+  MAX_ROW_PROPS,
   propertyTypeSchema,
   selectOptionSchema,
   propertyDefSchema,

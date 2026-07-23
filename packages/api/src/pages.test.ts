@@ -230,6 +230,37 @@ describe("Phase 11 DB 뷰", () => {
     expect(result[0].rowProps).toEqual({});
   });
 
+  it("updatePage는 잘못된 dbSchema(뷰 0개)를 쓰기 전에 거부한다", async () => {
+    // views min(1) 위반 — 저장되면 읽기 경로가 강등하므로 애초에 막는다(보안 리뷰 HIGH).
+    await expect(
+      updatePage(fakeSupabase(), VALID_ROW.id, {
+        dbSchema: { properties: [], views: [] },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("updatePage는 상한 초과 rowProps 값을 쓰기 전에 거부한다", async () => {
+    await expect(
+      updatePage(fakeSupabase(), VALID_ROW.id, {
+        rowProps: { big: "a".repeat(2001) },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("listChildPages는 잘못된 db_schema 행도 목록을 죽이지 않고 dbSchema=null로 강등한다", async () => {
+    const badRow = {
+      ...VALID_ROW,
+      id: "44444444-4444-4444-8444-444444444444",
+      parent_id: VALID_ROW.id,
+      db_schema: { garbage: true },
+      row_props: { nope: { nested: 1 } },
+    };
+    const result = await listChildPages(childSupabase([badRow]), VALID_ROW.id);
+    expect(result).toHaveLength(1);
+    expect(result[0].dbSchema).toBeNull();
+    expect(result[0].rowProps).toEqual({});
+  });
+
   it("updatePage가 dbSchema를 db_schema로, rowProps를 row_props로 저장한다", async () => {
     let captured: Record<string, unknown> | undefined;
     const supabase = fakeSupabase({
