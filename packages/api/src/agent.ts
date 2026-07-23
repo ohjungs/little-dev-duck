@@ -23,6 +23,15 @@ export type AgentResult =
   | { status: "final"; text: string }
   | { status: "approval_pending"; calls: ToolCall[] };
 
+// 도구 카탈로그가 없을 때(예: Google 미연동) 쓰는 빈 어댑터 — tools 없이 순수 RAG 대화로만 동작하게 한다.
+// catalog가 비어 있으면 Gemini에 tools 자체를 안 보내므로(runAgentTurn) execute는 절대 호출되지 않는다.
+export const NO_TOOLS_ADAPTER: Adapter = {
+  catalog: [],
+  execute: () => {
+    throw new LddError("internal", "연동된 도구가 없습니다.");
+  },
+};
+
 // Gemini content part는 이질적(text | functionCall | functionResponse)이라 전 필드 optional인 단일
 // 타입으로 느슨하게 받는다(파싱 편의 — 실제 값 검증은 toolCallSchema/어댑터가 담당).
 type GeminiPart = {
@@ -72,15 +81,19 @@ export async function runAgentTurn(
   systemPrompt?: string,
 ): Promise<AgentResult> {
   // Gemini functionDeclarations는 우리 계약에서 kind를 뺀 name/description/parameters만.
-  const tools = [
-    {
-      functionDeclarations: adapter.catalog.map((decl) => ({
-        name: decl.name,
-        description: decl.description,
-        parameters: decl.parameters,
-      })),
-    },
-  ];
+  // 카탈로그가 비면 tools 자체를 안 보낸다(빈 functionDeclarations는 Gemini가 거부) — 순수 RAG 대화.
+  const tools =
+    adapter.catalog.length > 0
+      ? [
+          {
+            functionDeclarations: adapter.catalog.map((decl) => ({
+              name: decl.name,
+              description: decl.description,
+              parameters: decl.parameters,
+            })),
+          },
+        ]
+      : undefined;
 
   const preamble = [INJECTION_GUARD, systemPrompt].filter(Boolean).join("\n\n");
   const firstText = `${preamble}\n\n${question}`;

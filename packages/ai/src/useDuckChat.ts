@@ -1,20 +1,45 @@
 import { useCallback, useState } from "react";
 import type { ChatMessage, ToolCall, ToolResult } from "@ldd/core";
 
-// /api/ai/agent 응답 형태 — Phase 10 AgentResult 계약과 동일 shape(+ unavailable = Calendar 미연동/쿼터).
-export type AgentResponse =
+// /api/ai/agent 응답 형태 — Phase 10 DuckTurnResult 계약 + 클라 전용 unavailable(Calendar 미연동/쿼터).
+// rule = 룰 대사로 답할 발화(Gemini 미호출), final = LLM 텍스트 답, approval_pending = mutating 도구 승인
+// 대기, unavailable = 일시적으로 처리 불가(쿼터 소진·토큰 만료 등, message 포함).
+export type DuckChatResponse =
+  | { status: "rule" }
   | { status: "final"; text: string }
   | { status: "approval_pending"; calls: ToolCall[] }
   | { status: "unavailable"; message: string };
 
-export type UseAgentChatOptions = {
+const DEFAULT_RULE_REPLY =
+  "꽥? 그건 아직 잘 모르겠어요. 메모나 할 일을 적어두면 기억해둘게요!";
+
+// 서버 응답 → 오리가 말할 내용. approval_pending은 메시지가 아니라 승인 카드로 표현하므로 null.
+// 순수함수라 테스트 대상(훅의 상태 관리는 얇게 유지, Phase 8 resolveDuckReply와 동일 취지).
+export function resolveDuckMessage(
+  response: DuckChatResponse,
+  rulePhrase?: () => string,
+): string | null {
+  switch (response.status) {
+    case "rule":
+      return rulePhrase?.() ?? DEFAULT_RULE_REPLY;
+    case "final":
+      return response.text;
+    case "unavailable":
+      return response.message;
+    case "approval_pending":
+      return null;
+  }
+}
+
+export type UseDuckChatOptions = {
   endpoint?: string;
   approveEndpoint?: string;
+  rulePhrase?: () => string; // rule 분기 시 오리 룰 대사(Phase 6 pickIdlePhrase 등) 주입
   fetchImpl?: typeof fetch;
-  now?: () => string;
+  now?: () => string; // 타임스탬프 주입(테스트용)
 };
 
-export type UseAgentChatResult = {
+export type UseDuckChatResult = {
   messages: ChatMessage[];
   pending: boolean;
   error: string | null;
@@ -31,12 +56,15 @@ export function summarizeResults(results: ToolResult[]): string {
   return "완료했어요!";
 }
 
-// 오리 에이전트 대화 훅. /api/ai/agent가 도구 루프를 처리하고, mutating 도구는 승인 대기(pendingApproval)로
-// 노출한다 — 실제 실행은 사용자가 approve()를 명시 호출해야만 일어난다(파괴적 액션 자동 실행 금지, T0-4).
-export function useAgentChat(options: UseAgentChatOptions = {}): UseAgentChatResult {
+// 오리 대화 훅(단일). RAG 질답(Phase 8)과 에이전트 액션(Phase 10)을 한 대화창에서 자연스럽게 다룬다 —
+// /api/ai/agent가 룰 라우팅·RAG·도구 루프를 전부 처리하고, 여기선 메시지·승인대기 상태만 관리한다.
+// mutating 도구는 승인 대기(pendingApproval)로 노출되며, 실제 실행은 사용자가 approve()를 명시 호출해야만
+// 일어난다(파괴적 액션 자동 실행 금지, T0-4).
+export function useDuckChat(options: UseDuckChatOptions = {}): UseDuckChatResult {
   const {
     endpoint = "/api/ai/agent",
     approveEndpoint = "/api/ai/agent/approve",
+    rulePhrase,
     fetchImpl = fetch,
     now = () => new Date().toISOString(),
   } = options;
@@ -72,22 +100,21 @@ export function useAgentChat(options: UseAgentChatOptions = {}): UseAgentChatRes
           body: JSON.stringify({ question }),
         });
         if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as AgentResponse;
-        if (data.status === "final") {
-          addDuckMessage(data.text);
-        } else if (data.status === "approval_pending") {
+        const data = (await res.json()) as DuckChatResponse;
+        if (data.status === "approval_pending") {
           setPendingApproval(data.calls);
         } else {
-          addDuckMessage(data.message);
+          addDuckMessage(resolveDuckMessage(data, rulePhrase) ?? DEFAULT_RULE_REPLY);
         }
       } catch {
-        setError("지금은 처리하기 어려워요. 잠시 후 다시 시도해주세요.");
-        addDuckMessage("꽥... 지금은 답하기 어려워요.");
+        // 실패해도 오리가 침묵하지 않도록 폴백 대사 + 에러 표시.
+        setError("지금은 답하기 어려워요. 잠시 후 다시 시도해주세요.");
+        addDuckMessage(rulePhrase?.() ?? DEFAULT_RULE_REPLY);
       } finally {
         setPending(false);
       }
     },
-    [endpoint, fetchImpl, now, pending, addDuckMessage],
+    [endpoint, rulePhrase, fetchImpl, now, pending, addDuckMessage],
   );
 
   const approve = useCallback(async () => {

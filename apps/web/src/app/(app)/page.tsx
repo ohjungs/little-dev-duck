@@ -7,7 +7,6 @@ import { CalendarWidget } from "@/components/CalendarWidget";
 import { HabitWidget } from "@/components/HabitWidget";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
-import { AgentChatPanel } from "@/components/AgentChatPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +57,6 @@ export default async function DashboardPage() {
           <MemoWidget />
         </div>
         <CalendarWidget />
-        <div className="md:col-span-1 lg:col-span-1">
-          <AgentChatPanel />
-        </div>
 
         <div className="md:col-span-2 lg:col-span-3">
           <GithubContributionWidget />

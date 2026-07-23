@@ -54,30 +54,3 @@ export async function geminiEmbed(
   }
   return json.embeddings.map((e) => e.values);
 }
-
-type GenerateResponse = {
-  candidates?: { content?: { parts?: { text?: string }[] } }[];
-};
-
-// 프롬프트로 텍스트 1개 생성.
-export async function geminiGenerate(
-  prompt: string,
-  apiKey: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<string> {
-  const res = await fetchImpl(
-    `${GEMINI_BASE}/models/${GEMINI_GEN_MODEL}:generateContent`,
-    {
-      method: "POST",
-      headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    },
-  );
-
-  if (!res.ok) throw upstreamError(res.status, await safeBody(res));
-
-  const json = (await res.json()) as GenerateResponse;
-  const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new LddError("upstream", "gemini generate 빈 응답");
-  return text;
-}

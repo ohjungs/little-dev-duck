@@ -1,13 +1,15 @@
 # Status.md — 현재 Phase 진행 현황
 
-현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T1~T4~T7 코드 완료(2026-07-22 밤, `/loop` 자율).**
+현재 Phase: **Phase 10(AI 2단계=에이전트 액션) 진행 — T1~T4~T7 코드 완료 + 대화창 UX 통합(2026-07-23, `/loop` 자율).**
 Phase 1~9 전부 완료(인프라·검증 게이트 없음). Google Calendar 어댑터 end-to-end 배선(계약→어댑터→토큰
-캡처→라우트→UI 승인카드→감사 로그)까지 코드 완료, core/api/ai 전 테스트 + web build GREEN.
+캡처→라우트→UI 승인카드→감사 로그)까지 코드 완료, core/api/ai 전 테스트 + web build GREEN. `supabase db
+push` 2건은 사용자가 직접 적용 완료(2026-07-23 보고 — 이 세션은 MCP가 read-only라 직접 검증은 못 함).
 계획 문서: docs/plans/phase_01~10.md, 리뷰 스냅샷 docs/reviews/2026-07-21-phase5.md·2026-07-22-phase9.md,
 Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
-**다음 세션: 사용자 실기 검증 필요(Google 재로그인→Calendar scope 동의→"내일 회의 잡아줘" 시도) — 로컬은
-진짜 Google OAuth consent/토큰 발급을 재현할 수 없어 이 부분만 사람이 확인해야 한다. `supabase db push`
-2건 대기. 검증 후 T5(두 번째 어댑터) 또는 T6(Gmail, 격리)로 진행.**
+**다음 세션: 사용자 실기 검증 필요(Google 재로그인 시 Google Cloud Console OAuth 동의 화면 "테스트 사용자"
+403으로 막혔던 문제 — 테스트 사용자 등록 확인 후 재시도). 통합된 오리 대화창(DuckChatPanel 1개)에서
+RAG 질문과 "내일 회의 잡아줘" 같은 액션이 모두 자연스럽게 되는지 확인. 검증 후 T5(두 번째 어댑터) 또는
+T6(Gmail, 격리)로 진행.**
 
 ## Phase 10 — AI 2단계 (에이전트 액션) — T1~T4·T7 코드 완료 (2026-07-22, `/loop` 자율)
 
@@ -52,13 +54,31 @@ Notion 델타 docs/plans/notion-inventory-delta-2026-07-21.md.
   시 readonly 유실) ponytail 주석으로 명시(카탈로그 소규모라 현재는 낮은 우선순위, T5+ 확장 시 재검토).
   action_log id 매칭(별도 발견, 이미 수정 커밋 b61b228)은 security-reviewer도 독립 재확인.
 - 검증: core 117(+4) / api 142(+4) / ai 9 tests + web build GREEN + core·api·web 로컬 full eslint 선검증.
+- [x] **대화창 UX 통합(2026-07-23, 사용자 지시)**: "오리에게 시키는 건 맨위 대화창에서 자연스럽게" —
+  DuckChatPanel(RAG)/AgentChatPanel(액션) 분리가 부자연스럽다는 피드백으로 단일 대화창으로 재병합.
+  이전 세션이 "관심사 분리"로 일부러 나눴던 결정(2026-07-22 밤)을 사용자가 명시적으로 뒤집음.
+  - core `buildRagContext`(질문 없는 RAG 컨텍스트 블록, `buildRagPrompt`가 이를 재사용하도록 리팩터).
+  - api `aiChat.ts`: `answerQuestion` 제거 → `runDuckTurn`(룰 라우팅→RAG 검색→`runAgentTurn`에 컨텍스트를
+    systemPrompt로 전달) 신설. Gemini `generateContent`는 tools를 줘도 필요 없으면 그냥 텍스트로 답하므로
+    RAG 질답과 도구 호출이 **한 호출·한 엔드포인트**에서 자연스럽게 공존 — 별도 라우트가 불필요해짐.
+  - api `agent.ts`: `NO_TOOLS_ADAPTER`(Google 미연동 시 카탈로그 0개로 순수 RAG만) 신설, `runAgentTurn`이
+    카탈로그가 비면 `tools` 필드 자체를 생략(빈 functionDeclarations는 Gemini가 거부).
+  - `geminiGenerate`(미사용이 된 단순 생성 헬퍼) 삭제.
+  - web `/api/ai/agent`: `runDuckTurn` 기반으로 통합(토큰 없으면 NO_TOOLS_ADAPTER + 안내 systemPrompt 주입,
+    쿼터 소진은 Phase 8과 동일하게 `status:"rule"`로 조용히 폴백). `/api/ai/chat` 라우트 삭제.
+  - ai `useChat`+`useAgentChat` → `useDuckChat` 하나로 병합(`resolveDuckMessage` 순수함수로 rule/final/
+    approval_pending/unavailable 분기).
+  - web `DuckChatPanel.tsx` 1개로 병합(재인덱싱 버튼 + 승인 카드 모두 포함), `AgentChatPanel.tsx` 삭제,
+    홈 대시보드 그리드에서 중복 슬롯 제거.
+  - 검증: core 119 / api 141 / ai 10 tests + web build GREEN + core·api·ai·web 로컬 full eslint 선검증.
 - [ ] **T3 실기 검증(사용자, 로그인 필요)**: Google 재로그인(재동의 화면 필수)→provider_token 저장 확인→
-  AgentChatPanel에서 "일정 만들어줘" 시도→승인 카드→승인 후 실제 Google Calendar에 반영되는지 +
+  통합된 오리 대화창에서 "일정 만들어줘" 시도→승인 카드→승인 후 실제 Google Calendar에 반영되는지 +
   action_log에 기록되는지. `gemini-flash-latest`의 function calling 실동작도 이 시점에 실측(phase_10.md
-  미검증 절).
-- [ ] **인프라(사용자/세션, DB 자격증명)**: `supabase db push` 2건 — 20260722080000_user_google_tokens,
-  20260722090000_action_log.
-- [ ] T4 인젝션 방어 하드닝 / T5 두 번째 어댑터 / T6 Gmail(격리) / T7 감사 로그 — phase_10.md 참조.
+  미검증 절). **Google OAuth 동의 화면이 "테스트 사용자만 접근 가능" 403으로 막혔던 이력 있음(2026-07-23,
+  Google Cloud Console 설정 문제 — 코드와 무관) — 테스트 사용자 등록 후 재시도 필요.**
+- [x] **인프라(사용자)**: `supabase db push` 2건 사용자 적용 완료 보고(2026-07-23) — 20260722080000_user_google_tokens,
+  20260722090000_action_log. (이 세션은 Supabase MCP가 read-only라 직접 재확인은 못 함.)
+- [ ] T5 두 번째 어댑터 / T6 Gmail(격리) — phase_10.md 참조. T3 실기 검증 통과 후 진행 권장(계획 원칙).
 
 ## Phase 9 — 워크스페이스 코어 (블록 에디터) — T1·T2·T4·T5·T7 구현·배포 (2026-07-22 오후, `/loop` 자율)
 

@@ -1,38 +1,33 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  buildRagPrompt,
-  routeUtterance,
-  type RetrievedChunk,
-  type UtteranceRoute,
-} from "@ldd/core";
-import { geminiEmbed, geminiGenerate } from "./gemini";
+import { buildRagContext, routeUtterance } from "@ldd/core";
+import { geminiEmbed } from "./gemini";
 import { searchEmbeddings } from "./embeddings";
+import { runAgentTurn, type Adapter, type AgentResult } from "./agent";
 
-export type AiAnswer = {
-  route: UtteranceRoute;
-  // rule이면 null(호출측이 Phase 6 룰 대사 사용). llm이면 생성된 답변.
-  answer: string | null;
-  sources: RetrievedChunk[];
-};
+export type DuckTurnResult = { status: "rule" } | AgentResult;
 
-// 질문 → 라우팅 → (llm이면) 질문 임베딩 → 본인 데이터 top-k 검색 → 프롬프트 → 생성.
-// rule이면 Gemini를 호출하지 않는다(무료 쿼터 절약). 실패(쿼터 등)는 LddError로 던져 호출측이 폴백.
-export async function answerQuestion(
+// 발화 하나를 오리 턴으로 처리: 룰 라우팅(무료, Gemini 미호출) → RAG 검색 → 에이전트 루프.
+// RAG 컨텍스트와 도구 카탈로그를 같은 systemPrompt/tools 아래 한 번에 넘기면 Gemini가 스스로 "그냥
+// 답할지" "도구를 부를지" 고른다 — 대화용 엔드포인트와 액션용 엔드포인트를 분리할 필요가 없다(오리에게
+// 묻기/시키기가 한 대화창에서 자연스럽게 공존). adapter.catalog가 비어 있으면(NO_TOOLS_ADAPTER) 순수
+// RAG 대화로 동작한다.
+export async function runDuckTurn(
   supabase: SupabaseClient,
   apiKey: string,
   question: string,
+  adapter: Adapter,
   fetchImpl: typeof fetch = fetch,
-): Promise<AiAnswer> {
+  extraSystemNote?: string,
+): Promise<DuckTurnResult> {
   if (routeUtterance(question) === "rule") {
-    return { route: "rule", answer: null, sources: [] };
+    return { status: "rule" };
   }
 
   const [queryVector] = await geminiEmbed([question], apiKey, fetchImpl);
   const sources = await searchEmbeddings(supabase, queryVector, 5);
-  const prompt = buildRagPrompt(
-    question,
-    sources.map((s) => s.content),
-  );
-  const answer = await geminiGenerate(prompt, apiKey, fetchImpl);
-  return { route: "llm", answer, sources };
+  const systemPrompt = [buildRagContext(sources.map((s) => s.content)), extraSystemNote]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return runAgentTurn(question, adapter, apiKey, fetchImpl, systemPrompt);
 }

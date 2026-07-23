@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { geminiEmbed, geminiGenerate } from "./gemini";
+import { geminiEmbed } from "./gemini";
 
 function fakeFetch(response: unknown, ok = true, status = 200) {
   return vi.fn().mockResolvedValue({
@@ -37,29 +37,6 @@ describe("geminiEmbed", () => {
     const f = fakeFetch({ error: "rate" }, false, 429);
     await expect(geminiEmbed(["a"], "key", f)).rejects.toMatchObject({
       code: "quota_exceeded",
-    });
-  });
-});
-
-describe("geminiGenerate", () => {
-  it("candidates의 텍스트를 반환", async () => {
-    const f = fakeFetch({
-      candidates: [{ content: { parts: [{ text: "꽥 답변" }] } }],
-    });
-    expect(await geminiGenerate("prompt", "key", f)).toBe("꽥 답변");
-  });
-
-  it("빈 응답이면 upstream 에러", async () => {
-    const f = fakeFetch({ candidates: [] });
-    await expect(geminiGenerate("p", "key", f)).rejects.toMatchObject({
-      code: "upstream",
-    });
-  });
-
-  it("500은 upstream 에러", async () => {
-    const f = fakeFetch({}, false, 500);
-    await expect(geminiGenerate("p", "key", f)).rejects.toMatchObject({
-      code: "upstream",
     });
   });
 });

@@ -27,9 +27,9 @@ export function routeUtterance(input: string): UtteranceRoute {
   return text.length > 12 ? "llm" : "rule";
 }
 
-// RAG 프롬프트 조립: 검색된 본인 데이터 청크만 컨텍스트로. 프롬프트 인젝션 방어(T0-6)를 위해
-// 컨텍스트는 데이터로만 취급하고, 시스템 지시와 사용자 데이터 경계를 명시적으로 표기한다.
-export function buildRagPrompt(question: string, contextChunks: string[]): string {
+// RAG 컨텍스트 블록(질문 없음): 인젝션 방어 지시 + 검색된 본인 데이터. 질문을 붙이지 않은 형태라
+// 에이전트 턴(Phase 10)의 systemPrompt로도 재사용한다 — RAG와 도구 호출이 같은 지시문 아래 공존.
+export function buildRagContext(contextChunks: string[]): string {
   const context =
     contextChunks.length > 0
       ? contextChunks.map((c, i) => `[자료 ${i + 1}]\n${c}`).join("\n\n")
@@ -41,8 +41,11 @@ export function buildRagPrompt(question: string, contextChunks: string[]): strin
     "",
     "[사용자 자료]",
     context,
-    "",
-    "[질문]",
-    question,
   ].join("\n");
+}
+
+// RAG 프롬프트 조립: 컨텍스트 블록 + 질문. 프롬프트 인젝션 방어(T0-6)를 위해 컨텍스트는 데이터로만
+// 취급하고, 시스템 지시와 사용자 데이터 경계를 명시적으로 표기한다.
+export function buildRagPrompt(question: string, contextChunks: string[]): string {
+  return [buildRagContext(contextChunks), "", "[질문]", question].join("\n");
 }

@@ -1,15 +1,9 @@
-export {
-  useChat,
-  resolveDuckReply,
-  type ChatResponse,
-  type UseChatOptions,
-  type UseChatResult,
-} from "./useChat";
 export { reindexSource, type ReindexInput } from "./reindex";
 export {
-  useAgentChat,
+  useDuckChat,
+  resolveDuckMessage,
   summarizeResults,
-  type AgentResponse,
-  type UseAgentChatOptions,
-  type UseAgentChatResult,
-} from "./useAgentChat";
+  type DuckChatResponse,
+  type UseDuckChatOptions,
+  type UseDuckChatResult,
+} from "./useDuckChat";

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { RefreshCw, Send, Sparkles } from "lucide-react";
-import { useChat } from "@ldd/ai";
+import { useDuckChat } from "@ldd/ai";
+import type { ToolCall } from "@ldd/core";
 import { cn } from "@/lib/utils";
 import {
   Card,
@@ -13,7 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-// 오리 RAG 대화 패널. /api/ai/chat이 라우팅·검색·폴백을 처리하고 여기선 입력·표시만 담당.
+// 오리 대화 패널(단일). RAG 질답과 에이전트 액션을 같은 대화창에서 자연스럽게 다룬다 —
+// /api/ai/agent가 라우팅·검색·도구 루프·폴백을 전부 처리하고, 여기선 입력·표시·승인 카드만 담당한다.
 type ReindexState = "idle" | "running" | "done" | "error";
 
 const REINDEX_LABEL: Record<ReindexState, string> = {
@@ -23,8 +25,37 @@ const REINDEX_LABEL: Record<ReindexState, string> = {
   error: "다시 인덱싱",
 };
 
+// 도구 이름을 사람이 읽을 라벨로. 카탈로그가 늘면 여기만 추가(어댑터 자체는 core에 라벨을 안 둠 —
+// Gemini 계약과 UI 표현을 분리).
+const TOOL_LABELS: Record<string, string> = {
+  createCalendarEvent: "캘린더 일정 만들기",
+};
+
+function formatWhen(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
+}
+
+// 승인 카드는 사용자가 정확히 무엇을 승인하는지 안전하게 판단할 수 있어야 한다(CLAUDE.md 5절 안전 규칙
+// + T0-4 승인 게이트 취지) — 도구명뿐 아니라 LLM이 채운 실제 파라미터(제목/시간)를 전부 노출한다.
+// 제목·시간은 LLM 산출이라 신뢰 불가한 텍스트일 수 있으므로 지시문처럼 렌더링하지 않고 순수 텍스트로만
+// 표시(HTML 삽입 없음, React가 이스케이프) — 승인 카드 자체가 프롬프트 인젝션의 실행 표면이 되지 않게.
+function describeCall(call: ToolCall): string {
+  const label = TOOL_LABELS[call.name] ?? call.name;
+  const title = typeof call.args.title === "string" ? call.args.title : null;
+  const start = formatWhen(call.args.start);
+  const end = formatWhen(call.args.end);
+  const parts = [title ? `"${title}"` : null, start && end ? `${start} ~ ${end}` : null].filter(
+    Boolean,
+  );
+  return parts.length > 0 ? `${label}: ${parts.join(", ")}` : label;
+}
+
 export function DuckChatPanel() {
-  const { messages, pending, error, send } = useChat();
+  const { messages, pending, error, pendingApproval, send, approve, cancel } =
+    useDuckChat();
   const [input, setInput] = useState("");
   const [reindexState, setReindexState] = useState<ReindexState>("idle");
 
@@ -52,7 +83,7 @@ export function DuckChatPanel() {
       <CardHeader>
         <CardTitle>
           <Sparkles className="size-4 text-primary-accent" />
-          오리에게 물어보기
+          오리에게 물어보고 시키기
         </CardTitle>
         <Button
           type="button"
@@ -71,15 +102,15 @@ export function DuckChatPanel() {
 
       <CardContent className="flex flex-1 flex-col">
         <div className="mb-3 flex min-h-[220px] flex-1 flex-col gap-2 overflow-y-auto pr-1">
-          {messages.length === 0 && (
+          {messages.length === 0 && !pendingApproval && (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
               <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary-accent">
                 <Sparkles className="size-5" />
               </span>
               <p className="text-sm text-muted-foreground">
-                메모·할 일에 대해 물어보세요.
+                메모·할 일을 물어보거나 일을 시켜보세요.
                 <br />
-                예: &quot;이번 주 마감 뭐 있어?&quot;
+                예: &quot;이번 주 마감 뭐 있어?&quot; · &quot;내일 오후 3시에 회의 잡아줘&quot;
               </p>
             </div>
           )}
@@ -96,6 +127,34 @@ export function DuckChatPanel() {
               {m.content}
             </div>
           ))}
+          {pendingApproval && (
+            <div
+              role="alertdialog"
+              aria-label="에이전트 작업 승인"
+              className="self-start rounded-2xl rounded-bl-md border border-primary/30 bg-primary/5 px-3.5 py-3 text-sm"
+            >
+              <p className="mb-2 font-medium">이 작업을 할까요?</p>
+              <ul className="mb-3 list-disc space-y-0.5 pl-4 text-muted-foreground">
+                {pendingApproval.map((call, i) => (
+                  <li key={`${call.id ?? i}`}>{describeCall(call)}</li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={approve} disabled={pending}>
+                  승인
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={cancel}
+                  disabled={pending}
+                >
+                  취소
+                </Button>
+              </div>
+            </div>
+          )}
           {pending && (
             <div className="flex items-center gap-1.5 self-start rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5">
               <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
@@ -118,13 +177,14 @@ export function DuckChatPanel() {
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
             }}
-            placeholder="오리에게 물어보기"
+            placeholder="오리에게 물어보거나 시키기"
+            disabled={!!pendingApproval}
           />
           <Button
             type="button"
             size="icon"
             onClick={submit}
-            disabled={pending}
+            disabled={pending || !!pendingApproval}
             aria-label="보내기"
           >
             <Send />
