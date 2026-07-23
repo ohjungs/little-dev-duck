@@ -61,7 +61,11 @@ function TreeRow({
           className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-2"
           style={{ paddingLeft: depth * 14 + 8 }}
         >
-          <FileText className="size-3.5 shrink-0 opacity-70" />
+          {node.icon ? (
+            <span className="shrink-0 text-sm leading-none">{node.icon}</span>
+          ) : (
+            <FileText className="size-3.5 shrink-0 opacity-70" />
+          )}
           <span className="truncate">{node.title || "제목 없음"}</span>
         </Link>
         <button

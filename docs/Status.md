@@ -394,6 +394,10 @@ docs/plans/phase_09.md. 각 슬라이스 빌드 GREEN 확인 후 main 커밋·pu
   lib/pageTemplates.ts) + 전체 백업 내보내기(활성+휴지통 페이지를 JSON 다운로드, 사이드바 하단).
 - [x] **인프라**: `supabase db push` 5건 프로덕션 적용 완료(2026-07-22, 사용자 `npx supabase db push`).
 - [x] **T8 실기 검증**(사용자): 로그인 후 에디터/검색/휴지통/페이지 RAG 동작 확인 완료(2026-07-22).
+- [x] **후속 — 페이지 아이콘 이모지**(2026-07-24, `/loop` 자율): `pages.icon` 필드는 있었으나 설정 UI가
+  없었음. PageEditor 제목 위 아이콘 버튼 + 큐레이션 40종 이모지 그리드 피커(라이브러리 없음, 즉시
+  updatePage 저장·롤백) + "아이콘 제거". PageWorkspace 트리도 아이콘 표시(없으면 FileText 폴백).
+  뉴스 스크랩(📰)과 일관. 검증 web tsc GREEN.
 
 ## Phase 8 — AI 1단계 (룰 대사 → RAG Q&A) — 구현·리뷰·배포·검증 완료 (2026-07-22, `/loop` 자율+협업)
 

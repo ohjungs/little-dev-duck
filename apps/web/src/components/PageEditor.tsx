@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Download, Globe, History, Link2, Save, Table2 } from "lucide-react";
+import {
+  Download,
+  Globe,
+  History,
+  Link2,
+  Save,
+  Smile,
+  Table2,
+} from "lucide-react";
 import type { Block } from "@blocknote/core";
 import { createDefaultDbSchema, type DbSchema, type Page } from "@ldd/core";
 import {
@@ -51,6 +59,8 @@ export function PageEditor({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [title, setTitle] = useState(page.title);
+  const [icon, setIcon] = useState<string | null>(page.icon);
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showVersions, setShowVersions] = useState(false);
   const [versionMsg, setVersionMsg] = useState<string | null>(null);
@@ -78,6 +88,17 @@ export function PageEditor({
     updatePage(supabase, page.id, { dbSchema: schema }).catch(() => {
       setDbSchema(prev);
       flashMsg("변경 저장에 실패했습니다.");
+    });
+  };
+
+  // 아이콘(이모지) 즉시 저장 — 디바운스 자동저장과 별개로 선택 즉시 반영. 실패 시 이전 값 롤백.
+  const handleSetIcon = (next: string | null) => {
+    setShowIconPicker(false);
+    const prev = icon;
+    setIcon(next);
+    updatePage(supabase, page.id, { icon: next }).catch(() => {
+      setIcon(prev);
+      flashMsg("아이콘 저장에 실패했습니다.");
     });
   };
 
@@ -292,6 +313,33 @@ export function PageEditor({
           }}
         />
       )}
+      <div className="relative px-4">
+        {icon ? (
+          <button
+            type="button"
+            onClick={() => setShowIconPicker((o) => !o)}
+            aria-label="페이지 아이콘 변경"
+            className="rounded-lg text-5xl leading-none transition-transform hover:scale-105"
+          >
+            {icon}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowIconPicker((o) => !o)}
+            className="flex items-center gap-1 text-xs text-muted-foreground opacity-60 transition-opacity hover:opacity-100"
+          >
+            <Smile className="size-3.5" /> 아이콘 추가
+          </button>
+        )}
+        {showIconPicker && (
+          <IconPicker
+            onSelect={handleSetIcon}
+            onClear={() => handleSetIcon(null)}
+            onClose={() => setShowIconPicker(false)}
+          />
+        )}
+      </div>
       <input
         value={title}
         onChange={(e) => {
@@ -328,5 +376,56 @@ export function PageEditor({
         />
       )}
     </div>
+  );
+}
+
+// 큐레이션 이모지(노트/문서용 흔한 것들). 라이브러리 없이 그리드 피커(ponytail).
+const PAGE_EMOJIS = [
+  "📄", "📝", "📌", "📎", "🗂️", "📁", "📚", "📖",
+  "✅", "⭐", "🔥", "💡", "🎯", "🚀", "🏆", "🎉",
+  "💰", "📊", "📈", "🗓️", "⏰", "🔔", "❤️", "☕",
+  "🦆", "🐣", "🌱", "🌟", "🧩", "🔧", "🛠️", "🔒",
+  "💬", "📮", "🌍", "🎨", "🎵", "🍀", "🧠", "✨",
+];
+
+function IconPicker({
+  onSelect,
+  onClear,
+  onClose,
+}: {
+  onSelect: (emoji: string) => void;
+  onClear: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div
+        role="presentation"
+        className="fixed inset-0 z-10"
+        onClick={onClose}
+      />
+      <div className="absolute left-4 top-full z-20 mt-1 flex w-64 flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-lg">
+        <div className="grid grid-cols-8 gap-1">
+          {PAGE_EMOJIS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => onSelect(e)}
+              aria-label={`아이콘 ${e}`}
+              className="rounded p-1 text-xl leading-none transition-colors hover:bg-muted"
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          className="self-start text-xs text-muted-foreground transition-colors hover:text-destructive"
+        >
+          아이콘 제거
+        </button>
+      </div>
+    </>
   );
 }
