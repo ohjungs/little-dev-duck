@@ -153,13 +153,20 @@ export function DbTableView({
           )}
         </tbody>
       </table>
-      <button
-        type="button"
-        onClick={onAddRow}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-      >
-        <Plus className="size-3.5" /> 새 행
-      </button>
+      <div className="flex items-center justify-between border-t border-border/60">
+        <button
+          type="button"
+          onClick={onAddRow}
+          className="flex items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+        >
+          <Plus className="size-3.5" /> 새 행
+        </button>
+        {rows.length > 0 && (
+          <span className="px-3 text-xs tabular-nums text-muted-foreground/60">
+            {rows.length}개 행
+          </span>
+        )}
+      </div>
     </div>
   );
 }
