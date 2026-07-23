@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { Drumstick, Sparkles } from "lucide-react";
+import { Drumstick, ImageDown, Sparkles } from "lucide-react";
 import { getDuckState } from "@ldd/api";
 import { levelProgress, type DuckState } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
@@ -20,6 +20,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { AchievementCard } from "@/components/AchievementCard";
 import { useDuckMood } from "./useDuckMood";
 
 const DUCK_HEIGHT = 220;
@@ -37,6 +39,7 @@ export function DuckWidget() {
   const [duckState, setDuckState] = useState<DuckState | null>(null);
   const [celebrate, setCelebrate] = useState(false);
   const [quietHours, setQuietHours] = useState<QuietHours | null>(null);
+  const [showCard, setShowCard] = useState(false);
   const levelRef = useRef<number | null>(null);
   const celebrateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -138,9 +141,27 @@ export function DuckWidget() {
                 먹이 {duckState.feed}
               </span>
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCard(true)}
+              className="self-end text-muted-foreground"
+            >
+              <ImageDown className="size-3.5" /> 성과 카드
+            </Button>
           </div>
         )}
       </CardContent>
+
+      {showCard && duckState && (
+        <AchievementCard
+          level={duckState.level}
+          xp={duckState.xp}
+          feed={duckState.feed}
+          onClose={() => setShowCard(false)}
+        />
+      )}
     </Card>
   );
 }
