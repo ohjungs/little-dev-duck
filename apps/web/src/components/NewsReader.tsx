@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import {
   getReadArticles,
   markArticleRead,
+  markArticlesRead,
   subscribeReadArticles,
 } from "@/lib/readArticles";
 
@@ -280,6 +281,15 @@ export function NewsReader() {
             개 기사
           </span>
           <div className="flex items-center gap-2">
+            {articles.some((a) => !readSet.has(a.id)) && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => markArticlesRead(articles.map((a) => a.id))}
+              >
+                모두 읽음
+              </Button>
+            )}
             {readIds.length > 0 && (
               <Button
                 size="sm"

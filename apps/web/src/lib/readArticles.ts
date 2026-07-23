@@ -11,6 +11,15 @@ export function markInList(ids: readonly string[], id: string): string[] {
   return [id, ...ids.filter((x) => x !== id)].slice(0, MAX);
 }
 
+// 여러 id를 한 번에 읽음 목록 앞에 추가(중복 제거, 상한 유지). 순수 함수.
+export function markManyInList(
+  ids: readonly string[],
+  add: readonly string[],
+): string[] {
+  const addSet = new Set(add);
+  return [...add, ...ids.filter((x) => !addSet.has(x))].slice(0, MAX);
+}
+
 function read(): string[] {
   if (typeof window === "undefined") return [];
   try {
@@ -32,6 +41,18 @@ export function markArticleRead(id: string): void {
   if (typeof window === "undefined") return;
   try {
     const next = markInList(read(), id);
+    window.localStorage.setItem(KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event(EVENT));
+  } catch {
+    // 저장 실패는 무시(부가 기능).
+  }
+}
+
+// 여러 기사를 한 번에 읽음 처리(1회 저장 + 1회 이벤트).
+export function markArticlesRead(ids: readonly string[]): void {
+  if (typeof window === "undefined" || ids.length === 0) return;
+  try {
+    const next = markManyInList(read(), ids);
     window.localStorage.setItem(KEY, JSON.stringify(next));
     window.dispatchEvent(new Event(EVENT));
   } catch {
