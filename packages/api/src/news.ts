@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   feedSchema,
   articleSchema,
-  normalizeUrl,
   parseRssItems,
   FEED_FAIL_THRESHOLD,
   type Feed,
@@ -80,12 +79,31 @@ async function requireUserId(supabase: SupabaseClient): Promise<string> {
   return user.id;
 }
 
-// 정규화 URL의 SHA-256(중복 판정 키). Web Crypto라 Node 20+·브라우저 공통.
-async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+// 추적/분석 파라미터 — 정규화 시 제거해 같은 기사가 다른 링크로 중복 저장되는 걸 막는다.
+const TRACKING_PARAM = /^(utm_|fbclid$|gclid$|mc_|ref$|ref_src$|igshid$|_hsenc$|_hsmi$)/i;
+
+// URL 정규화: 호스트 소문자 + 추적 파라미터 제거 + 해시 제거 + 남은 쿼리 정렬 + 끝 슬래시 정리.
+// url_hash(중복 판정)의 입력이라 결정론적이어야 한다. 파싱 불가면 trim만 해서 돌려준다.
+// (core가 아니라 여기 있는 이유: `new URL`은 웹/노드 전역 타입이고 core는 lib=ES2022뿐이라 CI에서 미해석.)
+export function normalizeUrl(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const u = new URL(trimmed);
+    u.hash = "";
+    u.hostname = u.hostname.toLowerCase();
+    const kept: [string, string][] = [];
+    for (const [k, v] of u.searchParams) {
+      if (!TRACKING_PARAM.test(k)) kept.push([k, v]);
+    }
+    kept.sort(([a], [b]) => a.localeCompare(b));
+    u.search = "";
+    for (const [k, v] of kept) u.searchParams.append(k, v);
+    let out = u.toString();
+    if (out.endsWith("/") && !u.search) out = out.slice(0, -1);
+    return out;
+  } catch {
+    return trimmed;
+  }
 }
 
 export async function addFeed(
@@ -171,7 +189,6 @@ function isDuplicate(error: { code?: string } | null): boolean {
 
 export type CollectDeps = {
   fetchImpl?: typeof fetch;
-  hashImpl?: (input: string) => Promise<string>;
 };
 
 // 피드 1개 수집: fetch→파싱→정규화·해시→중복 제외 insert. 실패 시 fail_count 증가·임계 도달 시
@@ -183,7 +200,6 @@ export async function collectFeed(
 ): Promise<{ inserted: number; paused: boolean }> {
   const userId = await requireUserId(supabase);
   const doFetch = deps.fetchImpl ?? fetch;
-  const doHash = deps.hashImpl ?? sha256Hex;
 
   let xml: string;
   try {
@@ -209,7 +225,8 @@ export async function collectFeed(
   const items = parseRssItems(xml);
   let inserted = 0;
   for (const item of items) {
-    const urlHash = await doHash(normalizeUrl(item.link));
+    // 정규화 URL 자체를 중복 판정 키로 쓴다(같은 기사=같은 정규화 URL → UNIQUE로 차단). 해시 불필요.
+    const urlHash = normalizeUrl(item.link);
     const { error } = await supabase.from("articles").insert({
       user_id: userId,
       feed_id: feed.id,

@@ -39,31 +39,8 @@ export type RssItem = {
 // 자동 일시정지 임계: 연속 수집 실패가 이 횟수에 도달하면 피드를 paused로.
 export const FEED_FAIL_THRESHOLD = 5;
 
-// 추적/분석 파라미터 — 정규화 시 제거해 같은 기사가 다른 링크로 중복 저장되는 걸 막는다.
-const TRACKING_PARAM = /^(utm_|fbclid$|gclid$|mc_|ref$|ref_src$|igshid$|_hsenc$|_hsmi$)/i;
-
-// URL 정규화: 호스트 소문자 + 추적 파라미터 제거 + 해시 제거 + 남은 쿼리 정렬 + 끝 슬래시 정리.
-// url_hash(중복 판정)의 입력이라 결정론적이어야 한다. 파싱 불가면 trim만 해서 돌려준다.
-export function normalizeUrl(raw: string): string {
-  const trimmed = raw.trim();
-  try {
-    const u = new URL(trimmed);
-    u.hash = "";
-    u.hostname = u.hostname.toLowerCase();
-    const kept: [string, string][] = [];
-    for (const [k, v] of u.searchParams) {
-      if (!TRACKING_PARAM.test(k)) kept.push([k, v]);
-    }
-    kept.sort(([a], [b]) => a.localeCompare(b));
-    u.search = "";
-    for (const [k, v] of kept) u.searchParams.append(k, v);
-    let out = u.toString();
-    if (out.endsWith("/") && !u.search) out = out.slice(0, -1);
-    return out;
-  } catch {
-    return trimmed;
-  }
-}
+// 주의: URL 정규화(normalizeUrl)는 `new URL`(웹/노드 전역 타입)에 의존하는데 core는 플랫폼 중립이라
+// tsconfig lib이 ES2022뿐이고 @types/node도 없어 CI에서 URL 타입이 없다 → api로 옮겼다(packages/api/news.ts).
 
 function decodeEntities(s: string): string {
   return s

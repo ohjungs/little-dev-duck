@@ -1,27 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { normalizeUrl, parseRssItems } from "./news";
+import { parseRssItems } from "./news";
 
-describe("normalizeUrl", () => {
-  it("추적 파라미터(utm_/fbclid 등)를 제거한다", () => {
-    expect(
-      normalizeUrl("https://ex.com/a?utm_source=x&id=7&fbclid=abc"),
-    ).toBe("https://ex.com/a?id=7");
-  });
-
-  it("해시·끝 슬래시 제거 + 호스트 소문자", () => {
-    expect(normalizeUrl("https://Ex.COM/path/#frag")).toBe("https://ex.com/path");
-  });
-
-  it("남은 쿼리를 정렬해 순서가 달라도 같은 결과", () => {
-    expect(normalizeUrl("https://ex.com/a?b=2&a=1")).toBe(
-      normalizeUrl("https://ex.com/a?a=1&b=2"),
-    );
-  });
-
-  it("파싱 불가한 문자열은 trim만 한다", () => {
-    expect(normalizeUrl("  not a url  ")).toBe("not a url");
-  });
-});
+// normalizeUrl은 `new URL`(플랫폼 전역) 의존이라 api로 옮김 — 테스트도 api/news.test.ts에 있다.
 
 describe("parseRssItems", () => {
   it("RSS 2.0 item에서 제목/링크/발행일/요약을 뽑는다", () => {

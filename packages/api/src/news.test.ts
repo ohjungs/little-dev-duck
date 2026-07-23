@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Feed } from "@ldd/core";
-import { addFeed, collectFeed, summarizeArticle } from "./news";
+import { addFeed, collectFeed, normalizeUrl, summarizeArticle } from "./news";
 
 const USER_ID = "55555555-5555-4555-8555-555555555555";
 const FEED_ID = "66666666-6666-4666-8666-666666666666";
@@ -59,9 +59,6 @@ function fakeSupabase(opts: FakeOpts = {}) {
   return { supabase, state };
 }
 
-// hashImpl = identity로 주입해 url_hash가 곧 정규화 URL이 되게 한다(중복 판정 검증 쉬움).
-const identityHash = async (s: string) => s;
-
 function xmlResponse(xml: string) {
   return async () => ({ ok: true, text: async () => xml }) as unknown as Response;
 }
@@ -71,6 +68,25 @@ const TWO_ITEMS = `<rss><channel>
   <item><title>B</title><link>https://ex.com/b</link></item>
 </channel></rss>`;
 
+describe("normalizeUrl", () => {
+  it("추적 파라미터(utm_/fbclid 등)를 제거한다", () => {
+    expect(normalizeUrl("https://ex.com/a?utm_source=x&id=7&fbclid=abc")).toBe(
+      "https://ex.com/a?id=7",
+    );
+  });
+  it("해시·끝 슬래시 제거 + 호스트 소문자", () => {
+    expect(normalizeUrl("https://Ex.COM/path/#frag")).toBe("https://ex.com/path");
+  });
+  it("남은 쿼리를 정렬해 순서가 달라도 같은 결과", () => {
+    expect(normalizeUrl("https://ex.com/a?b=2&a=1")).toBe(
+      normalizeUrl("https://ex.com/a?a=1&b=2"),
+    );
+  });
+  it("파싱 불가한 문자열은 trim만 한다", () => {
+    expect(normalizeUrl("  not a url  ")).toBe("not a url");
+  });
+});
+
 describe("collectFeed", () => {
   it("새 기사만 저장하고 중복(url_hash 충돌)은 건너뛴다", async () => {
     const { supabase, state } = fakeSupabase({
@@ -78,7 +94,6 @@ describe("collectFeed", () => {
     });
     const result = await collectFeed(supabase, baseFeed(), {
       fetchImpl: xmlResponse(TWO_ITEMS),
-      hashImpl: identityHash,
     });
     expect(result.inserted).toBe(1); // a만 새로
     expect(state.articleInserts).toHaveLength(2); // 둘 다 시도
@@ -93,7 +108,7 @@ describe("collectFeed", () => {
     const result = await collectFeed(
       supabase,
       baseFeed({ failCount: 4 }), // 임계 5 → 이번 실패로 5
-      { fetchImpl: failingFetch as unknown as typeof fetch, hashImpl: identityHash },
+      { fetchImpl: failingFetch as unknown as typeof fetch },
     );
     expect(result.paused).toBe(true);
     expect(state.feedUpdates[0]).toMatchObject({ fail_count: 5, status: "paused" });
@@ -106,7 +121,6 @@ describe("collectFeed", () => {
     };
     const result = await collectFeed(supabase, baseFeed({ failCount: 0 }), {
       fetchImpl: failingFetch as unknown as typeof fetch,
-      hashImpl: identityHash,
     });
     expect(result.paused).toBe(false);
     expect(state.feedUpdates[0]).toMatchObject({ fail_count: 1, status: "active" });
@@ -117,7 +131,6 @@ describe("collectFeed", () => {
     await expect(
       collectFeed(supabase, baseFeed(), {
         fetchImpl: xmlResponse(TWO_ITEMS),
-        hashImpl: identityHash,
       }),
     ).rejects.toThrow("로그인이 필요합니다.");
   });

@@ -154,7 +154,6 @@ export {
 export {
   feedSchema,
   articleSchema,
-  normalizeUrl,
   parseRssItems,
   FEED_FAIL_THRESHOLD,
   type Feed,
