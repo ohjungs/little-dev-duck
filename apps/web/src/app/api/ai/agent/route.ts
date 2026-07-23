@@ -73,9 +73,15 @@ export async function POST(request: Request) {
     );
     return NextResponse.json(result);
   } catch (error) {
-    // 쿼터 소진은 룰 대사 폴백으로 우아하게 degrade(Phase 8과 동일 원칙, 클라가 오리 룰 대사를 붙인다).
+    // Phase 8은 쿼터 소진을 룰 대사로 조용히 degrade했지만(순수 RAG라 "모르겠다"가 자연스러웠음), 여기선
+    // 액션 요청도 같은 rule 폴백을 타면서 "오리가 명령을 이해 못 함"처럼 보여 실사용 검증 중 혼란을 일으켰다
+    // (2026-07-23, 실제로는 요청이 다 llm 라우팅됐는데 쿼터 소진으로 매번 캔 답변만 나감). unavailable로
+    // 구분해 원인을 알 수 있게 한다.
     if (isLddError(error) && error.code === "quota_exceeded") {
-      return NextResponse.json({ status: "rule" });
+      return NextResponse.json({
+        status: "unavailable",
+        message: "지금 요청이 많아서 잠시 답하기 어려워요. 1분 정도 후 다시 시도해주세요.",
+      });
     }
     // access_token 만료(~1시간, 갱신 미구현) 시 Google이 401을 주고 어댑터가 unauthorized로 표시한다.
     // 일반 502 대신 실제로 도움이 되는 재연동 안내를 준다.
