@@ -27,6 +27,7 @@ import {
 } from "@ldd/core";
 import {
   createPageVersion,
+  listBacklinks,
   publishPage,
   unpublishPage,
   updatePage,
@@ -111,6 +112,15 @@ export function PageEditor({
   useEffect(() => {
     recordRecentPage({ id: page.id, title: page.title, icon: page.icon });
   }, [page.id, page.title, page.icon]);
+
+  // 이 페이지를 참조하는 페이지 목록(백링크). 마운트 시 1회 조회.
+  const [backlinks, setBacklinks] = useState<
+    { sourcePageId: string; sourceTitle: string }[]
+  >([]);
+  useEffect(() => {
+    listBacklinks(supabase, page.id).then(setBacklinks).catch(() => {});
+  }, [supabase, page.id]);
+
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showVersions, setShowVersions] = useState(false);
   const [versionMsg, setVersionMsg] = useState<string | null>(null);
@@ -585,6 +595,24 @@ export function PageEditor({
         )}
       </div>
       <AiWriteAssistant />
+      {backlinks.length > 0 && (
+        <div className="border-t px-4 pt-3">
+          <h4 className="mb-2 text-xs font-semibold text-muted-foreground">
+            백링크 ({backlinks.length})
+          </h4>
+          <div className="space-y-1">
+            {backlinks.map((bl) => (
+              <Link
+                key={bl.sourcePageId}
+                href={`/pages/${bl.sourcePageId}`}
+                className="block text-xs text-primary hover:underline"
+              >
+                {bl.sourceTitle}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
       {dbSchema && (
         <DatabaseView
           dbId={page.id}
