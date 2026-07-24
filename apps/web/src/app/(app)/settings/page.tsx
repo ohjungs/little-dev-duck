@@ -4,6 +4,7 @@ import {
   Bell,
   CalendarClock,
   Download,
+  Info,
   Keyboard,
   LogOut,
   Mail,
@@ -223,7 +224,7 @@ export default async function SettingsPage() {
             <div className="space-y-2 text-sm">
               {[
                 { label: "명령 팔레트", key: "Ctrl+K" },
-                { label: "페이지 검색", key: "Ctrl+K" },
+                { label: "할 일 추가", key: "Ctrl+Shift+T" },
                 { label: "오피스 이동", key: "방향키 / WASD" },
                 { label: "오피스 상호작용", key: "E" },
                 { label: "오피스 경영 패널", key: "Tab" },
@@ -274,6 +275,32 @@ export default async function SettingsPage() {
             </CardContent>
           </Card>
         )}
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Info className="size-4 text-primary-accent" />
+              앱 정보
+            </CardTitle>
+            <CardDescription>Little Dev Duck v1.0.0</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                Next.js 16 + Supabase + Gemini AI
+              </p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>블록 에디터 (BlockNote)</li>
+                <li>AI 오리 비서 (Gemini)</li>
+                <li>픽셀 오피스</li>
+                <li>뉴스 피드</li>
+                <li>GitHub 기여 잔디</li>
+                <li>뽀모도로 타이머</li>
+                <li>습관 트래커</li>
+                <li>캘린더 연동</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <p className="mt-8 text-xs text-muted-foreground">Little Dev Duck v1.0.0</p>
