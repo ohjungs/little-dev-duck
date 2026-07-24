@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flame, Plus, Repeat, X } from "lucide-react";
+import { Bell, Flame, Plus, Repeat, X } from "lucide-react";
 import {
   checkHabit,
   createHabit,
@@ -190,6 +190,19 @@ export function HabitWidget() {
       </CardHeader>
 
       <CardContent className="flex flex-col gap-3">
+        {(() => {
+          const now = new Date();
+          const isAfternoon = now.getHours() >= 14;
+          const uncheckedToday = habits.filter(
+            (h) => !checks.some((c) => c.habitId === h.id && c.checkedDate === todayIso()),
+          );
+          return isAfternoon && uncheckedToday.length > 0 ? (
+            <div className="text-xs text-orange-500 mb-2 flex items-center gap-1">
+              <Bell className="size-3" />
+              오늘 {uncheckedToday.length}개 습관이 아직 체크되지 않았어요
+            </div>
+          ) : null;
+        })()}
         <div className="flex gap-2">
           <Input
             value={newTitle}

@@ -55,6 +55,21 @@ function byStartAt(a: CalendarEvent, b: CalendarEvent): number {
   return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
 }
 
+const EVENT_COLORS = [
+  "border-l-blue-400",
+  "border-l-green-400",
+  "border-l-purple-400",
+  "border-l-orange-400",
+  "border-l-pink-400",
+  "border-l-teal-400",
+];
+
+function eventColor(title: string): string {
+  let hash = 0;
+  for (const c of title) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
+  return EVENT_COLORS[hash % EVENT_COLORS.length]!;
+}
+
 export function CalendarWidget() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [state, setState] = useState<LoadState>("loading");
@@ -188,7 +203,7 @@ export function CalendarWidget() {
                 <li
                   key={event.id}
                   data-testid={`calendar-event-${event.id}`}
-                  className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60${isToday ? " bg-primary/5" : ""}`}
+                  className={`group flex items-center gap-2.5 rounded-lg border-l-2 px-2 py-1.5 transition-colors hover:bg-muted/60 ${eventColor(event.title)}${isToday ? " bg-primary/5" : ""}`}
                 >
                   <Badge
                     variant={ddayVariant(event.startAt)}
