@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { Check, Pencil, Pin, Plus, Search, StickyNote, X } from "lucide-react";
+import { Check, Download, Pencil, Pin, Plus, Search, StickyNote, X } from "lucide-react";
 import { createMemo, deleteMemo, listMemos, updateMemo } from "@ldd/api";
 import type { Memo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
@@ -34,6 +34,19 @@ const MEMO_COLORS = [
 
 const textareaClass =
   "w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none";
+
+function exportMemos(memos: Memo[]) {
+  const text = memos
+    .map((m) => `---\n${m.content}\n(${new Date(m.createdAt).toLocaleDateString("ko-KR")})`)
+    .join("\n\n");
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `memos-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const PINNED_KEY = "ldd-pinned-memos";
 
@@ -183,6 +196,18 @@ export function MemoWidget() {
           <StickyNote className="size-4 text-primary-accent" />
           메모
         </CardTitle>
+        {state === "ready" && memos.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => exportMemos(sortedMemos)}
+            aria-label="전체 내보내기"
+          >
+            <Download className="size-3.5" />
+            전체 내보내기
+          </Button>
+        )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-3">

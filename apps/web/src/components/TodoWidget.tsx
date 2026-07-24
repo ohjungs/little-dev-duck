@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, CheckCheck, ListTodo, Pencil, Plus, X } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, ListTodo, Pencil, Plus, X } from "lucide-react";
 import {
   applyXpAward,
   createTodo,
@@ -32,6 +32,18 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type LoadState = "loading" | "error" | "ready";
 
+const TODO_ORDER_KEY = "ldd-todo-order";
+function getTodoOrder(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(TODO_ORDER_KEY) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+function saveTodoOrder(ids: string[]): void {
+  localStorage.setItem(TODO_ORDER_KEY, JSON.stringify(ids));
+}
+
 export function TodoWidget() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [state, setState] = useState<LoadState>("loading");
@@ -42,6 +54,7 @@ export function TodoWidget() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [confirmCompleteAll, setConfirmCompleteAll] = useState(false);
+  const [todoOrder, setTodoOrder] = useState<string[]>(() => getTodoOrder());
   const inputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
@@ -194,10 +207,33 @@ export function TodoWidget() {
     }
   };
 
+  // 저장된 순서로 todos를 정렬. 순서 배열에 없는 항목은 뒤에 붙는다.
+  const sortedTodos = (() => {
+    if (todoOrder.length === 0) return todos;
+    const indexed = new Map(todoOrder.map((id, i) => [id, i]));
+    return [...todos].sort((a, b) => {
+      const ia = indexed.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const ib = indexed.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      return ia - ib;
+    });
+  })();
+
+  const moveTodo = (id: string, direction: "up" | "down") => {
+    const ids = sortedTodos.map((t) => t.id);
+    const idx = ids.indexOf(id);
+    if (idx === -1) return;
+    const target = direction === "up" ? idx - 1 : idx + 1;
+    if (target < 0 || target >= ids.length) return;
+    const next = [...ids];
+    [next[idx], next[target]] = [next[target]!, next[idx]!];
+    saveTodoOrder(next);
+    setTodoOrder(next);
+  };
+
   const today = todayIso();
   const baseTodos = onlyToday
-    ? todos.filter((t) => t.dueDate?.slice(0, 10) === today)
-    : todos;
+    ? sortedTodos.filter((t) => t.dueDate?.slice(0, 10) === today)
+    : sortedTodos;
   const visibleTodos = hideDone
     ? baseTodos.filter((t) => !t.isDone)
     : baseTodos;
@@ -332,7 +368,7 @@ export function TodoWidget() {
         )}
         {state === "ready" && visibleTodos.length > 0 && (
           <ul className="flex flex-col gap-1">
-            {visibleTodos.map((todo) =>
+            {visibleTodos.map((todo, idx) =>
               editingId === todo.id ? (
                 <li
                   key={todo.id}
@@ -373,6 +409,26 @@ export function TodoWidget() {
                   data-testid={`todo-${todo.id}`}
                   className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60"
                 >
+                  <div className="flex flex-col opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => moveTodo(todo.id, "up")}
+                      aria-label="위로 이동"
+                      disabled={idx === 0}
+                      className="text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                    >
+                      <ChevronUp className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveTodo(todo.id, "down")}
+                      aria-label="아래로 이동"
+                      disabled={idx === visibleTodos.length - 1}
+                      className="text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                    >
+                      <ChevronDown className="size-3" />
+                    </button>
+                  </div>
                   <input
                     type="checkbox"
                     checked={todo.isDone}
