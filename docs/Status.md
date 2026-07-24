@@ -64,22 +64,21 @@ Phase 완료분은 실기 검증만 남음(코드+DB 전부 배포됨).**
 
 - [x] 오리 스탠드업 생성기: 24h 활동 → Gemini 요약 → 페이지 자동생성 ✅ bedd1e5
 - [x] 습관 히트맵 + 뽀모도로 InsightsView 통계 ✅ cdd4083
-- [ ] 습관 히트맵: habit_checks 90일 시각화 (feature) → 스펙: docs/specs/2026-07-24-insights-enhancement.md
-- [ ] 뽀모도로 InsightsView 통계 타일 (feature) → 스펙: docs/specs/2026-07-24-insights-enhancement.md
-- [ ] 임베딩 upsert 배치화: N회 순차 → 1회 batch (performance, embeddings.ts:97)
+- [x] 습관 히트맵 + 뽀모도로 통계 (중복 — 위에서 완료) ✅ cdd4083
+- [x] 임베딩 upsert 배치화 ✅ ff066df
 - [ ] XP 원자적 증가: read-modify-write → Postgres RPC (correctness, duckState.ts:61)
-- [ ] OAuth 토큰 모듈 3파일 통합: generic factory 추출 (code-quality)
-- [ ] 모바일 하단 네비게이션: top strip → bottom tab bar (UX, AppNav.tsx)
-- [ ] ConfirmDialog 공용 컴포넌트: window.confirm 3곳 대체 (UX/a11y)
-- [ ] CommandPalette ARIA: aria-activedescendant + listbox/option (a11y)
-- [ ] unbounded query .limit() 추가: listTodos, listMemos 등 7개 함수 (architecture)
+- [x] OAuth 토큰 모듈 통합: oauthTokens.ts generic factory ✅ ff066df
+- [x] 모바일 하단 네비게이션: 고정 하단 탭바 5항목 ✅ ef87a43
+- [x] ConfirmDialog 공용 컴포넌트: 3곳 대체 ✅ ef87a43
+- [x] CommandPalette ARIA: listbox/option/activedescendant ✅ ef87a43
+- [x] unbounded query .limit(500) 7개 함수 ✅ ff066df
 - [ ] page_versions 쓰기 상한: per-page 50건 (architecture)
-- [ ] apps/web/src/lib/ 테스트: 16개 순수함수 파일 0 테스트 (test)
+- [ ] apps/web/src/lib/ 테스트: vitest 미설정으로 이월
 
 ### NICE (priority 3) — 후속
 
 - [ ] 백링크 page_links 테이블 + UI (feature)
-- [ ] 페이지 커버 cover_url 컬럼 + UI (feature)
+- [x] 페이지 커버 cover_url 컬럼 + UI ✅ 6959510
 - [ ] Realtime 멀티서피스 동기화 (feature)
 - [ ] hover-revealed 버튼 focus-visible 링 (a11y)
 - [ ] listPages SELECT 프로젝션: content 제외 (architecture)
