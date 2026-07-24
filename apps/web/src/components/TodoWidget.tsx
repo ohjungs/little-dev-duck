@@ -268,59 +268,66 @@ export function TodoWidget() {
   return (
     <>
     <Card data-testid="todo-widget" className="h-full">
-      <CardHeader>
-        <CardTitle>
-          <ListTodo className="size-4 text-primary-accent" />
-          할 일
-          {state === "ready" && (
-            <Badge variant="muted">{remaining}개 남음</Badge>
-          )}
-          {state === "ready" && baseTodos.length > 0 && (
-            <span className="ml-1 text-xs font-normal text-muted-foreground">
-              {doneCount}/{baseTodos.length}
-            </span>
-          )}
-        </CardTitle>
+      <CardHeader className="flex-col items-stretch gap-2">
+        {/* 제목 행 + 오늘/전체 토글: 좁은 카드에서 제목이 세로로 찌부러지지 않도록 별도 행으로 분리 */}
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="min-w-0">
+            <ListTodo className="size-4 shrink-0 text-primary-accent" />
+            <span className="whitespace-nowrap">할 일</span>
+            {state === "ready" && (
+              <Badge variant="muted" className="shrink-0">{remaining}개 남음</Badge>
+            )}
+            {state === "ready" && baseTodos.length > 0 && (
+              <span className="shrink-0 text-xs font-normal text-muted-foreground">
+                {doneCount}/{baseTodos.length}
+              </span>
+            )}
+          </CardTitle>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setOnlyToday((v) => !v)}
+            aria-pressed={onlyToday}
+          >
+            {onlyToday ? "전체 보기" : "오늘 마감"}
+          </Button>
+        </div>
         {state === "ready" && baseTodos.length > 0 && (
-          <div className="h-0.5 rounded-full bg-muted">
+          <div className="h-1 rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${(doneCount / baseTodos.length) * 100}%` }}
             />
           </div>
         )}
-        <div className="flex items-center gap-1">
-          {state === "ready" && incompleteVisible.length > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setConfirmCompleteAll(true)}
-            >
-              <CheckCheck className="size-3.5" />
-              전체 완료
-            </Button>
-          )}
-          {state === "ready" && doneCount > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setHideDone((v) => !v)}
-              aria-pressed={hideDone}
-            >
-              {hideDone ? `완료 표시(${doneCount})` : "완료 숨기기"}
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setOnlyToday((v) => !v)}
-          >
-            {onlyToday ? "전체" : "오늘만"}
-          </Button>
-        </div>
+        {state === "ready" && (incompleteVisible.length > 0 || doneCount > 0) && (
+          <div className="flex flex-wrap items-center gap-1">
+            {incompleteVisible.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmCompleteAll(true)}
+              >
+                <CheckCheck className="size-3.5" />
+                전체 완료
+              </Button>
+            )}
+            {doneCount > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setHideDone((v) => !v)}
+                aria-pressed={hideDone}
+              >
+                {hideDone ? `완료 표시(${doneCount})` : "완료 숨기기"}
+              </Button>
+            )}
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-3">
@@ -363,7 +370,11 @@ export function TodoWidget() {
         )}
         {state === "ready" && visibleTodos.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            아직 할 일이 없어요. 위에서 추가해보세요!
+            {onlyToday
+              ? "오늘 마감인 할 일이 없어요. ‘전체 보기’로 모두 볼 수 있어요."
+              : hideDone
+                ? "미완료 할 일이 없어요. 다 끝냈네요!"
+                : "아직 할 일이 없어요. 위에서 추가해보세요!"}
           </p>
         )}
         {state === "ready" && visibleTodos.length > 0 && (
