@@ -2,15 +2,17 @@
 
 // 2026-07-24 : Phase F — NPC 상세 대화 패널 (React 오버레이, 하단 시트 모바일)
 
+import { useState } from "react";
 import type { Npc } from "@ldd/core";
 
 type Props = {
   npc: Npc;
   onClose: () => void;
-  onEncourage?: (npc: Npc) => void;
+  onEncourage?: (npcId: string) => void;
 };
 
 export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
+  const [encouraged, setEncouraged] = useState(false);
   const activeTasks = npc.tasks.filter((t) => t.status === "active");
   const waitingTasks = npc.tasks.filter((t) => t.status === "waiting");
 
@@ -110,10 +112,16 @@ export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
         {onEncourage && (
           <button
             type="button"
-            onClick={() => onEncourage(npc)}
-            className="flex-1 text-xs py-1.5 rounded border border-border hover:bg-accent transition-colors"
+            onClick={() => {
+              if (encouraged) return;
+              onEncourage(npc.id);
+              setEncouraged(true);
+              setTimeout(() => setEncouraged(false), 1000);
+            }}
+            disabled={encouraged}
+            className="flex-1 text-xs py-1.5 rounded border border-border hover:bg-accent transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            수고했어
+            {encouraged ? "격려 완료!" : "수고했어"}
           </button>
         )}
         <button

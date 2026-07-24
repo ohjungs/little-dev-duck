@@ -319,6 +319,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const [paused, setPaused] = useState(false);
   const [zoneHud, setZoneHud] = useState<string | null>(null);
   const [showMinimap, setShowMinimap] = useState(true);
+  const [showHelp, setShowHelp] = useState(false);
   const [clockDisplay, setClockDisplay] = useState("08:00 ☀️ 오전");
   const [hudMoney, setHudMoney] = useState(0);
   const [hudNpcCount, setHudNpcCount] = useState(0);
@@ -328,6 +329,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const lastZoneRef = useRef<string | null>(null);
   const zoneHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showMinimapRef = useRef(true);
+  const showHelpRef = useRef(false);
 
   // RNG — seeded lcg for determinism within session
   const seedRef = useRef(42);
@@ -347,6 +349,10 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   useEffect(() => {
     showMinimapRef.current = showMinimap;
   }, [showMinimap]);
+
+  useEffect(() => {
+    showHelpRef.current = showHelp;
+  }, [showHelp]);
 
   // 맵 + NPC 초기화
   useEffect(() => {
@@ -392,6 +398,13 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         // 스프라이트 로드 실패 — 폴백 렌더러로 계속 동작
         console.warn("스프라이트 로드 실패, 폴백 렌더러 사용:", err);
       });
+  }, []);
+
+  // "수고했어" 버튼 — NPC 만족도 +5 (최대 100)
+  const handleEncourage = useCallback((npcId: string) => {
+    npcsRef.current = npcsRef.current.map((n) =>
+      n.id === npcId ? { ...n, satisfaction: Math.min(100, n.satisfaction + 5) } : n,
+    );
   }, []);
 
   // 충돌 판정: 타일맵 + NPC 위치
@@ -721,6 +734,8 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         showDashboardRef.current = false;
         setShowDashboard(false);
         setTalking(null);
+        showHelpRef.current = false;
+        setShowHelp(false);
       }
       // TAB 키 — 경영 관리 패널 토글
       if (input.consumeJustPressed("management")) {
@@ -735,6 +750,11 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           }
           return !prev;
         });
+      }
+      // ? 키 — 단축키 도움말 오버레이 토글
+      if (input.consumeJustPressed("help")) {
+        showHelpRef.current = !showHelpRef.current;
+        setShowHelp(showHelpRef.current);
       }
 
       const ctx = canvas.getContext("2d");
@@ -821,6 +841,73 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
               }
             }
           }
+        }
+      }
+
+      // --- Pass 2.5: 부서 구역 입구 NPC 수 배지 ---
+      // 각 구역의 문(Door 타일) 위치를 찾아 "현재인원/총인원" 배지를 그린다.
+      {
+        const allNpcs = npcsRef.current;
+        for (const zone of map.zones) {
+          // 부서 구역만 (복도·로비·화장실 등 제외)
+          if (!DEPT_CHAR_INDEX[zone.id]) continue;
+
+          // 구역 경계 내 Door 타일 찾기 (첫 번째)
+          let doorCol = -1;
+          let doorRow = -1;
+          outer: for (let dy = 0; dy < zone.bounds.h; dy++) {
+            for (let dx = 0; dx < zone.bounds.w; dx++) {
+              const col = zone.bounds.x + dx;
+              const row = zone.bounds.y + dy;
+              if (getTile(map, col, row) === TileType.Door) {
+                doorCol = col;
+                doorRow = row;
+                break outer;
+              }
+            }
+          }
+          if (doorCol < 0) continue;
+          // 가시 범위 바깥이면 스킵
+          if (doorCol < c0 || doorCol >= c1 || doorRow < r0 || doorRow >= r1) continue;
+
+          // 구역 NPC 집계
+          const total = allNpcs.filter((n) => n.department === zone.id).length;
+          const working = allNpcs.filter(
+            (n) => n.department === zone.id && n.schedulePhase === "working",
+          ).length;
+
+          const label = `${working}/${total}`;
+          const { x: bx, y: by } = worldToScreen(cam, doorCol * TILE, doorRow * TILE);
+          const badgeX = bx + TILE / 2;
+          const badgeY = by - 4;
+
+          ctx.save();
+          ctx.font = "bold 8px sans-serif";
+          ctx.textAlign = "center";
+          const tw = ctx.measureText(label).width;
+          const bw = tw + 6;
+          const bh = 11;
+          // 배지 둥근 사각형
+          ctx.fillStyle = "rgba(0,0,0,0.72)";
+          ctx.beginPath();
+          const rx = badgeX - bw / 2;
+          const ry = badgeY - bh + 2;
+          const radius = 3;
+          ctx.moveTo(rx + radius, ry);
+          ctx.lineTo(rx + bw - radius, ry);
+          ctx.arcTo(rx + bw, ry, rx + bw, ry + radius, radius);
+          ctx.lineTo(rx + bw, ry + bh - radius);
+          ctx.arcTo(rx + bw, ry + bh, rx + bw - radius, ry + bh, radius);
+          ctx.lineTo(rx + radius, ry + bh);
+          ctx.arcTo(rx, ry + bh, rx, ry + bh - radius, radius);
+          ctx.lineTo(rx, ry + radius);
+          ctx.arcTo(rx, ry, rx + radius, ry, radius);
+          ctx.closePath();
+          ctx.fill();
+          // 텍스트: 근무 인원 수에 따라 색 구분
+          ctx.fillStyle = working > 0 ? "#86efac" : "#9ca3af";
+          ctx.fillText(label, badgeX, badgeY);
+          ctx.restore();
         }
       }
 
@@ -1053,6 +1140,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           <OfficeTalkPanel
             npc={talking.npc}
             onClose={() => setTalking(null)}
+            onEncourage={handleEncourage}
           />
         )}
 
@@ -1074,12 +1162,60 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
             onClose={() => setShowManagement(false)}
           />
         )}
+
+        {/* 단축키 도움말 오버레이 — ? 키 또는 ESC로 닫기 */}
+        {showHelp && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="단축키 도움말"
+            className="absolute inset-0 flex items-center justify-center z-50"
+          >
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setShowHelp(false)}
+              aria-hidden="true"
+            />
+            <div className="relative bg-gray-900/95 border border-gray-600 rounded-xl shadow-2xl px-6 py-5 min-w-[220px] text-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-bold text-sm text-yellow-300">단축키 도움말</span>
+                <button
+                  type="button"
+                  onClick={() => setShowHelp(false)}
+                  aria-label="도움말 닫기"
+                  className="text-gray-400 hover:text-white text-base leading-none px-1 border border-gray-600 hover:border-gray-400 rounded transition-colors"
+                >
+                  x
+                </button>
+              </div>
+              <table className="w-full text-xs border-separate border-spacing-y-1">
+                <tbody>
+                  {([
+                    ["방향키 / WASD", "이동"],
+                    ["E / Enter", "상호작용"],
+                    ["TAB", "경영 패널"],
+                    ["M", "미니맵"],
+                    ["N", "사운드"],
+                    ["?", "이 도움말"],
+                    ["ESC", "닫기"],
+                  ] as const).map(([key, desc]) => (
+                    <tr key={key}>
+                      <td className="pr-4 font-mono text-yellow-200 whitespace-nowrap">{key}</td>
+                      <td className="text-gray-300">{desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           캔버스를 클릭해 포커스한 뒤 방향키/WASD로 대장오리를 움직여요. 직원 오리 옆에서 E를 누르면
           지금 뭐 하는지 물어볼 수 있어요. TAB으로 경영 패널, M 키로 미니맵, N 키로 사운드를 켜고 끌 수 있습니다.
+          ? 키로 단축키 도움말을 볼 수 있습니다.
         </p>
         <div className="flex items-center gap-2">
           <button

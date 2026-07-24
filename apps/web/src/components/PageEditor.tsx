@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ChevronRight,
@@ -451,11 +452,16 @@ export function PageEditor({
       <div className="group relative w-full">
         {coverUrl ? (
           <>
-            <img
-              src={coverUrl}
-              alt="페이지 커버"
-              className="h-[200px] w-full object-cover"
-            />
+            <div className="relative h-[200px] w-full">
+              <Image
+                src={coverUrl}
+                alt="페이지 커버"
+                fill
+                unoptimized
+                className="object-cover"
+                sizes="100vw"
+              />
+            </div>
             <div className="absolute inset-0 flex items-end justify-start gap-2 bg-black/0 px-4 pb-3 opacity-0 transition-opacity group-hover:bg-black/20 group-hover:opacity-100">
               <button
                 type="button"
