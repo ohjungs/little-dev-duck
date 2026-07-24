@@ -27,14 +27,6 @@ const VALID_CHECK_ROW = {
   created_at: "2026-07-21T00:00:00.000Z",
 };
 
-const VALID_DUCK_ROW = {
-  user_id: "22222222-2222-4222-8222-222222222222",
-  xp: 0,
-  level: 1,
-  feed: 0,
-  costume: "default",
-  updated_at: "2026-07-20T00:00:00.000Z",
-};
 
 function fakeSupabase(overrides: Record<string, unknown> = {}) {
   return {
@@ -56,6 +48,7 @@ function fakeSupabase(overrides: Record<string, unknown> = {}) {
         eq: async () => ({ error: null }),
       }),
     }),
+    rpc: () => Promise.resolve({ data: null, error: null }),
     ...overrides,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
@@ -139,8 +132,9 @@ describe("listHabitChecks", () => {
 });
 
 describe("checkHabit", () => {
-  it("체크를 삽입하고 XP 지급 후 삽입된 체크를 반환한다", async () => {
-    // 체크 insert → 삽입 체크 반환, 이어지는 applyXpAward는 duck_state select/update로 처리.
+  it("체크를 삽입하고 award_xp RPC 호출 후 삽입된 체크를 반환한다", async () => {
+    // 체크 insert → 삽입 체크 반환, 이어지는 applyXpAward는 rpc("award_xp", ...) 단일 호출.
+    const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
     const supabase = fakeSupabase({
       from: () => ({
         insert: () => ({
@@ -148,23 +142,17 @@ describe("checkHabit", () => {
             single: async () => ({ data: VALID_CHECK_ROW, error: null }),
           }),
         }),
-        select: () => ({
-          eq: () => ({
-            maybeSingle: async () => ({ data: VALID_DUCK_ROW, error: null }),
-          }),
-        }),
-        update: () => ({
-          eq: () => ({
-            select: () => ({
-              single: async () => ({ data: VALID_DUCK_ROW, error: null }),
-            }),
-          }),
-        }),
       }),
+      rpc: (name: string, args: Record<string, unknown>) => {
+        rpcCalls.push({ name, args });
+        return Promise.resolve({ data: null, error: null });
+      },
     });
     const result = await checkHabit(supabase, VALID_HABIT_ROW.id, "2026-07-21");
     expect(result.habitId).toBe(VALID_HABIT_ROW.id);
     expect(result.checkedDate).toBe("2026-07-21");
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0].name).toBe("award_xp");
   });
 
   it("로그인하지 않으면 에러를 던진다", async () => {

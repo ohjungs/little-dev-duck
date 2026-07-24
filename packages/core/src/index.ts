@@ -87,6 +87,7 @@ export {
   pageVersionSchema,
   extractPlainText,
   type Page,
+  type PageLink,
   type PageVersion,
 } from "./domain/page";
 export { pageStats, type PageStats } from "./domain/page-stats";

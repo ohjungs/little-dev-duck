@@ -2,9 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   FEED_MAX,
   FEED_PER_XP,
-  deriveLevel,
+  XP_PER_LEVEL_BASE,
+  XP_REWARDS,
   duckStateSchema,
-  xpAfterAward,
   type DuckState,
   type XpSource,
 } from "@ldd/core";
@@ -55,30 +55,22 @@ export async function getDuckState(
   return fromRow(created as DuckStateRow);
 }
 
-// XP 원천 보상을 적용하고 레벨 재계산 + 먹이 적립 후 갱신된 상태를 반환.
-// 주의: read-modify-write라 여러 원천에서 거의 동시에 획득하면 일부가 언더카운트될 수 있다
-// (1인 저동시성 전제상 허용, 정확성이 필요해지면 Postgres 원자 증가 rpc로 교체 — 후속 과제).
+// XP 원천 보상을 Postgres RPC로 원자적으로 증가시킨다.
+// 단일 UPDATE로 xp·level·feed를 동시에 갱신해 read-modify-write race condition을 제거한다.
 export async function applyXpAward(
   supabase: SupabaseClient,
+  userId: string,
   source: XpSource,
-): Promise<DuckState> {
-  const current = await getDuckState(supabase);
-  const newXp = xpAfterAward(current.xp, source);
-  const gained = newXp - current.xp;
-  const newLevel = deriveLevel(newXp);
-  const newFeed = Math.min(FEED_MAX, current.feed + Math.round(gained * FEED_PER_XP));
+): Promise<void> {
+  const amount = XP_REWARDS[source] ?? 0;
+  if (amount <= 0) return;
 
-  const { data, error } = await supabase
-    .from("duck_state")
-    .update({
-      xp: newXp,
-      level: newLevel,
-      feed: newFeed,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", current.userId)
-    .select()
-    .single();
+  const { error } = await supabase.rpc("award_xp", {
+    p_user_id: userId,
+    p_xp_amount: amount,
+    p_xp_per_level: XP_PER_LEVEL_BASE,
+    p_feed_per_xp: FEED_PER_XP,
+    p_feed_max: FEED_MAX,
+  });
   if (error) throw new Error(error.message);
-  return fromRow(data as DuckStateRow);
 }

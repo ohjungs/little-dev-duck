@@ -96,6 +96,6 @@ export async function completePomodoro(
   }
 
   const session = fromRow(data as PomodoroRow);
-  await applyXpAward(supabase, "pomodoroComplete");
+  await applyXpAward(supabase, session.userId, "pomodoroComplete");
   return session;
 }

@@ -14,7 +14,7 @@ type PageRow = {
   user_id: string;
   parent_id: string | null;
   title: string;
-  content: unknown;
+  content?: unknown;
   plain_text: string;
   icon: string | null;
   is_trashed: boolean;
@@ -47,7 +47,7 @@ function fromRow(row: PageRow): Page {
     userId: row.user_id,
     parentId: row.parent_id,
     title: row.title,
-    content: row.content,
+    content: row.content ?? null,
     plainText: row.plain_text,
     icon: row.icon,
     isTrashed: row.is_trashed,
@@ -63,10 +63,11 @@ function fromRow(row: PageRow): Page {
 }
 
 // 휴지통 제외 전체. 트리는 UI가 parentId로 조립(서버 트리 불필요 — ponytail).
+// content JSONB는 사이드바 트리에 불필요해 제외 — 페이지 열람 시 getPage로 full fetch.
 export async function listPages(supabase: SupabaseClient): Promise<Page[]> {
   const { data, error } = await supabase
     .from("pages")
-    .select("*")
+    .select("id, parent_id, user_id, title, plain_text, icon, is_trashed, trashed_at, created_at, updated_at, db_schema, row_props, is_public, public_slug, cover_url")
     .eq("is_trashed", false)
     .order("created_at", { ascending: true })
     .limit(500);
@@ -118,7 +119,7 @@ export async function listChildPages(
 export async function listTrashedPages(supabase: SupabaseClient): Promise<Page[]> {
   const { data, error } = await supabase
     .from("pages")
-    .select("*")
+    .select("id, parent_id, user_id, title, plain_text, icon, is_trashed, trashed_at, created_at, updated_at, db_schema, row_props, is_public, public_slug, cover_url")
     .eq("is_trashed", true)
     .order("trashed_at", { ascending: false })
     .limit(500);

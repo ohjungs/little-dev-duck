@@ -131,7 +131,7 @@ export async function checkHabit(
   if (error) throw new Error(error.message);
 
   // 습관 체크가 확정된 뒤에만 XP를 지급한다(먹이·레벨 반영). 삽입된 체크를 반환.
-  await applyXpAward(supabase, "habitCheck");
+  await applyXpAward(supabase, user.id, "habitCheck");
   return fromCheckRow(data as HabitCheckRow);
 }
 

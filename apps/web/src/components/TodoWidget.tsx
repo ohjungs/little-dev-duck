@@ -109,8 +109,13 @@ export function TodoWidget() {
       if (willBeDone) {
         // 할일 완료 시 오리 XP 적립(원천: 할일 완료). 적립/신호 실패는 완료 자체를 되돌리지 않는다.
         try {
-          await applyXpAward(supabase, "todoComplete");
-          emitXpChanged();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user) {
+            await applyXpAward(supabase, user.id, "todoComplete");
+            emitXpChanged();
+          }
         } catch {
           // XP 적립 실패는 조용히 무시(완료 상태는 유지)
         }

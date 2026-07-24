@@ -140,3 +140,5 @@ export {
 } from "./news";
 
 export { generateStandup } from "./standup";
+
+export { listBacklinks, updatePageLinks } from "./pageLinks";

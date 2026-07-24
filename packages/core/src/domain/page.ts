@@ -38,6 +38,15 @@ export const pageVersionSchema = z.object({
 });
 export type PageVersion = z.infer<typeof pageVersionSchema>;
 
+// 페이지 간 링크 관계. source → target. 백링크는 target_page_id 기준 조회.
+export type PageLink = {
+  id: string;
+  userId: string;
+  sourcePageId: string;
+  targetPageId: string;
+  createdAt: string;
+};
+
 // 테이블 블록의 content는 { type:'tableContent', rows:[{cells:[...]}] } 객체다. 셀은 인라인 배열이거나
 // { content } 형태(TableCell)라 방어적으로 둘 다 처리해 셀 텍스트를 공백으로 이어붙인다.
 function tableText(obj: Record<string, unknown>): string {

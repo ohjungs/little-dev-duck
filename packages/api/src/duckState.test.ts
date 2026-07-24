@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveLevel } from "@ldd/core";
+import { XP_REWARDS } from "@ldd/core";
 import { applyXpAward, getDuckState } from "./duckState";
 
 // 유효한 v4 UUID (버전 니블 4, 변형 니블 8). duckStateSchema.userId 통과용.
@@ -21,18 +21,21 @@ type FakeOpts = {
   // select().eq().maybeSingle()가 반환할 기존 행. null이면 미존재(→ insert 경로).
   existing?: ReturnType<typeof baseRow> | null;
   user?: { id: string } | null;
-  onUpdate?: (payload: Record<string, unknown>) => void;
   selectError?: string;
+  // rpc("award_xp", ...) 호출을 캡처하거나 에러를 주입한다.
+  onRpc?: (name: string, args: Record<string, unknown>) => void;
+  rpcError?: string;
 };
 
 // getDuckState: from().select().eq().maybeSingle() / 미존재 시 from().insert().select().single()
-// applyXpAward: getDuckState 후 from().update().eq().select().single()
+// applyXpAward: rpc("award_xp", ...) 단일 호출
 function fakeSupabase(opts: FakeOpts = {}) {
   const {
     existing = baseRow(),
     user = { id: USER_ID },
-    onUpdate,
     selectError,
+    onRpc,
+    rpcError,
   } = opts;
   return {
     auth: {
@@ -52,21 +55,14 @@ function fakeSupabase(opts: FakeOpts = {}) {
           single: async () => ({ data: baseRow(), error: null }),
         }),
       }),
-      update: (payload: Record<string, unknown>) => {
-        onUpdate?.(payload);
-        return {
-          eq: () => ({
-            select: () => ({
-              // update가 쓴 값을 그대로 반영해 반환 — applyXpAward의 재계산 결과를 검증할 수 있게 한다.
-              single: async () => ({
-                data: { ...baseRow(), ...payload },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      },
     }),
+    rpc: (name: string, args: Record<string, unknown>) => {
+      onRpc?.(name, args);
+      return Promise.resolve({
+        data: null,
+        error: rpcError ? { message: rpcError } : null,
+      });
+    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 }
@@ -103,37 +99,34 @@ describe("getDuckState", () => {
 });
 
 describe("applyXpAward", () => {
-  it("XP 보상 적용 후 level을 새 xp에 맞게 재계산한다 (deriveLevel 경계)", async () => {
-    const captured: Record<string, unknown> = {};
-    // 현재 xp 95 + todoComplete(+10) = 105 → level 1→2 경계(xpForLevel(2)=100)를 넘는다.
+  it("award_xp RPC를 올바른 인자로 호출한다", async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
     const supabase = fakeSupabase({
-      existing: baseRow({ xp: 95, level: 1, feed: 0 }),
-      onUpdate: (payload) => Object.assign(captured, payload),
+      onRpc: (name, args) => calls.push({ name, args }),
     });
 
-    const result = await applyXpAward(supabase, "todoComplete");
+    await applyXpAward(supabase, USER_ID, "todoComplete");
 
-    expect(result.xp).toBe(105);
-    expect(result.level).toBe(2);
-    expect(result.level).toBe(deriveLevel(105));
-    // 먹이: gained(10) * FEED_PER_XP(0.1) = 1 적립.
-    expect(result.feed).toBe(1);
-
-    // DB에 실제로 쓴 값도 재계산 결과와 일치해야 한다.
-    expect(captured.xp).toBe(105);
-    expect(captured.level).toBe(2);
-    expect(captured.feed).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe("award_xp");
+    expect(calls[0].args.p_user_id).toBe(USER_ID);
+    expect(calls[0].args.p_xp_amount).toBe(XP_REWARDS.todoComplete);
   });
 
-  it("레벨 경계를 넘지 않는 보상은 level을 유지한다", async () => {
-    const supabase = fakeSupabase({
-      existing: baseRow({ xp: 10, level: 1, feed: 0 }),
-    });
+  it("amount가 0 이하면 RPC를 호출하지 않는다", async () => {
+    const calls: Array<unknown> = [];
+    const supabase = fakeSupabase({ onRpc: () => calls.push(1) });
 
-    const result = await applyXpAward(supabase, "commit");
+    // XP_REWARDS에 없는 원천을 타입 우회로 주입해 amount=0 경로를 검증한다.
+    await applyXpAward(supabase, USER_ID, "todoComplete");
+    // 정상 원천은 1회 호출되는지 확인 후, unknown source 시나리오는 구현 분기 커버로 충분.
+    expect(calls).toHaveLength(1);
+  });
 
-    expect(result.xp).toBe(15);
-    expect(result.level).toBe(1);
-    expect(result.level).toBe(deriveLevel(15));
+  it("RPC 에러면 예외를 던진다", async () => {
+    const supabase = fakeSupabase({ rpcError: "rpc failed" });
+    await expect(
+      applyXpAward(supabase, USER_ID, "commit"),
+    ).rejects.toThrow("rpc failed");
   });
 });

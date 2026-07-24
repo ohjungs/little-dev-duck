@@ -21,21 +21,11 @@ const COMPLETED_ROW = {
   completed_at: "2026-07-21T00:00:00.000Z",
 };
 
-// completePomodoro는 applyXpAward를 호출하므로 duck_state 경로도 mock이 응답해야 한다.
-const VALID_DUCK_ROW = {
-  user_id: VALID_ROW.user_id,
-  xp: 30,
-  level: 1,
-  feed: 10,
-  costume: "default",
-  updated_at: "2026-07-20T00:00:00.000Z",
-};
-
 type FakeOpts = {
   // 조건부 완료 update가 돌려줄 결과(완료 성공 시 행, 이미 완료면 data: null).
   completeResult?: { data: unknown; error: unknown };
-  // applyXpAward가 duck_state를 갱신할 때의 payload를 캡처(XP 부수효과 검증용).
-  onDuckUpdate?: (payload: unknown) => void;
+  // applyXpAward RPC 호출을 캡처(XP 부수효과 검증용).
+  onRpc?: (name: string, args: Record<string, unknown>) => void;
 };
 
 function fakeSupabase(
@@ -50,54 +40,31 @@ function fakeSupabase(
     auth: {
       getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }),
     },
-    from: (table: string) => {
-      if (table === "duck_state") {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: VALID_DUCK_ROW, error: null }),
-            }),
-          }),
-          insert: () => ({
-            select: () => ({
-              single: async () => ({ data: VALID_DUCK_ROW, error: null }),
-            }),
-          }),
-          update: (payload: unknown) => {
-            opts.onDuckUpdate?.(payload);
-            return {
-              eq: () => ({
-                select: () => ({
-                  single: async () => ({ data: VALID_DUCK_ROW, error: null }),
-                }),
-              }),
-            };
-          },
-        };
-      }
-      // pomodoro_sessions
-      return {
+    from: () => ({
+      select: () => ({
+        order: () => ({ limit: async () => ({ data: [VALID_ROW], error: null }) }),
+        eq: () => ({
+          single: async () => ({ data: COMPLETED_ROW, error: null }),
+        }),
+      }),
+      insert: () => ({
         select: () => ({
-          order: () => ({ limit: async () => ({ data: [VALID_ROW], error: null }) }),
-          eq: () => ({
-            single: async () => ({ data: COMPLETED_ROW, error: null }),
-          }),
+          single: async () => ({ data: VALID_ROW, error: null }),
         }),
-        insert: () => ({
-          select: () => ({
-            single: async () => ({ data: VALID_ROW, error: null }),
-          }),
-        }),
-        update: () => ({
-          eq: () => ({
-            is: () => ({
-              select: () => ({
-                maybeSingle: async () => completeResult,
-              }),
+      }),
+      update: () => ({
+        eq: () => ({
+          is: () => ({
+            select: () => ({
+              maybeSingle: async () => completeResult,
             }),
           }),
         }),
-      };
+      }),
+    }),
+    rpc: (name: string, args: Record<string, unknown>) => {
+      opts.onRpc?.(name, args);
+      return Promise.resolve({ data: null, error: null });
     },
     ...overrides,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -175,32 +142,31 @@ describe("startPomodoro", () => {
 });
 
 describe("completePomodoro", () => {
-  it("완료된 세션을 반환하고 XP를 지급한다", async () => {
-    const updates: unknown[] = [];
+  it("완료된 세션을 반환하고 award_xp RPC를 호출한다", async () => {
+    const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
     const result = await completePomodoro(
-      fakeSupabase({ onDuckUpdate: (p) => updates.push(p) }),
+      fakeSupabase({ onRpc: (name, args) => rpcCalls.push({ name, args }) }),
       VALID_ROW.id,
     );
     expect(result.id).toBe(VALID_ROW.id);
-    // 부수효과: duck_state가 pomodoroComplete 보상만큼 xp 증가로 갱신됐는지 검증.
-    expect(updates).toHaveLength(1);
-    expect((updates[0] as { xp: number }).xp).toBe(
-      VALID_DUCK_ROW.xp + XP_REWARDS.pomodoroComplete,
-    );
+    // 부수효과: award_xp RPC가 pomodoroComplete 보상량으로 호출됐는지 검증.
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0].name).toBe("award_xp");
+    expect(rpcCalls[0].args.p_xp_amount).toBe(XP_REWARDS.pomodoroComplete);
   });
 
   it("이미 완료된 세션은 XP를 재지급하지 않는다", async () => {
-    const updates: unknown[] = [];
+    const rpcCalls: unknown[] = [];
     // 조건부 update가 0행(이미 완료) → data null.
     const result = await completePomodoro(
       fakeSupabase({
         completeResult: { data: null, error: null },
-        onDuckUpdate: (p) => updates.push(p),
+        onRpc: () => rpcCalls.push(1),
       }),
       VALID_ROW.id,
     );
     expect(result.completedAt).not.toBeNull();
-    expect(updates).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
   });
 
   it("DB 에러면 예외를 던진다", async () => {
