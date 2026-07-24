@@ -1045,6 +1045,12 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         }
       }
 
+      // --- Pass 5.5: 다크 모드 오버레이 (html 요소에 .dark 클래스 존재 시 상시 적용) ---
+      if (document.documentElement.classList.contains("dark")) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+        ctx.fillRect(0, 0, viewW, viewH);
+      }
+
       // --- HUD: 미니맵 (우상단, 플레이어 이동 시에만 의미 있게 변경됨) ---
       if (showMinimapRef.current) {
         const mmW = map.cols * MINIMAP_SCALE;
