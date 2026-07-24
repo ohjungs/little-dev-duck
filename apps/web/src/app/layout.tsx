@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +15,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Little Dev Duck",
+  title: {
+    default: "Little Dev Duck",
+    template: "%s — Little Dev Duck",
+  },
   description: "3D 아기오리 AI 비서가 상주하는 개인 워크스페이스",
+  keywords: ["productivity", "workspace", "AI", "duck", "notion alternative"],
+  authors: [{ name: "Little Dev Duck" }],
+  openGraph: {
+    title: "Little Dev Duck",
+    description: "3D 아기오리 AI 비서가 상주하는 개인 워크스페이스",
+    type: "website",
+    locale: "ko_KR",
+  },
+  twitter: {
+    card: "summary",
+    title: "Little Dev Duck",
+    description: "3D 아기오리 AI 비서가 상주하는 개인 워크스페이스",
+  },
 };
 
 export default function RootLayout({
@@ -26,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
+        <OfflineIndicator />
         {children}
         <Analytics />
       </body>

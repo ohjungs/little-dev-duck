@@ -4,6 +4,7 @@ import { AppSidebar, AppMobileBar } from "@/components/AppNav";
 import { DesktopCollectorSync } from "@/components/DesktopCollectorSync";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ShortcutsHelp } from "@/components/ShortcutsHelp";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function AppLayout({
       <div className="flex min-w-0 flex-1 flex-col">
         <AppMobileBar />
         <main id="main" className="flex-1 pb-16 md:pb-0">
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>
       <DesktopCollectorSync />

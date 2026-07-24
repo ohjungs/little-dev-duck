@@ -509,13 +509,27 @@ export function PageEditor({
           />
         )}
       </div>
-      {breadcrumb && breadcrumb.length > 0 && (
-        <nav
-          aria-label="상위 페이지"
-          className="flex flex-wrap items-center gap-0.5 px-4 text-xs text-muted-foreground"
+      <nav
+        aria-label="경로"
+        className="flex flex-wrap items-center gap-0.5 px-4 text-xs text-muted-foreground"
+      >
+        <Link
+          href="/"
+          className="rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground"
         >
-          {breadcrumb.map((b) => (
+          홈
+        </Link>
+        <ChevronRight className="size-3 shrink-0 opacity-50" />
+        <Link
+          href="/pages"
+          className="rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground"
+        >
+          페이지
+        </Link>
+        {breadcrumb &&
+          breadcrumb.map((b) => (
             <span key={b.id} className="flex items-center gap-0.5">
+              <ChevronRight className="size-3 shrink-0 opacity-50" />
               <Link
                 href={`/pages/${b.id}`}
                 className="flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground"
@@ -525,11 +539,13 @@ export function PageEditor({
                   {b.title || "제목 없음"}
                 </span>
               </Link>
-              <ChevronRight className="size-3 shrink-0 opacity-50" />
             </span>
           ))}
-        </nav>
-      )}
+        <ChevronRight className="size-3 shrink-0 opacity-50" />
+        <span className="max-w-[14rem] truncate text-foreground">
+          {page.title || "제목 없음"}
+        </span>
+      </nav>
       <div className="relative px-4">
         {icon ? (
           <button
