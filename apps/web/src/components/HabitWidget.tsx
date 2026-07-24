@@ -156,12 +156,36 @@ export function HabitWidget() {
 
   const today = todayIso();
 
+  // 이번 주(월~일) 중 하나 이상의 습관이 체크된 날짜 수를 센다.
+  // 로컬 타임존 기준 이번 주 월요일 ISO 날짜를 구한다.
+  const weekCheckCount = (() => {
+    const now = new Date();
+    // getDay(): 0=일, 1=월 ... 6=토. 월요일 시작 주 기준 오프셋.
+    const dayOfWeek = now.getDay();
+    const offsetToMonday = (dayOfWeek + 6) % 7; // 월=0, 화=1, ..., 일=6
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - offsetToMonday);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const mondayIso = `${monday.getFullYear()}-${pad(monday.getMonth() + 1)}-${pad(monday.getDate())}`;
+    const datesThisWeek = new Set(
+      checks
+        .map((c) => c.checkedDate)
+        .filter((d) => d >= mondayIso && d <= today),
+    );
+    return datesThisWeek.size;
+  })();
+
   return (
     <Card data-testid="habit-widget" className="h-full">
       <CardHeader>
         <CardTitle>
           <Repeat className="size-4 text-primary-accent" />
           습관
+          {state === "ready" && (
+            <span className="text-xs text-muted-foreground font-normal ml-auto">
+              이번 주 {weekCheckCount}일 체크
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { Check, Pencil, Plus, Search, StickyNote, X } from "lucide-react";
+import { Check, Pencil, Pin, Plus, Search, StickyNote, X } from "lucide-react";
 import { createMemo, deleteMemo, listMemos, updateMemo } from "@ldd/api";
 import type { Memo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
@@ -34,8 +34,28 @@ const MEMO_COLORS = [
 const textareaClass =
   "w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none";
 
+const PINNED_KEY = "ldd-pinned-memos";
+
+function getPinnedIds(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(PINNED_KEY) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+function togglePin(id: string): string[] {
+  const current = getPinnedIds();
+  const next = current.includes(id)
+    ? current.filter((p) => p !== id)
+    : [id, ...current];
+  localStorage.setItem(PINNED_KEY, JSON.stringify(next));
+  return next;
+}
+
 export function MemoWidget() {
   const [memos, setMemos] = useState<Memo[]>([]);
+  const [pinnedIds, setPinnedIds] = useState<string[]>(() => getPinnedIds());
   const [state, setState] = useState<LoadState>("loading");
   const [actionError, setActionError] = useState<string | null>(null);
   const [newContent, setNewContent] = useState("");
@@ -45,11 +65,25 @@ export function MemoWidget() {
 
   const supabase = createClient();
 
+  const handleTogglePin = (id: string) => {
+    setPinnedIds(togglePin(id));
+  };
+
+  // 고정 메모를 앞에, 나머지는 원래 순서(생성일 내림차순)로 정렬한다.
+  const sortedMemos = [
+    ...memos.filter((m) => pinnedIds.includes(m.id)).sort((a, b) => {
+      const ai = pinnedIds.indexOf(a.id);
+      const bi = pinnedIds.indexOf(b.id);
+      return ai - bi;
+    }),
+    ...memos.filter((m) => !pinnedIds.includes(m.id)),
+  ];
+
   // 내용 부분일치 필터(메모가 많을 때만 검색창 노출).
   const q = query.trim().toLowerCase();
   const visibleMemos = q
-    ? memos.filter((m) => m.content.toLowerCase().includes(q))
-    : memos;
+    ? sortedMemos.filter((m) => m.content.toLowerCase().includes(q))
+    : sortedMemos;
 
   const fetchMemos = async () => {
     try {
@@ -256,6 +290,18 @@ export function MemoWidget() {
                   className={`group flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border p-3 shadow-sm transition-all rotate-[var(--rot)] hover:-translate-y-1 hover:rotate-0 hover:shadow-md ${MEMO_COLORS[index % MEMO_COLORS.length]}`}
                 >
                   <div className="flex justify-end gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePin(memo.id)}
+                      aria-label={pinnedIds.includes(memo.id) ? "고정 해제" : "고정"}
+                      className={`transition-opacity focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring ${
+                        pinnedIds.includes(memo.id)
+                          ? "text-primary opacity-100"
+                          : "text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
+                      }`}
+                    >
+                      <Pin className="size-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => startEdit(memo)}
