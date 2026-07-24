@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   FileText,
@@ -44,8 +45,13 @@ function StatTile({
 
 // Phase 12 T6: 요약 통계. 여러 소스를 병렬 조회해 core dashboardSummary로 집계, 스탯 타일로 표시.
 export function InsightsView() {
+  const router = useRouter();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [standupState, setStandupState] = useState<
+    "idle" | "loading" | "error"
+  >("idle");
+  const [standupError, setStandupError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -77,6 +83,24 @@ export function InsightsView() {
     void run();
   }, []);
 
+  async function handleStandup() {
+    setStandupState("loading");
+    setStandupError(null);
+    try {
+      const res = await fetch("/api/ai/standup", { method: "POST" });
+      const json = (await res.json()) as { pageId?: string; error?: string };
+      if (!res.ok || !json.pageId) {
+        setStandupError(json.error ?? "스탠드업 생성에 실패했어요.");
+        setStandupState("error");
+        return;
+      }
+      router.push(`/pages/${json.pageId}`);
+    } catch {
+      setStandupError("네트워크 오류가 발생했어요.");
+      setStandupState("error");
+    }
+  }
+
   if (state === "loading") {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -91,6 +115,25 @@ export function InsightsView() {
   }
 
   return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => void handleStandup()}
+          disabled={standupState === "loading"}
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+        >
+          {standupState === "loading" ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Sparkles className="size-4" />
+          )}
+          스탠드업 생성
+        </button>
+        {standupState === "error" && standupError && (
+          <p className="text-sm text-destructive">{standupError}</p>
+        )}
+      </div>
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       <StatTile
         icon={<ListTodo className="size-5" />}
@@ -127,6 +170,7 @@ export function InsightsView() {
         value={summary.articleCount}
         label="수집 기사"
       />
+    </div>
     </div>
   );
 }

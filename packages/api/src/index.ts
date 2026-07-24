@@ -136,3 +136,5 @@ export {
   setArticleSummary,
   type CollectDeps,
 } from "./news";
+
+export { generateStandup } from "./standup";

@@ -212,3 +212,9 @@ export {
   type Vec,
   type Dir,
 } from "./domain/office-play";
+export {
+  formatStandupPrompt,
+  hasActivity,
+  standupInputSchema,
+  type StandupInput,
+} from "./domain/standup";
