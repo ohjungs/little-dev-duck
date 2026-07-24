@@ -66,22 +66,22 @@ Phase 완료분은 실기 검증만 남음(코드+DB 전부 배포됨).**
 - [x] 습관 히트맵 + 뽀모도로 InsightsView 통계 ✅ cdd4083
 - [x] 습관 히트맵 + 뽀모도로 통계 (중복 — 위에서 완료) ✅ cdd4083
 - [x] 임베딩 upsert 배치화 ✅ ff066df
-- [ ] XP 원자적 증가: read-modify-write → Postgres RPC (correctness, duckState.ts:61)
+- [x] XP 원자적 증가: award_xp Postgres RPC ✅ 91666c8
 - [x] OAuth 토큰 모듈 통합: oauthTokens.ts generic factory ✅ ff066df
 - [x] 모바일 하단 네비게이션: 고정 하단 탭바 5항목 ✅ ef87a43
 - [x] ConfirmDialog 공용 컴포넌트: 3곳 대체 ✅ ef87a43
 - [x] CommandPalette ARIA: listbox/option/activedescendant ✅ ef87a43
 - [x] unbounded query .limit(500) 7개 함수 ✅ ff066df
-- [ ] page_versions 쓰기 상한: per-page 50건 (architecture)
+- [x] page_versions 쓰기 상한: per-page 50건 ✅ 3c65108
 - [ ] apps/web/src/lib/ 테스트: vitest 미설정으로 이월
 
 ### NICE (priority 3) — 후속
 
-- [ ] 백링크 page_links 테이블 + UI (feature)
+- [x] 백링크 page_links 테이블 + API ✅ 91666c8 (UI 후속)
 - [x] 페이지 커버 cover_url 컬럼 + UI ✅ 6959510
 - [ ] Realtime 멀티서피스 동기화 (feature)
-- [ ] hover-revealed 버튼 focus-visible 링 (a11y)
-- [ ] listPages SELECT 프로젝션: content 제외 (architecture)
+- [x] hover-revealed 버튼 focus-visible 링 ✅ 3c65108
+- [x] listPages SELECT 프로젝션: content 제외 ✅ 91666c8
 
 ## 픽셀 오피스 대규모 확장 로드맵 (2026-07-24 /plan, 스타듀밸리급)
 
