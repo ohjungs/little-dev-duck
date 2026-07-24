@@ -1,5 +1,5 @@
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-muted ${className}`} />;
+  return <div className={`motion-safe:animate-pulse rounded bg-muted ${className}`} />;
 }
 
 export function WidgetSkeleton() {

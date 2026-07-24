@@ -290,7 +290,7 @@ export function MemoWidget() {
                   key={memo.id}
                   data-testid={`memo-${memo.id}`}
                   style={rotationStyle(index)}
-                  className={`group flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border p-3 shadow-sm transition-all rotate-[var(--rot)] hover:-translate-y-1 hover:rotate-0 hover:shadow-md ${MEMO_COLORS[index % MEMO_COLORS.length]}`}
+                  className={`group flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border p-3 shadow-sm transition-all motion-safe:rotate-[var(--rot)] motion-safe:hover:-translate-y-1 motion-safe:hover:rotate-0 hover:shadow-md ${MEMO_COLORS[index % MEMO_COLORS.length]}`}
                 >
                   <div className="flex justify-end gap-1">
                     <button
