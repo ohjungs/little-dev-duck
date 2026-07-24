@@ -22,6 +22,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WidgetSkeleton } from "@/components/Skeleton";
 
+// 집중 모드 플래그. DuckWidget 등 다른 컴포넌트가 이 이벤트를 수신해 알림을 억제한다.
+const FOCUS_MODE_KEY = "ldd-focus-mode";
+const FOCUS_CHANGED_EVENT = "ldd:focus-changed";
+
+function enableFocusMode(): void {
+  localStorage.setItem(FOCUS_MODE_KEY, "true");
+  window.dispatchEvent(new Event(FOCUS_CHANGED_EVENT));
+}
+
+function disableFocusMode(): void {
+  localStorage.removeItem(FOCUS_MODE_KEY);
+  window.dispatchEvent(new Event(FOCUS_CHANGED_EVENT));
+}
+
 type LoadState = "loading" | "error" | "ready";
 
 // 선택 가능한 집중 길이(분). 기본값은 첫 번째 항목.
@@ -118,6 +132,13 @@ export function PomodoroWidget() {
     return () => clearInterval(id);
   }, [running]);
 
+  // 컴포넌트 언마운트 시 집중 모드 플래그가 남지 않도록 정리한다.
+  useEffect(() => {
+    return () => {
+      disableFocusMode();
+    };
+  }, []);
+
   // 0초 도달 시 완료 처리. 상태 변경은 async 콜백 안에서만 해 이펙트 본문 동기 setState를 피한다.
   // 완료 후 running/activeId를 내려 재진입을 막고, cancelled 가드로 언마운트 경쟁을 막는다.
   useEffect(() => {
@@ -128,6 +149,7 @@ export function PomodoroWidget() {
       try {
         await completePomodoro(supabase, id);
         if (cancelled) return;
+        disableFocusMode();
         setRunning(false);
         setActiveId(null);
         setCelebrate(true);
@@ -136,6 +158,7 @@ export function PomodoroWidget() {
         emitXpChanged();
       } catch {
         if (!cancelled) {
+          disableFocusMode();
           setRunning(false);
           setActiveId(null);
           setActionError("완료 처리하지 못했습니다.");
@@ -163,6 +186,7 @@ export function PomodoroWidget() {
       setActiveId(session.id);
       setRemaining(durationMinutes * SECONDS_PER_MINUTE);
       setRunning(true);
+      enableFocusMode();
     } catch {
       setActionError("시작하지 못했습니다.");
     }
@@ -173,6 +197,7 @@ export function PomodoroWidget() {
     setRunning(false);
     setActiveId(null);
     setRemaining(0);
+    disableFocusMode();
   };
 
   const todayCount = sessions.filter(
@@ -219,6 +244,9 @@ export function PomodoroWidget() {
             >
               {formatMmss(remaining)}
             </p>
+            <Badge variant="muted" className="text-xs">
+              집중 모드
+            </Badge>
             <p className="text-sm text-muted-foreground">
               오리가 함께 집중 중...
             </p>

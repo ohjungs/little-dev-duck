@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
@@ -18,6 +19,19 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { WalkingModeToggle } from "@/components/WalkingModeToggle";
 import { OPEN_SEARCH_EVENT } from "@/components/CommandPalette";
+import { onTodosChanged } from "@/lib/todoSignal";
+
+// 대시보드(할 일) 항목에 미완료 투두가 있을 때 빨간 점을 표시한다.
+// todoSignal에 구독해 실시간으로 반영한다.
+function usePendingTodos(): boolean {
+  const [hasPending, setHasPending] = useState(false);
+  useEffect(() => {
+    return onTodosChanged((tally) => {
+      setHasPending(tally.total > tally.done);
+    });
+  }, []);
+  return hasPending;
+}
 
 // 사이드바 검색 버튼: Cmd+K 팔레트를 CustomEvent로 연다(팔레트가 전역에서 수신).
 function SearchTrigger() {
@@ -78,6 +92,7 @@ export function AppSidebar({
   email: string;
 }) {
   const pathname = usePathname();
+  const hasPendingTodos = usePendingTodos();
   return (
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-1 border-r border-border bg-card/40 p-3 md:flex">
       <div className="py-2">
@@ -92,6 +107,7 @@ export function AppSidebar({
         {NAV.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
+          const showDot = item.href === "/" && hasPendingTodos;
           return (
             <Link
               key={item.href}
@@ -104,9 +120,14 @@ export function AppSidebar({
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
-              <Icon
-                className={cn("size-4", active && "text-primary-accent")}
-              />
+              <span className="relative shrink-0">
+                <Icon
+                  className={cn("size-4", active && "text-primary-accent")}
+                />
+                {showDot && (
+                  <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive" />
+                )}
+              </span>
               {item.label}
             </Link>
           );
@@ -153,6 +174,7 @@ const MOBILE_NAV = [
 
 export function AppMobileBar() {
   const pathname = usePathname();
+  const hasPendingTodos = usePendingTodos();
   return (
     <nav
       aria-label="하단 탐색"
@@ -161,6 +183,7 @@ export function AppMobileBar() {
       {MOBILE_NAV.map((item) => {
         const active = isActive(pathname, item.href);
         const Icon = item.icon;
+        const showDot = item.href === "/" && hasPendingTodos;
         return (
           <Link
             key={item.href}
@@ -173,9 +196,14 @@ export function AppMobileBar() {
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <Icon
-              className={cn("size-5", active && "text-primary-accent")}
-            />
+            <span className="relative">
+              <Icon
+                className={cn("size-5", active && "text-primary-accent")}
+              />
+              {showDot && (
+                <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive" />
+              )}
+            </span>
             <span>{item.label}</span>
           </Link>
         );
