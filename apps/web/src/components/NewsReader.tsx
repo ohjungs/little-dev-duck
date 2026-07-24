@@ -5,6 +5,7 @@ import {
   Bookmark,
   BookmarkCheck,
   BookmarkPlus,
+  Check,
   ExternalLink,
   Layers,
   Loader2,
@@ -13,6 +14,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Share2,
   Trash2,
 } from "lucide-react";
 import {
@@ -65,16 +67,20 @@ function ArticleCard({
   a,
   read,
   bookmarked,
+  copied,
   onScrap,
   onRead,
   onBookmark,
+  onShare,
 }: {
   a: Article;
   read?: boolean;
   bookmarked?: boolean;
+  copied?: boolean;
   onScrap?: (a: Article) => void;
   onRead?: (a: Article) => void;
   onBookmark?: (a: Article) => void;
+  onShare?: (a: Article) => void;
 }) {
   return (
     <div
@@ -124,6 +130,26 @@ function ArticleCard({
               <BookmarkPlus className="size-4" />
             </button>
           )}
+          {onShare && (
+            <button
+              type="button"
+              onClick={() => onShare(a)}
+              aria-label="링크 복사"
+              title="링크 복사"
+              className={cn(
+                "transition-colors",
+                copied
+                  ? "text-primary-accent"
+                  : "text-muted-foreground hover:text-primary-accent",
+              )}
+            >
+              {copied ? (
+                <Check className="size-3.5" />
+              ) : (
+                <Share2 className="size-3.5" />
+              )}
+            </button>
+          )}
           <a
             href={safeHref(a.link)}
             target="_blank"
@@ -169,6 +195,7 @@ export function NewsReader() {
   const [readIds, setReadIds] = useState<string[]>([]);
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [pendingDeleteFeed, setPendingDeleteFeed] = useState<Feed | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // 읽음 상태(localStorage) 동기화 — 링크 클릭/스크랩 시 즉시 반영.
   useEffect(() => {
@@ -185,6 +212,31 @@ export function NewsReader() {
     return subscribeBookmarks(sync);
   }, []);
   const bookmarkSet = useMemo(() => new Set(bookmarkedIds), [bookmarkedIds]);
+
+  // 피드별 기사 수 / 안 읽음 수 — Map 순회로 결정적 계산(LLM 아님).
+  const articlesByFeed = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of articles) {
+      map.set(a.feedId, (map.get(a.feedId) ?? 0) + 1);
+    }
+    return map;
+  }, [articles]);
+
+  const unreadByFeed = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of articles) {
+      if (!readSet.has(a.id)) {
+        map.set(a.feedId, (map.get(a.feedId) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [articles, readSet]);
+
+  function handleShare(article: Article) {
+    void navigator.clipboard.writeText(article.link);
+    setCopiedId(article.id);
+    setTimeout(() => setCopiedId(null), 1500);
+  }
 
   // 검색어 부분일치 + (안 읽음만 토글 시) 읽은 기사 제외 + (저장됨만 토글 시) 북마크 기사만. 군집·목록 모두 이 결과 기준.
   const shown = useMemo(() => {
@@ -425,6 +477,14 @@ export function NewsReader() {
               >
                 {feed.title ?? new URL(feed.url).hostname}
               </span>
+              <span className="text-xs text-muted-foreground">
+                {articlesByFeed.get(feed.id) ?? 0}
+              </span>
+              {(unreadByFeed.get(feed.id) ?? 0) > 0 && (
+                <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary-accent">
+                  {unreadByFeed.get(feed.id)}개 안읽음
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => onToggle(feed)}
@@ -491,9 +551,11 @@ export function NewsReader() {
                       a={a}
                       read={readSet.has(a.id)}
                       bookmarked={bookmarkSet.has(a.id)}
+                      copied={copiedId === a.id}
                       onScrap={onScrap}
                       onRead={onRead}
                       onBookmark={onBookmark}
+                      onShare={handleShare}
                     />
                   ))}
                 </div>
@@ -504,9 +566,11 @@ export function NewsReader() {
                 a={cluster.articles[0]}
                 read={readSet.has(cluster.articles[0].id)}
                 bookmarked={bookmarkSet.has(cluster.articles[0].id)}
+                copied={copiedId === cluster.articles[0].id}
                 onScrap={onScrap}
                 onRead={onRead}
                 onBookmark={onBookmark}
+                onShare={handleShare}
               />
             ),
           )}
@@ -519,9 +583,11 @@ export function NewsReader() {
               a={a}
               read={readSet.has(a.id)}
               bookmarked={bookmarkSet.has(a.id)}
+              copied={copiedId === a.id}
               onScrap={onScrap}
               onRead={onRead}
               onBookmark={onBookmark}
+              onShare={handleShare}
             />
           ))}
         </div>
