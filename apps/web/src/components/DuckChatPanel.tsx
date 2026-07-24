@@ -29,6 +29,7 @@ const TOOL_LABELS: Record<string, string> = {
   createGithubIssue: "GitHub 이슈 만들기",
   trashEmail: "이메일 휴지통으로 이동",
   createTodo: "할 일 추가",
+  completeTodo: "할 일 완료",
   createMemo: "메모 작성",
   createPage: "페이지 만들기",
 };

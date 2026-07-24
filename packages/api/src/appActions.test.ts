@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAppActionsAdapter } from "./appActions";
+import { createAppActionsAdapter, findTodoByTitle } from "./appActions";
 
 // createTodo/createMemo는 supabase.auth.getUser + from().insert().select().single() 체인을 쓴다.
 // 최소 목으로 성공/검증 경로를 확인한다(외부 호출 0).
@@ -17,10 +17,10 @@ function mockSupabase(insertedRow: Record<string, unknown>): SupabaseClient {
 }
 
 describe("createAppActionsAdapter", () => {
-  it("카탈로그에 createTodo·createMemo·createPage가 있고 전부 mutating(승인 필요)", () => {
+  it("카탈로그에 생성·완료 도구가 있고 전부 mutating(승인 필요)", () => {
     const a = createAppActionsAdapter(mockSupabase({}));
     const names = a.catalog.map((t) => t.name).sort();
-    expect(names).toEqual(["createMemo", "createPage", "createTodo"]);
+    expect(names).toEqual(["completeTodo", "createMemo", "createPage", "createTodo"]);
     expect(a.catalog.every((t) => t.kind === "mutating")).toBe(true);
   });
 
@@ -53,5 +53,27 @@ describe("createAppActionsAdapter", () => {
     const a = createAppActionsAdapter(mockSupabase({}));
     const res = await a.execute({ id: "c3", name: "deleteEverything", args: {} });
     expect(res.response.error).toBeDefined();
+  });
+});
+
+describe("findTodoByTitle", () => {
+  const todos = [
+    { id: "1", title: "장보기" },
+    { id: "2", title: "자격증 공부하기" },
+    { id: "3", title: "지원서 쓰기" },
+  ];
+  it("정확 일치(대소문자 무시)를 우선한다", () => {
+    expect(findTodoByTitle(todos, "장보기")).toMatchObject({ id: "1" });
+  });
+  it("정확 일치가 없으면 부분일치 1건을 고른다", () => {
+    expect(findTodoByTitle(todos, "자격증")).toMatchObject({ id: "2" });
+  });
+  it("부분일치가 여러 개면 ambiguous", () => {
+    const many = [{ id: "a", title: "회의 준비" }, { id: "b", title: "회의록 작성" }];
+    expect(findTodoByTitle(many, "회의")).toBe("ambiguous");
+  });
+  it("없으면 null", () => {
+    expect(findTodoByTitle(todos, "없는할일")).toBeNull();
+    expect(findTodoByTitle(todos, "  ")).toBeNull();
   });
 });
