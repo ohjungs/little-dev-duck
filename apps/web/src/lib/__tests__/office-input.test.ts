@@ -54,6 +54,50 @@ describe("InputManager - endFrame", () => {
   });
 });
 
+describe("InputManager - releaseAll", () => {
+  it("clears all pressed keys at once", () => {
+    mgr.press("up");
+    mgr.press("right");
+    mgr.releaseAll();
+    expect(mgr.isPressed("up")).toBe(false);
+    expect(mgr.isPressed("right")).toBe(false);
+  });
+
+  it("clears justPressed so a held key does not re-consume after release", () => {
+    mgr.press("interact");
+    mgr.releaseAll();
+    expect(mgr.isJustPressed("interact")).toBe(false);
+    expect(mgr.consumeJustPressed("interact")).toBe(false);
+  });
+});
+
+describe("InputManager - bindKeyboard blur releases stuck keys", () => {
+  // node 환경이라 실제 DOM 없이, addEventListener를 가로채는 목 엘리먼트로 검증한다.
+  function makeMockEl() {
+    const handlers: Record<string, (e: unknown) => void> = {};
+    const el = {
+      addEventListener: (type: string, fn: (e: unknown) => void) => {
+        handlers[type] = fn;
+      },
+      removeEventListener: (type: string) => {
+        delete handlers[type];
+      },
+    };
+    return { el: el as unknown as HTMLElement, handlers };
+  }
+
+  it("held direction key is cleared when the element blurs", () => {
+    const { el, handlers } = makeMockEl();
+    const unbind = mgr.bindKeyboard(el);
+    handlers.keydown?.({ key: "ArrowRight", preventDefault() {} });
+    expect(mgr.isPressed("right")).toBe(true);
+    // keyup 없이 blur만 발생(다른 앱으로 전환 시나리오)
+    handlers.blur?.({});
+    expect(mgr.isPressed("right")).toBe(false);
+    unbind();
+  });
+});
+
 describe("InputManager - tap world position", () => {
   it("returns null initially", () => {
     expect(mgr.lastTapWorld()).toBeNull();

@@ -19,6 +19,15 @@ export class InputManager {
     this.consumed.delete(action);
   }
 
+  // 포커스 상실(blur) 등으로 keyup을 못 받는 상황에서 모든 키 상태를 초기화한다.
+  // 방향키를 누른 채 캔버스 포커스를 잃으면 keyup이 다른 요소로 가 pressed가 고착되는데,
+  // 포커스 복귀 시 대장오리가 저절로 움직이는 걸 막는다(Phase 17 T1 포커스 제약).
+  releaseAll(): void {
+    this.pressed.clear();
+    this.justPressed.clear();
+    this.consumed.clear();
+  }
+
   setTapWorld(x: number, y: number): void {
     this.tapWorldPos = { x, y };
   }
@@ -89,11 +98,16 @@ export class InputManager {
       if (action) this.release(action);
     };
 
+    // 포커스를 잃으면 눌린 키 상태를 전부 비운다(고착 방지).
+    const onBlur = () => this.releaseAll();
+
     el.addEventListener("keydown", onDown);
     el.addEventListener("keyup", onUp);
+    el.addEventListener("blur", onBlur);
     return () => {
       el.removeEventListener("keydown", onDown);
       el.removeEventListener("keyup", onUp);
+      el.removeEventListener("blur", onBlur);
     };
   }
 }
