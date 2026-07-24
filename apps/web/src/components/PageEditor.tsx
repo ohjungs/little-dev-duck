@@ -6,6 +6,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
+  Check,
   ChevronRight,
   Copy,
   Download,
@@ -13,6 +15,8 @@ import {
   History,
   ImageIcon,
   Link2,
+  Loader2,
+  RefreshCw,
   Save,
   Smile,
   Star,
@@ -652,15 +656,46 @@ export function PageEditor({
         onImportReady={handleImportReady}
       />
       <div className="flex flex-wrap items-center gap-x-3 px-4 text-xs text-muted-foreground">
-        <p role="status" aria-live="polite">
-          {saveState === "saving" && "저장 중..."}
-          {saveState === "saved" && "저장됨"}
-          {saveState === "error" && "저장 실패 — 잠시 후 다시 시도하세요"}
-        </p>
+        <span role="status" aria-live="polite" className="flex items-center gap-1">
+          {saveState === "saving" && (
+            <>
+              <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+              저장 중...
+            </>
+          )}
+          {saveState === "saved" && (
+            <>
+              <Check className="size-3 text-green-500" aria-hidden="true" />
+              저장됨
+            </>
+          )}
+          {saveState === "error" && (
+            <>
+              <AlertCircle className="size-3 text-destructive" aria-hidden="true" />
+              <span className="text-destructive">저장 실패</span>
+              <button
+                type="button"
+                onClick={scheduleSave}
+                className="ml-1 flex items-center gap-0.5 underline underline-offset-2 hover:text-foreground"
+                aria-label="저장 다시 시도"
+              >
+                <RefreshCw className="size-3" aria-hidden="true" />
+                다시 시도
+              </button>
+            </>
+          )}
+        </span>
+        {stats.chars === 0 && <span className="opacity-50">계속 써보세요</span>}
         {stats.chars > 0 && (
           <span className="opacity-70">
-            {stats.chars.toLocaleString()}자 · 약 {stats.readMinutes}분
+            {stats.chars.toLocaleString()}자 · 약 {stats.readMinutes}분 읽기
           </span>
+        )}
+        {stats.chars > 0 && stats.chars < 100 && (
+          <span className="opacity-50">계속 써보세요</span>
+        )}
+        {stats.chars >= 100 && stats.chars < 500 && (
+          <span className="opacity-50">좋은 시작이에요</span>
         )}
       </div>
       <div className="border-t mt-4 pt-2 px-4 text-xs text-muted-foreground flex flex-wrap gap-4">
