@@ -86,6 +86,9 @@ export class InputManager {
     };
 
     const onDown = (e: KeyboardEvent) => {
+      // Shift+Tab은 가로채지 않아 캔버스 밖으로 포커스를 빼는 탈출구로 남긴다.
+      // Tab을 전부 preventDefault하면 키보드만 쓰는 사용자가 캔버스에 갇힌다(WCAG 2.1.2 키보드 트랩).
+      if (e.key === "Tab" && e.shiftKey) return;
       const action = KEY_MAP[e.key];
       if (action) {
         e.preventDefault();

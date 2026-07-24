@@ -96,6 +96,26 @@ describe("InputManager - bindKeyboard blur releases stuck keys", () => {
     expect(mgr.isPressed("right")).toBe(false);
     unbind();
   });
+
+  it("Tab opens management, but Shift+Tab is left as a focus escape (no keyboard trap)", () => {
+    const { el, handlers } = makeMockEl();
+    const unbind = mgr.bindKeyboard(el);
+
+    // Tab: 경영 패널 열기 + 기본 동작 차단
+    let tabPrevented = false;
+    handlers.keydown?.({ key: "Tab", shiftKey: false, preventDefault() { tabPrevented = true; } });
+    expect(mgr.isPressed("management")).toBe(true);
+    expect(tabPrevented).toBe(true);
+
+    mgr.releaseAll();
+
+    // Shift+Tab: 가로채지 않음(포커스 탈출구 유지)
+    let shiftTabPrevented = false;
+    handlers.keydown?.({ key: "Tab", shiftKey: true, preventDefault() { shiftTabPrevented = true; } });
+    expect(mgr.isPressed("management")).toBe(false);
+    expect(shiftTabPrevented).toBe(false);
+    unbind();
+  });
 });
 
 describe("InputManager - tap world position", () => {
