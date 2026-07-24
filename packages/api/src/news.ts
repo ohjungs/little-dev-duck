@@ -256,6 +256,11 @@ export async function collectFeed(
     const discovered = discoverFeedUrl(xml, feed.url);
     if (discovered && discovered !== feed.url) {
       try {
+        // 발견된 URL은 원격 HTML에서 유래하므로 addFeed와 동일하게 fetch 전 사전검증한다(SSRF 방어 —
+        // 사설/내부 대역 링크가 GET 요청 자체를 발사하지 못하게). 프로토콜·호스트를 먼저 막는다.
+        const dh = new URL(discovered);
+        if (dh.protocol !== "http:" && dh.protocol !== "https:") throw new Error("bad protocol");
+        if (PRIVATE_HOST.test(dh.hostname)) throw new Error("사설 주소");
         const res2 = await doFetch(discovered, {
           headers: { "user-agent": "LittleDevDuck/1.0 (+rss)" },
         });

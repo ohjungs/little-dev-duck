@@ -157,6 +157,21 @@ describe("collectFeed", () => {
       }),
     ).rejects.toThrow("로그인이 필요합니다.");
   });
+
+  it("자동발견 URL이 사설/내부 대역이면 fetch하지 않는다(SSRF 방어)", async () => {
+    const { supabase } = fakeSupabase();
+    // 등록된 사이트 홈이 HTML만 반환하고, 그 안의 RSS 링크가 내부 메타데이터 주소를 가리키는 경우.
+    const html = `<html><head><link rel="alternate" type="application/rss+xml" href="http://169.254.169.254/latest/meta-data/"></head></html>`;
+    let calls = 0;
+    const countingFetch = (async (url: string) => {
+      calls += 1;
+      return { ok: true, url, text: async () => html } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const result = await collectFeed(supabase, baseFeed(), { fetchImpl: countingFetch });
+    // 원 피드 1회만 fetch — 사설 대역 발견 URL은 fetch 전 차단돼 두 번째 요청이 나가지 않는다.
+    expect(calls).toBe(1);
+    expect(result.inserted).toBe(0);
+  });
 });
 
 function addFeedSupabase(captured: { url?: string }) {
