@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { DuckLogo } from "@/components/DuckLogo";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { GitHubMark } from "@/components/ui/github-mark";
@@ -54,23 +54,13 @@ export function LoginForm() {
     <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-secondary/40 to-background p-6">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
         <div className="flex flex-col items-center gap-4 text-center">
-          <span className="text-5xl leading-none" role="img" aria-label="오리">
-            🦆
-          </span>
-          <Image
-            src="/duck-logo.png"
-            alt="Little Dev Duck 로고"
-            width={72}
-            height={72}
-            priority
-            className="rounded-full ring-1 ring-border"
-          />
+          <DuckLogo size={84} intro />
           <div className="space-y-1.5">
             <h1 className="text-2xl font-bold tracking-tight">
               Little Dev Duck
             </h1>
             <p className="text-sm text-muted-foreground">
-              3D 아기오리 AI 비서와 함께하는 워크스페이스
+              아기오리 AI 비서와 함께하는 워크스페이스
             </p>
           </div>
         </div>
