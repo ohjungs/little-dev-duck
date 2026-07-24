@@ -9,6 +9,7 @@ import { HabitWidget } from "@/components/HabitWidget";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
+import { DashboardGrid } from "@/components/DashboardGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -71,34 +72,54 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <div className="md:col-span-1 xl:col-start-3 xl:row-start-1 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <DuckWidget />
-        </div>
-        <div className="md:col-span-2 xl:col-start-1 xl:col-span-2 xl:row-start-1 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <DuckChatPanel />
-        </div>
-
-        <div className="rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <TodoWidget />
-        </div>
-        <div className="rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <HabitWidget />
-        </div>
-        <div className="rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <PomodoroWidget />
-        </div>
-        <div className="md:col-span-2 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <MemoWidget />
-        </div>
-        <div className="rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <CalendarWidget />
-        </div>
-
-        <div className="md:col-span-2 xl:col-span-3 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <GithubContributionWidget />
-        </div>
-      </div>
+      <DashboardGrid
+        widgets={[
+          {
+            id: "duck",
+            label: "오리",
+            className: "md:col-span-1 xl:col-start-3 xl:row-start-1",
+            children: <DuckWidget />,
+          },
+          {
+            id: "chat",
+            label: "오리 채팅",
+            className: "md:col-span-2 xl:col-start-1 xl:col-span-2 xl:row-start-1",
+            children: <DuckChatPanel />,
+          },
+          {
+            id: "todo",
+            label: "할 일",
+            children: <TodoWidget />,
+          },
+          {
+            id: "habit",
+            label: "습관",
+            children: <HabitWidget />,
+          },
+          {
+            id: "pomodoro",
+            label: "뽀모도로",
+            children: <PomodoroWidget />,
+          },
+          {
+            id: "memo",
+            label: "메모",
+            className: "md:col-span-2",
+            children: <MemoWidget />,
+          },
+          {
+            id: "calendar",
+            label: "캘린더",
+            children: <CalendarWidget />,
+          },
+          {
+            id: "github",
+            label: "GitHub 잔디",
+            className: "md:col-span-2 xl:col-span-3",
+            children: <GithubContributionWidget />,
+          },
+        ]}
+      />
     </div>
   );
 }

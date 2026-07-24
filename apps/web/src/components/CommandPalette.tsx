@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   BarChart3,
   Building2,
+  Clock,
   FileText,
   Loader2,
   Newspaper,
@@ -17,6 +18,33 @@ import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { getRecentPages, type RecentPage } from "@/lib/recentPages";
+
+// ---------------------------------------------------------------------------
+// 최근 검색어 localStorage helpers
+// ---------------------------------------------------------------------------
+const RECENT_SEARCHES_KEY = "ldd-recent-searches";
+const MAX_RECENT_SEARCHES = 5;
+
+function getRecentSearches(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentSearch(query: string): void {
+  const trimmed = query.trim();
+  if (!trimmed) return;
+  const current = getRecentSearches();
+  const deduped = [trimmed, ...current.filter((s) => s !== trimmed)].slice(
+    0,
+    MAX_RECENT_SEARCHES,
+  );
+  localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(deduped));
+}
+
+// ---------------------------------------------------------------------------
 
 type QuickAction = {
   id: string;
@@ -41,6 +69,7 @@ export function CommandPalette() {
   const [results, setResults] = useState<Page[]>([]);
   const [state, setState] = useState<SearchState>("idle");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 최신 검색어를 담아 out-of-order 응답(느린 옛 요청이 최신 결과를 덮어씀)을 버린다.
@@ -87,9 +116,13 @@ export function CommandPalette() {
     };
   }, []);
 
-  // 열릴 때 입력에 포커스(setState 없음 — 규칙 회피).
+  // 열릴 때 입력에 포커스하고 최근 검색어를 로드한다.
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (open) {
+      inputRef.current?.focus();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 팔레트 오픈 시 localStorage 동기화
+      setRecentSearches(getRecentSearches());
+    }
   }, [open]);
 
   const runSearch = (raw: string) => {
@@ -123,6 +156,8 @@ export function CommandPalette() {
   };
 
   const goTo = (id: string) => {
+    // 검색어가 있을 때만 저장한다(최근 페이지 클릭은 검색어가 없으므로 저장 안 함).
+    if (query.trim()) saveRecentSearch(query.trim());
     setOpen(false);
     router.push(`/pages/${id}`);
   };
@@ -181,21 +216,31 @@ export function CommandPalette() {
 
   // 검색어가 없을 때만 최근 연 페이지(localStorage MRU)를 노출.
   const recent = q ? [] : getRecentPages();
+  // 검색어가 없을 때만 최근 검색어를 노출.
+  const recentSearchItems = q ? [] : recentSearches;
 
-  // 액션 + 최근 + 페이지 결과를 하나의 내비게이션 목록으로. Enter/↑↓가 통합 인덱스로 동작.
+  // 액션 + 최근 검색어 + 최근 페이지 + 검색 결과를 하나의 내비게이션 목록으로.
   type Item =
     | { kind: "action"; action: QuickAction }
+    | { kind: "recentSearch"; query: string }
     | { kind: "recent"; page: RecentPage }
     | { kind: "page"; page: Page };
   const items: Item[] = [
     ...actions.map((action) => ({ kind: "action" as const, action })),
+    ...recentSearchItems.map((sq) => ({ kind: "recentSearch" as const, query: sq })),
     ...recent.map((page) => ({ kind: "recent" as const, page })),
     ...results.map((page) => ({ kind: "page" as const, page })),
   ];
 
   const runItem = (item: Item) => {
-    if (item.kind === "action") item.action.run();
-    else goTo(item.page.id);
+    if (item.kind === "action") {
+      item.action.run();
+    } else if (item.kind === "recentSearch") {
+      // 최근 검색어를 클릭하면 해당 쿼리로 검색을 다시 실행한다.
+      runSearch(item.query);
+    } else {
+      goTo(item.page.id);
+    }
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -250,43 +295,72 @@ export function CommandPalette() {
           {items.map((item, i) => {
             const active = i === activeIndex;
             const key =
-              item.kind === "action" ? item.action.id : item.page.id;
+              item.kind === "action"
+                ? item.action.id
+                : item.kind === "recentSearch"
+                  ? `recent-search-${item.query}`
+                  : item.page.id;
+
+            // 섹션 구분선 — 최근 검색어 첫 항목 앞에 헤더를 삽입한다.
+            const isFirstRecentSearch =
+              item.kind === "recentSearch" &&
+              (i === 0 || items[i - 1]?.kind !== "recentSearch");
+            // 최근 페이지 첫 항목 앞에도 헤더를 삽입한다.
+            const isFirstRecentPage =
+              item.kind === "recent" &&
+              (i === 0 || items[i - 1]?.kind !== "recent");
+
             return (
-              <button
-                key={key}
-                id={`palette-item-${i}`}
-                role="option"
-                aria-selected={active}
-                type="button"
-                onClick={() => runItem(item)}
-                onMouseEnter={() => setActiveIndex(i)}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                  active
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:bg-muted",
+              <div key={key}>
+                {isFirstRecentSearch && (
+                  <p className="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+                    최근 검색
+                  </p>
                 )}
-              >
-                {item.kind === "action" ? (
-                  item.action.icon
-                ) : item.page.icon ? (
-                  <span className="shrink-0 text-sm leading-none">
-                    {item.page.icon}
-                  </span>
-                ) : (
-                  <FileText className="size-3.5 shrink-0 opacity-70" />
+                {isFirstRecentPage && (
+                  <p className="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+                    최근 페이지
+                  </p>
                 )}
-                <span className="min-w-0 flex-1 truncate">
-                  {item.kind === "action"
-                    ? item.action.label
-                    : item.page.title || "제목 없음"}
-                  {item.kind === "page" && item.page.plainText && (
-                    <span className="ml-2 text-xs text-muted-foreground/70">
-                      {item.page.plainText.slice(0, 50)}
-                    </span>
+                <button
+                  id={`palette-item-${i}`}
+                  role="option"
+                  aria-selected={active}
+                  type="button"
+                  onClick={() => runItem(item)}
+                  onMouseEnter={() => setActiveIndex(i)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                    active
+                      ? "bg-secondary text-foreground"
+                      : "text-muted-foreground hover:bg-muted",
                   )}
-                </span>
-              </button>
+                >
+                  {item.kind === "action" ? (
+                    item.action.icon
+                  ) : item.kind === "recentSearch" ? (
+                    <Clock className="size-3.5 shrink-0 opacity-70" />
+                  ) : item.page.icon ? (
+                    <span className="shrink-0 text-sm leading-none">
+                      {item.page.icon}
+                    </span>
+                  ) : (
+                    <FileText className="size-3.5 shrink-0 opacity-70" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">
+                    {item.kind === "action"
+                      ? item.action.label
+                      : item.kind === "recentSearch"
+                        ? item.query
+                        : item.page.title || "제목 없음"}
+                    {item.kind === "page" && item.page.plainText && (
+                      <span className="ml-2 text-xs text-muted-foreground/70">
+                        {item.page.plainText.slice(0, 50)}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </div>
             );
           })}
           {q !== "" && state === "ready" && results.length === 0 && (
