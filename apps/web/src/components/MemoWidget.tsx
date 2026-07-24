@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { WidgetSkeleton } from "@/components/Skeleton";
+import { timeAgo } from "@/lib/timeAgo";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -325,6 +326,9 @@ export function MemoWidget() {
                   <p className="flex-1 whitespace-pre-wrap text-sm">
                     {memo.content}
                   </p>
+                  <span className="text-[10px] text-muted-foreground">
+                    {timeAgo(memo.createdAt)}
+                  </span>
                 </div>
               ),
             )}

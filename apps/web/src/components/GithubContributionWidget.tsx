@@ -78,7 +78,23 @@ export function GithubContributionWidget() {
           GitHub 잔디
         </CardTitle>
         {state === "ready" && data && data.linked && (
-          <Badge variant="muted">최근 1년 {data.summary.totalCount}개</Badge>
+          <>
+            <Badge variant="muted">최근 1년 {data.summary.totalCount}개</Badge>
+            {(() => {
+              const contributions = data.summary.days;
+              let streak = 0;
+              for (let i = contributions.length - 1; i >= 0; i--) {
+                if (contributions[i].count > 0) {
+                  streak++;
+                } else if (i < contributions.length - 1) {
+                  break; // today can be 0
+                }
+              }
+              return streak > 0 ? (
+                <Badge variant="muted">연속 {streak}일</Badge>
+              ) : null;
+            })()}
+          </>
         )}
       </CardHeader>
 

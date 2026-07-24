@@ -446,7 +446,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
           {favoritePages.length > 0 && (
             <div className="mb-2 border-b border-border/60 pb-2">
               <span className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                즐겨찾기
+                즐겨찾기 ({favoritePages.length})
               </span>
               {favoritePages.map((p) => (
                 <div
