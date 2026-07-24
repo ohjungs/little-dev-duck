@@ -152,6 +152,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortMode, setSortMode] = useState<"updated" | "name" | "created">("updated");
 
   const fetchPages = () => {
     listPages(supabase).then(
@@ -197,7 +198,23 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
         : pages,
     [pages, searchQuery],
   );
-  const tree = useMemo(() => buildTree(filteredPages), [filteredPages]);
+  const sortedPages = useMemo(() => {
+    const sorted = [...filteredPages];
+    switch (sortMode) {
+      case "name":
+        sorted.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case "created":
+        sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        break;
+      case "updated":
+      default:
+        sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        break;
+    }
+    return sorted;
+  }, [filteredPages, sortMode]);
+  const tree = useMemo(() => buildTree(sortedPages), [sortedPages]);
   const current = pages.find((p) => p.id === pageId) ?? null;
   // 현재 페이지의 상위 체인(root→parent). 순환/누락 방어(guard). 브레드크럼 내비게이션에 사용.
   const breadcrumb = useMemo(() => {
@@ -371,6 +388,20 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
                 <X className="size-3.5" />
               </button>
             )}
+          </div>
+          <div className="mt-1.5 flex items-center justify-end">
+            <select
+              value={sortMode}
+              onChange={(e) =>
+                setSortMode(e.target.value as "updated" | "name" | "created")
+              }
+              aria-label="페이지 정렬 기준"
+              className="rounded border border-border bg-transparent px-1 py-0.5 text-xs text-muted-foreground outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="updated">최근 수정</option>
+              <option value="name">이름순</option>
+              <option value="created">생성순</option>
+            </select>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-2 pb-3">

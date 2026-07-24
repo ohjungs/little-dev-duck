@@ -329,7 +329,9 @@ export function TodoWidget() {
                     className={
                       todo.isDone
                         ? "flex-1 text-sm text-muted-foreground line-through"
-                        : "flex-1 text-sm"
+                        : todo.dueDate && new Date(todo.dueDate) < new Date() && !todo.isDone
+                          ? "flex-1 text-sm text-destructive"
+                          : "flex-1 text-sm"
                     }
                   >
                     {todo.title}

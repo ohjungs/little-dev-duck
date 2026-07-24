@@ -27,8 +27,10 @@ import {
   habitHeatmapData,
   pomodoroStats,
   type DashboardSummary,
+  type HabitCheck,
   type HeatmapDay,
   type PomodoroStats,
+  type Todo,
 } from "@ldd/core";
 import { HabitHeatmap } from "./HabitHeatmap";
 import { createClient } from "@/lib/supabase/client";
@@ -59,6 +61,8 @@ export function InsightsView() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [pomStats, setPomStats] = useState<PomodoroStats | null>(null);
   const [heatmap, setHeatmap] = useState<HeatmapDay[] | null>(null);
+  const [rawTodos, setRawTodos] = useState<Todo[]>([]);
+  const [rawChecks, setRawChecks] = useState<HabitCheck[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [standupState, setStandupState] = useState<
     "idle" | "loading" | "error"
@@ -98,6 +102,8 @@ export function InsightsView() {
         );
         setPomStats(pomodoroStats(pomSessions));
         setHeatmap(habitHeatmapData(checks.map((c) => ({ checkedDate: c.checkedDate })), today));
+        setRawTodos(todos);
+        setRawChecks(checks);
         setState("ready");
       } catch {
         setState("error");
@@ -144,8 +150,60 @@ export function InsightsView() {
     return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
   }
 
+  function calculateStreak(todos: Todo[], checks: HabitCheck[]): number {
+    const activeDates = new Set<string>();
+    for (const t of todos) {
+      if (t.isDone && t.updatedAt) activeDates.add(t.updatedAt.slice(0, 10));
+    }
+    for (const h of checks) {
+      activeDates.add(h.checkedDate);
+    }
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      if (activeDates.has(iso)) {
+        streak++;
+      } else if (i === 0) {
+        // 오늘 아직 활동 없음 — 어제부터 체크
+        continue;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  const streak = calculateStreak(rawTodos, rawChecks);
+
+  const dayLabels = ["일", "월", "화", "수", "목", "금", "토"];
+  const dayOfWeekCounts = [0, 0, 0, 0, 0, 0, 0];
+  for (const t of rawTodos) {
+    if (t.isDone && t.updatedAt) {
+      const day = new Date(t.updatedAt).getDay();
+      dayOfWeekCounts[day]++;
+    }
+  }
+  for (const h of rawChecks) {
+    const day = new Date(h.checkedDate).getDay();
+    dayOfWeekCounts[day]++;
+  }
+  const maxCount = Math.max(...dayOfWeekCounts);
+  const bestDay = maxCount > 0 ? dayLabels[dayOfWeekCounts.indexOf(maxCount)] : null;
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="rounded-lg border bg-primary/5 p-4 text-center">
+        <div className="text-3xl font-bold">{streak}일</div>
+        <div className="text-sm text-muted-foreground">연속 활동</div>
+        {bestDay && (
+          <div className="mt-2 text-xs text-muted-foreground">
+            가장 활발한 요일: {bestDay}요일
+          </div>
+        )}
+      </div>
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"
