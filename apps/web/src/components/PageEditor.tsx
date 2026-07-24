@@ -46,6 +46,7 @@ import {
   toggleFavorite,
 } from "@/lib/favorites";
 import { recordRecentPage } from "@/lib/recentPages";
+import { timeAgo } from "@/lib/timeAgo";
 
 // 파일명에 못 쓰는 문자·제어문자를 -로 치환하고 끝의 점/공백을 정리한다(공백은 중간에선 보존).
 // 결과가 비면(공백만 등) "page"로 폴백.
@@ -599,6 +600,18 @@ export function PageEditor({
             {stats.chars.toLocaleString()}자 · 약 {stats.readMinutes}분
           </span>
         )}
+      </div>
+      <div className="border-t mt-4 pt-2 px-4 text-xs text-muted-foreground flex flex-wrap gap-4">
+        <span>
+          생성일{" "}
+          {new Date(page.createdAt).toLocaleDateString("ko-KR", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </span>
+        <span>수정 {timeAgo(page.updatedAt)}</span>
+        <span>{plainText.length.toLocaleString()}자</span>
       </div>
       <AiWriteAssistant />
       {backlinks.length > 0 && (

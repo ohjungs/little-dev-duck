@@ -9,9 +9,11 @@ import {
   FileText,
   Loader2,
   Plus,
+  Search,
   Star,
   Trash,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   createPage,
@@ -149,6 +151,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchPages = () => {
     listPages(supabase).then(
@@ -185,7 +188,16 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
     return subscribeFavorites(sync);
   }, []);
 
-  const tree = useMemo(() => buildTree(pages), [pages]);
+  const filteredPages = useMemo(
+    () =>
+      searchQuery
+        ? pages.filter((p) =>
+            p.title.toLowerCase().includes(searchQuery.toLowerCase()),
+          )
+        : pages,
+    [pages, searchQuery],
+  );
+  const tree = useMemo(() => buildTree(filteredPages), [filteredPages]);
   const current = pages.find((p) => p.id === pageId) ?? null;
   // 현재 페이지의 상위 체인(root→parent). 순환/누락 방어(guard). 브레드크럼 내비게이션에 사용.
   const breadcrumb = useMemo(() => {
@@ -338,6 +350,29 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
             </>
           )}
         </div>
+        <div className="px-2 pb-2">
+          <div className="relative flex items-center">
+            <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="페이지 검색..."
+              aria-label="페이지 검색"
+              className="w-full rounded-md bg-muted/50 py-1.5 pl-7 pr-7 text-sm outline-none placeholder:text-muted-foreground/60 focus:bg-muted focus:ring-1 focus:ring-ring"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                aria-label="검색 초기화"
+                className="absolute right-1.5 rounded p-0.5 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
         <nav className="flex-1 overflow-y-auto px-2 pb-3">
           {favoritePages.length > 0 && (
             <div className="mb-2 border-b border-border/60 pb-2">
@@ -392,7 +427,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
           )}
           {state === "ready" && tree.length === 0 && (
             <p className="px-2 py-2 text-sm text-muted-foreground">
-              아직 페이지가 없습니다.
+              {searchQuery ? "검색 결과가 없습니다." : "아직 페이지가 없습니다."}
             </p>
           )}
           {tree.map((node) => (

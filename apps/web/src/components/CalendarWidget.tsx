@@ -23,6 +23,17 @@ import { Input } from "@/components/ui/input";
 
 type LoadState = "loading" | "error" | "ready";
 
+// 시작 시간을 한국어 오전/오후 형식으로 반환. 자정(0:00)이면 시간 부분을 숨긴다.
+function formatEventTime(startAt: string): string | null {
+  const d = new Date(startAt);
+  const h = d.getHours();
+  const m = d.getMinutes();
+  if (h === 0 && m === 0) return null;
+  const period = h < 12 ? "오전" : "오후";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${period} ${h12}:${String(m).padStart(2, "0")}`;
+}
+
 // D-day 라벨: 0=오늘, 양수=D-N(다가옴), 음수=D+N(지남).
 function ddayLabel(startAt: string): string {
   const diff = daysUntil(startAt, todayIso());
@@ -173,32 +184,46 @@ export function CalendarWidget() {
         )}
         {state === "ready" && events.length > 0 && (
           <ul className="flex flex-col gap-1">
-            {events.map((event) => (
-              <li
-                key={event.id}
-                data-testid={`calendar-event-${event.id}`}
-                className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60"
-              >
-                <Badge
-                  variant={ddayVariant(event.startAt)}
-                  className="min-w-16 justify-center tabular-nums"
+            {events.map((event) => {
+              const isToday = daysUntil(event.startAt, todayIso()) === 0;
+              const startTime = formatEventTime(event.startAt);
+              const endTime = event.endAt ? formatEventTime(event.endAt) : null;
+              return (
+                <li
+                  key={event.id}
+                  data-testid={`calendar-event-${event.id}`}
+                  className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60${isToday ? " bg-primary/5" : ""}`}
                 >
-                  {ddayLabel(event.startAt)}
-                </Badge>
-                <span className="flex-1 truncate text-sm">{event.title}</span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {event.startAt.slice(0, 10)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(event.id)}
-                  aria-label="삭제"
-                  className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </li>
-            ))}
+                  <Badge
+                    variant={ddayVariant(event.startAt)}
+                    className="min-w-16 justify-center tabular-nums"
+                  >
+                    {ddayLabel(event.startAt)}
+                  </Badge>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className={`truncate text-sm${isToday ? " font-medium" : ""}`}>
+                      {event.title}
+                    </span>
+                    {startTime && (
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {startTime}{endTime ? ` ~ ${endTime}` : ""}
+                      </span>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {event.startAt.slice(0, 10)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(event.id)}
+                    aria-label="삭제"
+                    className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>

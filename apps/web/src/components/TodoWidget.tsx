@@ -196,7 +196,20 @@ export function TodoWidget() {
           {state === "ready" && (
             <Badge variant="muted">{remaining}개 남음</Badge>
           )}
+          {state === "ready" && baseTodos.length > 0 && (
+            <span className="ml-1 text-xs font-normal text-muted-foreground">
+              {doneCount}/{baseTodos.length}
+            </span>
+          )}
         </CardTitle>
+        {state === "ready" && baseTodos.length > 0 && (
+          <div className="h-0.5 rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: `${(doneCount / baseTodos.length) * 100}%` }}
+            />
+          </div>
+        )}
         <div className="flex items-center gap-1">
           {state === "ready" && doneCount > 0 && (
             <Button
