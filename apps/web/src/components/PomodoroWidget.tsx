@@ -52,8 +52,11 @@ function disableFocusMode(): void {
 
 type LoadState = "loading" | "error" | "ready";
 
-// 선택 가능한 집중 길이(분). 기본값은 첫 번째 항목.
-const DURATION_OPTIONS = [25, 50] as const;
+// 선택 가능한 집중 길이(분) 프리셋. 기본값은 25분. 그 외 값은 "직접"에서 1~180 입력.
+const DURATION_OPTIONS = [15, 25, 50] as const;
+const DEFAULT_DURATION = 25;
+const MIN_DURATION = 1;
+const MAX_DURATION = 180; // core pomodoroSessionSchema와 동일 상한
 const SECONDS_PER_MINUTE = 60;
 
 // 태그 이력 localStorage 키. max 20개 보관.
@@ -104,9 +107,9 @@ function timeAgo(iso: string): string {
 export function PomodoroWidget() {
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [state, setState] = useState<LoadState>("loading");
-  const [durationMinutes, setDurationMinutes] = useState<number>(
-    DURATION_OPTIONS[0],
-  );
+  const [durationMinutes, setDurationMinutes] = useState<number>(DEFAULT_DURATION);
+  // "직접" 커스텀 입력값(문자열로 관리 — 빈칸 허용). 커밋 시 clamp.
+  const [customInput, setCustomInput] = useState("");
   const [running, setRunning] = useState(false);
   const [remaining, setRemaining] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -289,18 +292,21 @@ export function PomodoroWidget() {
                 집중 완료! 오리가 뿌듯해합니다.
               </div>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">집중 길이</span>
-              <div className="flex gap-1 rounded-lg bg-muted p-1">
+              <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
                 {DURATION_OPTIONS.map((min) => (
                   <button
                     key={min}
                     type="button"
-                    onClick={() => setDurationMinutes(min)}
-                    aria-pressed={durationMinutes === min}
+                    onClick={() => {
+                      setDurationMinutes(min);
+                      setCustomInput("");
+                    }}
+                    aria-pressed={durationMinutes === min && customInput === ""}
                     className={cn(
                       "rounded-md px-3 py-1 text-sm font-medium transition-colors",
-                      durationMinutes === min
+                      durationMinutes === min && customInput === ""
                         ? "bg-card text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground",
                     )}
@@ -308,6 +314,35 @@ export function PomodoroWidget() {
                     {min}분
                   </button>
                 ))}
+                {/* 직접 입력(1~180분) — 프리셋 외 값 선택 */}
+                <span
+                  className={cn(
+                    "flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition-colors",
+                    customInput !== "" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+                  )}
+                >
+                  <input
+                    type="number"
+                    min={MIN_DURATION}
+                    max={MAX_DURATION}
+                    inputMode="numeric"
+                    value={customInput}
+                    placeholder="직접"
+                    aria-label="집중 길이 직접 입력(분)"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setCustomInput(raw);
+                      const n = Number(raw);
+                      if (raw !== "" && Number.isFinite(n)) {
+                        setDurationMinutes(
+                          Math.min(MAX_DURATION, Math.max(MIN_DURATION, Math.round(n))),
+                        );
+                      }
+                    }}
+                    className="w-12 bg-transparent text-center outline-none placeholder:text-muted-foreground"
+                  />
+                  <span className="text-muted-foreground">분</span>
+                </span>
               </div>
             </div>
 
