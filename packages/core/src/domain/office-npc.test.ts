@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createGameClock,
+  gameClockFromHm,
   formatClockTime,
   phaseToWorkState,
   schedulePhase,
@@ -48,6 +49,16 @@ function makeTask(overrides: Partial<NpcTask> = {}): NpcTask {
     ...overrides,
   };
 }
+
+describe("gameClockFromHm", () => {
+  it("시/분을 그대로 반영한다", () => {
+    expect(gameClockFromHm(14, 30)).toEqual({ hour: 14, minute: 30, totalMinutes: 870 });
+  });
+  it("범위를 벗어난 값을 정규화한다", () => {
+    expect(gameClockFromHm(25, 61)).toEqual({ hour: 1, minute: 1, totalMinutes: 61 });
+    expect(gameClockFromHm(-1, -1)).toEqual({ hour: 23, minute: 59, totalMinutes: 1439 });
+  });
+});
 
 describe("createGameClock", () => {
   it("지정한 시각으로 시작한다", () => {

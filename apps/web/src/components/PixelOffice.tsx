@@ -20,8 +20,7 @@ import {
   TileType,
   DEPT_REGISTRY,
   DUCK_NAMES,
-  createGameClock,
-  tickClock,
+  gameClockFromHm,
   formatClockTime,
   schedulePhase,
   phaseToWorkState,
@@ -59,6 +58,20 @@ import { loadAllSprites, type SpriteAssets } from "@/lib/sprite-loader";
 // ---------------------------------------------------------------------------
 // 상수
 // ---------------------------------------------------------------------------
+// 오피스 시계를 실제 KST 시각에 동기화한다(빠른 게임 시뮬 대신 실시간 반영 — "게임처럼 보이지만
+// 게임은 아닌" 실제 시간 오피스). 밤이면 실제로 직원들이 퇴근한 상태로 보인다.
+function kstClock(): GameClock {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  return gameClockFromHm(hour, minute);
+}
+
 const TILE = 32;          // 오리 스프라이트 프레임 32x32와 맞춤
 const FRAME_MS = 60;      // ~16fps (깜빡임 방지)
 const ZONE_HUD_MS = 2000;
@@ -292,7 +305,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const playerFacingRef = useRef<"up" | "down" | "left" | "right">("down");
   const playerMovingRef = useRef(false);
 
-  const clockRef = useRef<GameClock>(createGameClock(CLOCK_START_HOUR));
+  const clockRef = useRef<GameClock>(kstClock());
   const lastTickRef = useRef<number>(0);
   // 회사 재정 상태
   const companyRef = useRef<CompanyStats>(createCompany());
@@ -308,7 +321,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showManagement, setShowManagement] = useState(false);
   const [soundMuted, setSoundMuted] = useState(false);
-  const [dashboardClock, setDashboardClock] = useState<GameClock>(createGameClock(CLOCK_START_HOUR));
+  const [dashboardClock, setDashboardClock] = useState<GameClock>(kstClock());
   const [dashboardNpcs, setDashboardNpcs] = useState<Npc[]>([]);
   // management panel용 스냅샷 (React 렌더 트리거용)
   const [managementSnapshot, setManagementSnapshot] = useState<{
@@ -383,7 +396,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
     }
 
     npcsRef.current = npcs;
-    clockRef.current = createGameClock(CLOCK_START_HOUR);
+    clockRef.current = kstClock();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- realTasks는 마운트 시 1회만 반영 (의도적 빈 deps)
   }, []);
 
@@ -516,10 +529,9 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
       const map = mapRef.current;
       if (!map) return;
 
-      // 게임 클럭 업데이트 (1실초 = 1게임분)
-      if (!pausedRef.current && lastTickRef.current > 0) {
-        const deltaMs = t - lastTickRef.current;
-        clockRef.current = tickClock(clockRef.current, deltaMs);
+      // 게임 클럭을 실제 KST 시각에 동기화(실시간 반영 — 게임 아님).
+      if (!pausedRef.current) {
+        clockRef.current = kstClock();
       }
       lastTickRef.current = t;
 
@@ -527,7 +539,13 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
       if (!pausedRef.current) {
         const clock = clockRef.current;
         npcsRef.current = npcsRef.current.map((npc) => {
-          const phase = schedulePhase(clock.hour);
+          const realPhase = schedulePhase(clock.hour);
+          // AI 에이전트는 사람과 달리 시간 무관 상주한다 — 출퇴근/퇴근 단계는 working으로 대체해
+          // 밤(실시간)에도 오피스가 비지 않게 한다(낮의 점심·휴식 배회는 그대로 유지).
+          const phase =
+            realPhase === "offwork" || realPhase === "commuting" || realPhase === "leaving"
+              ? "working"
+              : realPhase;
           const workState = phaseToWorkState(phase);
           const updated = simulateNpcTasks({ ...npc, schedulePhase: phase, workState }, clock, rand);
           return updated;

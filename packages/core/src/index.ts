@@ -262,6 +262,7 @@ export {
 } from "./domain/office-department";
 export {
   createGameClock,
+  gameClockFromHm,
   tickClock,
   formatClockTime,
   schedulePhase,

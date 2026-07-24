@@ -53,6 +53,15 @@ export function createGameClock(startHour: number = 8): GameClock {
   return { hour: startHour, minute: 0, totalMinutes: startHour * 60 };
 }
 
+// 시/분(정수)으로 게임 클럭을 만든다. 오피스를 실제 시각(KST)에 동기화할 때 사용 —
+// 빠른 시뮬 대신 현재 시각을 그대로 반영해 "게임처럼 보이지만 게임은 아닌" 실시간 오피스를 만든다.
+// 범위를 벗어난 값은 정규화(hour 0-23, minute 0-59).
+export function gameClockFromHm(hour: number, minute: number): GameClock {
+  const h = ((Math.floor(hour) % 24) + 24) % 24;
+  const m = ((Math.floor(minute) % 60) + 60) % 60;
+  return { hour: h, minute: m, totalMinutes: h * 60 + m };
+}
+
 export function tickClock(clock: GameClock, deltaMs: number): GameClock {
   // 1실초 = 1게임분: deltaMs / 1000 = 추가 게임 분
   const addedMinutes = deltaMs / 1000;
