@@ -1,11 +1,12 @@
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
+import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
 import { createTodo, listTodos, updateTodo } from "./todos";
 import { createMemo } from "./memos";
 import { createPage } from "./pages";
 import { createCalendarEvent } from "./calendar";
+import { indexSource } from "./embeddings";
 
 // LLM이 준 날짜/시각 문자열을 offset 포함 ISO(내부 캘린더 스키마 요구)로 보정한다. 순수함수 — 테스트 대상.
 // 지원: 완전 ISO(offset/Z 포함) 그대로, 'YYYY-MM-DD'→KST 자정, offset 없는 'YYYY-MM-DDTHH:mm(:ss)'→KST.
@@ -132,7 +133,29 @@ function errorResult(call: ToolCall, message: string): ToolResult {
   return { id: call.id, name: call.name, response: { error: message } };
 }
 
-export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
+// apiKey를 주면 생성/변경한 항목을 그 자리에서 RAG 임베딩에 반영한다(오리가 방금 만든 걸 바로 알도록 —
+// 제품 정의: "오리는 RAG 기반으로 사용자 데이터를 알고 답한다"). best-effort(fire-and-forget) — 실패해도
+// 액션 자체는 성공 처리하고, apiKey가 없으면 조용히 건너뛴다(자동 백필이 다음 로드에 커버).
+export function createAppActionsAdapter(
+  supabase: SupabaseClient,
+  apiKey?: string,
+): Adapter {
+  const reindex = (sourceType: EmbeddingSource, sourceId: string, text: string): void => {
+    if (!apiKey) return;
+    void (async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          await indexSource(supabase, apiKey, { userId: user.id, sourceType, sourceId, text });
+        }
+      } catch {
+        // 임베딩 실패는 무시 — 항목은 이미 저장됐고 다음 백필에서 인덱싱된다.
+      }
+    })();
+  };
+
   return {
     catalog: [createTodoDecl, completeTodoDecl, createMemoDecl, createPageDecl, addEventDecl],
     async execute(call: ToolCall): Promise<ToolResult> {
@@ -140,6 +163,7 @@ export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
         const parsed = todoArgs.safeParse(call.args);
         if (!parsed.success) return errorResult(call, "할 일 정보가 올바르지 않습니다.");
         const todo = await createTodo(supabase, { title: parsed.data.title });
+        reindex("todo", todo.id, `${todo.title} (미완료)`);
         return {
           id: call.id,
           name: call.name,
@@ -157,6 +181,7 @@ export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
         }
         if (!found) return errorResult(call, "완료할 할 일을 찾지 못했어요.");
         const updated = await updateTodo(supabase, found.id, { isDone: true });
+        reindex("todo", updated.id, `${updated.title} (완료)`);
         return {
           id: call.id,
           name: call.name,
@@ -168,6 +193,7 @@ export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
         const parsed = memoArgs.safeParse(call.args);
         if (!parsed.success) return errorResult(call, "메모 내용이 올바르지 않습니다.");
         const memo = await createMemo(supabase, { content: parsed.data.content });
+        reindex("memo", memo.id, parsed.data.content);
         return {
           id: call.id,
           name: call.name,
@@ -182,6 +208,7 @@ export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
           title: parsed.data.title,
           content: bodyToContent(parsed.data.body),
         });
+        reindex("page", page.id, parsed.data.body ?? parsed.data.title);
         return {
           id: call.id,
           name: call.name,
@@ -199,6 +226,7 @@ export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
           startAt,
           endAt: null,
         });
+        reindex("calendar_event", event.id, event.title);
         return {
           id: call.id,
           name: call.name,

@@ -57,7 +57,8 @@ export async function POST(request: Request) {
     getGmailTokens(supabase, user.id),
   ]);
   const adapters: Adapter[] = [];
-  adapters.push(createAppActionsAdapter(supabase));
+  // 승인 실행 시 생성/변경 항목을 RAG에 즉시 반영하도록 Gemini 키를 넘긴다(best-effort — 없으면 스킵).
+  adapters.push(createAppActionsAdapter(supabase, process.env.GEMINI_API_KEY));
   if (googleTokens) adapters.push(createGoogleCalendarAdapter(googleTokens.accessToken));
   if (githubTokens) adapters.push(createGitHubIssuesAdapter(githubTokens.accessToken));
   if (gmailTokens) adapters.push(createGmailAdapter(gmailTokens.accessToken));
