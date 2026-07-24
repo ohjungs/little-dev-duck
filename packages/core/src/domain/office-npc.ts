@@ -123,7 +123,7 @@ export function simulateNpcTasks(npc: Npc, clock: GameClock, rng: () => number):
 }
 
 // 부서별 태스크 템플릿(결정적 데이터 — LLM 없이 매핑)
-function getTaskTemplates(dept: DepartmentId): string[] {
+export function getTaskTemplates(dept: DepartmentId): string[] {
   const templates: Record<DepartmentId, string[]> = {
     engineering: [
       "API 리팩터링", "버그 수정 #142", "코드 리뷰", "DB 마이그레이션",

@@ -1,9 +1,12 @@
 "use client";
 
+// 2026-07-24 : 스프라이트 기반 렌더링 + 35 NPC 통합
+// TILE = 32 (오리 스프라이트 프레임 크기와 일치)
+// NPC는 DEPT_REGISTRY에서 자동 생성 (총 35명)
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   eventToState,
-  describeActivity,
   isAdjacent,
   movePlayer,
   buildOfficeMap,
@@ -16,267 +19,65 @@ import {
   isBlocked as tileIsBlocked,
   getZoneAt,
   TileType,
+  DEPT_REGISTRY,
+  DUCK_NAMES,
+  createGameClock,
+  tickClock,
+  formatClockTime,
+  schedulePhase,
+  phaseToWorkState,
+  simulateNpcTasks,
+  getTaskTemplates,
   type DuckWorkState,
-  type OfficeRole,
-  type Vec,
   type TileMap,
   type Camera,
+  type Vec,
+  type Npc,
+  type GameClock,
+  type DepartmentId,
+  type NpcTask,
 } from "@ldd/core";
 import { cn } from "@/lib/utils";
 import { InputManager } from "@/lib/office-input";
 import { VirtualDpad } from "@/components/VirtualDpad";
+import { drawDuckSprite, drawFurnitureSprite, drawFloorTile, drawFurniture } from "@/lib/office-draw";
+import { loadAllSprites, type SpriteAssets } from "@/lib/sprite-loader";
 
-// Phase 16+17+AC-5+6: Camera-tracked tilemap rendering, 80x60 map at TILE=16.
-// AC-5: Camera follows player, visible tile range culling, worldToScreen for all entities.
-// AC-6: movePlayer uses tilemap isBlocked + worker collision combined.
-
-const BODY = "#F6EFDD";
-const SHADOW = "#E3D3B9";
-const BEAK = "#A99C65";
-const OUTLINE = "#352116";
-
-const TILE = 16; // 16px per tile — map is 80x60 = 1280x960 world pixels
-const FRAME_MS = 90; // ~11fps
-const IDLE_MS = 12_000;
-const SIM_MS = 2200;
-
-const ROLE_LABEL: Record<OfficeRole, string> = {
-  plan: "기획 오리",
-  do: "개발 오리",
-  check: "리뷰 오리",
-  boss: "대장오리",
-};
-const WORKER_ROLES: OfficeRole[] = ["plan", "do", "check"];
-const SIM_TOOLS = ["Edit", "Write", "Read", "Grep", "Bash", "Task"] as const;
-const SIM_FILES = ["Duck.tsx", "news.ts", "office.ts", "route.ts", "page.tsx"];
-const LOG_MAX = 30;
-
-// Zone name HUD — shown for 2 seconds on zone entry
+// ---------------------------------------------------------------------------
+// 상수
+// ---------------------------------------------------------------------------
+const TILE = 32;          // 오리 스프라이트 프레임 32x32와 맞춤
+const FRAME_MS = 120;     // ~8fps
 const ZONE_HUD_MS = 2000;
+const CLOCK_START_HOUR = 8;
 
-type LogEntry = {
-  id: number;
-  role: OfficeRole;
-  tool: string;
-  file: string;
-  status: "ok" | "error";
-  ts: number;
+// 오리 스프라이트 행 확장: 2열 = idle(frame 0-1), 나머지는 walk(frame 0-3)
+const DUCK_SCALE = 1.5; // 32px 타일에서 오리를 약간 크게
+
+// ---------------------------------------------------------------------------
+// TileType -> 가구 스프라이트 이름 매핑
+// ---------------------------------------------------------------------------
+const TILE_TO_SPRITE: Partial<Record<number, string>> = {
+  [TileType.Desk]:         "Desk",
+  [TileType.Chair]:        "Chair",
+  [TileType.Monitor]:      "Desk-2",      // 모니터 → Desk-2(모니터 달린 책상)로 표시
+  [TileType.Bookshelf]:    "Bookshelf",
+  [TileType.CoffeeMachine]:"Coffee-Machine",
+  [TileType.VendingMachine]:"Vending-Machine",
+  [TileType.WaterCooler]:  "Water-Dispenser",
+  [TileType.Plant]:        "Big-Plant",
+  [TileType.Sofa]:         "Big-Sofa",
+  [TileType.Table]:        "Big-Round-Table",
+  [TileType.Whiteboard]:   "Board",
+  [TileType.Printer]:      "Printer",
+  [TileType.Toilet]:       "Toilet-Closed",
+  [TileType.Server]:       "Big-Filing-Cabinet",  // 서버랙 대신
+  [TileType.Fridge]:       "Folders",
+  [TileType.Calendar]:     "Wall-Note",
+  [TileType.Clock]:        "Wall-Clock",
 };
 
-type Worker = {
-  role: OfficeRole;
-  tile: Vec;
-  state: DuckWorkState;
-  label: string;
-  lastTs: number;
-};
-
-function agoLabel(ts: number): string {
-  const s = Math.max(0, Math.round((performance.now() - ts) / 1000));
-  if (s < 5) return "방금";
-  if (s < 60) return `${s}초 전`;
-  return `${Math.floor(s / 60)}분 전`;
-}
-
-// Find walkable tiles inside a zone by scanning the map
-function walkableTilesInZone(
-  map: TileMap,
-  zoneId: string,
-): Vec[] {
-  const zone = map.zones.find((z) => z.id === zoneId);
-  if (!zone) return [];
-  const tiles: Vec[] = [];
-  for (let dy = 1; dy < zone.bounds.h - 1; dy++) {
-    for (let dx = 1; dx < zone.bounds.w - 1; dx++) {
-      const x = zone.bounds.x + dx;
-      const y = zone.bounds.y + dy;
-      if (!tileIsBlocked(map, x, y)) {
-        tiles.push({ x, y });
-      }
-    }
-  }
-  return tiles;
-}
-
-// Place workers on walkable desk-adjacent tiles across department zones
-function buildWorkers(map: TileMap, count: number): Worker[] {
-  const deptZones = ["engineering", "design", "qa", "marketing", "hr", "finance", "operations", "support", "sales"];
-  const workers: Worker[] = [];
-  let zoneIdx = 0;
-  for (let i = 0; i < count; i++) {
-    // Rotate through department zones
-    const zId = deptZones[zoneIdx % deptZones.length];
-    zoneIdx++;
-    const walkable = walkableTilesInZone(map, zId);
-    // Pick a stable slot based on i
-    const tile = walkable[i % Math.max(1, walkable.length)] ?? { x: 40, y: 15 };
-    workers.push({
-      role: WORKER_ROLES[i % WORKER_ROLES.length],
-      tile,
-      state: "idle" as DuckWorkState,
-      label: "대기 중",
-      lastTs: 0,
-    });
-  }
-  return workers;
-}
-
-// Find center of CEO office for player start
-function ceoStartPos(map: TileMap): Vec {
-  const ceo = map.zones.find((z) => z.id === "ceo-office");
-  if (!ceo) return { x: 40, y: 17 };
-  return {
-    x: Math.floor(ceo.bounds.x + ceo.bounds.w / 2),
-    y: Math.floor(ceo.bounds.y + ceo.bounds.h / 2),
-  };
-}
-
-
-// --- Inline drawing helpers (placeholder until office-draw.ts is available) ---
-
-function drawFloorTile(
-  ctx: CanvasRenderingContext2D,
-  sx: number,
-  sy: number,
-  tileType: number,
-  tileSize: number,
-  col: number,
-  row: number,
-): void {
-  const even = (col + row) % 2 === 0;
-  if (tileType === TileType.Corridor) {
-    ctx.fillStyle = even ? "#D4C9B0" : "#CCC0A8";
-  } else if (tileType === TileType.Carpet) {
-    ctx.fillStyle = even ? "#C8D4E8" : "#BEC9DF";
-  } else {
-    ctx.fillStyle = even ? "#EFE9DC" : "#E7E0CF";
-  }
-  ctx.fillRect(sx, sy, tileSize, tileSize);
-}
-
-function drawFurnitureTile(
-  ctx: CanvasRenderingContext2D,
-  sx: number,
-  sy: number,
-  tileType: number,
-  tileSize: number,
-): void {
-  const S = tileSize;
-  switch (tileType) {
-    case TileType.Wall:
-      ctx.fillStyle = "#6B5B4E";
-      ctx.fillRect(sx, sy, S, S);
-      ctx.fillStyle = "#5A4A3E";
-      ctx.fillRect(sx, sy, S, 2);
-      break;
-    case TileType.Desk:
-      ctx.fillStyle = "#C9A36B";
-      ctx.fillRect(sx + 1, sy + 3, S - 2, S - 5);
-      ctx.fillStyle = OUTLINE;
-      ctx.fillRect(sx + 1, sy + S - 3, S - 2, 1);
-      break;
-    case TileType.Chair:
-      ctx.fillStyle = "#7B9EA8";
-      ctx.fillRect(sx + 3, sy + 3, S - 6, S - 6);
-      break;
-    case TileType.Monitor:
-      ctx.fillStyle = "#2A2A3A";
-      ctx.fillRect(sx + 2, sy + 2, S - 4, S - 6);
-      ctx.fillStyle = "#4AF";
-      ctx.fillRect(sx + 3, sy + 3, S - 6, S - 9);
-      break;
-    case TileType.Server:
-      ctx.fillStyle = "#3A4A3A";
-      ctx.fillRect(sx + 1, sy + 1, S - 2, S - 2);
-      ctx.fillStyle = "#4F4";
-      ctx.fillRect(sx + 2, sy + 2, 2, 2);
-      ctx.fillRect(sx + 2, sy + 6, 2, 2);
-      break;
-    case TileType.Door:
-      ctx.fillStyle = "#C9B06B";
-      ctx.fillRect(sx + 2, sy, S - 4, S);
-      ctx.fillStyle = "#A89050";
-      ctx.fillRect(sx + 3, sy + 4, 2, 2);
-      break;
-    case TileType.Plant:
-      ctx.fillStyle = "#5A7A3A";
-      ctx.fillRect(sx + 4, sy + 1, S - 8, S - 5);
-      ctx.fillStyle = "#8B6B3A";
-      ctx.fillRect(sx + 5, sy + S - 5, S - 10, 4);
-      break;
-    case TileType.Sofa:
-      ctx.fillStyle = "#8B6B8B";
-      ctx.fillRect(sx + 1, sy + 3, S - 2, S - 5);
-      ctx.fillStyle = "#7A5A7A";
-      ctx.fillRect(sx + 1, sy + 3, S - 2, 3);
-      break;
-    case TileType.Bookshelf:
-      ctx.fillStyle = "#8B6B3A";
-      ctx.fillRect(sx + 1, sy + 1, S - 2, S - 2);
-      ctx.fillStyle = "#6B4B2A";
-      for (let i = 0; i < 3; i++) {
-        ctx.fillRect(sx + 2 + i * 3, sy + 2, 2, S - 4);
-      }
-      break;
-    case TileType.Table:
-      ctx.fillStyle = "#B89A6B";
-      ctx.fillRect(sx + 1, sy + 2, S - 2, S - 5);
-      ctx.fillStyle = "#A08050";
-      ctx.fillRect(sx + 1, sy + 2, S - 2, 1);
-      break;
-    case TileType.Whiteboard:
-      ctx.fillStyle = "#F0EEE8";
-      ctx.fillRect(sx + 1, sy + 1, S - 2, S - 3);
-      ctx.fillStyle = "#2A7AC8";
-      ctx.fillRect(sx + 3, sy + 4, S - 7, 1);
-      ctx.fillRect(sx + 3, sy + 7, S - 9, 1);
-      break;
-    case TileType.CoffeeMachine:
-      ctx.fillStyle = "#3A2A1A";
-      ctx.fillRect(sx + 2, sy + 1, S - 4, S - 3);
-      ctx.fillStyle = "#C84A00";
-      ctx.fillRect(sx + 4, sy + 3, 2, 2);
-      break;
-    case TileType.Reception:
-      ctx.fillStyle = "#A0785A";
-      ctx.fillRect(sx + 1, sy + 2, S - 2, S - 4);
-      ctx.fillStyle = "#C8A07A";
-      ctx.fillRect(sx + 2, sy + 3, S - 4, 2);
-      break;
-    case TileType.Toilet:
-      ctx.fillStyle = "#E8E8F0";
-      ctx.fillRect(sx + 2, sy + 2, S - 4, S - 4);
-      ctx.fillStyle = "#C8C8D8";
-      ctx.fillRect(sx + 3, sy + 3, S - 6, S - 6);
-      break;
-    case TileType.VendingMachine:
-      ctx.fillStyle = "#2A5A8A";
-      ctx.fillRect(sx + 2, sy + 1, S - 4, S - 2);
-      ctx.fillStyle = "#F0C830";
-      ctx.fillRect(sx + 4, sy + 3, 3, 2);
-      ctx.fillRect(sx + 4, sy + 7, 3, 2);
-      break;
-    case TileType.WaterCooler:
-      ctx.fillStyle = "#AAD0E8";
-      ctx.fillRect(sx + 4, sy + 1, S - 8, S - 6);
-      ctx.fillStyle = "#78A8C8";
-      ctx.fillRect(sx + 5, sy + 2, S - 10, 3);
-      break;
-    case TileType.Fridge:
-      ctx.fillStyle = "#D0D8E0";
-      ctx.fillRect(sx + 2, sy + 1, S - 4, S - 2);
-      ctx.fillStyle = "#A8B8C8";
-      ctx.fillRect(sx + 3, sy + 2, S - 6, (S - 4) / 2);
-      break;
-    default:
-      // Unknown furniture — draw a generic gray block
-      ctx.fillStyle = "#8A8A8A";
-      ctx.fillRect(sx + 2, sy + 2, S - 4, S - 4);
-      break;
-  }
-}
-
-// Tiles considered "furniture" (rendered on top of floor)
+// 타일이 가구 레이어인지 (바닥 위에 그림)
 const SOLID_VISUAL = new Set<number>([
   TileType.Wall,
   TileType.Desk,
@@ -301,169 +102,214 @@ const SOLID_VISUAL = new Set<number>([
   TileType.FireExtinguisher,
 ]);
 
-function isFurniture(t: number): boolean {
+function isFurnitureTile(t: number): boolean {
   return SOLID_VISUAL.has(t);
 }
 
-function drawDuck(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  state: DuckWorkState,
-  frame: number,
-  boss: boolean,
-): void {
-  const px = 2; // scaled down from original px=3 to fit TILE=16
-  const bob = state === "typing" && frame % 2 === 1 ? px : 0;
-  const sleeping = state === "offwork";
-  const oy = cy + bob;
-  const rect = (gx: number, gy: number, gw: number, gh: number, color: string) => {
-    ctx.fillStyle = color;
-    ctx.fillRect(cx + gx * px, oy + gy * px, gw * px, gh * px);
-  };
+// ---------------------------------------------------------------------------
+// 상태 아이콘
+// ---------------------------------------------------------------------------
+const STATE_ICON: Record<DuckWorkState, string> = {
+  idle:     "☕",
+  typing:   "⌨️",
+  reading:  "📖",
+  server:   "🖥️",
+  question: "🍽️",
+  offwork:  "💤",
+};
 
-  // Shadow
-  ctx.fillStyle = "rgba(53,33,22,0.15)";
-  ctx.fillRect(cx - 4 * px, cy + 4 * px, 8 * px, 2 * px);
+// ---------------------------------------------------------------------------
+// NPC 초기화 — DEPT_REGISTRY에서 모든 직원 생성
+// ---------------------------------------------------------------------------
+function buildAllNpcs(map: TileMap): Npc[] {
+  const npcs: Npc[] = [];
+  let nameIdx = 0;
+  let globalId = 0;
 
-  // Body
-  rect(-4, -1, 8, 5, OUTLINE);
-  rect(-3, 0, 6, 4, BODY);
-  rect(-3, 3, 6, 1, SHADOW);
-  // Head
-  rect(-3, -5, 6, 5, OUTLINE);
-  rect(-2, -4, 4, 4, BODY);
-  rect(2, -3, 3, 2, BEAK);
-  // Feet
-  rect(-2, 4, 1, 1, BEAK);
-  rect(1, 4, 1, 1, BEAK);
-  // Eyes
-  if (sleeping) rect(-1, -3, 2, 1, OUTLINE);
-  else rect(0, -3, 1, 1, OUTLINE);
-  // Boss glasses
-  if (boss) rect(-2, -3, 4, 1, OUTLINE);
+  for (const dept of Object.values(DEPT_REGISTRY)) {
+    const walkable = walkableTilesInZone(map, dept.id);
+    const templates = getTaskTemplates(dept.id);
 
-  // Icon above head
-  ctx.font = "bold 10px system-ui";
-  ctx.textAlign = "center";
-  const icon: Record<DuckWorkState, string> = {
-    idle: "☕",
-    typing: "⌨️",
-    reading: "📖",
-    server: "🖥️",
-    question: "❓",
-    offwork: "💤",
-  };
-  ctx.fillText(boss ? "👑" : icon[state], cx, oy - 6 * px);
+    for (let i = 0; i < dept.headcount; i++) {
+      const name = DUCK_NAMES[nameIdx % DUCK_NAMES.length] ?? `오리${nameIdx}`;
+      nameIdx++;
+      const tile = walkable[i % Math.max(1, walkable.length)] ?? { x: 40, y: 20 };
+
+      // 초기 태스크 2개 할당
+      const tasks: NpcTask[] = [
+        {
+          id: `t-${globalId}-0`,
+          title: templates[i % templates.length] ?? "업무 중",
+          status: "active",
+          progress: Math.floor(Math.random() * 60),
+        },
+        {
+          id: `t-${globalId}-1`,
+          title: templates[(i + 1) % templates.length] ?? "태스크",
+          status: "waiting",
+          progress: 0,
+        },
+      ];
+
+      const npc: Npc = {
+        id: `npc-${globalId}`,
+        name,
+        department: dept.id as DepartmentId,
+        role: dept.roles[i % dept.roles.length] ?? "직원",
+        accessory: dept.accessory,
+        accessoryColor: dept.color,
+        tile: { ...tile },
+        deskTile: { ...tile },
+        facing: "down",
+        workState: "typing",
+        schedulePhase: "working",
+        tasks,
+        recentDone: [],
+        mood: "neutral",
+      };
+
+      npcs.push(npc);
+      globalId++;
+    }
+  }
+
+  return npcs;
 }
 
+function walkableTilesInZone(map: TileMap, zoneId: string): Vec[] {
+  const zone = map.zones.find((z) => z.id === zoneId);
+  if (!zone) return [];
+  const tiles: Vec[] = [];
+  for (let dy = 1; dy < zone.bounds.h - 1; dy++) {
+    for (let dx = 1; dx < zone.bounds.w - 1; dx++) {
+      const x = zone.bounds.x + dx;
+      const y = zone.bounds.y + dy;
+      if (!tileIsBlocked(map, x, y)) {
+        tiles.push({ x, y });
+      }
+    }
+  }
+  return tiles;
+}
+
+function ceoStartPos(map: TileMap): Vec {
+  const ceo = map.zones.find((z) => z.id === "ceo-office");
+  if (!ceo) return { x: 40, y: 17 };
+  return {
+    x: Math.floor(ceo.bounds.x + ceo.bounds.w / 2),
+    y: Math.floor(ceo.bounds.y + ceo.bounds.h / 2),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 대화 패널용 NPC 정보
+// ---------------------------------------------------------------------------
+type TalkTarget = {
+  npc: Npc;
+  text: string;
+};
+
+// ---------------------------------------------------------------------------
+// 메인 컴포넌트
+// ---------------------------------------------------------------------------
 export function PixelOffice() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Map and camera — built once, stored in refs
   const mapRef = useRef<TileMap | null>(null);
   const camRef = useRef<Camera | null>(null);
+  const spritesRef = useRef<SpriteAssets | null>(null);
+  const spritesLoadedRef = useRef(false);
 
-  // 단일 입력 시스템 — 키보드와 터치 D-pad가 동일한 인스턴스를 공유한다
   const inputRef = useRef<InputManager>(new InputManager());
 
-  const [count, setCount] = useState(3);
-  const workersRef = useRef<Worker[]>([]);
+  const npcsRef = useRef<Npc[]>([]);
   const playerRef = useRef<Vec>({ x: 40, y: 17 });
-  const nearbyRef = useRef<OfficeRole | null>(null);
+  const nearbyNpcRef = useRef<Npc | null>(null);
 
-  const [talking, setTalking] = useState<{ role: OfficeRole; text: string } | null>(null);
+  const clockRef = useRef<GameClock>(createGameClock(CLOCK_START_HOUR));
+  const lastTickRef = useRef<number>(0);
+
+  const [talking, setTalking] = useState<TalkTarget | null>(null);
   const [paused, setPaused] = useState(false);
-  const [showLog, setShowLog] = useState(false);
-  const [log, setLog] = useState<LogEntry[]>([]);
   const [zoneHud, setZoneHud] = useState<string | null>(null);
+  const [clockDisplay, setClockDisplay] = useState("08:00");
 
-  const logIdRef = useRef(0);
   const pausedRef = useRef(false);
   const lastZoneRef = useRef<string | null>(null);
   const zoneHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // RNG — seeded lcg for determinism within session
+  const seedRef = useRef(42);
+  const rand = useCallback((): number => {
+    seedRef.current = (seedRef.current * 1103515245 + 12345) & 0x7fffffff;
+    return seedRef.current / 0x7fffffff;
+  }, []);
 
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
 
-  // Initialize map once
+  // 맵 + NPC 초기화
   useEffect(() => {
     const map = buildOfficeMap();
     mapRef.current = map;
     playerRef.current = ceoStartPos(map);
-    workersRef.current = buildWorkers(map, count);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    npcsRef.current = buildAllNpcs(map);
+    clockRef.current = createGameClock(CLOCK_START_HOUR);
   }, []);
 
-  // Rebuild workers when count changes (map already built)
+  // 스프라이트 비동기 로드
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    workersRef.current = buildWorkers(map, count);
-  }, [count]);
-
-  // Combined blocked check: tilemap solids + worker bodies
-  const isBlockedFn = useCallback(
-    (x: number, y: number): boolean => {
-      const map = mapRef.current;
-      if (!map) return true;
-      return (
-        tileIsBlocked(map, x, y) ||
-        workersRef.current.some((w) => w.tile.x === x && w.tile.y === y)
-      );
-    },
-    [],
-  );
-
-  const talkToNearby = useCallback(() => {
-    const near = nearbyRef.current;
-    if (!near) return;
-    const worker = workersRef.current.find((w) => w.role === near);
-    if (!worker) return;
-    setTalking({ role: near, text: describeActivity(worker) });
+    loadAllSprites()
+      .then((assets) => {
+        spritesRef.current = assets;
+        spritesLoadedRef.current = true;
+      })
+      .catch((err) => {
+        // 스프라이트 로드 실패 — 폴백 렌더러로 계속 동작
+        console.warn("스프라이트 로드 실패, 폴백 렌더러 사용:", err);
+      });
   }, []);
 
-  // 키보드 바인딩 — InputManager에 위임한다. 캔버스 포커스 필요.
+  // 충돌 판정: 타일맵 + NPC 위치
+  const isBlockedFn = useCallback((x: number, y: number): boolean => {
+    const map = mapRef.current;
+    if (!map) return true;
+    if (tileIsBlocked(map, x, y)) return true;
+    return npcsRef.current.some((n) => n.tile.x === x && n.tile.y === y);
+  }, []);
+
+  // 키보드 바인딩
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const unbind = inputRef.current.bindKeyboard(canvas);
-    return unbind;
+    return inputRef.current.bindKeyboard(canvas);
   }, []);
 
-  // 캔버스 탭 핸들러 (AC-C3): 터치 탭 위치를 월드 좌표로 변환해 인접 NPC 확인
+  // 캔버스 터치 탭 — NPC 탭하면 대화
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const onTouchEnd = (e: TouchEvent) => {
-      // 멀티터치나 스크롤 직후 탭은 무시
       if (e.changedTouches.length !== 1) return;
       const touch = e.changedTouches[0];
       if (!touch) return;
-
       const cam = camRef.current;
       if (!cam) return;
-
       const rect = canvas.getBoundingClientRect();
-      // getBoundingClientRect 기준 CSS 좌표로 변환 (DPR 보정 없이 — worldToScreen도 CSS 픽셀 기준)
       const sx = touch.clientX - rect.left;
       const sy = touch.clientY - rect.top;
       const { x: wx, y: wy } = screenToWorld(cam, sx, sy);
-
-      // 타일 좌표로 변환
       const tileX = Math.floor(wx / TILE);
       const tileY = Math.floor(wy / TILE);
-
-      // 탭된 타일에 인접한 NPC가 있으면 대화 시작
-      const worker = workersRef.current.find(
-        (w) => isAdjacent(w.tile, { x: tileX, y: tileY }),
+      const npc = npcsRef.current.find(
+        (n) => isAdjacent(n.tile, { x: tileX, y: tileY }),
       );
-      if (worker) {
+      if (npc) {
         inputRef.current.setTapWorld(wx, wy);
-        setTalking({ role: worker.role, text: describeActivity(worker) });
+        setTalking({ npc, text: buildNpcDescription(npc) });
       }
     };
 
@@ -471,7 +317,7 @@ export function PixelOffice() {
     return () => canvas.removeEventListener("touchend", onTouchEnd);
   }, []);
 
-  // ResizeObserver — update canvas size and camera viewW/viewH
+  // ResizeObserver — 캔버스 크기 + 카메라 뷰포트 갱신
   useEffect(() => {
     const container = containerRef.current;
     const canvas = canvasRef.current;
@@ -487,7 +333,6 @@ export function PixelOffice() {
         ctx.scale(dpr, dpr);
         ctx.imageSmoothingEnabled = false;
       }
-      // Create or update camera
       if (!camRef.current) {
         camRef.current = createCamera(w, h);
       } else {
@@ -501,64 +346,47 @@ export function PixelOffice() {
     });
     ro.observe(container);
     applySize(container.getBoundingClientRect().width || 480);
-
     return () => ro.disconnect();
   }, []);
 
-  // Main game loop
+  // 메인 게임 루프
   useEffect(() => {
     let raf = 0;
     let lastDraw = 0;
     let frame = 0;
-    let simAt = 0;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    let seed = 7;
-    const rand = () => {
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-      return seed / 0x7fffffff;
-    };
-
     const tick = (t: number) => {
       raf = requestAnimationFrame(tick);
-      const now = t;
-      const workers = workersRef.current;
       const map = mapRef.current;
       if (!map) return;
 
-      // Simulator
-      if (!pausedRef.current && now - simAt > SIM_MS && workers.length > 0) {
-        simAt = now;
-        const w = workers[Math.floor(rand() * workers.length)];
-        const tool = SIM_TOOLS[Math.floor(rand() * SIM_TOOLS.length)];
-        const file = SIM_FILES[Math.floor(rand() * SIM_FILES.length)];
-        const status: "ok" | "error" = rand() < 0.12 ? "error" : "ok";
-        w.state = eventToState({ tool, status });
-        w.label = `${tool} · ${file}`;
-        w.lastTs = now;
-        const entry: LogEntry = {
-          id: (logIdRef.current += 1),
-          role: w.role,
-          tool,
-          file,
-          status,
-          ts: now,
-        };
-        setLog((prev) => [entry, ...prev].slice(0, LOG_MAX));
+      // 게임 클럭 업데이트 (1실초 = 1게임분)
+      if (!pausedRef.current && lastTickRef.current > 0) {
+        const deltaMs = t - lastTickRef.current;
+        clockRef.current = tickClock(clockRef.current, deltaMs);
       }
-      for (const w of workers) {
-        if (w.state !== "offwork" && w.lastTs > 0 && now - w.lastTs > IDLE_MS) {
-          w.state = "offwork";
-          w.label = "퇴근";
-        }
+      lastTickRef.current = t;
+
+      // NPC 스케줄 + 태스크 시뮬레이션 (매 프레임, pausedRef 외부)
+      if (!pausedRef.current) {
+        const clock = clockRef.current;
+        npcsRef.current = npcsRef.current.map((npc) => {
+          const phase = schedulePhase(clock.hour);
+          const workState = phaseToWorkState(phase);
+          const updated = simulateNpcTasks({ ...npc, schedulePhase: phase, workState }, clock, rand);
+          return updated;
+        });
       }
 
+      // 플레이어 인접 NPC 탐지
       const player = playerRef.current;
-      nearbyRef.current = workers.find((w) => isAdjacent(player, w.tile))?.role ?? null;
+      nearbyNpcRef.current =
+        npcsRef.current.find((n) => isAdjacent(player, n.tile)) ?? null;
 
-      // Zone detection for HUD
+      // 구역 진입 HUD
       const zone = getZoneAt(map, player.x, player.y);
       const zoneId = zone?.id ?? null;
       if (zoneId !== lastZoneRef.current) {
@@ -570,15 +398,17 @@ export function PixelOffice() {
         }
       }
 
-      // Frame rate gate
-      if (now - lastDraw < FRAME_MS) return;
-      lastDraw = now;
+      // 클럭 표시 갱신 (매 초 단위)
+      setClockDisplay(formatClockTime(clockRef.current));
+
+      // 프레임 게이트
+      if (t - lastDraw < FRAME_MS) return;
+      lastDraw = t;
       if (!reduce) frame += 1;
 
-      // InputManager: 이동 처리 — FRAME_MS 게이트 안에서 처리해 속도를 제한한다
+      // 입력 처리
       const input = inputRef.current;
-      const dirs = ["up", "down", "left", "right"] as const;
-      for (const dir of dirs) {
+      for (const dir of ["up", "down", "left", "right"] as const) {
         if (input.isPressed(dir)) {
           playerRef.current = movePlayer(
             playerRef.current,
@@ -587,109 +417,215 @@ export function PixelOffice() {
             map.rows,
             isBlockedFn,
           );
-          // 이동 시 대화 패널 닫기
           setTalking(null);
-          break; // 한 프레임에 한 방향만
+          break;
         }
       }
-      // InputManager: 상호작용 처리
       if (input.consumeJustPressed("interact")) {
-        talkToNearby();
+        const near = nearbyNpcRef.current;
+        if (near) setTalking({ npc: near, text: buildNpcDescription(near) });
       }
 
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // 입력 처리 후 최신 플레이어 위치를 읽는다
       const currentPlayer = playerRef.current;
-
-      // Update camera to follow player
       const viewW = camRef.current?.viewW ?? canvas.width;
       const viewH = camRef.current?.viewH ?? canvas.height;
-      if (!camRef.current) {
-        camRef.current = createCamera(viewW, viewH);
-      }
+      if (!camRef.current) camRef.current = createCamera(viewW, viewH);
+
       camRef.current = followTarget(
         camRef.current,
         currentPlayer.x * TILE + TILE / 2,
         currentPlayer.y * TILE + TILE / 2,
         map.cols * TILE,
         map.rows * TILE,
-        0.1,
+        0.12,
       );
       const cam = camRef.current;
 
-      // Clear canvas
       ctx.clearRect(0, 0, viewW, viewH);
-
-      // Get visible tile range
       const { minCol, maxCol, minRow, maxRow } = visibleTileRange(cam, TILE);
-      const clampedMinCol = Math.max(0, minCol);
-      const clampedMaxCol = Math.min(map.cols, maxCol);
-      const clampedMinRow = Math.max(0, minRow);
-      const clampedMaxRow = Math.min(map.rows, maxRow);
+      const c0 = Math.max(0, minCol);
+      const c1 = Math.min(map.cols, maxCol);
+      const r0 = Math.max(0, minRow);
+      const r1 = Math.min(map.rows, maxRow);
 
-      // Pass 1: Render floor tiles
-      for (let row = clampedMinRow; row < clampedMaxRow; row++) {
-        for (let col = clampedMinCol; col < clampedMaxCol; col++) {
-          const tileType = getTile(map, col, row);
-          if (tileType === TileType.Wall) continue; // walls drawn in pass 2
+      const sprites = spritesRef.current;
+
+      // --- Pass 1: 바닥 타일 ---
+      for (let row = r0; row < r1; row++) {
+        for (let col = c0; col < c1; col++) {
+          const tt = getTile(map, col, row);
+          if (tt === TileType.Wall) continue;
           const { x: sx, y: sy } = worldToScreen(cam, col * TILE, row * TILE);
-          drawFloorTile(ctx, sx, sy, tileType, TILE, col, row);
+          drawFloorTile(ctx, sx, sy, tt, TILE, col, row);
         }
       }
 
-      // Pass 2: Render furniture and walls on top of floor
-      for (let row = clampedMinRow; row < clampedMaxRow; row++) {
-        for (let col = clampedMinCol; col < clampedMaxCol; col++) {
-          const tileType = getTile(map, col, row);
-          if (!isFurniture(tileType)) continue;
+      // --- Pass 2: 가구 / 벽 ---
+      for (let row = r0; row < r1; row++) {
+        for (let col = c0; col < c1; col++) {
+          const tt = getTile(map, col, row);
+          if (!isFurnitureTile(tt)) continue;
           const { x: sx, y: sy } = worldToScreen(cam, col * TILE, row * TILE);
-          drawFurnitureTile(ctx, sx, sy, tileType, TILE);
+
+          // 스프라이트 우선, 없으면 폴백
+          const spriteName = TILE_TO_SPRITE[tt];
+          const spriteImg = sprites && spriteName ? sprites.furniture.get(spriteName) : undefined;
+
+          if (spriteImg) {
+            drawFurnitureSprite(ctx, spriteImg, sx, sy, TILE);
+          } else {
+            // 벽은 단색 블록
+            if (tt === TileType.Wall) {
+              ctx.fillStyle = "#5C5C5C";
+              ctx.fillRect(sx, sy, TILE, TILE);
+              ctx.fillStyle = "#7A7A7A";
+              ctx.fillRect(sx, sy, TILE, 2);
+            } else {
+              // 다른 가구는 기존 폴백 (office-draw 프로시저럴)
+              // TILE=32이므로 16px 폴백을 2배 스케일로 그린다
+              ctx.save();
+              ctx.translate(sx, sy);
+              ctx.scale(2, 2);
+              drawFurniture(ctx, 0, 0, tt, 16);
+              ctx.restore();
+            }
+          }
         }
       }
 
-      // Render workers
-      for (const w of workers) {
-        const wx = w.tile.x * TILE + TILE / 2;
-        const wy = w.tile.y * TILE + TILE / 2;
-        // Only render if within visible range
+      // --- Pass 3: NPC 오리 (Y순 정렬 — 앞쪽이 위에 그려짐) ---
+      const sortedNpcs = [...npcsRef.current].sort((a, b) => a.tile.y - b.tile.y);
+      for (const npc of sortedNpcs) {
         if (
-          w.tile.x < clampedMinCol || w.tile.x >= clampedMaxCol ||
-          w.tile.y < clampedMinRow || w.tile.y >= clampedMaxRow
+          npc.tile.x < c0 || npc.tile.x >= c1 ||
+          npc.tile.y < r0 || npc.tile.y >= r1
         ) continue;
+
+        const wx = npc.tile.x * TILE;
+        const wy = npc.tile.y * TILE;
         const { x: sx, y: sy } = worldToScreen(cam, wx, wy);
-        drawDuck(ctx, sx, sy, w.state, frame, false);
-        ctx.font = "8px system-ui";
-        ctx.fillStyle = OUTLINE;
+
+        // 스프라이트 렌더
+        const sheet = sprites?.duckYellow;
+        const animFrame = Math.floor(frame / 2) % 4;
+        const facing = npc.facing;
+
+        if (sheet) {
+          drawDuckSprite(ctx, sheet, sx, sy, TILE, facing, animFrame, DUCK_SCALE);
+        } else {
+          // 폴백: 색 원형
+          ctx.fillStyle = npc.accessoryColor || "#F6EFDD";
+          ctx.beginPath();
+          ctx.arc(sx + TILE / 2, sy + TILE / 2, TILE / 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 이름 태그
+        const isNearby = nearbyNpcRef.current?.id === npc.id;
+        ctx.save();
         ctx.textAlign = "center";
-        ctx.fillText(ROLE_LABEL[w.role], sx, sy + 22);
+        ctx.font = `bold ${isNearby ? 10 : 8}px sans-serif`;
+
+        // 이름 배경
+        const nameLabel = npc.name;
+        const nameWidth = ctx.measureText(nameLabel).width + 4;
+        const nameX = sx + TILE / 2;
+        const nameY = sy + TILE + 10;
+
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(nameX - nameWidth / 2, nameY - 9, nameWidth, 11);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillText(nameLabel, nameX, nameY);
+
+        // 현재 태스크 표시 (인접할 때 + 작업 중)
+        if (isNearby && npc.workState === "typing") {
+          const activeTask = npc.tasks.find((tk) => tk.status === "active");
+          if (activeTask) {
+            const taskLabel = `${activeTask.title} ${Math.floor(activeTask.progress)}%`;
+            ctx.font = "9px sans-serif";
+            const tw = ctx.measureText(taskLabel).width + 6;
+            const tx = sx + TILE / 2;
+            const ty = sy - 8;
+            ctx.fillStyle = "rgba(0,0,0,0.7)";
+            ctx.fillRect(tx - tw / 2, ty - 10, tw, 12);
+            ctx.fillStyle = "#AAFFAA";
+            ctx.fillText(taskLabel, tx, ty);
+          }
+        }
+
+        // 상태 아이콘
+        ctx.font = "10px serif";
+        ctx.fillText(STATE_ICON[npc.workState] ?? "❓", sx + TILE / 2, sy + TILE - 2);
+
+        ctx.restore();
       }
 
-      // Render player (boss duck)
-      const pwx = currentPlayer.x * TILE + TILE / 2;
-      const pwy = currentPlayer.y * TILE + TILE / 2;
+      // --- Pass 4: 플레이어(CEO 오리) ---
+      const pwx = currentPlayer.x * TILE;
+      const pwy = currentPlayer.y * TILE;
       const { x: psx, y: psy } = worldToScreen(cam, pwx, pwy);
-      drawDuck(ctx, psx, psy, "idle", frame, true);
 
-      // Proximity prompt
-      const near = nearbyRef.current;
-      if (near) {
-        ctx.font = "9px system-ui";
-        ctx.fillStyle = OUTLINE;
-        ctx.textAlign = "center";
-        ctx.fillText("E: 말 걸기", psx, psy - 28);
+      const bossSheet = sprites?.duckBoss;
+      const bossFrame = Math.floor(frame / 2) % 4;
+      if (bossSheet) {
+        drawDuckSprite(ctx, bossSheet, psx, psy, TILE, "down", bossFrame, DUCK_SCALE);
+      } else {
+        ctx.fillStyle = "#FFD700";
+        ctx.beginPath();
+        ctx.arc(psx + TILE / 2, psy + TILE / 2, TILE / 3, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      // 프레임 끝: justPressed / tapWorldPos 초기화
-      inputRef.current.endFrame();
+      // CEO 이름 태그
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 9px sans-serif";
+      const ceoLabel = "대장오리 👑";
+      const ceoW = ctx.measureText(ceoLabel).width + 4;
+      const ceoX = psx + TILE / 2;
+      const ceoY = psy + TILE + 10;
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      ctx.fillRect(ceoX - ceoW / 2, ceoY - 9, ceoW, 11);
+      ctx.fillStyle = "#FFD700";
+      ctx.fillText(ceoLabel, ceoX, ceoY);
+      ctx.restore();
+
+      // 인접 NPC 프롬프트
+      if (nearbyNpcRef.current) {
+        ctx.save();
+        ctx.font = "bold 9px sans-serif";
+        ctx.textAlign = "center";
+        const promptLabel = "E: 말 걸기";
+        const pw2 = ctx.measureText(promptLabel).width + 6;
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(psx + TILE / 2 - pw2 / 2, psy - 20, pw2, 12);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillText(promptLabel, psx + TILE / 2, psy - 11);
+        ctx.restore();
+      }
+
+      // --- HUD: 시계 ---
+      const clockStr = formatClockTime(clockRef.current);
+      ctx.save();
+      ctx.font = "bold 11px monospace";
+      ctx.textAlign = "right";
+      const clockW = ctx.measureText(clockStr).width + 10;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(viewW - clockW - 4, 4, clockW, 16);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillText(clockStr, viewW - 8, 16);
+      ctx.restore();
+
+      input.endFrame();
     };
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [isBlockedFn, talkToNearby]);
+  }, [isBlockedFn, rand]);
 
-  // Canvas aspect ratio: 15:9 to match the 80x60 tile map proportion
   const aspectRatio = "15 / 9";
 
   return (
@@ -702,14 +638,14 @@ export function PixelOffice() {
         <canvas
           ref={canvasRef}
           tabIndex={0}
-          onDoubleClick={() => setShowLog((s) => !s)}
           role="img"
-          aria-label="픽셀 오리 오피스 — 방향키/WASD로 대장오리를 움직이고, 직원 오리 옆에서 E로 말을 겁니다. 더블클릭하면 활동 로그가 열립니다"
+          aria-label="픽셀 오리 오피스 — 방향키/WASD로 대장오리를 움직이고, 직원 오리 옆에서 E로 말을 겁니다"
           className="block h-full w-full cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           style={{ imageRendering: "pixelated" }}
         />
         <VirtualDpad input={inputRef.current} />
-        {/* Zone name HUD overlay */}
+
+        {/* 구역 이름 HUD */}
         {zoneHud && (
           <div
             className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-lg bg-black/60 px-3 py-1 text-sm font-semibold text-white"
@@ -718,57 +654,74 @@ export function PixelOffice() {
             {zoneHud}
           </div>
         )}
+
+        {/* 시계 HUD (React 레이어 — canvas HUD와 동기화) */}
+        <div className="pointer-events-none absolute right-2 top-2 rounded bg-black/55 px-2 py-0.5 font-mono text-xs font-bold text-white">
+          {clockDisplay}
+        </div>
       </div>
 
+      {/* 대화 패널 */}
       {talking && (
         <div className="rounded-xl border border-border bg-card p-3 text-sm">
-          <span className="font-semibold">{ROLE_LABEL[talking.role]}</span>
-          <span className="text-muted-foreground"> — {talking.text}</span>
-        </div>
-      )}
-
-      {showLog && (
-        <div className="rounded-xl border border-border bg-card">
-          <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <span className="text-xs font-semibold">활동 로그</span>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="font-semibold">{talking.npc.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {talking.npc.role} · {talking.npc.department}
+            </span>
             <button
               type="button"
-              onClick={() => setShowLog(false)}
-              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+              onClick={() => setTalking(null)}
+              className="ml-2 text-xs text-muted-foreground hover:text-foreground"
             >
               닫기
             </button>
           </div>
-          {log.length === 0 ? (
-            <p className="px-3 py-4 text-xs text-muted-foreground">
-              아직 기록된 활동이 없어요. 데모가 재생되면 쌓여요.
-            </p>
-          ) : (
-            <ul className="max-h-52 overflow-y-auto">
-              {log.map((e) => (
-                <li
-                  key={e.id}
-                  className="flex items-center gap-2 border-b border-border/40 px-3 py-1.5 text-xs last:border-0"
-                >
+          <p className="mb-2 text-muted-foreground">{talking.text}</p>
+
+          {/* 태스크 목록 */}
+          {talking.npc.tasks.length > 0 && (
+            <div className="space-y-1.5">
+              {talking.npc.tasks.map((task) => (
+                <div key={task.id} className="flex items-center gap-2">
                   <span
                     className={cn(
-                      "size-1.5 shrink-0 rounded-full",
-                      e.status === "error" ? "bg-destructive" : "bg-primary/60",
+                      "shrink-0 text-xs font-medium w-16",
+                      task.status === "active" ? "text-primary" : "text-muted-foreground",
                     )}
-                  />
-                  <span className="font-medium">{ROLE_LABEL[e.role]}</span>
-                  <span className="min-w-0 truncate text-muted-foreground">
-                    {e.tool} · {e.file}
+                  >
+                    {task.status === "active" ? "진행 중" : "대기"}
                   </span>
-                  {e.status === "error" && (
-                    <span className="text-destructive">오류</span>
+                  <span className="min-w-0 truncate text-xs">{task.title}</span>
+                  {task.status === "active" && (
+                    <div className="ml-auto flex items-center gap-1 shrink-0">
+                      <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${task.progress}%` }}
+                        />
+                      </div>
+                      <span className="tabular-nums text-xs text-muted-foreground w-8 text-right">
+                        {Math.floor(task.progress)}%
+                      </span>
+                    </div>
                   )}
-                  <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">
-                    {agoLabel(e.ts)}
-                  </span>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
+          )}
+
+          {/* 최근 완료 태스크 */}
+          {talking.npc.recentDone.length > 0 && (
+            <div className="mt-2 border-t border-border pt-2">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">최근 완료</p>
+              {talking.npc.recentDone.map((task) => (
+                <div key={task.id} className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span className="text-primary">✓</span>
+                  <span>{task.title}</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -776,37 +729,30 @@ export function PixelOffice() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           캔버스를 클릭해 포커스한 뒤 방향키/WASD로 대장오리를 움직여요. 직원 오리 옆에서 E를 누르면
-          지금 뭐 하는지 물어보고, 캔버스를 더블클릭하면 활동 로그가 열려요. (데모 구동 — 실 Claude
-          Code 이벤트 연동은 데스크톱 앱)
+          지금 뭐 하는지 물어볼 수 있어요. 총 35명의 직원 오리가 각자 업무 중입니다.
         </p>
-        <div className="flex items-center gap-1 text-xs">
-          <span className="text-muted-foreground">직원 오리</span>
-          <button
-            type="button"
-            onClick={() => setCount((c) => Math.max(1, c - 1))}
-            aria-label="직원 오리 줄이기"
-            className="rounded-md border border-border px-2 py-1 hover:bg-muted"
-          >
-            −
-          </button>
-          <span className="w-5 text-center tabular-nums">{count}</span>
-          <button
-            type="button"
-            onClick={() => setCount((c) => Math.min(6, c + 1))}
-            aria-label="직원 오리 늘리기"
-            className="rounded-md border border-border px-2 py-1 hover:bg-muted"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            onClick={() => setPaused((p) => !p)}
-            className="ml-2 rounded-md border border-border px-2 py-1 text-muted-foreground hover:text-foreground"
-          >
-            {paused ? "데모 재생" : "데모 정지"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setPaused((p) => !p)}
+          className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          {paused ? "시뮬 재개" : "시뮬 정지"}
+        </button>
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// NPC 설명 문자열 생성
+// ---------------------------------------------------------------------------
+function buildNpcDescription(npc: Npc): string {
+  const activeTask = npc.tasks.find((t) => t.status === "active");
+  if (npc.workState === "offwork") return "오늘 업무를 마쳤어요. 퇴근 중입니다.";
+  if (npc.schedulePhase === "lunch") return "점심 식사 중이에요.";
+  if (npc.schedulePhase === "break") return "잠깐 휴식 중이에요.";
+  if (activeTask) {
+    return `"${activeTask.title}" 작업 중이에요. (${Math.floor(activeTask.progress)}% 완료)`;
+  }
+  return "잠깐 여유를 즐기는 중이에요.";
 }

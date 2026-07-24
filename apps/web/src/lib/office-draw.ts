@@ -1,6 +1,7 @@
 // 2026-07-24 : AC-4 - 16x16 pixel art duck + furniture drawing module
 // Pure Canvas 2D — no React, no external dependencies. All drawings are procedural fillRect calls.
 // TILE_SIZE = 16. One canvas pixel = one "art pixel" (camera transform handles scaling).
+// 2026-07-24 : 스프라이트 기반 렌더링 함수 추가 (drawDuckSprite, drawFurnitureSprite)
 
 // ---------------------------------------------------------------------------
 // Duck colors (character bible — DECISIONS.md §4)
@@ -713,4 +714,60 @@ export function drawFurniture(
     default:
       break;
   }
+}
+
+// ---------------------------------------------------------------------------
+// drawDuckSprite — 스프라이트시트에서 오리 한 프레임을 캔버스에 그린다
+// ducky_2/3_spritesheet.png: 192x128, 6열x4행, 프레임당 32x32
+// 행: 0=down, 1=left, 2=right, 3=up
+// 열: 0-5 = 애니메이션 프레임 (이동 0-3, 대기 0-1)
+// x, y = 타일 좌상단 캔버스 좌표
+// ---------------------------------------------------------------------------
+export function drawDuckSprite(
+  ctx: CanvasRenderingContext2D,
+  sheet: HTMLImageElement,
+  x: number,
+  y: number,
+  tileSize: number,
+  facing: "down" | "up" | "left" | "right",
+  frame: number,
+  scale: number = 1,
+): void {
+  const FRAME_W = 32;
+  const FRAME_H = 32;
+  const dirRow: Record<string, number> = { down: 0, left: 1, right: 2, up: 3 };
+  const row = dirRow[facing] ?? 0;
+  const col = frame % 6;
+
+  const sx = col * FRAME_W;
+  const sy = row * FRAME_H;
+  const destSize = tileSize * scale;
+  // 타일 중앙 하단에 발 맞춤
+  const offsetX = (tileSize - destSize) / 2;
+  const offsetY = tileSize - destSize;
+
+  ctx.drawImage(
+    sheet,
+    sx, sy, FRAME_W, FRAME_H,
+    x + offsetX, y + offsetY, destSize, destSize,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// drawFurnitureSprite — 개별 가구 이미지를 타일에 맞춰 그린다
+// 이미지 원본이 16px 이하면 1타일, 32px 이하면 2타일, 그 이상은 그대로 확대.
+// ---------------------------------------------------------------------------
+export function drawFurnitureSprite(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  tileSize: number,
+): void {
+  // naturalWidth 기준으로 표시 크기 결정 (16px -> 1타일, 32px -> 2타일)
+  const naturalW = img.naturalWidth || img.width;
+  const tiles = naturalW <= 16 ? 1 : naturalW <= 32 ? 2 : Math.ceil(naturalW / 16);
+  const drawW = tileSize * tiles;
+  const drawH = tileSize * tiles;
+  ctx.drawImage(img, x, y, drawW, drawH);
 }

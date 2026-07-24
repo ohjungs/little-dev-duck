@@ -265,6 +265,7 @@ export {
   schedulePhase,
   phaseToWorkState,
   simulateNpcTasks,
+  getTaskTemplates,
   type NpcTask,
   type NpcSchedulePhase,
   type Npc,
