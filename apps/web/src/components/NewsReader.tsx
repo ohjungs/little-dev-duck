@@ -355,6 +355,22 @@ export function NewsReader() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* 헤더 요약: 피드·기사 수 — state=ready 때만 표시해 레이아웃 점프 방지 */}
+      {state === "ready" && (
+        <p className="text-sm text-muted-foreground">
+          피드 <strong className="font-semibold text-foreground">{feeds.length}개</strong> ·{" "}
+          기사 <strong className="font-semibold text-foreground">{articles.length}개</strong>
+          {articles.some((a) => !readSet.has(a.id)) && (
+            <>
+              {" "}·{" "}
+              <span className="text-primary-accent font-medium">
+                안 읽음{" "}
+                {articles.filter((a) => !readSet.has(a.id)).length}개
+              </span>
+            </>
+          )}
+        </p>
+      )}
       {/* 피드 추가 + 수집 */}
       <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
         <form onSubmit={onAdd} className="flex gap-2">

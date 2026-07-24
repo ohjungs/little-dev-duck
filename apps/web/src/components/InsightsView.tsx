@@ -12,6 +12,8 @@ import {
   Newspaper,
   Sparkles,
   StickyNote,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
 import {
   getDuckState,
@@ -220,6 +222,65 @@ export function InsightsView() {
   const maxCount = Math.max(...dayOfWeekCounts);
   const bestDay = maxCount > 0 ? dayLabels[dayOfWeekCounts.indexOf(maxCount)] : null;
 
+  // 이번 주(월~일) / 지난 주 ISO 날짜 범위를 계산한다.
+  const weekBounds = (() => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const offsetToMonday = (dayOfWeek + 6) % 7;
+    const thisMonday = new Date(now);
+    thisMonday.setDate(now.getDate() - offsetToMonday);
+    thisMonday.setHours(0, 0, 0, 0);
+    const lastMonday = new Date(thisMonday);
+    lastMonday.setDate(thisMonday.getDate() - 7);
+    const lastSunday = new Date(thisMonday);
+    lastSunday.setDate(thisMonday.getDate() - 1);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    return {
+      thisStart: fmt(thisMonday),
+      thisEnd: fmt(now),
+      lastStart: fmt(lastMonday),
+      lastEnd: fmt(lastSunday),
+    };
+  })();
+
+  const weeklyComparison = (() => {
+    const { thisStart, thisEnd, lastStart, lastEnd } = weekBounds;
+    const thisTodos = rawTodos.filter(
+      (t) =>
+        t.isDone &&
+        t.updatedAt &&
+        t.updatedAt.slice(0, 10) >= thisStart &&
+        t.updatedAt.slice(0, 10) <= thisEnd,
+    ).length;
+    const lastTodos = rawTodos.filter(
+      (t) =>
+        t.isDone &&
+        t.updatedAt &&
+        t.updatedAt.slice(0, 10) >= lastStart &&
+        t.updatedAt.slice(0, 10) <= lastEnd,
+    ).length;
+    const thisHabits = new Set(
+      rawChecks
+        .filter((c) => c.checkedDate >= thisStart && c.checkedDate <= thisEnd)
+        .map((c) => c.checkedDate),
+    ).size;
+    const lastHabits = new Set(
+      rawChecks
+        .filter((c) => c.checkedDate >= lastStart && c.checkedDate <= lastEnd)
+        .map((c) => c.checkedDate),
+    ).size;
+    const pct = (curr: number, prev: number) =>
+      prev === 0 ? null : Math.round(((curr - prev) / prev) * 100);
+    return {
+      thisTodos,
+      lastTodos,
+      todosPct: pct(thisTodos, lastTodos),
+      thisHabits,
+      lastHabits,
+      habitsPct: pct(thisHabits, lastHabits),
+    };
+  })();
+
   const totalTodos = summary.todosDone + summary.todosRemaining;
   const totalFocusHours = pomStats
     ? Math.round((pomStats.totalMinutes / 60) * 10) / 10
@@ -258,6 +319,54 @@ export function InsightsView() {
           </div>
         )}
       </div>
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">이번 주 vs 지난 주</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {(
+            [
+              {
+                label: "완료한 할 일",
+                thisVal: weeklyComparison.thisTodos,
+                lastVal: weeklyComparison.lastTodos,
+                pct: weeklyComparison.todosPct,
+              },
+              {
+                label: "습관 체크일",
+                thisVal: weeklyComparison.thisHabits,
+                lastVal: weeklyComparison.lastHabits,
+                pct: weeklyComparison.habitsPct,
+              },
+            ] as const
+          ).map(({ label, thisVal, lastVal, pct }) => (
+            <div
+              key={label}
+              className="flex flex-col gap-1 rounded-lg bg-muted/50 p-3"
+            >
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <span className="text-2xl font-bold tabular-nums">{thisVal}</span>
+              <div className="flex items-center gap-1 text-xs">
+                {pct === null ? (
+                  <span className="text-muted-foreground">지난 주 {lastVal}</span>
+                ) : pct > 0 ? (
+                  <>
+                    <TrendingUp className="size-3 text-green-500" />
+                    <span className="text-green-600">+{pct}%</span>
+                    <span className="text-muted-foreground">vs 지난 주 {lastVal}</span>
+                  </>
+                ) : pct < 0 ? (
+                  <>
+                    <TrendingDown className="size-3 text-red-500" />
+                    <span className="text-red-600">{pct}%</span>
+                    <span className="text-muted-foreground">vs 지난 주 {lastVal}</span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">지난 주와 동일 ({lastVal})</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <button

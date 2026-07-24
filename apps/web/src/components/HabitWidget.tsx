@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Flame, Plus, Repeat, X } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, Flame, Plus, Repeat, X } from "lucide-react";
 import {
   checkHabit,
   createHabit,
@@ -30,6 +30,18 @@ import { WidgetSkeleton } from "@/components/Skeleton";
 type LoadState = "loading" | "error" | "ready";
 type Frequency = "daily" | "weekly";
 
+const ORDER_KEY = "ldd-habit-order";
+function getHabitOrder(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(ORDER_KEY) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+function saveHabitOrder(ids: string[]): void {
+  localStorage.setItem(ORDER_KEY, JSON.stringify(ids));
+}
+
 export function HabitWidget() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [checks, setChecks] = useState<HabitCheck[]>([]);
@@ -39,6 +51,7 @@ export function HabitWidget() {
   const [newFrequency, setNewFrequency] = useState<Frequency>("daily");
   const [newHabitToast, setNewHabitToast] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [habitOrder, setHabitOrder] = useState<string[]>(() => getHabitOrder());
 
   const supabase = createClient();
 
@@ -159,6 +172,29 @@ export function HabitWidget() {
     }
   };
 
+  // 저장된 순서로 habits를 정렬. 순서 배열에 없는 습관은 뒤에 붙는다.
+  const sortedHabits = (() => {
+    if (habitOrder.length === 0) return habits;
+    const indexed = new Map(habitOrder.map((id, i) => [id, i]));
+    return [...habits].sort((a, b) => {
+      const ia = indexed.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const ib = indexed.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      return ia - ib;
+    });
+  })();
+
+  const moveHabit = (id: string, direction: "up" | "down") => {
+    const ids = sortedHabits.map((h) => h.id);
+    const idx = ids.indexOf(id);
+    if (idx === -1) return;
+    const target = direction === "up" ? idx - 1 : idx + 1;
+    if (target < 0 || target >= ids.length) return;
+    const next = [...ids];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    saveHabitOrder(next);
+    setHabitOrder(next);
+  };
+
   const today = todayIso();
 
   // 이번 주(월~일) 중 하나 이상의 습관이 체크된 날짜 수를 센다.
@@ -260,14 +296,14 @@ export function HabitWidget() {
             </Button>
           </div>
         )}
-        {state === "ready" && habits.length === 0 && (
+        {state === "ready" && sortedHabits.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
             새 습관을 만들어볼까요?
           </p>
         )}
-        {state === "ready" && habits.length > 0 && (
+        {state === "ready" && sortedHabits.length > 0 && (
           <ul className="flex flex-col gap-1">
-            {habits.map((habit) => {
+            {sortedHabits.map((habit, idx) => {
               const dates = checkedDatesFor(habit.id);
               const isCheckedToday = dates.includes(today);
               const streak = deriveHabitStreak(dates, today);
@@ -277,6 +313,26 @@ export function HabitWidget() {
                   data-testid={`habit-${habit.id}`}
                   className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60"
                 >
+                  <div className="flex flex-col opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => moveHabit(habit.id, "up")}
+                      aria-label="위로 이동"
+                      disabled={idx === 0}
+                      className="text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                    >
+                      <ChevronUp className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveHabit(habit.id, "down")}
+                      aria-label="아래로 이동"
+                      disabled={idx === sortedHabits.length - 1}
+                      className="text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                    >
+                      <ChevronDown className="size-3" />
+                    </button>
+                  </div>
                   <input
                     type="checkbox"
                     checked={isCheckedToday}
