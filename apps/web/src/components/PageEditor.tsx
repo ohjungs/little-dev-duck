@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronRight,
+  Copy,
   Download,
   Globe,
   History,
@@ -27,6 +29,7 @@ import {
   type Page,
 } from "@ldd/core";
 import {
+  createPage,
   createPageVersion,
   listBacklinks,
   publishPage,
@@ -92,6 +95,7 @@ export function PageEditor({
   breadcrumb?: Page[];
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const [title, setTitle] = useState(page.title);
   const [icon, setIcon] = useState<string | null>(page.icon);
   const [showIconPicker, setShowIconPicker] = useState(false);
@@ -301,6 +305,21 @@ export function PageEditor({
     URL.revokeObjectURL(url);
   };
 
+  // 현재 페이지를 복제해 새 페이지로 이동(제목/본문/아이콘/부모 복사). db_schema는 계약상 미포함.
+  const handleDuplicate = async () => {
+    try {
+      const newPage = await createPage(supabase, {
+        title: `${latest.current.title || "제목 없음"} (복사본)`,
+        content: latest.current.content,
+        icon: icon,
+        parentId: page.parentId,
+      });
+      router.push(`/pages/${newPage.id}`);
+    } catch {
+      flashMsg("복제에 실패했습니다.");
+    }
+  };
+
   // 페이지 본문을 일반 텍스트로 클립보드에 복사. 성공 피드백은 1.5초 후 원복.
   const handleCopyText = () => {
     void navigator.clipboard.writeText(plainText).then(() => {
@@ -382,6 +401,15 @@ export function PageEditor({
           className="text-muted-foreground"
         >
           <History className="size-3.5" /> 버전 기록
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleDuplicate}
+          className="text-muted-foreground"
+        >
+          <Copy className="size-3.5" /> 복제
         </Button>
         <Button
           type="button"

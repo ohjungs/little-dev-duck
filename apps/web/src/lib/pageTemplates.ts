@@ -11,6 +11,8 @@ type TemplateBlock = {
 export type PageTemplate = {
   key: string;
   label: string;
+  description: string;
+  icon: string;
   title: string;
   content: TemplateBlock[];
 };
@@ -32,10 +34,19 @@ function check(t: string): TemplateBlock {
 }
 
 export const PAGE_TEMPLATES: PageTemplate[] = [
-  { key: "blank", label: "빈 페이지", title: "", content: [] },
+  {
+    key: "blank",
+    label: "빈 페이지",
+    description: "백지에서 시작",
+    icon: "📄",
+    title: "",
+    content: [],
+  },
   {
     key: "meeting",
     label: "회의록",
+    description: "참석자·안건·결정사항·액션 아이템",
+    icon: "🗓️",
     title: "회의록",
     content: [
       heading("회의록", 1),
@@ -52,6 +63,8 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
   {
     key: "daily",
     label: "일일 노트",
+    description: "오늘의 할 일과 메모",
+    icon: "☀️",
     title: "일일 노트",
     content: [
       heading("오늘", 1),
@@ -64,12 +77,16 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
   {
     key: "todo",
     label: "할 일 목록",
+    description: "체크리스트만 빠르게",
+    icon: "✅",
     title: "할 일",
     content: [heading("할 일", 1), check(""), check(""), check("")],
   },
   {
     key: "weekly-retro",
     label: "주간 회고",
+    description: "한 주를 돌아보고 다음을 계획",
+    icon: "🔄",
     title: "주간 회고",
     content: [
       heading("주간 회고", 1),
@@ -86,6 +103,8 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
   {
     key: "project",
     label: "프로젝트 계획",
+    description: "목표·범위·마일스톤·리스크",
+    icon: "🚀",
     title: "프로젝트",
     content: [
       heading("프로젝트", 1),
@@ -102,6 +121,8 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
   {
     key: "dev-note",
     label: "개발 노트",
+    description: "작업·막힌 점·배운 점·다음 할 일",
+    icon: "🔧",
     title: "개발 노트",
     content: [
       heading("개발 노트", 1),

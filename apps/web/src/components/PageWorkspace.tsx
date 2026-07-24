@@ -352,17 +352,26 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
                 className="fixed inset-0 z-10"
                 onClick={() => setNewMenuOpen(false)}
               />
-              <div className="absolute right-2 top-11 z-20 w-40 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg">
-                {PAGE_TEMPLATES.map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => handleCreate(t)}
-                    className="flex w-full items-center px-3 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    {t.label}
-                  </button>
-                ))}
+              <div className="absolute right-2 top-11 z-20 w-56 rounded-lg border border-border bg-card p-2 shadow-lg">
+                <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+                  템플릿
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {PAGE_TEMPLATES.map((t) => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => handleCreate(t)}
+                      className="rounded-lg border border-border p-2.5 text-left transition-colors hover:bg-accent"
+                    >
+                      <div className="mb-1 text-base leading-none">{t.icon}</div>
+                      <div className="text-xs font-medium text-foreground">{t.label}</div>
+                      <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+                        {t.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </>
           )}

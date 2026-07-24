@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Bookmark,
+  BookmarkCheck,
   BookmarkPlus,
   ExternalLink,
   Layers,
@@ -33,6 +35,11 @@ import {
   markArticlesRead,
   subscribeReadArticles,
 } from "@/lib/readArticles";
+import {
+  getBookmarkedIds,
+  toggleBookmark,
+  subscribeBookmarks,
+} from "@/lib/bookmarkedArticles";
 
 // RSS 피드가 준 외부 링크는 http(s)만 허용(zod .url()이 javascript: 스킴을 통과시키므로 렌더 시 화이트리스트 — 보안 리뷰).
 function safeHref(url: string): string {
@@ -57,13 +64,17 @@ function scrapContent(a: Article): unknown[] {
 function ArticleCard({
   a,
   read,
+  bookmarked,
   onScrap,
   onRead,
+  onBookmark,
 }: {
   a: Article;
   read?: boolean;
+  bookmarked?: boolean;
   onScrap?: (a: Article) => void;
   onRead?: (a: Article) => void;
+  onBookmark?: (a: Article) => void;
 }) {
   return (
     <div
@@ -73,8 +84,35 @@ function ArticleCard({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold leading-snug">{a.title}</h3>
+        <div className="flex items-center gap-2 min-w-0">
+          <h3 className="text-sm font-semibold leading-snug">{a.title}</h3>
+          {bookmarked && (
+            <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary-accent">
+              저장됨
+            </span>
+          )}
+        </div>
         <div className="flex shrink-0 items-center gap-2">
+          {onBookmark && (
+            <button
+              type="button"
+              onClick={() => onBookmark(a)}
+              aria-label={bookmarked ? "북마크 해제" : "나중에 읽기"}
+              title={bookmarked ? "북마크 해제" : "나중에 읽기"}
+              className={cn(
+                "transition-colors",
+                bookmarked
+                  ? "text-primary-accent hover:text-muted-foreground"
+                  : "text-muted-foreground hover:text-primary-accent",
+              )}
+            >
+              {bookmarked ? (
+                <BookmarkCheck className="size-4" />
+              ) : (
+                <Bookmark className="size-4" />
+              )}
+            </button>
+          )}
           {onScrap && (
             <button
               type="button"
@@ -127,7 +165,9 @@ export function NewsReader() {
   const [grouped, setGrouped] = useState(false);
   const [query, setQuery] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [bookmarkedOnly, setBookmarkedOnly] = useState(false);
   const [readIds, setReadIds] = useState<string[]>([]);
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [pendingDeleteFeed, setPendingDeleteFeed] = useState<Feed | null>(null);
 
   // 읽음 상태(localStorage) 동기화 — 링크 클릭/스크랩 시 즉시 반영.
@@ -138,17 +178,26 @@ export function NewsReader() {
   }, []);
   const readSet = useMemo(() => new Set(readIds), [readIds]);
 
-  // 검색어 부분일치 + (안 읽음만 토글 시) 읽은 기사 제외. 군집·목록 모두 이 결과 기준.
+  // 북마크 상태(localStorage) 동기화.
+  useEffect(() => {
+    const sync = () => setBookmarkedIds(getBookmarkedIds());
+    sync();
+    return subscribeBookmarks(sync);
+  }, []);
+  const bookmarkSet = useMemo(() => new Set(bookmarkedIds), [bookmarkedIds]);
+
+  // 검색어 부분일치 + (안 읽음만 토글 시) 읽은 기사 제외 + (저장됨만 토글 시) 북마크 기사만. 군집·목록 모두 이 결과 기준.
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return articles.filter((a) => {
       if (unreadOnly && readSet.has(a.id)) return false;
+      if (bookmarkedOnly && !bookmarkSet.has(a.id)) return false;
       if (!needle) return true;
       return `${a.title} ${a.summary ?? ""} ${a.snippet ?? ""}`
         .toLowerCase()
         .includes(needle);
     });
-  }, [articles, query, unreadOnly, readSet]);
+  }, [articles, query, unreadOnly, bookmarkedOnly, readSet, bookmarkSet]);
 
   // Phase 15 T3: 제목/스니펫 유사도로 관련 기사 군집화(무의존성 순수함수). 다중 멤버 군집만 시각적으로 묶는다.
   const clusters = useMemo(() => clusterArticles(shown), [shown]);
@@ -227,6 +276,7 @@ export function NewsReader() {
     }
   };
   const onRead = (a: Article) => markArticleRead(a.id);
+  const onBookmark = (a: Article) => { toggleBookmark(a.id); };
 
   const onCollect = async () => {
     setCollecting(true);
@@ -296,6 +346,17 @@ export function NewsReader() {
                 안 읽음만
               </Button>
             )}
+            {bookmarkedIds.length > 0 && (
+              <Button
+                size="sm"
+                variant={bookmarkedOnly ? "default" : "outline"}
+                onClick={() => setBookmarkedOnly((v) => !v)}
+                aria-pressed={bookmarkedOnly}
+              >
+                <BookmarkCheck className="size-3.5" />
+                저장됨
+              </Button>
+            )}
             {hasRelated && (
               <Button
                 size="sm"
@@ -336,8 +397,25 @@ export function NewsReader() {
           {feeds.map((feed) => (
             <span
               key={feed.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-1 pl-3 pr-1.5 text-xs"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-1 pl-2.5 pr-1.5 text-xs"
             >
+              <span
+                className={cn(
+                  "size-2 shrink-0 rounded-full",
+                  feed.status === "paused"
+                    ? "bg-orange-400"
+                    : feed.failCount > 0
+                      ? "bg-red-400"
+                      : "bg-green-400",
+                )}
+                title={
+                  feed.status === "paused"
+                    ? "일시정지"
+                    : feed.failCount > 0
+                      ? `수집 오류 ${feed.failCount}회`
+                      : "정상"
+                }
+              />
               <span
                 className={
                   feed.status === "paused"
@@ -388,7 +466,11 @@ export function NewsReader() {
       )}
       {state === "ready" && articles.length > 0 && shown.length === 0 && (
         <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          {unreadOnly ? "안 읽은 기사가 없어요." : "검색어와 일치하는 기사가 없어요."}
+          {bookmarkedOnly
+            ? "저장된 기사가 없어요."
+            : unreadOnly
+              ? "안 읽은 기사가 없어요."
+              : "검색어와 일치하는 기사가 없어요."}
         </p>
       )}
       {grouped ? (
@@ -408,8 +490,10 @@ export function NewsReader() {
                       key={a.id}
                       a={a}
                       read={readSet.has(a.id)}
+                      bookmarked={bookmarkSet.has(a.id)}
                       onScrap={onScrap}
                       onRead={onRead}
+                      onBookmark={onBookmark}
                     />
                   ))}
                 </div>
@@ -419,8 +503,10 @@ export function NewsReader() {
                 key={cluster.key}
                 a={cluster.articles[0]}
                 read={readSet.has(cluster.articles[0].id)}
+                bookmarked={bookmarkSet.has(cluster.articles[0].id)}
                 onScrap={onScrap}
                 onRead={onRead}
+                onBookmark={onBookmark}
               />
             ),
           )}
@@ -432,8 +518,10 @@ export function NewsReader() {
               key={a.id}
               a={a}
               read={readSet.has(a.id)}
+              bookmarked={bookmarkSet.has(a.id)}
               onScrap={onScrap}
               onRead={onRead}
+              onBookmark={onBookmark}
             />
           ))}
         </div>
