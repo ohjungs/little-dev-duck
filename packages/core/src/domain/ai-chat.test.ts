@@ -4,7 +4,25 @@ import {
   buildRagPrompt,
   chatMessageSchema,
   routeUtterance,
+  ruleReply,
 } from "./ai-chat";
+
+describe("ruleReply", () => {
+  it("인사에 제대로 응답한다(안녕/하이/hello)", () => {
+    expect(ruleReply("안녕")).toContain("안녕하세요");
+    expect(ruleReply("하이")).toContain("안녕하세요");
+    expect(ruleReply("hello")).toContain("안녕하세요");
+  });
+  it("감사·칭찬·작별을 구분해 응답한다", () => {
+    expect(ruleReply("고마워")).toContain("천만에요");
+    expect(ruleReply("귀여워")).toContain("좋아요");
+    expect(ruleReply("잘가")).toContain("안녕히");
+  });
+  it("사회적 발화가 아니면 null(호출부 폴백에 위임)", () => {
+    expect(ruleReply("asdf")).toBeNull();
+    expect(ruleReply("")).toBeNull();
+  });
+});
 
 describe("routeUtterance", () => {
   it("짧은 인사는 룰", () => {

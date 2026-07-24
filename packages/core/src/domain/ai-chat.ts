@@ -29,6 +29,26 @@ export function routeUtterance(input: string): UtteranceRoute {
   return text.length > 12 ? "llm" : "rule";
 }
 
+// rule 분기(무료·즉시)에서 사회적 발화(인사·감사·작별·칭찬)를 알아듣고 알맞게 답한다.
+// LLM 쿼터를 쓰지 않고도 "안녕"에 제대로 응답하기 위함(routeUtterance가 rule로 보낸 발화 대상).
+// 인식 못 하면 null → 호출부가 기본 폴백(idle 대사 등)으로 넘긴다.
+export function ruleReply(input: string): string | null {
+  const t = input.trim().toLowerCase();
+  if (/^(안녕히\s?(가|계)|잘\s?가|바이|bye|다음에)/.test(t)) {
+    return "안녕히 가세요! 또 불러주세요. 꽥!";
+  }
+  if (/(고마|감사|thank|thx|고맙)/.test(t)) {
+    return "천만에요! 도움이 됐다니 기뻐요. 꽥!";
+  }
+  if (/(사랑|좋아|귀여|최고|잘한|훌륭|멋지|예뻐)/.test(t)) {
+    return "헤헤, 저도 주인님이 좋아요! 꽥꽥!";
+  }
+  if (/^(안녕|하이|hi|hello|헤이|hey|반가|왔|안뇽|하잉|여보세요)/.test(t)) {
+    return "안녕하세요, 주인님! 오늘은 무엇을 도와드릴까요? 꽥!";
+  }
+  return null;
+}
+
 // RAG 컨텍스트 블록(질문 없음): 인젝션 방어 지시 + 검색된 본인 데이터. 질문을 붙이지 않은 형태라
 // 에이전트 턴(Phase 10)의 systemPrompt로도 재사용한다 — RAG와 도구 호출이 같은 지시문 아래 공존.
 export function buildRagContext(contextChunks: string[]): string {

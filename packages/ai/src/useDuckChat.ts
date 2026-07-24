@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { ChatMessage, ToolCall, ToolResult } from "@ldd/core";
+import { ruleReply, type ChatMessage, type ToolCall, type ToolResult } from "@ldd/core";
 
 // /api/ai/agent 응답 형태 — Phase 10 DuckTurnResult 계약 + 클라 전용 unavailable(Calendar 미연동/쿼터).
 // rule = 룰 대사로 답할 발화(Gemini 미호출), final = LLM 텍스트 답, approval_pending = mutating 도구 승인
@@ -104,6 +104,9 @@ export function useDuckChat(options: UseDuckChatOptions = {}): UseDuckChatResult
         const data = (await res.json()) as DuckChatResponse;
         if (data.status === "approval_pending") {
           setPendingApproval(data.calls);
+        } else if (data.status === "rule") {
+          // rule 분기: 인사·감사 등 사회적 발화를 먼저 알아듣고(무료·즉시), 아니면 idle 대사/기본 폴백.
+          addDuckMessage(ruleReply(question) ?? rulePhrase?.() ?? DEFAULT_RULE_REPLY);
         } else {
           addDuckMessage(resolveDuckMessage(data, rulePhrase) ?? DEFAULT_RULE_REPLY);
         }

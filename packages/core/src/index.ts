@@ -76,6 +76,7 @@ export {
   chatRoleSchema,
   chatMessageSchema,
   routeUtterance,
+  ruleReply,
   buildRagContext,
   buildRagPrompt,
   type ChatRole,
