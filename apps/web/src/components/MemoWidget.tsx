@@ -186,16 +186,19 @@ export function MemoWidget() {
 
       <CardContent className="flex flex-col gap-3">
         <div className="flex gap-2">
-          <textarea
-            value={newContent}
-            onChange={(e) => setNewContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAdd();
-            }}
-            placeholder="메모 (Ctrl+Enter로 추가)"
-            rows={2}
-            className={textareaClass}
-          />
+          <div className="flex flex-1 flex-col gap-1">
+            <textarea
+              value={newContent}
+              onChange={(e) => setNewContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAdd();
+              }}
+              placeholder="메모 (Ctrl+Enter로 추가)"
+              rows={2}
+              className={textareaClass}
+            />
+            <span className="text-xs text-muted-foreground">{newContent.length}/200자</span>
+          </div>
           <Button
             type="button"
             size="icon"

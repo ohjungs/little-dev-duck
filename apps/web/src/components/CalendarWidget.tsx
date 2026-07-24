@@ -190,7 +190,7 @@ export function CalendarWidget() {
         )}
         {state === "ready" && events.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            다가오는 일정이 없습니다.
+            오늘은 일정이 없어요
           </p>
         )}
         {state === "ready" && events.length > 0 && (

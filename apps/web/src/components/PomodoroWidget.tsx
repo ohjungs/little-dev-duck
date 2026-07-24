@@ -200,9 +200,11 @@ export function PomodoroWidget() {
     disableFocusMode();
   };
 
-  const todayCount = sessions.filter(
+  const todaySessions = sessions.filter(
     (s) => s.completedAt && localDateIso(s.completedAt) === todayIso(),
-  ).length;
+  );
+  const todayCount = todaySessions.length;
+  const todayMinutes = todaySessions.reduce((sum, s) => sum + s.durationMinutes, 0);
 
   // 최근 완료 세션 최대 5개 (completed_at 기준 내림차순은 listPomodoroSessions의 started_at 정렬 덕분에 유지됨)
   const recentCompleted = sessions
@@ -225,7 +227,12 @@ export function PomodoroWidget() {
           뽀모도로
         </CardTitle>
         {state === "ready" && (
-          <Badge variant="muted">오늘 {todayCount}회</Badge>
+          <div className="flex items-center gap-1.5">
+            <Badge variant="muted">오늘 {todayCount}회</Badge>
+            {todayMinutes > 0 && (
+              <span className="text-xs text-muted-foreground">오늘 {todayMinutes}분 집중</span>
+            )}
+          </div>
         )}
       </CardHeader>
 

@@ -181,11 +181,18 @@ export function HabitWidget() {
         <CardTitle>
           <Repeat className="size-4 text-primary-accent" />
           습관
-          {state === "ready" && (
-            <span className="text-xs text-muted-foreground font-normal ml-auto">
-              이번 주 {weekCheckCount}일 체크
-            </span>
-          )}
+          {state === "ready" && (() => {
+            const total = habits.length;
+            const doneToday = habits.filter((h) =>
+              checks.some((c) => c.habitId === h.id && c.checkedDate === today),
+            ).length;
+            const pct = total > 0 ? Math.round((doneToday / total) * 100) : 0;
+            return (
+              <span className="text-xs text-muted-foreground font-normal ml-auto">
+                오늘 {doneToday}/{total} ({pct}%) · 이번 주 {weekCheckCount}일
+              </span>
+            );
+          })()}
         </CardTitle>
       </CardHeader>
 
