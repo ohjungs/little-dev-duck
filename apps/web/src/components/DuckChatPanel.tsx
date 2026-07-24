@@ -28,6 +28,8 @@ const TOOL_LABELS: Record<string, string> = {
   createCalendarEvent: "캘린더 일정 만들기",
   createGithubIssue: "GitHub 이슈 만들기",
   trashEmail: "이메일 휴지통으로 이동",
+  createTodo: "할 일 추가",
+  createMemo: "메모 작성",
 };
 
 // 상대 시각 표시. createdAt은 ISO 8601 문자열(useDuckChat이 new Date().toISOString()으로 기록).
@@ -61,7 +63,8 @@ function describeCall(call: ToolCall): string {
   // 보여주는 같은 역할이라 하나로 합쳐 표시한다.
   const title =
     (typeof call.args.title === "string" ? call.args.title : null) ??
-    (typeof call.args.subject === "string" ? call.args.subject : null);
+    (typeof call.args.subject === "string" ? call.args.subject : null) ??
+    (typeof call.args.content === "string" ? call.args.content : null);
   const start = formatWhen(call.args.start);
   const end = formatWhen(call.args.end);
   // GitHub 이슈 도구의 owner/repo — 어느 저장소에 만들지도 승인 판단에 필요한 정보(T5).

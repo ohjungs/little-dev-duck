@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   allowRequest,
   composeAdapters,
+  createAppActionsAdapter,
   createGitHubIssuesAdapter,
   createGmailAdapter,
   createGoogleCalendarAdapter,
@@ -73,6 +74,8 @@ export async function POST(request: Request) {
     getGmailTokens(supabase, user.id),
   ]);
   const adapters: Adapter[] = [];
+  // 앱 내부 액션(할일·메모 생성)은 외부 토큰이 필요 없어 항상 제공 — 오리가 늘 대화로 워크스페이스를 조작.
+  adapters.push(createAppActionsAdapter(supabase));
   if (googleTokens) adapters.push(createGoogleCalendarAdapter(googleTokens.accessToken));
   if (githubTokens) adapters.push(createGitHubIssuesAdapter(githubTokens.accessToken));
   if (gmailTokens) adapters.push(createGmailAdapter(gmailTokens.accessToken));

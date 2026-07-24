@@ -78,6 +78,7 @@ export {
   type AgentResult,
 } from "./agent";
 export { createGoogleCalendarAdapter } from "./googleCalendar";
+export { createAppActionsAdapter } from "./appActions";
 export {
   saveGoogleTokens,
   getGoogleTokens,

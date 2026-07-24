@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   allowRequest,
   composeAdapters,
+  createAppActionsAdapter,
   createGitHubIssuesAdapter,
   createGmailAdapter,
   createGoogleCalendarAdapter,
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
     getGmailTokens(supabase, user.id),
   ]);
   const adapters: Adapter[] = [];
+  adapters.push(createAppActionsAdapter(supabase));
   if (googleTokens) adapters.push(createGoogleCalendarAdapter(googleTokens.accessToken));
   if (githubTokens) adapters.push(createGitHubIssuesAdapter(githubTokens.accessToken));
   if (gmailTokens) adapters.push(createGmailAdapter(gmailTokens.accessToken));
