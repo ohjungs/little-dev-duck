@@ -72,6 +72,7 @@ export function InsightsView() {
   >("idle");
   const [standupError, setStandupError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "done">("idle");
+  const [tab, setTab] = useState<"overview" | "tasks" | "focus">("overview");
 
   useEffect(() => {
     const supabase = createClient();
@@ -294,8 +295,66 @@ export function InsightsView() {
     },
   ];
 
+  const TABS = [
+    { id: "overview" as const, label: "개요" },
+    { id: "tasks" as const, label: "할 일·습관" },
+    { id: "focus" as const, label: "집중" },
+  ];
+
   return (
     <div className="flex flex-col gap-4">
+      {/* 전역 액션(스탠드업·복사)은 탭 위에 상시 노출 */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleStandup()}
+            disabled={standupState === "loading"}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+          >
+            {standupState === "loading" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+            스탠드업 생성
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCopyStats()}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
+          >
+            <Copy className="size-4" />
+            {copyState === "done" ? "복사됨" : "통계 텍스트 복사"}
+          </button>
+        </div>
+        {standupState === "error" && standupError && (
+          <p className="text-sm text-destructive">{standupError}</p>
+        )}
+      </div>
+
+      {/* 탭 바 */}
+      <div role="tablist" aria-label="통계 분류" className="flex gap-1 rounded-lg bg-muted p-1">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={
+              tab === t.id
+                ? "flex-1 rounded-md bg-card px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
+                : "flex-1 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+            }
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+      <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {lifetimeStats.map(({ label, value }) => (
           <div
@@ -364,34 +423,11 @@ export function InsightsView() {
           ))}
         </div>
       </section>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void handleStandup()}
-            disabled={standupState === "loading"}
-            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
-          >
-            {standupState === "loading" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Sparkles className="size-4" />
-            )}
-            스탠드업 생성
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleCopyStats()}
-            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
-          >
-            <Copy className="size-4" />
-            {copyState === "done" ? "복사됨" : "통계 텍스트 복사"}
-          </button>
-        </div>
-        {standupState === "error" && standupError && (
-          <p className="text-sm text-destructive">{standupError}</p>
-        )}
       </div>
+      )}
+
+      {tab === "tasks" && (
+      <div className="flex flex-col gap-4">
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       <StatTile
         icon={<ListTodo className="size-5" />}
@@ -429,7 +465,18 @@ export function InsightsView() {
         label="수집 기사"
       />
     </div>
-    {pomStats && (
+    {heatmap && (
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">습관 체크 (최근 90일)</h2>
+        <HabitHeatmap data={heatmap} />
+      </section>
+    )}
+      </div>
+      )}
+
+      {tab === "focus" && (
+      <div className="flex flex-col gap-4">
+    {pomStats ? (
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-muted-foreground">집중 세션</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -455,13 +502,13 @@ export function InsightsView() {
           />
         </div>
       </section>
+    ) : (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        아직 집중 세션 기록이 없어요. 뽀모도로를 완료해보세요!
+      </p>
     )}
-    {heatmap && (
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-muted-foreground">습관 체크 (최근 90일)</h2>
-        <HabitHeatmap data={heatmap} />
-      </section>
-    )}
+      </div>
+      )}
     </div>
   );
 }
