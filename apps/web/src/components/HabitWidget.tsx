@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, Flame, Plus, Repeat, X } from "lucide-react";
 import {
   checkHabit,
@@ -37,6 +37,8 @@ export function HabitWidget() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newFrequency, setNewFrequency] = useState<Frequency>("daily");
+  const [newHabitToast, setNewHabitToast] = useState(false);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = createClient();
 
@@ -103,6 +105,9 @@ export function HabitWidget() {
       setHabits((prev) => [created, ...prev]);
       // RAG 인덱싱(fire-and-forget).
       void reindexSource({ sourceType: "habit", sourceId: created.id, text: title });
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      setNewHabitToast(true);
+      toastTimer.current = setTimeout(() => setNewHabitToast(false), 2000);
     } catch {
       setActionError("추가하지 못했습니다.");
     }
@@ -176,7 +181,7 @@ export function HabitWidget() {
   })();
 
   return (
-    <Card data-testid="habit-widget" className="h-full">
+    <Card data-testid="habit-widget" className="relative h-full">
       <CardHeader>
         <CardTitle>
           <Repeat className="size-4 text-primary-accent" />
@@ -303,6 +308,14 @@ export function HabitWidget() {
           </ul>
         )}
       </CardContent>
+      {newHabitToast && (
+        <div
+          role="status"
+          className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-primary/30 bg-card px-3 py-1.5 text-xs font-medium shadow-md whitespace-nowrap"
+        >
+          새 습관을 시작했어요!
+        </div>
+      )}
     </Card>
   );
 }

@@ -409,6 +409,11 @@ export function DatabaseView({
           onFiltersChange={setActiveViewFilters}
         />
         <div className="flex items-center gap-1">
+          {rows !== null && !loadError && (
+            <span className="text-xs text-muted-foreground px-1">
+              총 {visibleRows.length}개 행
+            </span>
+          )}
           {view.type === "table" && dbSchema.properties.length > 0 && (
             <div className="relative">
               <button

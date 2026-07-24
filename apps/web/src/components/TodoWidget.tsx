@@ -17,6 +17,7 @@ import { subscribeTable } from "@/lib/realtime";
 import { emitTodosChanged } from "@/lib/todoSignal";
 import { emitXpChanged } from "@/lib/xpSignal";
 import { todayIso } from "@/lib/today";
+import { timeAgo } from "@/lib/timeAgo";
 import {
   Card,
   CardContent,
@@ -339,16 +340,21 @@ export function TodoWidget() {
                     onChange={() => handleToggle(todo)}
                     className="size-4 shrink-0 cursor-pointer accent-primary"
                   />
-                  <span
-                    className={
-                      todo.isDone
-                        ? "flex-1 text-sm text-muted-foreground line-through"
-                        : todo.dueDate && new Date(todo.dueDate) < new Date() && !todo.isDone
-                          ? "flex-1 text-sm text-destructive"
-                          : "flex-1 text-sm"
-                    }
-                  >
-                    {todo.title}
+                  <span className="flex flex-1 flex-col gap-0.5 min-w-0">
+                    <span
+                      className={
+                        todo.isDone
+                          ? "text-sm text-muted-foreground line-through"
+                          : todo.dueDate && new Date(todo.dueDate) < new Date() && !todo.isDone
+                            ? "text-sm text-destructive"
+                            : "text-sm"
+                      }
+                    >
+                      {todo.title}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/60 leading-none">
+                      {timeAgo(todo.createdAt)}
+                    </span>
                   </span>
                   <button
                     type="button"

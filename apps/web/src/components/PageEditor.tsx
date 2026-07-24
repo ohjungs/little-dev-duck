@@ -704,7 +704,7 @@ export function PageEditor({
         {stats.chars === 0 && <span className="opacity-50">계속 써보세요</span>}
         {stats.chars > 0 && (
           <span className="opacity-70">
-            {stats.chars.toLocaleString()}자 · 약 {stats.readMinutes}분 읽기
+            {stats.chars.toLocaleString()}자 · {stats.words.toLocaleString()}단어 · 약 {stats.readMinutes}분 읽기
           </span>
         )}
         {stats.chars > 0 && stats.chars < 100 && (
