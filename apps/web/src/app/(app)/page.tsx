@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DuckWidget } from "@/components/DuckWidget";
 import { DuckChatPanel } from "@/components/DuckChatPanel";
@@ -14,16 +13,26 @@ import { LastPageLink } from "@/components/LastPageLink";
 
 export const dynamic = "force-dynamic";
 
-function getGreeting(): string {
-  const h = new Date().getHours();
+// 서버 컴포넌트(force-dynamic)는 Vercel의 UTC 시간을 쓰므로, 인사·아이콘·날짜를 반드시
+// KST(Asia/Seoul) 기준으로 계산한다. 안 그러면 한국 밤에도 UTC 오후가 잡혀 "오후 ☀️"가 뜬다.
+function kstHour(): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Seoul",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date()),
+  );
+}
+
+function getGreeting(h: number): string {
   if (h < 6) return "좋은 새벽이에요";
   if (h < 12) return "좋은 아침이에요";
   if (h < 18) return "좋은 오후예요";
   return "좋은 저녁이에요";
 }
 
-function getTimeEmoji(): string {
-  const h = new Date().getHours();
+function getTimeEmoji(h: number): string {
   if (h >= 6 && h < 12) return "\u{1F324}\uFE0F"; // 🌤 morning sun
   if (h >= 12 && h < 18) return "\u2600\uFE0F";   // ☀ afternoon sun
   if (h >= 18 && h < 22) return "\u{1F307}";      // 🌇 sunset
@@ -63,14 +72,16 @@ export default async function DashboardPage() {
     "사용자";
 
   const dateLabel = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
     year: "numeric",
     month: "long",
     day: "numeric",
     weekday: "long",
   }).format(new Date());
 
-  const greeting = getGreeting();
-  const timeEmoji = getTimeEmoji();
+  const h = kstHour();
+  const greeting = getGreeting(h);
+  const timeEmoji = getTimeEmoji(h);
   const motivation = getDailyMotivation();
 
   return (
@@ -86,21 +97,6 @@ export default async function DashboardPage() {
         <p className="text-sm text-muted-foreground">
           안녕하세요, {displayName}님. 오늘도 오리와 함께 차근차근 시작해볼까요.
         </p>
-      </div>
-
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <Link href="/pages" className="px-3 py-1.5 text-xs rounded-full border hover:bg-accent">
-          페이지 작성
-        </Link>
-        <Link href="/office" className="px-3 py-1.5 text-xs rounded-full border hover:bg-accent">
-          오피스 방문
-        </Link>
-        <Link href="/news" className="px-3 py-1.5 text-xs rounded-full border hover:bg-accent">
-          뉴스 확인
-        </Link>
-        <Link href="/insights" className="px-3 py-1.5 text-xs rounded-full border hover:bg-accent">
-          통계 보기
-        </Link>
       </div>
 
       <LastPageLink />
