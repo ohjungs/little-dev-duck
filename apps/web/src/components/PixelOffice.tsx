@@ -320,6 +320,8 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const [zoneHud, setZoneHud] = useState<string | null>(null);
   const [showMinimap, setShowMinimap] = useState(true);
   const [clockDisplay, setClockDisplay] = useState("08:00 ☀️ 오전");
+  const [hudMoney, setHudMoney] = useState(0);
+  const [hudNpcCount, setHudNpcCount] = useState(0);
 
   const pausedRef = useRef(false);
   const showDashboardRef = useRef(false);
@@ -376,7 +378,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
 
     npcsRef.current = npcs;
     clockRef.current = createGameClock(CLOCK_START_HOUR);
-  // realTasks는 마운트 시 한 번만 반영 (빈 deps 의도적)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- realTasks는 마운트 시 1회만 반영 (의도적 빈 deps)
   }, []);
 
   // 스프라이트 비동기 로드
@@ -631,11 +633,11 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         }
       }
 
-      // CEO 책상 근접 감지: ceo-office 내 책상(8-9,15) 기준 2타일 이내
+      // CEO 책상 근접 감지: ceo-office 내 책상(3,7) 기준 2타일 이내
       const atCeoDesk =
         zoneId === "ceo-office" &&
-        Math.abs(player.x - 9) <= 2 &&
-        Math.abs(player.y - 15) <= 2;
+        Math.abs(player.x - 3) <= 2 &&
+        Math.abs(player.y - 7) <= 2;
 
       // 클럭 표시 갱신 (매 초 단위) — 시간대 레이블 + 아이콘 포함
       {
@@ -644,6 +646,8 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         setClockDisplay(
           `${formatClockTime(clock)} ${timeOfDayIcon(tod)} ${timeOfDayLabel(tod)}`,
         );
+        setHudMoney(companyRef.current.money);
+        setHudNpcCount(npcsRef.current.length);
 
         // 게임 hour 변경 시 회사 재정 틱
         if (clock.hour !== lastCompanyHourRef.current) {
@@ -994,6 +998,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           className="block h-full w-full cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           style={{ imageRendering: "pixelated" }}
         />
+        {/* eslint-disable-next-line react-hooks/refs -- inputRef는 초기화 후 불변(new InputManager()), 렌더 중 접근 안전 */}
         <VirtualDpad input={inputRef.current} />
 
         {/* 구역 이름 HUD — 페이드인/아웃 */}
@@ -1015,8 +1020,8 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
             {clockDisplay}
           </div>
           <div className="rounded bg-black/60 px-2 py-0.5 font-mono text-[10px] text-gray-200 flex gap-2">
-            <span className="text-green-400">₩{formatMoney(companyRef.current.money)}</span>
-            <span className="text-gray-400">{npcsRef.current.length}명</span>
+            <span className="text-green-400">₩{formatMoney(hudMoney)}</span>
+            <span className="text-gray-400">{hudNpcCount}명</span>
           </div>
         </div>
 

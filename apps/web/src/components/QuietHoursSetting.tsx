@@ -27,6 +27,7 @@ export function QuietHoursSetting() {
   useEffect(() => {
     const q = readQuietHours();
     if (!q) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
     setS({ enabled: true, start: q.start, end: q.end });
   }, []);
 

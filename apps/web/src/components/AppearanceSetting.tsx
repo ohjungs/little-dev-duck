@@ -11,6 +11,7 @@ export function AppearanceSetting() {
   const [mode, setMode] = useState<Mode>("light");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
     setMode(localStorage.getItem("ldd-theme") === "dark" ? "dark" : "light");
   }, []);
 

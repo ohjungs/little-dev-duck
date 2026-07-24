@@ -178,6 +178,7 @@ export function NewsReader() {
 
   useEffect(() => {
     // load는 async(await 후 setState)라 동기 캐스케이딩 렌더가 아니다 — 규칙 오탐이라 disable.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
     void load();
   }, [load]);
 

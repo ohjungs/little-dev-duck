@@ -11,11 +11,11 @@ describe("buildOfficeMap", () => {
     map = buildOfficeMap();
   });
 
-  it("80x60 크기의 유효한 맵을 반환한다", () => {
-    expect(map.cols).toBe(80);
-    expect(map.rows).toBe(60);
+  it("40x30 크기의 유효한 맵을 반환한다", () => {
+    expect(map.cols).toBe(40);
+    expect(map.rows).toBe(30);
     expect(map.tiles).toBeInstanceOf(Uint8Array);
-    expect(map.tiles.length).toBe(80 * 60);
+    expect(map.tiles.length).toBe(40 * 30);
   });
 
   it("타일 배열이 비어 있지 않다 (0이 아닌 타일이 존재한다)", () => {
@@ -30,8 +30,8 @@ describe("buildOfficeMap", () => {
   it("CEO 오피스 존이 올바른 좌표에 등록되어 있다", () => {
     const ceo = map.zones.find(z => z.id === "ceo-office");
     expect(ceo).toBeDefined();
-    expect(ceo!.bounds.x).toBe(1);
-    expect(ceo!.bounds.y).toBe(12);
+    expect(ceo!.bounds.x).toBe(0);
+    expect(ceo!.bounds.y).toBe(5);
     expect(ceo!.label).toBe("사장실");
   });
 
@@ -41,10 +41,10 @@ describe("buildOfficeMap", () => {
     expect(lobby!.label).toBe("로비");
   });
 
-  it("메인 수평 복도(y=9)는 Corridor 타일이다 (walkable)", () => {
-    // Main corridor: fillRect(map, 1, 9, 78, 3, Corridor) → row 9, several x values
-    for (const x of [5, 20, 40, 60, 75]) {
-      const tile = getTile(map, x, 9);
+  it("수평 복도(y=10)는 Corridor 타일이다 (walkable)", () => {
+    // mid1 corridor: fillRect(map, 0, 10, 40, 1, Corridor) → row 10, several x values
+    for (const x of [1, 5, 15, 25, 35]) {
+      const tile = getTile(map, x, 10);
       expect(tile).toBe(TileType.Corridor);
     }
   });
@@ -57,22 +57,22 @@ describe("buildOfficeMap", () => {
     expect(isSolid(TileType.Door)).toBe(false);
   });
 
-  it("로비 도어(39, 8)는 Door 타일이다", () => {
-    expect(getTile(map, 39, 8)).toBe(TileType.Door);
-    expect(getTile(map, 40, 8)).toBe(TileType.Door);
+  it("로비 도어(19, 4)는 Door 타일이다", () => {
+    expect(getTile(map, 19, 4)).toBe(TileType.Door);
+    expect(getTile(map, 20, 4)).toBe(TileType.Door);
   });
 
   it("로비 경계 외벽은 Wall 타일이다", () => {
-    // Top wall of lobby (y=1), left wall (x=1)
-    expect(getTile(map, 10, 1)).toBe(TileType.Wall);
-    expect(getTile(map, 1, 4)).toBe(TileType.Wall);
-    // Right wall (x=78, i.e. x+w-1 = 1+78-1 = 78)
-    expect(getTile(map, 78, 4)).toBe(TileType.Wall);
+    // Top wall of lobby (y=0), left wall (x=0)
+    expect(getTile(map, 10, 0)).toBe(TileType.Wall);
+    expect(getTile(map, 0, 2)).toBe(TileType.Wall);
+    // Right wall (x=39, i.e. x+w-1 = 0+40-1 = 39)
+    expect(getTile(map, 39, 2)).toBe(TileType.Wall);
   });
 
-  it("로비 내부(y=2~7, x=2~77)는 Floor 타일이다", () => {
-    expect(getTile(map, 20, 3)).toBe(TileType.Floor);
-    expect(getTile(map, 50, 5)).toBe(TileType.Floor);
+  it("로비 내부는 Floor 타일이다", () => {
+    expect(getTile(map, 10, 2)).toBe(TileType.Floor);
+    expect(getTile(map, 25, 2)).toBe(TileType.Floor);
   });
 
   it("서버실 존이 존재한다", () => {

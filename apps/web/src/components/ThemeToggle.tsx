@@ -10,6 +10,7 @@ export function ThemeToggle() {
 
   useEffect(() => {
     const isDark = localStorage.getItem("ldd-theme") === "dark";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
     setDark(isDark);
     document.documentElement.classList.toggle("dark", isDark);
   }, []);

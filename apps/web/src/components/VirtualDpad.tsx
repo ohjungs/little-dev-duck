@@ -64,6 +64,7 @@ export function VirtualDpad({ input }: { input: InputManager }) {
   const [isTouch, setIsTouch] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
     setIsTouch("ontouchstart" in window || navigator.maxTouchPoints > 0);
   }, []);
 
