@@ -33,6 +33,19 @@ const TOOL_LABELS: Record<string, string> = {
   trashEmail: "이메일 휴지통으로 이동",
 };
 
+// 상대 시각 표시. createdAt은 ISO 8601 문자열(useDuckChat이 new Date().toISOString()으로 기록).
+// 외부 라이브러리 없이 인라인 계산 — 분 단위까지, 그 이상은 시각 그대로.
+function timeAgo(createdAt: string): string {
+  const diffMs = Date.now() - new Date(createdAt).getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1) return "방금";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}시간 전`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}일 전`;
+}
+
 function formatWhen(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const date = new Date(value);
@@ -137,6 +150,9 @@ export function DuckChatPanel() {
               )}
             >
               {m.content}
+              <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                {timeAgo(m.createdAt)}
+              </span>
             </div>
           ))}
           {pendingApproval && (

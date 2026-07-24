@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
+  Copy,
   FileText,
   Flame,
   ListTodo,
@@ -68,6 +69,7 @@ export function InsightsView() {
     "idle" | "loading" | "error"
   >("idle");
   const [standupError, setStandupError] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "done">("idle");
 
   useEffect(() => {
     const supabase = createClient();
@@ -128,6 +130,31 @@ export function InsightsView() {
       setStandupError("네트워크 오류가 발생했어요.");
       setStandupState("error");
     }
+  }
+
+  async function handleCopyStats() {
+    if (!summary) return;
+    const streak = calculateStreak(rawTodos, rawChecks);
+    const totalTodos = summary.todosDone + summary.todosRemaining;
+    const totalFocusHours = pomStats
+      ? Math.round((pomStats.totalMinutes / 60) * 10) / 10
+      : 0;
+    const lines = [
+      `연속 활동: ${streak}일`,
+      `총 페이지: ${summary.pageCount}개`,
+      `총 할 일: ${totalTodos}개 (완료 ${summary.todosDone})`,
+      `총 메모: ${summary.memoCount}개`,
+      `총 습관 체크: ${rawChecks.length}일`,
+      `총 집중: ${totalFocusHours}시간`,
+      `오리 레벨: Lv.${summary.level}`,
+    ];
+    if (pomStats) {
+      lines.push(`집중 세션: ${pomStats.sessionsCount}회`);
+      lines.push(`주요 태그: ${pomStats.topTag ?? "-"}`);
+    }
+    await navigator.clipboard.writeText(lines.join("\n"));
+    setCopyState("done");
+    setTimeout(() => setCopyState("idle"), 2000);
   }
 
   if (state === "loading") {
@@ -229,19 +256,29 @@ export function InsightsView() {
         )}
       </div>
       <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => void handleStandup()}
-          disabled={standupState === "loading"}
-          className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
-        >
-          {standupState === "loading" ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Sparkles className="size-4" />
-          )}
-          스탠드업 생성
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleStandup()}
+            disabled={standupState === "loading"}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+          >
+            {standupState === "loading" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+            스탠드업 생성
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCopyStats()}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
+          >
+            <Copy className="size-4" />
+            {copyState === "done" ? "복사됨" : "통계 텍스트 복사"}
+          </button>
+        </div>
         {standupState === "error" && standupError && (
           <p className="text-sm text-destructive">{standupError}</p>
         )}

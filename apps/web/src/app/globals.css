@@ -175,6 +175,18 @@
   }
 }
 
+@media print {
+  nav,
+  aside,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    margin: 0;
+    padding: 0;
+  }
+}
+
 /* 픽셀 오피스 — 구역 이름 HUD 페이드인/아웃 애니메이션
    300ms 페이드인 → 1.5s 유지 → 500ms 페이드아웃 = 약 2.3s 총 길이
    translateX(-50%)는 Tailwind -translate-x-1/2로 처리하므로 여기서는 Y축만 */

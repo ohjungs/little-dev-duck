@@ -10,6 +10,7 @@ import { PomodoroWidget } from "@/components/PomodoroWidget";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { DashboardGrid } from "@/components/DashboardGrid";
+import { LastPageLink } from "@/components/LastPageLink";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,8 @@ export default async function DashboardPage() {
           통계 보기
         </Link>
       </div>
+
+      <LastPageLink />
 
       <DashboardGrid
         widgets={[

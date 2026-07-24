@@ -94,7 +94,7 @@ export function AppSidebar({
   const pathname = usePathname();
   const hasPendingTodos = usePendingTodos();
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-1 border-r border-border bg-card/40 p-3 md:flex">
+    <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-1 border-r border-border bg-card/40 p-3 md:flex">
       <div className="py-2">
         <Brand />
       </div>
@@ -178,7 +178,7 @@ export function AppMobileBar() {
   return (
     <nav
       aria-label="하단 탐색"
-      className="fixed bottom-0 left-0 right-0 z-30 flex min-h-14 justify-around border-t border-border bg-background/95 backdrop-blur-md pb-safe md:hidden"
+      className="no-print fixed bottom-0 left-0 right-0 z-30 flex min-h-14 justify-around border-t border-border bg-background/95 backdrop-blur-md pb-safe md:hidden"
     >
       {MOBILE_NAV.map((item) => {
         const active = isActive(pathname, item.href);
