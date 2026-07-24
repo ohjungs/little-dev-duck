@@ -196,3 +196,25 @@
   65%  { opacity: 1; translate: 0 0; }
   100% { opacity: 0; translate: 0 -4px; }
 }
+
+/* BlockNote 페이지 에디터: 앱 폰트(Geist)를 상속시키고 줄간격·자간을 정돈한다.
+   기본 테마 폰트(Inter 계열)와 앱 폰트가 달라 "자간이 안 맞는 느낌"이 나던 것을 맞춘다.
+   이미지 블록은 컨테이너를 넘지 않게 하고 모서리를 둥글려 삽입 이미지가 어색하지 않게 한다. */
+.bn-container {
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+}
+.bn-container .bn-editor {
+  line-height: 1.7;
+}
+.bn-container .bn-block-content p,
+.bn-container .bn-inline-content {
+  letter-spacing: normal;
+  word-break: keep-all; /* 한글 단어 중간 줄바꿈 방지 */
+}
+.bn-container img,
+.bn-container .bn-visual-media {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
