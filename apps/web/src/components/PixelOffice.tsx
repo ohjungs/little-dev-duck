@@ -825,16 +825,14 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           const officeTileset = sprites?.officeTileset ?? null;
 
           if (tilesetRect && officeTileset) {
-            // 타일셋에서 16px 셀을 32px(2x)로 확대 출력 — 1차 우선순위
+            // 타일셋에서 16px 셀을 32px(2x)로 확대 출력 — 1차 우선순위(현재 TILESET_MAP은 비어 있어
+            // 실질적으로 개별 PNG를 쓴다. 타일셋 셀 좌표가 가구와 어긋나 있어 비활성화함).
             drawFromTileset(
               ctx,
               officeTileset,
               tilesetRect.sx, tilesetRect.sy, tilesetRect.sw, tilesetRect.sh,
               sx, sy, TILE, TILE,
             );
-          } else if (officeTileset && tt === TileType.Wall) {
-            // 벽: 타일셋 맵에 없어도 오피스 타일셋의 벽 텍스처(row3 col6) 사용
-            drawFromTileset(ctx, officeTileset, 96, 48, 16, 16, sx, sy, TILE, TILE);
           } else {
             // 2차: 개별 가구 스프라이트 PNG
             const spriteName = TILE_TO_SPRITE[tt];
