@@ -68,6 +68,18 @@ function byStartAt(a: CalendarEvent, b: CalendarEvent): number {
   return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
 }
 
+// 이벤트 시각(ISO)의 로컬 달력 날짜 키(YYYY-MM-DD). 브라우저 로컬(사용자=KST) 기준이라 서버 UTC 문제 없음.
+function localDateKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function ymdKey(y: number, m0: number, day: number): string {
+  return `${y}-${String(m0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
+
 const EVENT_COLORS = [
   "border-l-blue-400",
   "border-l-green-400",
@@ -89,6 +101,11 @@ export function CalendarWidget() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newDate, setNewDate] = useState("");
+  // 월 그리드가 보는 연/월(0-11)과 선택된 날짜(YYYY-MM-DD). 초기값은 현재 월(로컬=KST).
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -144,6 +161,29 @@ export function CalendarWidget() {
     }
   };
 
+  // 월 그리드 계산: 날짜별 일정 수 + 이번 달 셀(앞 빈칸 + 1..말일).
+  const eventsByDay = new Map<string, number>();
+  for (const e of events) {
+    const k = localDateKey(e.startAt);
+    eventsByDay.set(k, (eventsByDay.get(k) ?? 0) + 1);
+  }
+  const todayKey = localDateKey(new Date().toISOString());
+  const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array<null>(firstWeekday).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  const gotoMonth = (delta: number) => {
+    const d = new Date(viewYear, viewMonth + delta, 1);
+    setViewYear(d.getFullYear());
+    setViewMonth(d.getMonth());
+    setSelectedDate(null);
+  };
+  const visibleEvents = selectedDate
+    ? events.filter((e) => localDateKey(e.startAt) === selectedDate)
+    : events;
+
   return (
     <Card data-testid="calendar-widget" className="h-full">
       <CardHeader>
@@ -190,6 +230,84 @@ export function CalendarWidget() {
           </p>
         )}
 
+        {/* 월 그리드 달력 */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => gotoMonth(-1)}
+              aria-label="이전 달"
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              ‹
+            </button>
+            <span className="text-sm font-semibold tabular-nums">
+              {viewYear}년 {viewMonth + 1}월
+            </span>
+            <button
+              type="button"
+              onClick={() => gotoMonth(1)}
+              aria-label="다음 달"
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              ›
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-0.5 text-center">
+            {WEEKDAYS.map((w, i) => (
+              <span
+                key={w}
+                className={`py-1 text-[10px] font-medium ${i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-muted-foreground"}`}
+              >
+                {w}
+              </span>
+            ))}
+            {cells.map((day, idx) => {
+              if (day === null) return <span key={`b${idx}`} />;
+              const key = ymdKey(viewYear, viewMonth, day);
+              const count = eventsByDay.get(key) ?? 0;
+              const isToday = key === todayKey;
+              const isSelected = key === selectedDate;
+              const dow = idx % 7;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDate(isSelected ? null : key);
+                    setNewDate(key);
+                  }}
+                  aria-label={`${viewMonth + 1}월 ${day}일${count > 0 ? `, 일정 ${count}개` : ""}`}
+                  aria-pressed={isSelected}
+                  className={`relative flex aspect-square flex-col items-center justify-center rounded-md text-xs tabular-nums transition-colors ${
+                    isSelected
+                      ? "bg-primary text-primary-foreground"
+                      : isToday
+                        ? "bg-primary/15 font-semibold text-foreground"
+                        : "hover:bg-muted"
+                  } ${!isSelected && dow === 0 ? "text-red-400" : ""} ${!isSelected && dow === 6 ? "text-blue-400" : ""}`}
+                >
+                  {day}
+                  {count > 0 && (
+                    <span
+                      className={`absolute bottom-1 size-1 rounded-full ${isSelected ? "bg-primary-foreground" : "bg-primary"}`}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {selectedDate && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(null)}
+              className="self-end text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              전체 일정 보기
+            </button>
+          )}
+        </div>
+
         {state === "loading" && <WidgetSkeleton />}
         {state === "error" && (
           <div className="flex flex-col items-start gap-2">
@@ -201,14 +319,14 @@ export function CalendarWidget() {
             </Button>
           </div>
         )}
-        {state === "ready" && events.length === 0 && (
+        {state === "ready" && visibleEvents.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            오늘은 일정이 없어요
+            {selectedDate ? "이 날은 일정이 없어요" : "아직 일정이 없어요"}
           </p>
         )}
-        {state === "ready" && events.length > 0 && (
+        {state === "ready" && visibleEvents.length > 0 && (
           <ul className="flex flex-col gap-1">
-            {events.map((event) => {
+            {visibleEvents.map((event) => {
               const isToday = daysUntil(event.startAt, todayIso()) === 0;
               const startTime = formatEventTime(event.startAt);
               const endTime = event.endAt ? formatEventTime(event.endAt) : null;
