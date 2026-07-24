@@ -222,3 +222,30 @@ export {
   standupInputSchema,
   type StandupInput,
 } from "./domain/standup";
+export {
+  createCamera,
+  followTarget,
+  worldToScreen,
+  screenToWorld,
+  visibleTileRange,
+  type Camera,
+} from "./domain/office-camera";
+export {
+  TileType,
+  createTileMap,
+  getTile,
+  setTile,
+  isSolid,
+  isBlocked,
+  getZoneAt,
+  fillRect,
+  strokeRect,
+  type TileTypeValue,
+  type Zone,
+  type TileMap,
+} from "./domain/office-tilemap";
+export {
+  buildOfficeMap,
+  stampRoom,
+  connectCorridor,
+} from "./domain/office-map-builder";
