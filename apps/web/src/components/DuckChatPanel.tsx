@@ -30,6 +30,7 @@ const TOOL_LABELS: Record<string, string> = {
   trashEmail: "이메일 휴지통으로 이동",
   createTodo: "할 일 추가",
   createMemo: "메모 작성",
+  createPage: "페이지 만들기",
 };
 
 // 상대 시각 표시. createdAt은 ISO 8601 문자열(useDuckChat이 new Date().toISOString()으로 기록).

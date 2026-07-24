@@ -17,10 +17,10 @@ function mockSupabase(insertedRow: Record<string, unknown>): SupabaseClient {
 }
 
 describe("createAppActionsAdapter", () => {
-  it("카탈로그에 createTodo·createMemo가 있고 둘 다 mutating(승인 필요)", () => {
+  it("카탈로그에 createTodo·createMemo·createPage가 있고 전부 mutating(승인 필요)", () => {
     const a = createAppActionsAdapter(mockSupabase({}));
     const names = a.catalog.map((t) => t.name).sort();
-    expect(names).toEqual(["createMemo", "createTodo"]);
+    expect(names).toEqual(["createMemo", "createPage", "createTodo"]);
     expect(a.catalog.every((t) => t.kind === "mutating")).toBe(true);
   });
 

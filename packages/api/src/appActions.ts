@@ -4,6 +4,7 @@ import type { ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
 import { createTodo } from "./todos";
 import { createMemo } from "./memos";
+import { createPage } from "./pages";
 
 // 앱 내부 액션 어댑터 — 외부 토큰 없이 오리가 사용자의 워크스페이스에 직접 쓰는 도구들.
 // "오리야 할일 추가해줘", "메모 남겨줘"처럼 대화로 앱 기능을 제어하기 위함. 모두 mutating이라 승인 게이트를
@@ -35,8 +36,32 @@ const createMemoDecl: ToolDeclaration = {
   kind: "mutating",
 };
 
+const createPageDecl: ToolDeclaration = {
+  name: "createPage",
+  description: "워크스페이스에 새 페이지(문서)를 만든다. 사용자가 '페이지 만들어줘', '문서 작성해줘' 등으로 요청할 때 사용.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "페이지 제목" },
+      body: { type: "string", description: "페이지 본문(선택 — 없으면 빈 페이지)" },
+    },
+    required: ["title"],
+  },
+  kind: "mutating",
+};
+
 const todoArgs = z.object({ title: z.string().min(1).max(500) });
 const memoArgs = z.object({ content: z.string().min(1).max(2000) });
+const pageArgs = z.object({
+  title: z.string().min(1).max(200),
+  body: z.string().max(5000).optional(),
+});
+
+// 본문 텍스트를 BlockNote 단락 블록으로 감싼다(서버가 plain_text 파생 → 검색·RAG 자동 편입).
+function bodyToContent(body: string | undefined): unknown {
+  if (!body) return [];
+  return [{ type: "paragraph", content: [{ type: "text", text: body, styles: {} }] }];
+}
 
 function errorResult(call: ToolCall, message: string): ToolResult {
   return { id: call.id, name: call.name, response: { error: message } };
@@ -44,7 +69,7 @@ function errorResult(call: ToolCall, message: string): ToolResult {
 
 export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
   return {
-    catalog: [createTodoDecl, createMemoDecl],
+    catalog: [createTodoDecl, createMemoDecl, createPageDecl],
     async execute(call: ToolCall): Promise<ToolResult> {
       if (call.name === createTodoDecl.name) {
         const parsed = todoArgs.safeParse(call.args);
@@ -65,6 +90,20 @@ export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
           id: call.id,
           name: call.name,
           response: { created: { id: memo.id, title: memo.title } },
+        };
+      }
+
+      if (call.name === createPageDecl.name) {
+        const parsed = pageArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "페이지 정보가 올바르지 않습니다.");
+        const page = await createPage(supabase, {
+          title: parsed.data.title,
+          content: bodyToContent(parsed.data.body),
+        });
+        return {
+          id: call.id,
+          name: call.name,
+          response: { created: { id: page.id, title: page.title } },
         };
       }
 
