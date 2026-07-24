@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ListTodo, Pencil, Plus, X } from "lucide-react";
 import {
   applyXpAward,
@@ -39,6 +39,7 @@ export function TodoWidget() {
   const [hideDone, setHideDone] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
 
@@ -87,6 +88,18 @@ export function TodoWidget() {
       done: todayTodos.filter((t) => t.isDone).length,
     });
   }, [todos]);
+
+  // Ctrl+Shift+T (Mac: Cmd+Shift+T) — 어디서든 할 일 입력창으로 포커스
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   const handleAdd = async () => {
     const title = newTitle.trim();
@@ -237,6 +250,7 @@ export function TodoWidget() {
       <CardContent className="flex flex-col gap-3">
         <div className="flex gap-2">
           <Input
+            ref={inputRef}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => {
