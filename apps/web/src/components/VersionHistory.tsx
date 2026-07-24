@@ -9,13 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useModalA11y } from "@/hooks/useModalA11y";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleString("ko-KR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-}
+import { timeAgo } from "@/lib/timeAgo";
 
 // 버전 기록 모달(T5): 저장된 스냅샷 목록 + 복원. 복원은 현재 내용을 덮으므로 확인 후 실행(안전 규칙).
 // onBeforeRestore: 상위(PageEditor)의 대기 중 자동저장을 확인창 전에 취소해 복원과의 경쟁을 없앤다.
@@ -94,7 +88,9 @@ export function VersionHistory({
       >
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <History className="size-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">버전 기록</span>
+          <span className="text-sm font-semibold">
+            버전 기록{state === "ready" && versions.length > 0 ? ` (${versions.length}개)` : ""}
+          </span>
         </div>
 
         <div className="max-h-[55vh] overflow-y-auto p-2">
@@ -124,7 +120,7 @@ export function VersionHistory({
                   {version.title || "제목 없음"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {timeLabel(version.createdAt)}
+                  {timeAgo(version.createdAt)}
                 </p>
               </div>
               <Button
@@ -148,7 +144,7 @@ export function VersionHistory({
     <ConfirmDialog
       open={!!pendingVersion}
       title="버전 복원"
-      description={pendingVersion ? `이 버전(${timeLabel(pendingVersion.createdAt)})으로 되돌릴까요? 현재 내용을 덮어씁니다. 먼저 "버전 저장"을 눌러두면 지금 상태로 다시 돌아올 수 있습니다.` : ""}
+      description={pendingVersion ? `이 버전(${timeAgo(pendingVersion.createdAt)})으로 되돌릴까요? 현재 내용을 덮어씁니다. 먼저 "버전 저장"을 눌러두면 지금 상태로 다시 돌아올 수 있습니다.` : ""}
       confirmLabel="복원"
       onConfirm={confirmRestore}
       onCancel={() => setPendingVersion(null)}
