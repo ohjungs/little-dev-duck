@@ -282,9 +282,6 @@ export function InsightsView() {
   })();
 
   const totalTodos = summary.todosDone + summary.todosRemaining;
-  const totalFocusHours = pomStats
-    ? Math.round((pomStats.totalMinutes / 60) * 10) / 10
-    : 0;
 
   const lifetimeStats = [
     { label: "총 페이지", value: `${summary.pageCount}개` },
