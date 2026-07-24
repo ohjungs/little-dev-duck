@@ -5,7 +5,7 @@ import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html, useGLTF } from "@react-three/drei";
 import type { Group } from "three";
 import { isQuietHour, type DuckMood } from "@ldd/core";
-import { pickIdlePhrase, pickPhrase } from "./phrases";
+import { pickClickPhrase, pickIdlePhrase, pickPhrase } from "./phrases";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
 // Meshy에서 받은 실제 모델(apps/web/public/little_dev_duck.glb, 배포된 웹 origin 루트에서 서빙 —
@@ -171,7 +171,8 @@ export function Duck({
   const handleGreet = () => {
     // 클릭 시점의 문구를 바로 고정한다 - clickCount를 렌더링에서 파생시키면
     // setClickCount로 인한 리렌더 이후 값을 읽어 항상 한 칸 밀려 표시된다.
-    speak(pickPhrase(clickCountRef.current));
+    // mood별 클릭 문구 풀을 사용해 기분에 맞는 반응을 보여준다.
+    speak(pickClickPhrase(clickCountRef.current, mood));
     clickCountRef.current += 1;
     lastInteractionRef.current = Date.now();
   };

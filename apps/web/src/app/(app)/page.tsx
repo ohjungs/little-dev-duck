@@ -21,6 +21,26 @@ function getGreeting(): string {
   return "좋은 저녁이에요";
 }
 
+// 날짜 기반으로 하루 동안 일관된 동기부여 메시지를 고른다(무작위 아님).
+const MOTIVATIONS = [
+  "오늘도 화이팅",
+  "좋은 하루 보내세요",
+  "오늘은 뭘 만들어볼까요",
+  "한 걸음씩 나아가요",
+  "작은 것부터 시작해봐요",
+  "오늘의 목표를 세워봐요",
+  "멋진 하루가 될 거예요",
+];
+
+function getDailyMotivation(): string {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor(
+    (now.getTime() - startOfYear.getTime()) / 86_400_000,
+  );
+  return MOTIVATIONS[dayOfYear % MOTIVATIONS.length];
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -41,6 +61,7 @@ export default async function DashboardPage() {
   }).format(new Date());
 
   const greeting = getGreeting();
+  const motivation = getDailyMotivation();
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6 lg:px-8">
@@ -50,7 +71,7 @@ export default async function DashboardPage() {
           {dateLabel}
         </p>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {greeting}! 오늘도 화이팅 🦆
+          {greeting}! {motivation}
         </h1>
         <p className="text-sm text-muted-foreground">
           안녕하세요, {displayName}님. 오늘도 오리와 함께 차근차근 시작해볼까요.
