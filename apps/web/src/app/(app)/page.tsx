@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DuckWidget } from "@/components/DuckWidget";
 import { DuckChatPanel } from "@/components/DuckChatPanel";
@@ -53,6 +54,21 @@ export default async function DashboardPage() {
         <p className="text-sm text-muted-foreground">
           안녕하세요, {displayName}님. 오늘도 오리와 함께 차근차근 시작해볼까요.
         </p>
+      </div>
+
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <Link href="/pages" className="px-3 py-1.5 text-xs rounded-full border hover:bg-accent">
+          페이지 작성
+        </Link>
+        <Link href="/office" className="px-3 py-1.5 text-xs rounded-full border hover:bg-accent">
+          오피스 방문
+        </Link>
+        <Link href="/news" className="px-3 py-1.5 text-xs rounded-full border hover:bg-accent">
+          뉴스 확인
+        </Link>
+        <Link href="/insights" className="px-3 py-1.5 text-xs rounded-full border hover:bg-accent">
+          통계 보기
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

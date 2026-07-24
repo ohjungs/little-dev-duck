@@ -5,6 +5,7 @@ import { DesktopCollectorSync } from "@/components/DesktopCollectorSync";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ShortcutsHelp } from "@/components/ShortcutsHelp";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ScrollToTop } from "@/components/ScrollToTop";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default async function AppLayout({
           <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>
+      <ScrollToTop />
       <DesktopCollectorSync />
       <CommandPalette />
       <ShortcutsHelp />
