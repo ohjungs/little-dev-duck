@@ -217,7 +217,7 @@ export function HabitWidget() {
         )}
         {state === "ready" && habits.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            습관이 없습니다.
+            새 습관을 만들어볼까요?
           </p>
         )}
         {state === "ready" && habits.length > 0 && (

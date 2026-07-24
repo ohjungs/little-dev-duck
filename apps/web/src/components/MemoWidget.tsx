@@ -21,6 +21,15 @@ type LoadState = "loading" | "error" | "ready";
 // CSS 변수로 넘겨 Tailwind hover가 덮어쓸 수 있게 한다(인라인 transform이면 hover가 안 먹음).
 const NOTE_ROTATIONS = ["-2deg", "1.5deg", "-1deg", "2deg", "0.5deg"];
 
+const MEMO_COLORS = [
+  "bg-yellow-50 dark:bg-yellow-950/30",
+  "bg-pink-50 dark:bg-pink-950/30",
+  "bg-blue-50 dark:bg-blue-950/30",
+  "bg-green-50 dark:bg-green-950/30",
+  "bg-purple-50 dark:bg-purple-950/30",
+  "bg-orange-50 dark:bg-orange-950/30",
+];
+
 const textareaClass =
   "w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none";
 
@@ -199,7 +208,7 @@ export function MemoWidget() {
         )}
         {state === "ready" && memos.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            메모가 없습니다.
+            메모를 남겨보세요.
           </p>
         )}
         {state === "ready" && memos.length > 0 && visibleMemos.length === 0 && (
@@ -214,7 +223,7 @@ export function MemoWidget() {
                 <div
                   key={memo.id}
                   data-testid={`memo-${memo.id}`}
-                  className="flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border bg-secondary/60 p-3 shadow-sm"
+                  className={`flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border p-3 shadow-sm ${MEMO_COLORS[index % MEMO_COLORS.length]}`}
                 >
                   <textarea
                     value={editContent}
@@ -248,7 +257,7 @@ export function MemoWidget() {
                   key={memo.id}
                   data-testid={`memo-${memo.id}`}
                   style={rotationStyle(index)}
-                  className="group flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border bg-secondary/60 p-3 shadow-sm transition-all rotate-[var(--rot)] hover:-translate-y-1 hover:rotate-0 hover:shadow-md"
+                  className={`group flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border p-3 shadow-sm transition-all rotate-[var(--rot)] hover:-translate-y-1 hover:rotate-0 hover:shadow-md ${MEMO_COLORS[index % MEMO_COLORS.length]}`}
                 >
                   <div className="flex justify-end gap-1">
                     <button

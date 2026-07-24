@@ -276,7 +276,7 @@ export function TodoWidget() {
         )}
         {state === "ready" && visibleTodos.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            할 일이 없습니다.
+            아직 할 일이 없어요. 위에서 추가해보세요!
           </p>
         )}
         {state === "ready" && visibleTodos.length > 0 && (
