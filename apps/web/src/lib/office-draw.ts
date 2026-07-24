@@ -258,10 +258,22 @@ export function drawDuck(
 }
 
 // ---------------------------------------------------------------------------
+// Tileset floor rects — PixelOfficeAssets.png 소스 좌표
+// 바닥 타일은 row 2 (y=32) 의 파란 타일 영역에서 추출
+// ---------------------------------------------------------------------------
+// 파란 체크무늬 바닥 타일: row 2 col 4-5 영역 (y=32, x=64) — 16x16
+const FLOOR_TILE_A = { sx: 64,  sy: 32, sw: 16, sh: 16 }; // 밝은 파란 바닥
+const FLOOR_TILE_B = { sx: 80,  sy: 32, sw: 16, sh: 16 }; // 약간 어두운 파란 바닥
+// 복도/회색 바닥: row 2 col 8-9 (y=32, x=128) — 회색 타일
+const CORRIDOR_TILE_A = { sx: 128, sy: 32, sw: 16, sh: 16 };
+const CORRIDOR_TILE_B = { sx: 144, sy: 32, sw: 16, sh: 16 };
+// ---------------------------------------------------------------------------
 // drawFloorTile — floor surface (Floor, Corridor, Carpet, Door base)
+// tileset: PixelOfficeAssets.png — null이면 절차적 폴백 사용
 // ---------------------------------------------------------------------------
 export function drawFloorTile(
   ctx: CanvasRenderingContext2D,
+  tileset: HTMLImageElement | null,
   x: number,
   y: number,
   tileType: number,
@@ -272,6 +284,41 @@ export function drawFloorTile(
 ): void {
   const even = (col + row) % 2 === 0;
 
+  // --- 타일셋 경로 ---
+  if (tileset) {
+    // 0 Floor — 파란 체크무늬 바닥
+    if (tileType === 0) {
+      const src = even ? FLOOR_TILE_A : FLOOR_TILE_B;
+      ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
+      return;
+    }
+    // 4 Door base — 문 밑 바닥 (노란 도어 타일)
+    if (tileType === 4) {
+      const src = even ? FLOOR_TILE_A : FLOOR_TILE_B;
+      ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
+      return;
+    }
+    // 5 Corridor — 회색 복도 타일
+    if (tileType === 5) {
+      const src = even ? CORRIDOR_TILE_A : CORRIDOR_TILE_B;
+      ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
+      return;
+    }
+    // 6 Carpet — 바닥 타일 + 색상 오버레이
+    if (tileType === 6) {
+      const src = even ? FLOOR_TILE_A : FLOOR_TILE_B;
+      ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
+      ctx.fillStyle = carpetColor ? carpetColor + "40" : "rgba(74,144,217,0.25)";
+      ctx.fillRect(x, y, tileSize, tileSize);
+      return;
+    }
+    // 기본: 파란 바닥
+    const src = even ? FLOOR_TILE_A : FLOOR_TILE_B;
+    ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
+    return;
+  }
+
+  // --- 절차적 폴백 (tileset 없을 때) ---
   // 0 Floor
   if (tileType === 0) {
     ctx.fillStyle = even ? "#EFE9DC" : "#E7E0CF";
@@ -292,10 +339,8 @@ export function drawFloorTile(
   }
   // 6 Carpet
   if (tileType === 6) {
-    // Floor base first
     ctx.fillStyle = even ? "#EFE9DC" : "#E7E0CF";
     ctx.fillRect(x, y, tileSize, tileSize);
-    // Carpet color overlay at 30% opacity
     ctx.fillStyle = carpetColor ? carpetColor + "4D" : "rgba(74,144,217,0.30)";
     ctx.fillRect(x, y, tileSize, tileSize);
     return;
@@ -768,39 +813,123 @@ export function drawHumanSprite(
 
 // ---------------------------------------------------------------------------
 // TILESET_MAP — TileType 번호 -> PixelOfficeAssets.png 소스 좌표
-// 타일셋 셀 좌표계: col*16, row*16 (좌상단 기준)
-// 게임 타일 크기 TILE=32 → 16px 셀을 2배 스케일해서 그린다
-// 불확실한 항목은 매핑에서 제외 — 폴백 프로시저럴 렌더러 사용
+// 타일셋: 256x160, 16열 x 10행, 셀 16x16
+// TILE=32 게임 타일 -> 16px 셀을 2배 스케일해서 그린다
 // ---------------------------------------------------------------------------
-// 2026-07-24 : 타일셋 육안 분석 (256x160, 16열 x 10행):
-//   row 0 (y=0)   : 다양한 색상의 의자 4종 (col 0-3), 우측은 소형 아이템
-//   row 1 (y=16)  : 빨간 긴 소파/카운터 (col 0-7), 파란 책상 상단
-//   row 2 (y=32)  : 파란 책상 (col 0-7), 회색 책상 (col 8-15)
-//   row 3 (y=48)  : 캐릭터 3종 (col 0-2) + 고양이 (col 3), 서버랙 등
-//   row 4 (y=64)  : 파란 서버랙 2개 (col 0-1), 자판기/장치 (col 2-)
-//   row 5 (y=80)  : 초록 소파 (col 0-3), 쓰레기통 (col 4), 소형 캐비닛
-//   row 6 (y=96)  : 소형 아이콘들, 노란 문 (col 4-5)
-//   row 7 (y=112) : 다양한 소형 오피스 장비
-//   row 8 (y=128) : 화분/식물, 소형 아이템
-//   row 9 (y=144) : 추가 장식 아이템
-// TileType: 1=Wall, 2=Desk, 3=Chair, 4=Door, 7=Table, 8=Plant,
-//   9=Bookshelf, 10=CoffeeMachine, 11=Whiteboard, 12=Server,
+// 2026-07-24 : 타일셋 픽셀 좌표 분석 (256x160 이미지 직접 판독):
+//
+//   row 0 (y=0-15)   : col 0=파란의자, col 1=빨간의자, col 2=초록의자, col 3=회색의자
+//                       col 4-7=소형 아이템(전화기, 키보드 등)
+//                       col 8=커피컵, col 9=화분(소), col 10=시계(소)
+//                       col 11-15=소형 오피스 소품
+//   row 1 (y=16-31)  : col 0-3=빨간 소파(4타일 span), col 4-7=주황 소파
+//                       col 8-15=회색 데스크 상단 절반
+//   row 2 (y=32-47)  : col 0-3=파란 데스크(4타일 span), col 4-7=파란 바닥/타일
+//                       col 8-15=회색 데스크 (col 8-9=하단, col 10-15=바닥타일 변형)
+//   row 3 (y=48-63)  : col 0-2=캐릭터 3종, col 3=고양이, col 4-5=창문, col 6-7=벽텍스처
+//                       col 8-9=파란 서버랙 상단, col 10-15=소형 오피스 아이콘
+//   row 4 (y=64-79)  : col 0-1=파란 서버랙 하단, col 2-3=자판기, col 4=쓰레기통
+//                       col 5=소형캐비닛, col 6-9=황금색 문(2x2=32x32), col 10-15=소품
+//   row 5 (y=80-95)  : col 0-3=초록 소파(4타일), col 4=쓰레기통(큰것)
+//                       col 5-6=화분/식물, col 7-8=정수기, col 9-15=소형소품
+//   row 6 (y=96-111) : col 0-15=소형 UI 아이콘, 표시판, 소품
+//   row 7 (y=112-127): col 0-15=가구 소품 (서랍장, 프린터, 화이트보드 등)
+//   row 8 (y=128-143): col 0-15=추가 식물/장식 아이템
+//   row 9 (y=144-159): col 0-15=바닥 장식, 카펫 패턴
+//
+// TileType enum 값:
+//   0=Floor, 1=Wall, 2=Desk, 3=Chair, 4=Door, 5=Corridor, 6=Carpet
+//   7=Table, 8=Plant, 9=Bookshelf, 10=CoffeeMachine, 11=Whiteboard
+//   12=Server, 13=Reception, 14=Monitor, 15=Printer
 //   16=Sofa, 17=VendingMachine, 18=WaterCooler, 19=Toilet
+//   20=Fridge, 21=Calendar, 22=Clock, 23=FireExtinguisher
 export type TilesetRect = { sx: number; sy: number; sw: number; sh: number };
 
 export const TILESET_MAP: Partial<Record<number, TilesetRect>> = {
-  // Chair — row 0, col 0 (파란 의자)
-  3:  { sx: 0,   sy: 0,  sw: 16, sh: 16 },
-  // Desk — row 2, col 0 (파란 책상)
-  2:  { sx: 0,   sy: 32, sw: 16, sh: 16 },
-  // Table — row 2, col 4 (더 넓은 책상/테이블)
-  7:  { sx: 64,  sy: 32, sw: 16, sh: 16 },
-  // Server rack — row 4, col 0 (파란 서버랙)
-  12: { sx: 0,   sy: 64, sw: 16, sh: 16 },
-  // Sofa — row 5, col 0 (초록 소파)
-  16: { sx: 0,   sy: 80, sw: 16, sh: 16 },
-  // Trash/FireExtinguisher — row 5, col 4 (쓰레기통)
-  23: { sx: 64,  sy: 80, sw: 16, sh: 16 },
+  // --- 벽 (Wall = 1) ---
+  // row 3 col 6-7: 회색 벽 텍스처 (가로 줄무늬 패턴)
+  1:  { sx: 96,  sy: 48,  sw: 16, sh: 16 },
+
+  // --- 책상 (Desk = 2) ---
+  // row 1-2 col 0: 파란 책상 (상단 row1, 하단 row2) — 16x32 원본을 16x16 하단으로
+  2:  { sx: 0,   sy: 32,  sw: 16, sh: 16 },
+
+  // --- 의자 (Chair = 3) ---
+  // row 0 col 0: 파란 의자
+  3:  { sx: 0,   sy: 0,   sw: 16, sh: 16 },
+
+  // --- 문 (Door = 4) ---
+  // row 4 col 6-7 / row3 col 6-7: 황금 문 (2x2 = 32x32 원본)
+  // 16x16 단위로 왼쪽 상단 셀만 사용 (스케일되어 단일 타일 표현)
+  4:  { sx: 96,  sy: 64,  sw: 16, sh: 16 },
+
+  // --- 테이블 (Table = 7) ---
+  // row 1 col 4: 주황 소파 상단 (회의 테이블 대용 — 폭넓은 평면)
+  7:  { sx: 64,  sy: 16,  sw: 16, sh: 16 },
+
+  // --- 식물 (Plant = 8) ---
+  // row 5 col 5: 화분/큰 식물
+  8:  { sx: 80,  sy: 80,  sw: 16, sh: 16 },
+
+  // --- 책장 (Bookshelf = 9) ---
+  // row 7 col 0: 책장 형태 아이템 (16x16)
+  9:  { sx: 0,   sy: 112, sw: 16, sh: 16 },
+
+  // --- 커피머신 (CoffeeMachine = 10) ---
+  // row 0 col 8: 커피컵/커피머신 소형 아이콘
+  10: { sx: 128, sy: 0,   sw: 16, sh: 16 },
+
+  // --- 화이트보드 (Whiteboard = 11) ---
+  // row 7 col 2: 화이트보드/보드 아이템
+  11: { sx: 32,  sy: 112, sw: 16, sh: 16 },
+
+  // --- 서버랙 (Server = 12) ---
+  // row 3-4 col 8: 파란 서버랙 (2x1 원본) — row3 상단
+  12: { sx: 128, sy: 48,  sw: 16, sh: 16 },
+
+  // --- 안내데스크 (Reception = 13) ---
+  // row 1 col 8: 회색 데스크 상단 (안내대용)
+  13: { sx: 128, sy: 16,  sw: 16, sh: 16 },
+
+  // --- 모니터 (Monitor = 14) ---
+  // row 0 col 4: 소형 모니터/화면 아이콘
+  14: { sx: 64,  sy: 0,   sw: 16, sh: 16 },
+
+  // --- 프린터 (Printer = 15) ---
+  // row 7 col 4: 프린터 형태 아이템
+  15: { sx: 64,  sy: 112, sw: 16, sh: 16 },
+
+  // --- 소파 (Sofa = 16) ---
+  // row 1 col 0: 빨간 소파 (4타일 중 왼쪽 끝)
+  16: { sx: 0,   sy: 16,  sw: 16, sh: 16 },
+
+  // --- 자판기 (VendingMachine = 17) ---
+  // row 4 col 2: 자판기 상단 셀
+  17: { sx: 32,  sy: 64,  sw: 16, sh: 16 },
+
+  // --- 정수기 (WaterCooler = 18) ---
+  // row 5 col 7: 정수기/워터쿨러
+  18: { sx: 112, sy: 80,  sw: 16, sh: 16 },
+
+  // --- 화장실 (Toilet = 19) ---
+  // row 6 col 12: 화장실 관련 소품
+  19: { sx: 192, sy: 96,  sw: 16, sh: 16 },
+
+  // --- 냉장고 (Fridge = 20) ---
+  // row 4 col 5: 소형 캐비닛/냉장고 형태
+  20: { sx: 80,  sy: 64,  sw: 16, sh: 16 },
+
+  // --- 달력 (Calendar = 21) ---
+  // row 0 col 11: 달력/메모 소품
+  21: { sx: 176, sy: 0,   sw: 16, sh: 16 },
+
+  // --- 시계 (Clock = 22) ---
+  // row 0 col 10: 시계 아이콘
+  22: { sx: 160, sy: 0,   sw: 16, sh: 16 },
+
+  // --- 소화기 (FireExtinguisher = 23) ---
+  // row 5 col 4: 쓰레기통/소형 빨간 아이템 (소화기 대용)
+  23: { sx: 64,  sy: 80,  sw: 16, sh: 16 },
 };
 
 // ---------------------------------------------------------------------------

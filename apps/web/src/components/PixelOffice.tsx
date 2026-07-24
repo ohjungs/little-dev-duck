@@ -761,12 +761,13 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
       const sprites = spritesRef.current;
 
       // --- Pass 1: 바닥 타일 ---
+      const officeTilesetPass1 = sprites?.officeTileset ?? null;
       for (let row = r0; row < r1; row++) {
         for (let col = c0; col < c1; col++) {
           const tt = getTile(map, col, row);
           if (tt === TileType.Wall) continue;
           const { x: sx, y: sy } = worldToScreen(cam, col * TILE, row * TILE);
-          drawFloorTile(ctx, sx, sy, tt, TILE, col, row);
+          drawFloorTile(ctx, officeTilesetPass1, sx, sy, tt, TILE, col, row);
         }
       }
 
@@ -782,28 +783,31 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           const officeTileset = sprites?.officeTileset ?? null;
 
           if (tilesetRect && officeTileset) {
-            // 타일셋에서 16px 셀을 32px(2x)로 확대 출력
+            // 타일셋에서 16px 셀을 32px(2x)로 확대 출력 — 1차 우선순위
             drawFromTileset(
               ctx,
               officeTileset,
               tilesetRect.sx, tilesetRect.sy, tilesetRect.sw, tilesetRect.sh,
               sx, sy, TILE, TILE,
             );
+          } else if (officeTileset && tt === TileType.Wall) {
+            // 벽: 타일셋 맵에 없어도 오피스 타일셋의 벽 텍스처(row3 col6) 사용
+            drawFromTileset(ctx, officeTileset, 96, 48, 16, 16, sx, sy, TILE, TILE);
           } else {
+            // 2차: 개별 가구 스프라이트 PNG
             const spriteName = TILE_TO_SPRITE[tt];
             const spriteImg = sprites && spriteName ? sprites.furniture.get(spriteName) : undefined;
 
             if (spriteImg) {
               drawFurnitureSprite(ctx, spriteImg, sx, sy, TILE);
             } else {
-              // 벽은 단색 블록
+              // 최후 폴백: 절차적 렌더러 (타일셋 없을 때만)
               if (tt === TileType.Wall) {
                 ctx.fillStyle = "#5C5C5C";
                 ctx.fillRect(sx, sy, TILE, TILE);
                 ctx.fillStyle = "#7A7A7A";
                 ctx.fillRect(sx, sy, TILE, 2);
               } else {
-                // 다른 가구는 기존 폴백 (office-draw 프로시저럴)
                 // TILE=32이므로 16px 폴백을 2배 스케일로 그린다
                 ctx.save();
                 ctx.translate(sx, sy);
