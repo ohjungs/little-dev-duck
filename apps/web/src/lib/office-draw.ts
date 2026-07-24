@@ -761,10 +761,12 @@ export function drawHumanSprite(
 ): void {
   const CHAR_W = 16;
   const CHAR_H = 16;
-  // row 3 (y=48): 0=갈색머리 여성, 1=파란머리 여성, 2=주황머리 남성
+  // Playwright로 타일셋 실측: 캐릭터 3종은 row 7(y=112) col 0-2에 있다. 기존 sy=48은 하늘(구름)이라
+  // NPC가 구름 조각으로 렌더돼 사실상 안 보였다("직원 없지"의 원인). → sy=112로 교정.
   const col = (characterIndex % 3);
   const sx = col * CHAR_W;
-  const sy = 48; // row 3
+  const sy = 112; // row 7 — 캐릭터
+
 
   if (isIdle) {
     ctx.globalAlpha = 0.45;
