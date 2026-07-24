@@ -12,8 +12,9 @@ import {
   Plus,
   Search,
   Settings,
+  StickyNote,
 } from "lucide-react";
-import { createPage, searchPages } from "@ldd/api";
+import { createMemo, createPage, searchPages } from "@ldd/api";
 import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -70,6 +71,9 @@ export function CommandPalette() {
   const [state, setState] = useState<SearchState>("idle");
   const [activeIndex, setActiveIndex] = useState(0);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [memoMode, setMemoMode] = useState(false);
+  const [memoText, setMemoText] = useState("");
+  const [memoSaved, setMemoSaved] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 최신 검색어를 담아 out-of-order 응답(느린 옛 요청이 최신 결과를 덮어씀)을 버린다.
@@ -87,6 +91,9 @@ export function CommandPalette() {
     setResults([]);
     setState("idle");
     setActiveIndex(0);
+    setMemoMode(false);
+    setMemoText("");
+    setMemoSaved(false);
   };
 
   // 전역 열기 트리거: Cmd/Ctrl+K(토글) + OPEN_SEARCH_EVENT(열기). 초기화는 이벤트 핸들러에서 수행
@@ -124,6 +131,13 @@ export function CommandPalette() {
       setRecentSearches(getRecentSearches());
     }
   }, [open]);
+
+  // 메모 모드로 전환 시 메모 입력에 포커스한다.
+  useEffect(() => {
+    if (memoMode) {
+      inputRef.current?.focus();
+    }
+  }, [memoMode]);
 
   const runSearch = (raw: string) => {
     setQuery(raw);
@@ -176,6 +190,18 @@ export function CommandPalette() {
     );
   };
 
+  const saveMemo = () => {
+    const content = memoText.trim();
+    if (!content) return;
+    createMemo(supabase, { content }).then(
+      () => {
+        setMemoSaved(true);
+        setTimeout(() => setOpen(false), 800);
+      },
+      () => {},
+    );
+  };
+
   // 빠른 동작(검색어와 무관한 명령). 검색어가 있으면 라벨 부분일치로 필터.
   const allActions: QuickAction[] = [
     {
@@ -183,6 +209,12 @@ export function CommandPalette() {
       label: "새 페이지 만들기",
       icon: <Plus className="size-3.5 shrink-0 opacity-70" />,
       run: createAndOpen,
+    },
+    {
+      id: "quick-memo",
+      label: "빠른 메모 작성",
+      icon: <StickyNote className="size-3.5 shrink-0 opacity-70" />,
+      run: () => setMemoMode(true),
     },
     {
       id: "go-insights",
@@ -244,6 +276,7 @@ export function CommandPalette() {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (memoMode) return;
     if (e.key === "Escape") {
       setOpen(false);
     } else if (e.key === "ArrowDown") {
@@ -274,23 +307,43 @@ export function CommandPalette() {
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
-        <div className="flex items-center gap-2 border-b border-border px-4">
-          <Search className="size-4 shrink-0 text-muted-foreground" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => runSearch(e.target.value)}
-            placeholder="페이지 검색 또는 명령..."
-            aria-label="페이지 검색 또는 명령"
-            aria-controls="palette-listbox"
-            aria-activedescendant={items.length > 0 ? `palette-item-${activeIndex}` : undefined}
-            className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-          {state === "loading" && (
-            <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
-          )}
-        </div>
+        {memoMode ? (
+          <div className="flex items-center gap-2 border-b border-border px-4">
+            <StickyNote className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              ref={inputRef}
+              value={memoSaved ? "저장됨" : memoText}
+              onChange={(e) => { if (!memoSaved) setMemoText(e.target.value); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); saveMemo(); }
+                if (e.key === "Escape") setOpen(false);
+              }}
+              placeholder="메모 내용을 입력하고 Enter..."
+              aria-label="빠른 메모 입력"
+              readOnly={memoSaved}
+              className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 border-b border-border px-4">
+            <Search className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => runSearch(e.target.value)}
+              placeholder="페이지 검색 또는 명령..."
+              aria-label="페이지 검색 또는 명령"
+              aria-controls="palette-listbox"
+              aria-activedescendant={items.length > 0 ? `palette-item-${activeIndex}` : undefined}
+              className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+            {state === "loading" && (
+              <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+            )}
+          </div>
+        )}
 
+        {!memoMode && (
         <div id="palette-listbox" role="listbox" className="max-h-[50vh] overflow-y-auto p-2">
           {items.map((item, i) => {
             const active = i === activeIndex;
@@ -374,6 +427,7 @@ export function CommandPalette() {
             </p>
           )}
         </div>
+        )}
       </div>
     </div>
   );
