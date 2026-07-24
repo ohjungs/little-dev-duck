@@ -20,6 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WidgetSkeleton } from "@/components/Skeleton";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -161,12 +162,7 @@ export function CalendarWidget() {
           </p>
         )}
 
-        {state === "loading" && (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="size-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-            불러오는 중...
-          </p>
-        )}
+        {state === "loading" && <WidgetSkeleton />}
         {state === "error" && (
           <div className="flex flex-col items-start gap-2">
             <p className="text-sm text-muted-foreground">

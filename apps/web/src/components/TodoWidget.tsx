@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ListTodo, Loader2, Pencil, Plus, X } from "lucide-react";
+import { Check, ListTodo, Pencil, Plus, X } from "lucide-react";
 import {
   applyXpAward,
   createTodo,
@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WidgetSkeleton } from "@/components/Skeleton";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -259,11 +260,7 @@ export function TodoWidget() {
           </p>
         )}
 
-        {state === "loading" && (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" /> 불러오는 중...
-          </p>
-        )}
+        {state === "loading" && <WidgetSkeleton />}
         {state === "error" && (
           <div className="flex flex-col items-start gap-2">
             <p className="text-sm text-muted-foreground">

@@ -11,6 +11,14 @@ import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 
 export const dynamic = "force-dynamic";
 
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 6) return "좋은 새벽이에요";
+  if (h < 12) return "좋은 아침이에요";
+  if (h < 18) return "좋은 오후예요";
+  return "좋은 저녁이에요";
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -24,10 +32,13 @@ export default async function DashboardPage() {
     "사용자";
 
   const dateLabel = new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
     month: "long",
     day: "numeric",
     weekday: "long",
   }).format(new Date());
+
+  const greeting = getGreeting();
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6 lg:px-8">
@@ -37,10 +48,10 @@ export default async function DashboardPage() {
           {dateLabel}
         </p>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          안녕하세요, {displayName}님
+          {greeting}! 오늘도 화이팅 🦆
         </h1>
         <p className="text-sm text-muted-foreground">
-          오늘도 오리와 함께 차근차근 시작해볼까요.
+          안녕하세요, {displayName}님. 오늘도 오리와 함께 차근차근 시작해볼까요.
         </p>
       </div>
 

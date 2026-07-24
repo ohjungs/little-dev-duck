@@ -23,6 +23,7 @@ import {
 } from "@ldd/api";
 import { clusterArticles, type Article, type Feed } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
+import { timeAgo } from "@/lib/timeAgo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -32,14 +33,6 @@ import {
   markArticlesRead,
   subscribeReadArticles,
 } from "@/lib/readArticles";
-
-function timeLabel(iso: string | null): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString("ko-KR", {
-    month: "short",
-    day: "numeric",
-  });
-}
 
 // RSS 피드가 준 외부 링크는 http(s)만 허용(zod .url()이 javascript: 스킴을 통과시키므로 렌더 시 화이트리스트 — 보안 리뷰).
 function safeHref(url: string): string {
@@ -106,7 +99,7 @@ function ArticleCard({
         </div>
       </div>
       {a.summary ? (
-        <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+        <p className="mt-2 whitespace-pre-line text-base leading-relaxed text-foreground/80">
           {a.summary}
         </p>
       ) : a.snippet ? (
@@ -116,7 +109,7 @@ function ArticleCard({
       ) : null}
       {a.publishedAt && (
         <p className="mt-2 text-xs text-muted-foreground/60">
-          {timeLabel(a.publishedAt)}
+          {timeAgo(a.publishedAt)}
         </p>
       )}
     </div>
