@@ -193,8 +193,32 @@ export function InsightsView() {
   const maxCount = Math.max(...dayOfWeekCounts);
   const bestDay = maxCount > 0 ? dayLabels[dayOfWeekCounts.indexOf(maxCount)] : null;
 
+  const totalTodos = summary.todosDone + summary.todosRemaining;
+  const totalFocusHours = pomStats
+    ? Math.round((pomStats.totalMinutes / 60) * 10) / 10
+    : 0;
+
+  const lifetimeStats = [
+    { label: "총 페이지", value: `${summary.pageCount}개` },
+    { label: "총 할 일", value: `${totalTodos}개 (완료 ${summary.todosDone})` },
+    { label: "총 메모", value: `${summary.memoCount}개` },
+    { label: "총 습관 체크", value: `${rawChecks.length}일` },
+    { label: "총 집중", value: `${totalFocusHours}시간` },
+  ];
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {lifetimeStats.map(({ label, value }) => (
+          <div
+            key={label}
+            className="rounded-lg bg-muted/50 p-2 text-center"
+          >
+            <div className="text-lg font-bold tabular-nums">{value}</div>
+            <div className="text-xs text-muted-foreground">{label}</div>
+          </div>
+        ))}
+      </div>
       <div className="rounded-lg border bg-primary/5 p-4 text-center">
         <div className="text-3xl font-bold">{streak}일</div>
         <div className="text-sm text-muted-foreground">연속 활동</div>

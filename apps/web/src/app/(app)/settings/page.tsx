@@ -3,6 +3,7 @@ import {
   Activity,
   Bell,
   CalendarClock,
+  Download,
   Keyboard,
   LogOut,
   Mail,
@@ -30,6 +31,7 @@ import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
 import { GitHubMark } from "@/components/ui/github-mark";
 import { GmailLink } from "@/components/GmailLink";
 import { DangerZone } from "@/components/DangerZone";
+import { ExportDataButton } from "@/components/ExportDataButton";
 
 export const dynamic = "force-dynamic";
 
@@ -237,6 +239,22 @@ export default async function SettingsPage() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Download className="size-4 text-primary-accent" />
+              데이터 내보내기
+            </CardTitle>
+            <CardDescription>
+              할 일·메모·습관·페이지 메타데이터를 JSON 파일로 내보냅니다. 페이지 본문은 용량 상
+              제외됩니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ExportDataButton />
           </CardContent>
         </Card>
 
