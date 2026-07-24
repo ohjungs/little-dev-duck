@@ -52,9 +52,7 @@ export function MemoWidget() {
 
   useEffect(() => {
     // 마운트 시 1회 조회. 재시도는 이벤트 핸들러(reload)가 담당.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMemos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const reload = () => {

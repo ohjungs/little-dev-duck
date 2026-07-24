@@ -27,7 +27,6 @@ export function OnboardingOverlay() {
 
   // localStorage는 클라이언트 전용이라 마운트 후 표시 여부를 결정한다(SSR에선 숨김).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!isOnboarded()) setShow(true);
   }, []);
 

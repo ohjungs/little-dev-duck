@@ -6,7 +6,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  eventToState,
   isAdjacent,
   movePlayer,
   buildOfficeMap,
@@ -32,6 +31,10 @@ import {
   timeOverlay,
   timeOfDayLabel,
   timeOfDayIcon,
+  createCompany,
+  tickCompany,
+  formatMoney,
+  type CompanyStats,
   type DuckWorkState,
   type TileMap,
   type Camera,
@@ -46,6 +49,7 @@ import { OfficeSoundManager } from "@/lib/office-sound";
 import { VirtualDpad } from "@/components/VirtualDpad";
 import { OfficeTalkPanel } from "@/components/OfficeTalkPanel";
 import { OfficeDashboard } from "@/components/OfficeDashboard";
+import { OfficeManagementPanel } from "@/components/OfficeManagementPanel";
 import { drawDuckSprite, drawFurnitureSprite, drawFloorTile, drawFurniture, drawMinimap } from "@/lib/office-draw";
 import { loadAllSprites, type SpriteAssets } from "@/lib/sprite-loader";
 
@@ -174,6 +178,11 @@ function buildAllNpcs(map: TileMap): Npc[] {
         tasks,
         recentDone: [],
         mood: "neutral",
+        // 직원 통계 초기값
+        productivity: 60 + Math.floor(Math.random() * 30), // 60-89
+        satisfaction: 60 + Math.floor(Math.random() * 30), // 60-89
+        salary: 10,
+        tasksCompleted: 0,
       };
 
       npcs.push(npc);
@@ -239,12 +248,23 @@ export function PixelOffice() {
 
   const clockRef = useRef<GameClock>(createGameClock(CLOCK_START_HOUR));
   const lastTickRef = useRef<number>(0);
+  // 회사 재정 상태
+  const companyRef = useRef<CompanyStats>(createCompany());
+  // 마지막으로 시간당 회사 틱을 실행한 게임 hour
+  const lastCompanyHourRef = useRef<number>(CLOCK_START_HOUR);
 
   const [talking, setTalking] = useState<TalkTarget | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showManagement, setShowManagement] = useState(false);
   const [soundMuted, setSoundMuted] = useState(false);
   const [dashboardClock, setDashboardClock] = useState<GameClock>(createGameClock(CLOCK_START_HOUR));
   const [dashboardNpcs, setDashboardNpcs] = useState<Npc[]>([]);
+  // management panel용 스냅샷 (React 렌더 트리거용)
+  const [managementSnapshot, setManagementSnapshot] = useState<{
+    company: CompanyStats;
+    npcs: Npc[];
+    clock: GameClock;
+  } | null>(null);
   const [paused, setPaused] = useState(false);
   const [zoneHud, setZoneHud] = useState<string | null>(null);
   const [showMinimap, setShowMinimap] = useState(true);
@@ -458,6 +478,12 @@ export function PixelOffice() {
         setClockDisplay(
           `${formatClockTime(clock)} ${timeOfDayIcon(tod)} ${timeOfDayLabel(tod)}`,
         );
+
+        // 게임 hour 변경 시 회사 재정 틱
+        if (clock.hour !== lastCompanyHourRef.current) {
+          lastCompanyHourRef.current = clock.hour;
+          companyRef.current = tickCompany(companyRef.current, npcsRef.current.length);
+        }
       }
 
       // 프레임 게이트
@@ -505,6 +531,25 @@ export function PixelOffice() {
       if (input.consumeJustPressed("sound")) {
         const nowMuted = sound.toggleMute();
         setSoundMuted(nowMuted);
+      }
+      // ESC 키 — 패널 닫기
+      if (input.consumeJustPressed("menu")) {
+        setShowManagement(false);
+        setTalking(null);
+      }
+      // TAB 키 — 경영 관리 패널 토글
+      if (input.consumeJustPressed("management")) {
+        setShowManagement((prev) => {
+          if (!prev) {
+            // 패널 열 때 스냅샷 갱신
+            setManagementSnapshot({
+              company: { ...companyRef.current },
+              npcs: [...npcsRef.current],
+              clock: { ...clockRef.current },
+            });
+          }
+          return !prev;
+        });
       }
 
       const ctx = canvas.getContext("2d");
@@ -753,10 +798,39 @@ export function PixelOffice() {
           </div>
         )}
 
-        {/* 시계 HUD (React 레이어 — canvas HUD와 동기화) */}
-        <div className="pointer-events-none absolute right-2 top-2 rounded bg-black/55 px-2 py-0.5 font-mono text-xs font-bold text-white">
-          {clockDisplay}
+        {/* 회사 HUD + 시계 — 우상단 반투명 바 */}
+        <div className="pointer-events-none absolute right-2 top-2 flex flex-col items-end gap-0.5">
+          <div className="rounded bg-black/60 px-2 py-0.5 font-mono text-xs font-bold text-white">
+            {clockDisplay}
+          </div>
+          <div className="rounded bg-black/60 px-2 py-0.5 font-mono text-[10px] text-gray-200 flex gap-2">
+            <span className="text-green-400">₩{formatMoney(companyRef.current.money)}</span>
+            <span className="text-gray-400">{npcsRef.current.length}명</span>
+          </div>
         </div>
+
+        {/* 경영 패널 토글 버튼 (좌상단) */}
+        <button
+          type="button"
+          onClick={() => {
+            setShowManagement((prev) => {
+              if (!prev) {
+                setManagementSnapshot({
+                  company: { ...companyRef.current },
+                  npcs: [...npcsRef.current],
+                  clock: { ...clockRef.current },
+                });
+              }
+              return !prev;
+            });
+          }}
+          aria-label="경영 관리 패널 열기"
+          className="absolute left-2 top-2 rounded bg-black/60 border border-gray-600
+                     px-2 py-0.5 font-mono text-[10px] text-gray-200
+                     hover:bg-black/80 hover:text-white transition-colors z-10"
+        >
+          경영 [TAB]
+        </button>
 
         {/* NPC 대화 패널 — canvas 위에 절대 오버레이 */}
         {talking && (
@@ -767,11 +841,21 @@ export function PixelOffice() {
         )}
 
         {/* CEO 전사 대시보드 — 사장실 책상 근접 시 자동 표시 */}
-        {showDashboard && !talking && (
+        {showDashboard && !talking && !showManagement && (
           <OfficeDashboard
             npcs={dashboardNpcs}
             clock={dashboardClock}
             onClose={() => setShowDashboard(false)}
+          />
+        )}
+
+        {/* 경영 관리 패널 — TAB 키 또는 버튼으로 열림 */}
+        {showManagement && managementSnapshot && (
+          <OfficeManagementPanel
+            company={managementSnapshot.company}
+            npcs={managementSnapshot.npcs}
+            clock={managementSnapshot.clock}
+            onClose={() => setShowManagement(false)}
           />
         )}
       </div>
@@ -779,7 +863,7 @@ export function PixelOffice() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           캔버스를 클릭해 포커스한 뒤 방향키/WASD로 대장오리를 움직여요. 직원 오리 옆에서 E를 누르면
-          지금 뭐 하는지 물어볼 수 있어요. M 키로 미니맵, N 키로 사운드를 켜고 끌 수 있습니다.
+          지금 뭐 하는지 물어볼 수 있어요. TAB으로 경영 패널, M 키로 미니맵, N 키로 사운드를 켜고 끌 수 있습니다.
         </p>
         <div className="flex items-center gap-2">
           <button

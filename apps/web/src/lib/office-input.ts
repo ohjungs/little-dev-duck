@@ -1,7 +1,7 @@
 // 2026-07-24 : office-input - InputManager — 키보드·터치 단일 입력 추상화 레이어.
 // 키보드 이벤트와 가상 D-pad 터치 이벤트를 동일한 InputAction으로 통합한다.
 
-export type InputAction = "up" | "down" | "left" | "right" | "interact" | "menu" | "minimap" | "sound";
+export type InputAction = "up" | "down" | "left" | "right" | "interact" | "menu" | "minimap" | "sound" | "management";
 
 export class InputManager {
   private pressed = new Set<InputAction>();
@@ -72,6 +72,7 @@ export class InputManager {
       M: "minimap",
       n: "sound",
       N: "sound",
+      Tab: "management",
     };
 
     const onDown = (e: KeyboardEvent) => {

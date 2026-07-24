@@ -279,3 +279,12 @@ export {
   timeOfDayIcon,
   type TimeOfDay,
 } from "./domain/office-time";
+export {
+  createCompany,
+  tickCompany,
+  recordTaskCompletion,
+  formatMoney,
+  reputationStars,
+  type CompanyStats,
+  type EmployeeStats,
+} from "./domain/office-company";

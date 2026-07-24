@@ -69,9 +69,7 @@ export function PomodoroWidget() {
 
   useEffect(() => {
     // 마운트 시 1회 조회(오늘 완료 집계용). 재시도는 reload가 담당.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSessions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 카운트다운: running일 때만 인터벌을 돌리고, 정지/언마운트 시 정리한다.
@@ -110,7 +108,6 @@ export function PomodoroWidget() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, remaining, activeId]);
 
   const reload = () => {

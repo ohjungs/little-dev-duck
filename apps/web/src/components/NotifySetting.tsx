@@ -18,7 +18,6 @@ export function NotifySetting() {
 
   // Notification API는 클라이언트 전용이라 마운트 후 1회 상태를 읽는다(SSR 불가).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPerm(notifySupported() ? notifyPermission() : "unsupported");
   }, []);
 

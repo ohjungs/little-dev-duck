@@ -64,9 +64,7 @@ export function CalendarWidget() {
 
   useEffect(() => {
     // 마운트 시 1회 조회. 재시도는 reload가 담당.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const reload = () => {

@@ -31,6 +31,10 @@ function makeNpc(overrides: Partial<Npc> = {}): Npc {
     tasks: [],
     recentDone: [],
     mood: "neutral",
+    productivity: 75,
+    satisfaction: 75,
+    salary: 10,
+    tasksCompleted: 0,
     ...overrides,
   };
 }
@@ -160,7 +164,7 @@ describe("simulateNpcTasks", () => {
   it("진행률 100% 태스크는 recentDone으로 이동한다", () => {
     const task = makeTask({ progress: 99.5 });
     const npc = makeNpc({ schedulePhase: "working", tasks: [task] });
-    // fixedRng → advance = 0.5 + 0.5*1.5 = 1.25 → 99.5+1.25 = 100.75 → 100 → done
+    // fixedRng=0.5, productivity=75 → prodFactor≈0.875, advance≈1.09 → 99.5+1.09>100 → done
     const result = simulateNpcTasks(npc, clock, fixedRng);
     expect(result.tasks).toHaveLength(0);
     expect(result.recentDone).toHaveLength(1);

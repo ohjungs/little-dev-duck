@@ -24,11 +24,9 @@ export function QuietHoursSetting() {
   });
 
   // localStorage는 클라이언트 전용이라 SSR 초기값(기본값) 이후 마운트 후 1회 실제 값으로 초기화한다.
-  // react-hooks/set-state-in-effect는 이 정당한 1회 외부 동기화를 막으므로 이 줄만 예외로 둔다.
   useEffect(() => {
     const q = readQuietHours();
     if (!q) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setS({ enabled: true, start: q.start, end: q.end });
   }, []);
 

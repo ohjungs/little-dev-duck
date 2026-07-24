@@ -35,6 +35,11 @@ export type Npc = {
   tasks: NpcTask[];
   recentDone: NpcTask[];
   mood: "happy" | "neutral" | "stressed" | "tired";
+  // 직원 통계 (management panel용)
+  productivity: number;    // 0-100
+  satisfaction: number;    // 0-100
+  salary: number;          // 시간당 급여
+  tasksCompleted: number;  // 누적 완료 태스크 수
 };
 
 export type GameClock = {
@@ -93,8 +98,9 @@ export function simulateNpcTasks(npc: Npc, clock: GameClock, rng: () => number):
 
   const tasks = npc.tasks.map((t) => {
     if (t.status !== "active") return t;
-    // 분당 0.5-2% 진행
-    const advance = 0.5 + rng() * 1.5;
+    // 생산성에 비례해 분당 0.5-2% 진행 (productivity 100 = 최대 속도)
+    const prodFactor = 0.5 + (npc.productivity / 100) * 0.5;
+    const advance = prodFactor * (0.5 + rng() * 1.5);
     const newProgress = Math.min(100, t.progress + advance);
     if (newProgress >= 100) {
       return { ...t, progress: 100, status: "done" as const };
@@ -106,6 +112,21 @@ export function simulateNpcTasks(npc: Npc, clock: GameClock, rng: () => number):
   const done = tasks.filter((t) => t.status === "done");
   const active = tasks.filter((t) => t.status !== "done");
   const recentDone = [...done, ...npc.recentDone].slice(0, 3);
+
+  // 누적 완료 수 갱신
+  const newTasksCompleted = npc.tasksCompleted + done.length;
+
+  // 완료 시 만족도 소폭 상승 (최대 100). 태스크 없으면 소폭 하락.
+  let newSatisfaction = npc.satisfaction;
+  if (done.length > 0) {
+    newSatisfaction = Math.min(100, npc.satisfaction + done.length * 2);
+  } else if (active.length === 0 && rng() < 0.02) {
+    newSatisfaction = Math.max(0, npc.satisfaction - 1);
+  }
+
+  // 생산성: 만족도에 수렴하도록 천천히 조정 (매 분 0-1 범위 랜덤 이동)
+  const prodDelta = (newSatisfaction - npc.productivity) * 0.005;
+  const newProductivity = Math.max(0, Math.min(100, npc.productivity + prodDelta));
 
   // 활성 태스크가 2개 미만이면 10% 확률로 새 태스크 생성
   if (active.length < 2 && rng() < 0.1) {
@@ -119,7 +140,14 @@ export function simulateNpcTasks(npc: Npc, clock: GameClock, rng: () => number):
     });
   }
 
-  return { ...npc, tasks: active, recentDone };
+  return {
+    ...npc,
+    tasks: active,
+    recentDone,
+    tasksCompleted: newTasksCompleted,
+    satisfaction: Math.round(newSatisfaction),
+    productivity: Math.round(newProductivity),
+  };
 }
 
 // 부서별 태스크 템플릿(결정적 데이터 — LLM 없이 매핑)

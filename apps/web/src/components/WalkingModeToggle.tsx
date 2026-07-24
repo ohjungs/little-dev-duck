@@ -24,7 +24,6 @@ export function WalkingModeToggle() {
   const [error, setError] = useState<string | null>(null);
 
   // 마운트 후에만 Tauri 여부를 판정해 SSR/하이드레이션 불일치를 피한다(마운트 표식용 setState).
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   if (!mounted) return null;

@@ -11,7 +11,6 @@ export function AppearanceSetting() {
   const [mode, setMode] = useState<Mode>("light");
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMode(localStorage.getItem("ldd-theme") === "dark" ? "dark" : "light");
   }, []);
 

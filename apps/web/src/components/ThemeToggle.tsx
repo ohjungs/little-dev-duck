@@ -10,7 +10,6 @@ export function ThemeToggle() {
 
   useEffect(() => {
     const isDark = localStorage.getItem("ldd-theme") === "dark";
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDark(isDark);
     document.documentElement.classList.toggle("dark", isDark);
   }, []);
