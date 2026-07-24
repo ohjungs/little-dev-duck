@@ -10,12 +10,12 @@ import {
   createCamera,
   followTarget,
   worldToScreen,
+  screenToWorld,
   visibleTileRange,
   getTile,
   isBlocked as tileIsBlocked,
   getZoneAt,
   TileType,
-  type Dir,
   type DuckWorkState,
   type OfficeRole,
   type Vec,
@@ -23,6 +23,8 @@ import {
   type Camera,
 } from "@ldd/core";
 import { cn } from "@/lib/utils";
+import { InputManager } from "@/lib/office-input";
+import { VirtualDpad } from "@/components/VirtualDpad";
 
 // Phase 16+17+AC-5+6: Camera-tracked tilemap rendering, 80x60 map at TILE=16.
 // AC-5: Camera follows player, visible tile range culling, worldToScreen for all entities.
@@ -129,20 +131,6 @@ function ceoStartPos(map: TileMap): Vec {
   };
 }
 
-const KEY_DIR: Record<string, Dir> = {
-  ArrowUp: "up",
-  ArrowDown: "down",
-  ArrowLeft: "left",
-  ArrowRight: "right",
-  w: "up",
-  s: "down",
-  a: "left",
-  d: "right",
-  W: "up",
-  S: "down",
-  A: "left",
-  D: "right",
-};
 
 // --- Inline drawing helpers (placeholder until office-draw.ts is available) ---
 
@@ -377,6 +365,9 @@ export function PixelOffice() {
   const mapRef = useRef<TileMap | null>(null);
   const camRef = useRef<Camera | null>(null);
 
+  // 단일 입력 시스템 — 키보드와 터치 D-pad가 동일한 인스턴스를 공유한다
+  const inputRef = useRef<InputManager>(new InputManager());
+
   const [count, setCount] = useState(3);
   const workersRef = useRef<Worker[]>([]);
   const playerRef = useRef<Vec>({ x: 40, y: 17 });
@@ -434,26 +425,51 @@ export function PixelOffice() {
     setTalking({ role: near, text: describeActivity(worker) });
   }, []);
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
-    if (e.key === "e" || e.key === "E" || e.key === "Enter") {
-      e.preventDefault();
-      talkToNearby();
-      return;
-    }
-    const dir = KEY_DIR[e.key];
-    if (!dir) return;
-    e.preventDefault();
-    const map = mapRef.current;
-    if (!map) return;
-    playerRef.current = movePlayer(
-      playerRef.current,
-      dir,
-      map.cols,
-      map.rows,
-      isBlockedFn,
-    );
-    setTalking(null);
-  };
+  // 키보드 바인딩 — InputManager에 위임한다. 캔버스 포커스 필요.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const unbind = inputRef.current.bindKeyboard(canvas);
+    return unbind;
+  }, []);
+
+  // 캔버스 탭 핸들러 (AC-C3): 터치 탭 위치를 월드 좌표로 변환해 인접 NPC 확인
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const onTouchEnd = (e: TouchEvent) => {
+      // 멀티터치나 스크롤 직후 탭은 무시
+      if (e.changedTouches.length !== 1) return;
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+
+      const cam = camRef.current;
+      if (!cam) return;
+
+      const rect = canvas.getBoundingClientRect();
+      // getBoundingClientRect 기준 CSS 좌표로 변환 (DPR 보정 없이 — worldToScreen도 CSS 픽셀 기준)
+      const sx = touch.clientX - rect.left;
+      const sy = touch.clientY - rect.top;
+      const { x: wx, y: wy } = screenToWorld(cam, sx, sy);
+
+      // 타일 좌표로 변환
+      const tileX = Math.floor(wx / TILE);
+      const tileY = Math.floor(wy / TILE);
+
+      // 탭된 타일에 인접한 NPC가 있으면 대화 시작
+      const worker = workersRef.current.find(
+        (w) => isAdjacent(w.tile, { x: tileX, y: tileY }),
+      );
+      if (worker) {
+        inputRef.current.setTapWorld(wx, wy);
+        setTalking({ role: worker.role, text: describeActivity(worker) });
+      }
+    };
+
+    canvas.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => canvas.removeEventListener("touchend", onTouchEnd);
+  }, []);
 
   // ResizeObserver — update canvas size and camera viewW/viewH
   useEffect(() => {
@@ -559,8 +575,33 @@ export function PixelOffice() {
       lastDraw = now;
       if (!reduce) frame += 1;
 
+      // InputManager: 이동 처리 — FRAME_MS 게이트 안에서 처리해 속도를 제한한다
+      const input = inputRef.current;
+      const dirs = ["up", "down", "left", "right"] as const;
+      for (const dir of dirs) {
+        if (input.isPressed(dir)) {
+          playerRef.current = movePlayer(
+            playerRef.current,
+            dir,
+            map.cols,
+            map.rows,
+            isBlockedFn,
+          );
+          // 이동 시 대화 패널 닫기
+          setTalking(null);
+          break; // 한 프레임에 한 방향만
+        }
+      }
+      // InputManager: 상호작용 처리
+      if (input.consumeJustPressed("interact")) {
+        talkToNearby();
+      }
+
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
+
+      // 입력 처리 후 최신 플레이어 위치를 읽는다
+      const currentPlayer = playerRef.current;
 
       // Update camera to follow player
       const viewW = camRef.current?.viewW ?? canvas.width;
@@ -570,8 +611,8 @@ export function PixelOffice() {
       }
       camRef.current = followTarget(
         camRef.current,
-        player.x * TILE + TILE / 2,
-        player.y * TILE + TILE / 2,
+        currentPlayer.x * TILE + TILE / 2,
+        currentPlayer.y * TILE + TILE / 2,
         map.cols * TILE,
         map.rows * TILE,
         0.1,
@@ -626,8 +667,8 @@ export function PixelOffice() {
       }
 
       // Render player (boss duck)
-      const pwx = player.x * TILE + TILE / 2;
-      const pwy = player.y * TILE + TILE / 2;
+      const pwx = currentPlayer.x * TILE + TILE / 2;
+      const pwy = currentPlayer.y * TILE + TILE / 2;
       const { x: psx, y: psy } = worldToScreen(cam, pwx, pwy);
       drawDuck(ctx, psx, psy, "idle", frame, true);
 
@@ -639,11 +680,14 @@ export function PixelOffice() {
         ctx.textAlign = "center";
         ctx.fillText("E: 말 걸기", psx, psy - 28);
       }
+
+      // 프레임 끝: justPressed / tapWorldPos 초기화
+      inputRef.current.endFrame();
     };
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [isBlockedFn]);
+  }, [isBlockedFn, talkToNearby]);
 
   // Canvas aspect ratio: 15:9 to match the 80x60 tile map proportion
   const aspectRatio = "15 / 9";
@@ -658,13 +702,13 @@ export function PixelOffice() {
         <canvas
           ref={canvasRef}
           tabIndex={0}
-          onKeyDown={onKeyDown}
           onDoubleClick={() => setShowLog((s) => !s)}
           role="img"
           aria-label="픽셀 오리 오피스 — 방향키/WASD로 대장오리를 움직이고, 직원 오리 옆에서 E로 말을 겁니다. 더블클릭하면 활동 로그가 열립니다"
           className="block h-full w-full cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           style={{ imageRendering: "pixelated" }}
         />
+        <VirtualDpad input={inputRef.current} />
         {/* Zone name HUD overlay */}
         {zoneHud && (
           <div
