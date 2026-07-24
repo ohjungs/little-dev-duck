@@ -134,6 +134,21 @@ export async function checkHabit(
   return fromCheckRow(data as HabitCheckRow);
 }
 
+export async function listHabitChecksInRange(
+  supabase: SupabaseClient,
+  from: string,
+  to: string,
+): Promise<HabitCheck[]> {
+  const { data, error } = await supabase
+    .from("habit_checks")
+    .select("*")
+    .gte("checked_date", from)
+    .lte("checked_date", to)
+    .order("checked_date", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as HabitCheckRow[]).map(fromCheckRow);
+}
+
 export async function uncheckHabit(
   supabase: SupabaseClient,
   habitId: string,

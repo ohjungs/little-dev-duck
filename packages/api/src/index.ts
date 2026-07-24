@@ -39,6 +39,7 @@ export {
   createHabit,
   deleteHabit,
   listHabitChecks,
+  listHabitChecksInRange,
   checkHabit,
   uncheckHabit,
   type CreateHabitInput,

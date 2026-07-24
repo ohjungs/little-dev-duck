@@ -4,6 +4,7 @@ import {
   createHabit,
   deleteHabit,
   listHabitChecks,
+  listHabitChecksInRange,
   listHabits,
   uncheckHabit,
 } from "./habits";
@@ -194,6 +195,42 @@ describe("deleteHabit", () => {
     await expect(
       deleteHabit(fakeSupabase(), VALID_HABIT_ROW.id),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("listHabitChecksInRange", () => {
+  it("범위 조회 결과를 HabitCheck[]로 변환한다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          gte: () => ({
+            lte: () => ({
+              order: async () => ({ data: [VALID_CHECK_ROW], error: null }),
+            }),
+          }),
+        }),
+      }),
+    });
+    const result = await listHabitChecksInRange(supabase, "2026-07-01", "2026-07-31");
+    expect(result).toHaveLength(1);
+    expect(result[0].checkedDate).toBe("2026-07-21");
+  });
+
+  it("DB 에러면 예외를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          gte: () => ({
+            lte: () => ({
+              order: async () => ({ data: null, error: { message: "range-boom" } }),
+            }),
+          }),
+        }),
+      }),
+    });
+    await expect(
+      listHabitChecksInRange(supabase, "2026-07-01", "2026-07-31"),
+    ).rejects.toThrow("range-boom");
   });
 });
 

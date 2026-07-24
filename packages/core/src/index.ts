@@ -93,8 +93,12 @@ export { pageStats, type PageStats } from "./domain/page-stats";
 export { rowsToCsv } from "./domain/db-export";
 export {
   dashboardSummary,
+  pomodoroStats,
+  habitHeatmapData,
   type DashboardInput,
   type DashboardSummary,
+  type PomodoroStats,
+  type HeatmapDay,
 } from "./domain/dashboard";
 export {
   WRITE_ACTIONS,

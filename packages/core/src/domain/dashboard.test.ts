@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dashboardSummary } from "./dashboard";
+import { dashboardSummary, habitHeatmapData, pomodoroStats } from "./dashboard";
 import { deriveLevel } from "./duck-xp";
 
 describe("dashboardSummary", () => {
@@ -41,5 +41,56 @@ describe("dashboardSummary", () => {
     expect(dashboardSummary({ ...base, duckXp: 250 }).level).toBe(
       deriveLevel(250),
     );
+  });
+});
+
+describe("pomodoroStats", () => {
+  it("빈 배열이면 모두 0, topTag null", () => {
+    const s = pomodoroStats([]);
+    expect(s).toEqual({ totalMinutes: 0, sessionsCount: 0, avgMinutes: 0, topTag: null });
+  });
+
+  it("완료된 세션만 집계한다", () => {
+    const s = pomodoroStats([
+      { durationMinutes: 25, tag: "코딩", completedAt: "2026-07-20T10:00:00Z" },
+      { durationMinutes: 30, tag: null, completedAt: null }, // 미완료 — 제외
+      { durationMinutes: 15, tag: "코딩", completedAt: "2026-07-21T10:00:00Z" },
+    ]);
+    expect(s.sessionsCount).toBe(2);
+    expect(s.totalMinutes).toBe(40);
+    expect(s.avgMinutes).toBe(20);
+    expect(s.topTag).toBe("코딩");
+  });
+
+  it("태그가 없으면 topTag는 null", () => {
+    const s = pomodoroStats([
+      { durationMinutes: 25, tag: null, completedAt: "2026-07-20T10:00:00Z" },
+    ]);
+    expect(s.topTag).toBeNull();
+  });
+});
+
+describe("habitHeatmapData", () => {
+  it("체크가 없으면 모두 count 0", () => {
+    const result = habitHeatmapData([], "2026-07-24", 7);
+    expect(result).toHaveLength(7);
+    expect(result.every((d) => d.count === 0)).toBe(true);
+    expect(result[result.length - 1].date).toBe("2026-07-24");
+  });
+
+  it("일치하는 날짜에 count를 누적한다", () => {
+    const result = habitHeatmapData(
+      [
+        { checkedDate: "2026-07-22" },
+        { checkedDate: "2026-07-22" },
+        { checkedDate: "2026-07-24" },
+      ],
+      "2026-07-24",
+      7,
+    );
+    const day22 = result.find((d) => d.date === "2026-07-22");
+    const day24 = result.find((d) => d.date === "2026-07-24");
+    expect(day22?.count).toBe(2);
+    expect(day24?.count).toBe(1);
   });
 });

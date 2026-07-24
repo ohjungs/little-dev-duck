@@ -15,12 +15,22 @@ import {
 import {
   getDuckState,
   listArticles,
+  listHabitChecksInRange,
   listHabits,
   listMemos,
   listPages,
+  listPomodoroSessions,
   listTodos,
 } from "@ldd/api";
-import { dashboardSummary, type DashboardSummary } from "@ldd/core";
+import {
+  dashboardSummary,
+  habitHeatmapData,
+  pomodoroStats,
+  type DashboardSummary,
+  type HeatmapDay,
+  type PomodoroStats,
+} from "@ldd/core";
+import { HabitHeatmap } from "./HabitHeatmap";
 import { createClient } from "@/lib/supabase/client";
 
 function StatTile({
@@ -47,6 +57,8 @@ function StatTile({
 export function InsightsView() {
   const router = useRouter();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [pomStats, setPomStats] = useState<PomodoroStats | null>(null);
+  const [heatmap, setHeatmap] = useState<HeatmapDay[] | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [standupState, setStandupState] = useState<
     "idle" | "loading" | "error"
@@ -57,14 +69,23 @@ export function InsightsView() {
     const supabase = createClient();
     const run = async () => {
       try {
-        const [todos, pages, memos, habits, articles, duck] = await Promise.all([
-          listTodos(supabase),
-          listPages(supabase),
-          listMemos(supabase),
-          listHabits(supabase),
-          listArticles(supabase, 200),
-          getDuckState(supabase).catch(() => null),
-        ]);
+        const today = new Date().toISOString().slice(0, 10);
+        const ninetyDaysAgo = (() => {
+          const d = new Date();
+          d.setDate(d.getDate() - 89);
+          return d.toISOString().slice(0, 10);
+        })();
+        const [todos, pages, memos, habits, articles, duck, pomSessions, checks] =
+          await Promise.all([
+            listTodos(supabase),
+            listPages(supabase),
+            listMemos(supabase),
+            listHabits(supabase),
+            listArticles(supabase, 200),
+            getDuckState(supabase).catch(() => null),
+            listPomodoroSessions(supabase),
+            listHabitChecksInRange(supabase, ninetyDaysAgo, today),
+          ]);
         setSummary(
           dashboardSummary({
             todos,
@@ -75,6 +96,8 @@ export function InsightsView() {
             duckXp: duck?.xp ?? null,
           }),
         );
+        setPomStats(pomodoroStats(pomSessions));
+        setHeatmap(habitHeatmapData(checks.map((c) => ({ checkedDate: c.checkedDate })), today));
         setState("ready");
       } catch {
         setState("error");
@@ -112,6 +135,13 @@ export function InsightsView() {
     return (
       <p className="text-sm text-muted-foreground">통계를 불러오지 못했어요.</p>
     );
+  }
+
+  function formatMinutes(minutes: number): string {
+    if (minutes < 60) return `${minutes}분`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
   }
 
   return (
@@ -171,6 +201,39 @@ export function InsightsView() {
         label="수집 기사"
       />
     </div>
+    {pomStats && (
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">집중 세션</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile
+            icon={<Flame className="size-5" />}
+            value={formatMinutes(pomStats.totalMinutes)}
+            label="총 집중 시간"
+          />
+          <StatTile
+            icon={<Flame className="size-5" />}
+            value={pomStats.sessionsCount}
+            label="세션 수"
+          />
+          <StatTile
+            icon={<Flame className="size-5" />}
+            value={formatMinutes(pomStats.avgMinutes)}
+            label="세션 평균"
+          />
+          <StatTile
+            icon={<Flame className="size-5" />}
+            value={pomStats.topTag ?? "-"}
+            label="주요 태그"
+          />
+        </div>
+      </section>
+    )}
+    {heatmap && (
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">습관 체크 (최근 90일)</h2>
+        <HabitHeatmap data={heatmap} />
+      </section>
+    )}
     </div>
   );
 }
