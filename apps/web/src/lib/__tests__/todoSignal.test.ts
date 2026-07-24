@@ -17,7 +17,7 @@ beforeEach(() => {
 describe("emitTodosChanged / onTodosChanged", () => {
   it("handler receives the tally on the same tick", async () => {
     const { emitTodosChanged, onTodosChanged } = await import("../todoSignal");
-    const tally = { total: 3, done: 1, pending: 2 } as const;
+    const tally = { total: 3, done: 1, } as const;
     const received: unknown[] = [];
     onTodosChanged((t) => received.push(t));
     emitTodosChanged(tally);
@@ -27,7 +27,7 @@ describe("emitTodosChanged / onTodosChanged", () => {
 
   it("replay: subscriber gets lastTally immediately if emit happened first", async () => {
     const { emitTodosChanged, onTodosChanged } = await import("../todoSignal");
-    const tally = { total: 5, done: 5, pending: 0 } as const;
+    const tally = { total: 5, done: 5, } as const;
     emitTodosChanged(tally);
     const received: unknown[] = [];
     onTodosChanged((t) => received.push(t));
@@ -41,7 +41,7 @@ describe("emitTodosChanged / onTodosChanged", () => {
     const received: unknown[] = [];
     const unsub = onTodosChanged((t) => received.push(t));
     unsub();
-    emitTodosChanged({ total: 1, done: 0, pending: 1 } as const);
+    emitTodosChanged({ total: 1, done: 0, } as const);
     // Replay would have fired if lastTally existed before subscribe — but it
     // doesn't (fresh module). The event after unsub must also not be received.
     expect(received).toHaveLength(0);
