@@ -17,7 +17,7 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 // 개인 단일 사용자 도구라 위험은 자기 자신에 한정되지만(RLS로 본인 피드만 수집), 메타데이터 엔드포인트
 // (169.254.169.254) 등 발등찍기 방지용 최소 방어. DNS 리바인딩까지는 막지 않는다(YAGNI).
 const PRIVATE_HOST =
-  /^(localhost$|127\.|0\.0\.0\.0$|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|\[?fc|\[?fd)/i;
+  /^(localhost$|127\.|0\.0\.0\.0$|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|\[?fc|\[?fd|::ffff:(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.))/i;
 
 type FeedRow = {
   id: string;
@@ -154,10 +154,12 @@ export async function setFeedStatus(
   status: "active" | "paused",
 ): Promise<void> {
   // 수동 재개/일시정지 시 fail_count도 리셋(자동 일시정지 카운터와 통일).
+  const userId = await requireUserId(supabase);
   const { error } = await supabase
     .from("feeds")
     .update({ status, fail_count: 0 })
-    .eq("id", feedId);
+    .eq("id", feedId)
+    .eq("user_id", userId);
   if (error) throw new Error(error.message);
 }
 
@@ -165,7 +167,8 @@ export async function deleteFeed(
   supabase: SupabaseClient,
   feedId: string,
 ): Promise<void> {
-  const { error } = await supabase.from("feeds").delete().eq("id", feedId);
+  const userId = await requireUserId(supabase);
+  const { error } = await supabase.from("feeds").delete().eq("id", feedId).eq("user_id", userId);
   if (error) throw new Error(error.message);
 }
 
@@ -207,6 +210,9 @@ export async function collectFeed(
       headers: { "user-agent": "LittleDevDuck/1.0 (+rss)" },
     });
     if (!res.ok) throw new Error(`feed HTTP ${res.status}`);
+    // 2026-07-24: redirect chain SSRF 방어 — 최종 도착지가 사설 대역이면 차단.
+    const resolvedHost = new URL(res.url).hostname;
+    if (PRIVATE_HOST.test(resolvedHost)) throw new Error("사설 주소로 리다이렉트됨");
     xml = await res.text();
   } catch {
     const nextFail = feed.failCount + 1;

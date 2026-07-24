@@ -13,6 +13,7 @@ import {
 } from "@ldd/api";
 import { isLddError } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
+import { requireGeminiKey } from "@/lib/apiHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -49,13 +50,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "GEMINI_API_KEY 환경변수가 설정되지 않았습니다." },
-      { status: 500 },
-    );
-  }
+  const keyOrError = requireGeminiKey();
+  if (keyOrError instanceof NextResponse) return keyOrError;
+  const apiKey = keyOrError;
 
   let question: unknown;
   try {

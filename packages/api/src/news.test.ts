@@ -59,8 +59,8 @@ function fakeSupabase(opts: FakeOpts = {}) {
   return { supabase, state };
 }
 
-function xmlResponse(xml: string) {
-  return async () => ({ ok: true, text: async () => xml }) as unknown as Response;
+function xmlResponse(xml: string, url = "https://ex.com/rss") {
+  return async () => ({ ok: true, url, text: async () => xml }) as unknown as Response;
 }
 
 const TWO_ITEMS = `<rss><channel>

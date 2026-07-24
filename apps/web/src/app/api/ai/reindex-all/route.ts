@@ -11,6 +11,7 @@ import {
 import type { EmbeddingSource } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 import { todoEmbedText } from "@/lib/embedText";
+import { requireGeminiKey } from "@/lib/apiHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -37,13 +38,9 @@ export async function POST() {
     );
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "GEMINI_API_KEY 환경변수가 설정되지 않았습니다." },
-      { status: 500 },
-    );
-  }
+  const keyOrError = requireGeminiKey();
+  if (keyOrError instanceof NextResponse) return keyOrError;
+  const apiKey = keyOrError;
 
   try {
     const [memos, todos, habits, events, pages] = await Promise.all([

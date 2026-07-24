@@ -177,6 +177,28 @@ describe("sortRows", () => {
     const out = sortRows(rows, { propId: "score", direction: "asc" }, PROPS);
     expect(out.map((r) => r.id)).toEqual(["a", "b", "c"]);
   });
+
+  it("텍스트 속성 오름차순 정렬", () => {
+    const rows = [
+      dbRow("a", "", { note: "사과" }),
+      dbRow("b", "", { note: "가지" }),
+      dbRow("c", "", { note: "바나나" }),
+    ];
+    const out = sortRows(rows, { propId: "note", direction: "asc" }, PROPS);
+    // 한글 자모순: 가지(b) < 바나나(c) < 사과(a)
+    expect(out.map((r) => r.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("텍스트 속성 내림차순 정렬", () => {
+    const rows = [
+      dbRow("a", "", { note: "사과" }),
+      dbRow("b", "", { note: "가지" }),
+      dbRow("c", "", { note: "바나나" }),
+    ];
+    const out = sortRows(rows, { propId: "note", direction: "desc" }, PROPS);
+    // 내림차순: 사과(a) > 바나나(c) > 가지(b)
+    expect(out.map((r) => r.id)).toEqual(["a", "c", "b"]);
+  });
 });
 
 describe("filterRows", () => {
@@ -260,6 +282,30 @@ describe("filterRows", () => {
       value: "약속",
     };
     expect(filterRows(rows, [f], PROPS).map((r) => r.id)).toEqual(["c"]);
+  });
+
+  it("text equals — 정확히 일치하는 행만 통과한다", () => {
+    const f: FilterSpec = { propId: "note", op: "equals", value: "긴급" };
+    expect(filterRows(rows, [f], PROPS).map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("text not_equals — 일치하지 않는 행을 통과시킨다(null 포함)", () => {
+    const f: FilterSpec = { propId: "note", op: "not_equals", value: "긴급" };
+    // b(null)과 c(undefined → null)는 "긴급"이 아니므로 통과
+    expect(filterRows(rows, [f], PROPS).map((r) => r.id)).toEqual(["b", "c"]);
+  });
+
+  it("contains — 대소문자 무시, 영문도 동작한다", () => {
+    const localRows = [
+      dbRow("x", "", { note: "Hello World" }),
+      dbRow("y", "", { note: "hello world" }),
+      dbRow("z", "", { note: "other" }),
+    ];
+    const f: FilterSpec = { propId: "note", op: "contains", value: "HELLO" };
+    expect(filterRows(localRows, [f], PROPS).map((r) => r.id)).toEqual([
+      "x",
+      "y",
+    ]);
   });
 });
 

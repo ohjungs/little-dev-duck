@@ -40,8 +40,54 @@ T2 키보드 접근성(전역 focus 링+공용 모달 훅+스킵 링크), T3 계
 +위험구역 UI, 강한 확인 게이트), T4 공개 랜딩(/welcome, 비로그인 리다이렉트 대상). T5 Sentry·T6 i18n은
 인프라·범위로 이월. Phase 12(공개 공유+알림+대시보드) T1~T5 코드 완료(T6 대시보드 이월, 최종 리뷰 대기).
 Phase 11(DB 뷰) T1~T5 완료·배포. Phase 10은 코드 완료.
-미적용 마이그레이션 db push 대기: pages_db_view(11), pages_public_share(12 T1), delete_all_my_data(13 T3).
-Phase 완료분은 사용자 db push + 실기 검증만 남음(코드는 전부 배포됨).**
+미적용 마이그레이션: ~~db push 대기 4건~~ → **2026-07-24 Supabase MCP로 전건 적용 완료**
+(user_github_tokens, user_gmail_tokens, pages_db_view, pages_public_share, delete_all_my_data, news — 총 6건).
+Phase 완료분은 실기 검증만 남음(코드+DB 전부 배포됨).**
+
+## 발굴된 개선점 (2026-07-24 /plan 5인 감사 + 내부 패널 교차검증)
+
+> 5인 감사관(code-reviewer, security-auditor, ui-ux-designer, test-automator, technical-researcher) 병렬 스윕
+> → 내부 회의 패널(증거 검증 debugger 14/15 TRUE + 가치 반박 task-decomposition-expert) 교차검증.
+> 교차검증 모드: internal-panel (외부 AI CLI 미설치). 정지 사유: round 1 충분(하드캡 미도달).
+> 총 79건 발굴 → 중복 제거·병합 후 25건 평가 → 2건 SKIP·1건 FALSE 탈락 → **22건 확정**.
+
+### MUST (priority 1) — 즉시 수정
+
+- [ ] GEMINI_API_KEY 가드 5곳 → 공용 requireGeminiKey 헬퍼 추출 (code-quality) → 스펙: docs/specs/2026-07-24-security-hardening.md
+- [ ] SSRF 가드 강화: IPv6-mapped·redirect chain 방어 (security) → 스펙: docs/specs/2026-07-24-security-hardening.md
+- [ ] deleteFeed/setFeedStatus에 user_id 필터 추가 (defense-in-depth) → 스펙: docs/specs/2026-07-24-security-hardening.md
+- [ ] agent.ts INJECTION_GUARD를 Gemini systemInstruction 필드로 이동 (security) → 스펙: docs/specs/2026-07-24-security-hardening.md
+- [ ] embeddings RLS initplan: auth.uid() → (select auth.uid()) ALTER POLICY 4건 (performance) → 스펙: docs/specs/2026-07-24-security-hardening.md
+- [ ] sortRows/filterRows 테스트 추가 — 복잡 순수함수 0 커버리지 (test) → 스펙: docs/specs/2026-07-24-security-hardening.md
+
+### SHOULD (priority 2) — 다음 차수
+
+- [ ] 오리 스탠드업 생성기: 24h 활동 → Gemini 요약 → 페이지 자동생성 (feature, 차별화) → 스펙: docs/specs/2026-07-24-duck-standup-generator.md
+- [ ] 습관 히트맵: habit_checks 90일 시각화 (feature) → 스펙: docs/specs/2026-07-24-insights-enhancement.md
+- [ ] 뽀모도로 InsightsView 통계 타일 (feature) → 스펙: docs/specs/2026-07-24-insights-enhancement.md
+- [ ] 임베딩 upsert 배치화: N회 순차 → 1회 batch (performance, embeddings.ts:97)
+- [ ] XP 원자적 증가: read-modify-write → Postgres RPC (correctness, duckState.ts:61)
+- [ ] OAuth 토큰 모듈 3파일 통합: generic factory 추출 (code-quality)
+- [ ] 모바일 하단 네비게이션: top strip → bottom tab bar (UX, AppNav.tsx)
+- [ ] ConfirmDialog 공용 컴포넌트: window.confirm 3곳 대체 (UX/a11y)
+- [ ] CommandPalette ARIA: aria-activedescendant + listbox/option (a11y)
+- [ ] unbounded query .limit() 추가: listTodos, listMemos 등 7개 함수 (architecture)
+- [ ] page_versions 쓰기 상한: per-page 50건 (architecture)
+- [ ] apps/web/src/lib/ 테스트: 16개 순수함수 파일 0 테스트 (test)
+
+### NICE (priority 3) — 후속
+
+- [ ] 백링크 page_links 테이블 + UI (feature)
+- [ ] 페이지 커버 cover_url 컬럼 + UI (feature)
+- [ ] Realtime 멀티서피스 동기화 (feature)
+- [ ] hover-revealed 버튼 focus-visible 링 (a11y)
+- [ ] listPages SELECT 프로젝션: content 제외 (architecture)
+
+### 탈락 (교차검증 미통과)
+
+- ~~Approval UI HMAC binding~~ — 서버측 catalog 재검증이 이미 존재 (evidence FALSE)
+- ~~useDuckChat hook 테스트~~ — 핵심 순수함수 이미 테스트됨 (SKIP)
+- ~~createClient per render~~ — Supabase JS 내부 싱글톤 처리 확인 필요 (SKIP)
 
 **인계 경위(2026-07-24 01:00~)**: 먼저 돌던 `/loop` 세션이 Phase 13 T1 커밋(01:00) 후 27분간 정지 →
 두 번째 `/loop` 세션(사용자 새로 지시)의 워치독이 죽음으로 판단하고 개발 인계. 같은 폴더 공유(worktree

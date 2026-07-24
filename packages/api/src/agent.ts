@@ -147,7 +147,7 @@ export async function runAgentTurn(
         ]
       : undefined;
 
-  const preamble = [
+  const systemText = [
     INJECTION_GUARD,
     buildDateContext(now),
     adapter.catalog.length > 0 ? TOOL_PREFERENCE_GUARD : null,
@@ -155,9 +155,9 @@ export async function runAgentTurn(
   ]
     .filter(Boolean)
     .join("\n\n");
-  const firstText = `${preamble}\n\n${question}`;
+
   const contents: GeminiContent[] = [
-    { role: "user", parts: [{ text: firstText }] },
+    { role: "user", parts: [{ text: question }] },
   ];
 
   for (let i = 0; i < AGENT_MAX_ITERATIONS; i++) {
@@ -166,7 +166,7 @@ export async function runAgentTurn(
       {
         method: "POST",
         headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ contents, tools }),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: systemText }] }, contents, tools }),
       },
     );
     if (!res.ok) throw upstreamError(res.status, await safeBody(res));
