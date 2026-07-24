@@ -8,6 +8,7 @@ import type { PageVersion } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useModalA11y } from "@/hooks/useModalA11y";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleString("ko-KR", {
@@ -31,6 +32,7 @@ export function VersionHistory({
   const [versions, setVersions] = useState<PageVersion[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [pendingVersion, setPendingVersion] = useState<PageVersion | null>(null);
   // 마운트되면 항상 열린 모달 — Esc 닫기 + 포커스 트랩/복원.
   const dialogRef = useModalA11y<HTMLDivElement>(true, onClose);
 
@@ -44,14 +46,17 @@ export function VersionHistory({
     );
   }, [supabase, pageId]);
 
-  const handleRestore = async (version: PageVersion) => {
-    // 확인창(동기 블로킹) '전에' 상위의 대기 중 자동저장을 취소 — confirm 이후엔 이미 큐에 오른 저장을
-    // 못 막아 복원과 경쟁하기 때문.
+  const handleRestore = (version: PageVersion) => {
+    // 확인창 '전에' 상위의 대기 중 자동저장을 취소 — 다이얼로그를 여는 시점에 취소해야 confirm 이후
+    // 이미 큐에 오른 저장이 복원과 경쟁하는 것을 막을 수 있다(기존 window.confirm 동기 블로킹과 동일 효과).
     onBeforeRestore?.();
-    const ok = window.confirm(
-      `이 버전(${timeLabel(version.createdAt)})으로 되돌릴까요?\n현재 내용을 덮어씁니다. 먼저 "버전 저장"을 눌러두면 지금 상태로 다시 돌아올 수 있습니다.`,
-    );
-    if (!ok) return;
+    setPendingVersion(version);
+  };
+
+  const confirmRestore = async () => {
+    if (!pendingVersion) return;
+    const version = pendingVersion;
+    setPendingVersion(null);
     setRestoringId(version.id);
     try {
       const updated = await updatePage(supabase, pageId, {
@@ -72,6 +77,7 @@ export function VersionHistory({
   };
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-background/60 px-4 pt-[12vh] backdrop-blur-sm"
       onClick={onClose}
@@ -139,5 +145,14 @@ export function VersionHistory({
         </div>
       </div>
     </div>
+    <ConfirmDialog
+      open={!!pendingVersion}
+      title="버전 복원"
+      description={pendingVersion ? `이 버전(${timeLabel(pendingVersion.createdAt)})으로 되돌릴까요? 현재 내용을 덮어씁니다. 먼저 "버전 저장"을 눌러두면 지금 상태로 다시 돌아올 수 있습니다.` : ""}
+      confirmLabel="복원"
+      onConfirm={confirmRestore}
+      onCancel={() => setPendingVersion(null)}
+    />
+    </>
   );
 }

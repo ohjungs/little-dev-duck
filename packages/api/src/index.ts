@@ -107,6 +107,7 @@ export {
   getPage,
   createPage,
   updatePage,
+  updatePageCover,
   softDeletePage,
   restorePage,
   purgePage,

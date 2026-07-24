@@ -143,43 +143,43 @@ export function AppSidebar({
   );
 }
 
+const MOBILE_NAV = [
+  { href: "/", label: "대시보드", icon: LayoutDashboard },
+  { href: "/pages", label: "페이지", icon: FileText },
+  { href: "/office", label: "오피스", icon: Building2 },
+  { href: "/news", label: "뉴스", icon: Newspaper },
+  { href: "/settings", label: "설정", icon: Settings },
+];
+
 export function AppMobileBar() {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md md:hidden">
-      <div className="flex h-14 items-center justify-between px-4">
-        <Brand />
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <form action="/auth/logout" method="post">
-            <Button type="submit" variant="ghost" size="sm">
-              로그아웃
-            </Button>
-          </form>
-        </div>
-      </div>
-      <nav className="flex gap-1 overflow-x-auto px-3 pb-2">
-        {NAV.map((item) => {
-          const active = isActive(pathname, item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors",
-                active
-                  ? "bg-secondary font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              <Icon className="size-4" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </header>
+    <nav
+      aria-label="하단 탐색"
+      className="fixed bottom-0 left-0 right-0 z-30 flex min-h-14 justify-around border-t border-border bg-background/95 backdrop-blur-md pb-safe md:hidden"
+    >
+      {MOBILE_NAV.map((item) => {
+        const active = isActive(pathname, item.href);
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition-colors",
+              active
+                ? "font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Icon
+              className={cn("size-5", active && "text-primary-accent")}
+            />
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

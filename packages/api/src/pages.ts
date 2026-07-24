@@ -27,6 +27,8 @@ type PageRow = {
   // Phase 12 T1 공개 공유.
   is_public?: boolean;
   public_slug?: string | null;
+  // 커버 이미지 URL. 마이그레이션 전 행엔 없을 수 있어 optional.
+  cover_url?: string | null;
 };
 
 function fromRow(row: PageRow): Page {
@@ -56,6 +58,7 @@ function fromRow(row: PageRow): Page {
     rowProps,
     isPublic: row.is_public ?? false,
     publicSlug: row.public_slug ?? null,
+    coverUrl: row.cover_url ?? null,
   });
 }
 
@@ -282,6 +285,19 @@ export async function unpublishPage(
     .from("pages")
     .update({ is_public: false, public_slug: null })
     .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// 커버 이미지 URL 갱신. null이면 커버 제거.
+export async function updatePageCover(
+  supabase: SupabaseClient,
+  pageId: string,
+  coverUrl: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from("pages")
+    .update({ cover_url: coverUrl })
+    .eq("id", pageId);
   if (error) throw new Error(error.message);
 }
 

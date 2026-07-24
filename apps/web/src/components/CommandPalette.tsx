@@ -237,6 +237,8 @@ export function CommandPalette() {
             onChange={(e) => runSearch(e.target.value)}
             placeholder="페이지 검색 또는 명령..."
             aria-label="페이지 검색 또는 명령"
+            aria-controls="palette-listbox"
+            aria-activedescendant={items.length > 0 ? `palette-item-${activeIndex}` : undefined}
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {state === "loading" && (
@@ -244,7 +246,7 @@ export function CommandPalette() {
           )}
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto p-2">
+        <div id="palette-listbox" role="listbox" className="max-h-[50vh] overflow-y-auto p-2">
           {items.map((item, i) => {
             const active = i === activeIndex;
             const key =
@@ -252,6 +254,9 @@ export function CommandPalette() {
             return (
               <button
                 key={key}
+                id={`palette-item-${i}`}
+                role="option"
+                aria-selected={active}
                 type="button"
                 onClick={() => runItem(item)}
                 onMouseEnter={() => setActiveIndex(i)}

@@ -8,12 +8,14 @@ import {
   Download,
   Globe,
   History,
+  ImageIcon,
   Link2,
   Save,
   Smile,
   Star,
   Table2,
   Upload,
+  X,
 } from "lucide-react";
 import type { Block } from "@blocknote/core";
 import {
@@ -28,6 +30,7 @@ import {
   publishPage,
   unpublishPage,
   updatePage,
+  updatePageCover,
 } from "@ldd/api";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
@@ -157,12 +160,38 @@ export function PageEditor({
   // Phase 12 T1 공개 공유. publicSlug=null이면 비공개. 공개 시 링크를 클립보드에 복사.
   const [publicSlug, setPublicSlug] = useState<string | null>(page.publicSlug);
 
+  // 커버 이미지 URL 상태. null=커버 없음. 낙관적 업데이트 + 실패 시 롤백.
+  const [coverUrl, setCoverUrl] = useState<string | null>(page.coverUrl);
+  const [showCoverInput, setShowCoverInput] = useState(false);
+  const [coverInputValue, setCoverInputValue] = useState("");
+
   const copyPublicLink = (slug: string) => {
     const link = `${window.location.origin}/p/${slug}`;
     void navigator.clipboard?.writeText(link).then(
       () => flashMsg("공개 링크가 복사되었습니다."),
       () => flashMsg(`공개 링크: ${link}`),
     );
+  };
+
+  const handleCoverConfirm = () => {
+    const url = coverInputValue.trim() || null;
+    setShowCoverInput(false);
+    setCoverInputValue("");
+    const prev = coverUrl;
+    setCoverUrl(url);
+    updatePageCover(supabase, page.id, url).catch(() => {
+      setCoverUrl((cur) => (cur === url ? prev : cur));
+      flashMsg("커버 이미지 저장에 실패했습니다.");
+    });
+  };
+
+  const handleCoverRemove = () => {
+    const prev = coverUrl;
+    setCoverUrl(null);
+    updatePageCover(supabase, page.id, null).catch(() => {
+      setCoverUrl((cur) => (cur === null ? prev : cur));
+      flashMsg("커버 이미지 제거에 실패했습니다.");
+    });
   };
 
   const handlePublish = async () => {
@@ -408,6 +437,61 @@ export function PageEditor({
           }}
         />
       )}
+      {/* 커버 이미지 배너 — URL이 있으면 전체 너비 배너로 표시. 호버 시 변경/삭제 버튼 노출. */}
+      <div className="group relative w-full">
+        {coverUrl ? (
+          <>
+            <img
+              src={coverUrl}
+              alt="페이지 커버"
+              className="h-[200px] w-full object-cover"
+            />
+            <div className="absolute inset-0 flex items-end justify-start gap-2 bg-black/0 px-4 pb-3 opacity-0 transition-opacity group-hover:bg-black/20 group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setCoverInputValue(coverUrl ?? "");
+                  setShowCoverInput(true);
+                }}
+                className="flex items-center gap-1 rounded bg-black/50 px-2 py-1 text-xs text-white hover:bg-black/70"
+              >
+                <ImageIcon className="size-3" /> 커버 변경
+              </button>
+              <button
+                type="button"
+                onClick={handleCoverRemove}
+                className="flex items-center gap-1 rounded bg-black/50 px-2 py-1 text-xs text-white hover:bg-black/70"
+              >
+                <X className="size-3" /> 커버 삭제
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex justify-start px-4 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={() => {
+                setCoverInputValue("");
+                setShowCoverInput(true);
+              }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ImageIcon className="size-3.5" /> 커버 추가
+            </button>
+          </div>
+        )}
+        {showCoverInput && (
+          <CoverUrlDialog
+            value={coverInputValue}
+            onChange={setCoverInputValue}
+            onConfirm={handleCoverConfirm}
+            onCancel={() => {
+              setShowCoverInput(false);
+              setCoverInputValue("");
+            }}
+          />
+        )}
+      </div>
       {breadcrumb && breadcrumb.length > 0 && (
         <nav
           aria-label="상위 페이지"
@@ -517,6 +601,60 @@ export function PageEditor({
         </div>
       )}
     </div>
+  );
+}
+
+// 커버 이미지 URL 입력 다이얼로그(ponytail — 파일 업로드 없이 URL만). 에디터 영역 위에 절대 위치.
+function CoverUrlDialog({
+  value,
+  onChange,
+  onConfirm,
+  onCancel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <>
+      <div
+        role="presentation"
+        className="fixed inset-0 z-10"
+        onClick={onCancel}
+      />
+      <div className="absolute left-4 top-full z-20 mt-1 flex w-80 flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-lg">
+        <p className="text-xs font-medium text-foreground">커버 이미지 URL</p>
+        <input
+          autoFocus
+          type="url"
+          placeholder="https://example.com/image.jpg"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onConfirm();
+            if (e.key === "Escape") onCancel();
+          }}
+          className="rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+        />
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground hover:opacity-90"
+          >
+            적용
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 

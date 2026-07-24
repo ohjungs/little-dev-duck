@@ -22,6 +22,8 @@ export const pageSchema = z.object({
   // Phase 12 T1 공개 공유. isPublic=공개 여부, publicSlug=추측 불가한 랜덤 링크. 하위호환 기본값.
   isPublic: z.boolean().default(false),
   publicSlug: z.string().nullable().default(null),
+  // 페이지 커버 이미지 URL. null=커버 없음. 마이그레이션 전 행 하위호환 기본값.
+  coverUrl: z.string().nullable().default(null),
 });
 export type Page = z.infer<typeof pageSchema>;
 

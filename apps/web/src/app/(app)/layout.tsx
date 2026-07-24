@@ -41,7 +41,7 @@ export default async function AppLayout({
       <AppSidebar displayName={displayName} email={email} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppMobileBar />
-        <main id="main" className="flex-1">
+        <main id="main" className="flex-1 pb-16 md:pb-0">
           {children}
         </main>
       </div>

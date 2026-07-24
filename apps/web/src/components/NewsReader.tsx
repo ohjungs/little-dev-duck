@@ -25,6 +25,7 @@ import { clusterArticles, type Article, type Feed } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   getReadArticles,
   markArticleRead,
@@ -134,6 +135,7 @@ export function NewsReader() {
   const [query, setQuery] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [readIds, setReadIds] = useState<string[]>([]);
+  const [pendingDeleteFeed, setPendingDeleteFeed] = useState<Feed | null>(null);
 
   // 읽음 상태(localStorage) 동기화 — 링크 클릭/스크랩 시 즉시 반영.
   useEffect(() => {
@@ -204,13 +206,14 @@ export function NewsReader() {
     await load();
   };
 
-  const onDelete = async (feed: Feed) => {
-    if (
-      !window.confirm(
-        `피드 "${feed.title ?? feed.url}"와 수집된 기사를 삭제할까요?`,
-      )
-    )
-      return;
+  const onDelete = (feed: Feed) => {
+    setPendingDeleteFeed(feed);
+  };
+
+  const confirmDeleteFeed = async () => {
+    if (!pendingDeleteFeed) return;
+    const feed = pendingDeleteFeed;
+    setPendingDeleteFeed(null);
     await deleteFeed(createClient(), feed.id);
     await load();
   };
@@ -441,6 +444,14 @@ export function NewsReader() {
           ))}
         </div>
       )}
+      <ConfirmDialog
+        open={!!pendingDeleteFeed}
+        title="피드 삭제"
+        description={pendingDeleteFeed ? `피드 "${pendingDeleteFeed.title ?? pendingDeleteFeed.url}"와 수집된 기사를 삭제할까요?` : ""}
+        confirmLabel="삭제"
+        onConfirm={confirmDeleteFeed}
+        onCancel={() => setPendingDeleteFeed(null)}
+      />
     </div>
   );
 }

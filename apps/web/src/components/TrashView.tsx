@@ -8,6 +8,7 @@ import { reindexSource } from "@ldd/ai";
 import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // 휴지통에 들어간 시각을 상대적으로 표시(간단 — 일 단위). 정밀 포맷은 과설계(ponytail).
 function trashedAgo(iso: string | null): string {
@@ -22,6 +23,7 @@ export function TrashView() {
   const supabase = useMemo(() => createClient(), []);
   const [pages, setPages] = useState<Page[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [pendingPurge, setPendingPurge] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     listTrashedPages(supabase).then(
@@ -48,13 +50,16 @@ export function TrashView() {
     }
   };
 
-  const handlePurge = async (id: string, title: string) => {
+  const handlePurge = (id: string, title: string) => {
     // 영구 삭제는 되돌릴 수 없고 하위 페이지도 DB cascade로 함께 삭제되므로 실행 전 확인(안전 규칙).
     // 하위 페이지 임베딩은 pages BEFORE DELETE 트리거(20260722070000)가 같은 트랜잭션에서 정리한다.
-    const ok = window.confirm(
-      `"${title || "제목 없음"}"을(를) 영구 삭제할까요?\n하위 페이지도 함께 삭제되며 되돌릴 수 없습니다.`,
-    );
-    if (!ok) return;
+    setPendingPurge({ id, title });
+  };
+
+  const confirmPurge = async () => {
+    if (!pendingPurge) return;
+    const { id } = pendingPurge;
+    setPendingPurge(null);
     const removed = pages.find((x) => x.id === id);
     setPages((p) => p.filter((x) => x.id !== id));
     try {
@@ -130,9 +135,18 @@ export function TrashView() {
             >
               <Trash2 className="size-3.5" /> 영구 삭제
             </Button>
+
           </li>
         ))}
       </ul>
+      <ConfirmDialog
+        open={!!pendingPurge}
+        title="영구 삭제"
+        description={pendingPurge ? `"${pendingPurge.title || "제목 없음"}"을(를) 영구 삭제할까요? 하위 페이지도 함께 삭제되며 되돌릴 수 없습니다.` : ""}
+        confirmLabel="영구 삭제"
+        onConfirm={confirmPurge}
+        onCancel={() => setPendingPurge(null)}
+      />
     </div>
   );
 }
