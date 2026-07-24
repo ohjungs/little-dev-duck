@@ -13,6 +13,7 @@ import {
 import { deriveHabitStreak, type Habit, type HabitCheck } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
+import { subscribeTable } from "@/lib/realtime";
 import { emitXpChanged } from "@/lib/xpSignal";
 import { todayIso } from "@/lib/today";
 import {
@@ -56,6 +57,26 @@ export function HabitWidget() {
     // 마운트 시 1회 조회. 재시도는 reload가 담당.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
     fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 실행
+  }, []);
+
+  // Realtime: 다른 탭/기기에서 habits 또는 habit_checks가 변경되면 전체를 다시 조회한다.
+  useEffect(() => {
+    let cleanupHabits: (() => void) | undefined;
+    let cleanupChecks: (() => void) | undefined;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      cleanupHabits = subscribeTable(supabase, "habits", user.id, () => {
+        void fetchAll();
+      });
+      cleanupChecks = subscribeTable(supabase, "habit_checks", user.id, () => {
+        void fetchAll();
+      });
+    });
+    return () => {
+      cleanupHabits?.();
+      cleanupChecks?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 실행
   }, []);
 

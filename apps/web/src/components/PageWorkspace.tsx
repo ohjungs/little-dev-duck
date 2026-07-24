@@ -22,6 +22,7 @@ import {
 import { reindexSource } from "@ldd/ai";
 import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
+import { subscribeTable } from "@/lib/realtime";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PageEditor } from "@/components/PageEditor";
@@ -149,7 +150,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  useEffect(() => {
+  const fetchPages = () => {
     listPages(supabase).then(
       (data) => {
         setPages(data);
@@ -157,7 +158,25 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
       },
       () => setState("error"),
     );
+  };
+
+  useEffect(() => {
+    fetchPages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase ref는 useMemo로 안정됨
   }, [supabase]);
+
+  // Realtime: 다른 탭/기기에서 pages가 변경되면 목록을 다시 조회한다.
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      cleanup = subscribeTable(supabase, "pages", user.id, () => {
+        fetchPages();
+      });
+    });
+    return () => cleanup?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 실행
+  }, []);
 
   // 즐겨찾기: 마운트 시 localStorage 초기 동기화(SSR 안전) + 변경 구독.
   useEffect(() => {

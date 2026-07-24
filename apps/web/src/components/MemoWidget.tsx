@@ -6,6 +6,7 @@ import { createMemo, deleteMemo, listMemos, updateMemo } from "@ldd/api";
 import type { Memo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
+import { subscribeTable } from "@/lib/realtime";
 import {
   Card,
   CardContent,
@@ -54,6 +55,19 @@ export function MemoWidget() {
     // 마운트 시 1회 조회. 재시도는 이벤트 핸들러(reload)가 담당.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
     fetchMemos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 실행
+  }, []);
+
+  // Realtime: 다른 탭/기기에서 memos가 변경되면 목록을 다시 조회한다.
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      cleanup = subscribeTable(supabase, "memos", user.id, () => {
+        void fetchMemos();
+      });
+    });
+    return () => cleanup?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 실행
   }, []);
 

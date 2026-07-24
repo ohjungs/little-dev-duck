@@ -7,6 +7,7 @@ import { getDuckState } from "@ldd/api";
 import { levelProgress, type DuckState } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { onXpChanged } from "@/lib/xpSignal";
+import { subscribeTable } from "@/lib/realtime";
 import {
   readQuietHours,
   QUIET_HOURS_EVENT,
@@ -85,9 +86,20 @@ export function DuckWidget() {
     refresh();
     // 투두/습관/뽀모도로에서 XP를 적립하면 이 신호로 오리 표시를 갱신한다.
     const unsubscribe = onXpChanged(refresh);
+
+    // Realtime: 다른 탭/기기에서 duck_state가 변경되면(XP·기분) 오리 표시를 갱신한다.
+    let realtimeCleanup: (() => void) | undefined;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (cancelled || !user) return;
+      realtimeCleanup = subscribeTable(supabase, "duck_state", user.id, () => {
+        refresh();
+      });
+    });
+
     return () => {
       cancelled = true;
       unsubscribe();
+      realtimeCleanup?.();
       if (celebrateTimer.current) clearTimeout(celebrateTimer.current);
     };
   }, []);

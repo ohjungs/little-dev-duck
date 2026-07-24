@@ -13,6 +13,7 @@ import type { Todo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import { todoEmbedText } from "@/lib/embedText";
 import { createClient } from "@/lib/supabase/client";
+import { subscribeTable } from "@/lib/realtime";
 import { emitTodosChanged } from "@/lib/todoSignal";
 import { emitXpChanged } from "@/lib/xpSignal";
 import { todayIso } from "@/lib/today";
@@ -54,6 +55,19 @@ export function TodoWidget() {
     // 마운트 시 1회 조회. 재시도는 이벤트 핸들러(reload)가 담당.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
     fetchTodos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 실행
+  }, []);
+
+  // Realtime: 다른 탭/기기에서 todos가 변경되면 목록을 다시 조회한다.
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      cleanup = subscribeTable(supabase, "todos", user.id, () => {
+        void fetchTodos();
+      });
+    });
+    return () => cleanup?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 실행
   }, []);
 
