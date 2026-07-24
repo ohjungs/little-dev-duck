@@ -271,3 +271,11 @@ export {
   type Npc,
   type GameClock,
 } from "./domain/office-npc";
+export {
+  timeOfDay,
+  timeOverlay,
+  shouldWindowsGlow,
+  timeOfDayLabel,
+  timeOfDayIcon,
+  type TimeOfDay,
+} from "./domain/office-time";

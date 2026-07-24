@@ -717,6 +717,91 @@ export function drawFurniture(
 }
 
 // ---------------------------------------------------------------------------
+// drawMinimap — 우상단 미니맵 오버레이 (단순 도트 렌더, 매 이동 시에만 호출)
+// x, y = 캔버스 기준 미니맵 좌상단 좌표
+// scale = 타일당 픽셀 수 (보통 2)
+// ---------------------------------------------------------------------------
+export type MinimapNpc = {
+  tile: { x: number; y: number };
+  department: string;
+};
+
+// 부서 ID -> 미니맵 도트 색상 (간결한 고정 팔레트)
+const DEPT_DOT_COLOR: Record<string, string> = {
+  engineering: "#4A90D9",
+  marketing:   "#E8A33C",
+  design:      "#9B59B6",
+  hr:          "#2ECC71",
+  finance:     "#1ABC9C",
+  sales:       "#E74C3C",
+  support:     "#F39C12",
+  qa:          "#3498DB",
+  operations:  "#E67E22",
+};
+
+export function drawMinimap(
+  ctx: CanvasRenderingContext2D,
+  map: { cols: number; rows: number; tiles: Uint8Array | number[] },
+  playerTile: { x: number; y: number },
+  npcs: MinimapNpc[],
+  x: number,
+  y: number,
+  scale: number,
+): void {
+  const w = map.cols * scale;
+  const h = map.rows * scale;
+
+  // 반투명 배경
+  ctx.save();
+  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+
+  // 타일 — 벽(1)과 바닥을 구분하는 2색 렌더
+  const tiles = map.tiles;
+  for (let row = 0; row < map.rows; row++) {
+    for (let col = 0; col < map.cols; col++) {
+      const tt = tiles[row * map.cols + col];
+      if (tt === 1) {
+        // 벽
+        ctx.fillStyle = "#5C5C5C";
+      } else if (tt === undefined || tt === 0) {
+        // 빈 공간 (맵 외부 포함)
+        ctx.fillStyle = "rgba(0,0,0,0)";
+        continue;
+      } else {
+        // 바닥/가구 등
+        ctx.fillStyle = "#3A3A2E";
+      }
+      ctx.fillRect(x + col * scale, y + row * scale, scale, scale);
+    }
+  }
+
+  // NPC 도트 (1x1 px 또는 scale이 2 이상이면 2x2)
+  const dotSize = Math.max(1, scale - 1);
+  for (const npc of npcs) {
+    ctx.fillStyle = DEPT_DOT_COLOR[npc.department] ?? "#AAAAAA";
+    ctx.fillRect(
+      x + npc.tile.x * scale,
+      y + npc.tile.y * scale,
+      dotSize,
+      dotSize,
+    );
+  }
+
+  // 플레이어 도트 (밝은 흰색, 한 픽셀 더 크게)
+  const pDot = Math.max(2, scale);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(
+    x + playerTile.x * scale - Math.floor((pDot - scale) / 2),
+    y + playerTile.y * scale - Math.floor((pDot - scale) / 2),
+    pDot,
+    pDot,
+  );
+
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
 // drawDuckSprite — 스프라이트시트에서 오리 한 프레임을 캔버스에 그린다
 // ducky_2/3_spritesheet.png: 192x128, 6열x4행, 프레임당 32x32
 // 행: 0=down, 1=left, 2=right, 3=up

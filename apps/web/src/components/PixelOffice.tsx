@@ -28,6 +28,10 @@ import {
   phaseToWorkState,
   simulateNpcTasks,
   getTaskTemplates,
+  timeOfDay,
+  timeOverlay,
+  timeOfDayLabel,
+  timeOfDayIcon,
   type DuckWorkState,
   type TileMap,
   type Camera,
@@ -37,10 +41,11 @@ import {
   type DepartmentId,
   type NpcTask,
 } from "@ldd/core";
-import { cn } from "@/lib/utils";
 import { InputManager } from "@/lib/office-input";
 import { VirtualDpad } from "@/components/VirtualDpad";
-import { drawDuckSprite, drawFurnitureSprite, drawFloorTile, drawFurniture } from "@/lib/office-draw";
+import { OfficeTalkPanel } from "@/components/OfficeTalkPanel";
+import { OfficeDashboard } from "@/components/OfficeDashboard";
+import { drawDuckSprite, drawFurnitureSprite, drawFloorTile, drawFurniture, drawMinimap } from "@/lib/office-draw";
 import { loadAllSprites, type SpriteAssets } from "@/lib/sprite-loader";
 
 // ---------------------------------------------------------------------------
@@ -50,6 +55,8 @@ const TILE = 32;          // 오리 스프라이트 프레임 32x32와 맞춤
 const FRAME_MS = 120;     // ~8fps
 const ZONE_HUD_MS = 2000;
 const CLOCK_START_HOUR = 8;
+const MINIMAP_SCALE = 2;  // 타일당 2px
+const MINIMAP_MARGIN = 6; // 우상단 여백
 
 // 오리 스프라이트 행 확장: 2열 = idle(frame 0-1), 나머지는 walk(frame 0-3)
 const DUCK_SCALE = 1.5; // 32px 타일에서 오리를 약간 크게
@@ -231,13 +238,18 @@ export function PixelOffice() {
   const lastTickRef = useRef<number>(0);
 
   const [talking, setTalking] = useState<TalkTarget | null>(null);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [dashboardClock, setDashboardClock] = useState<GameClock>(createGameClock(CLOCK_START_HOUR));
+  const [dashboardNpcs, setDashboardNpcs] = useState<Npc[]>([]);
   const [paused, setPaused] = useState(false);
   const [zoneHud, setZoneHud] = useState<string | null>(null);
-  const [clockDisplay, setClockDisplay] = useState("08:00");
+  const [showMinimap, setShowMinimap] = useState(true);
+  const [clockDisplay, setClockDisplay] = useState("08:00 ☀️ 오전");
 
   const pausedRef = useRef(false);
   const lastZoneRef = useRef<string | null>(null);
   const zoneHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showMinimapRef = useRef(true);
 
   // RNG — seeded lcg for determinism within session
   const seedRef = useRef(42);
@@ -249,6 +261,10 @@ export function PixelOffice() {
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
+
+  useEffect(() => {
+    showMinimapRef.current = showMinimap;
+  }, [showMinimap]);
 
   // 맵 + NPC 초기화
   useEffect(() => {
@@ -398,8 +414,27 @@ export function PixelOffice() {
         }
       }
 
-      // 클럭 표시 갱신 (매 초 단위)
-      setClockDisplay(formatClockTime(clockRef.current));
+      // CEO 책상 근접 감지: ceo-office 내 책상(8-9,15) 기준 2타일 이내
+      const atCeoDesk =
+        zoneId === "ceo-office" &&
+        Math.abs(player.x - 9) <= 2 &&
+        Math.abs(player.y - 15) <= 2;
+      if (atCeoDesk) {
+        setShowDashboard(true);
+        setDashboardClock(clockRef.current);
+        setDashboardNpcs([...npcsRef.current]);
+      } else {
+        setShowDashboard(false);
+      }
+
+      // 클럭 표시 갱신 (매 초 단위) — 시간대 레이블 + 아이콘 포함
+      {
+        const clock = clockRef.current;
+        const tod = timeOfDay(clock.hour);
+        setClockDisplay(
+          `${formatClockTime(clock)} ${timeOfDayIcon(tod)} ${timeOfDayLabel(tod)}`,
+        );
+      }
 
       // 프레임 게이트
       if (t - lastDraw < FRAME_MS) return;
@@ -424,6 +459,10 @@ export function PixelOffice() {
       if (input.consumeJustPressed("interact")) {
         const near = nearbyNpcRef.current;
         if (near) setTalking({ npc: near, text: buildNpcDescription(near) });
+      }
+      // M 키 — 미니맵 토글
+      if (input.consumeJustPressed("minimap")) {
+        setShowMinimap((prev) => !prev);
       }
 
       const ctx = canvas.getContext("2d");
@@ -607,17 +646,31 @@ export function PixelOffice() {
         ctx.restore();
       }
 
-      // --- HUD: 시계 ---
-      const clockStr = formatClockTime(clockRef.current);
-      ctx.save();
-      ctx.font = "bold 11px monospace";
-      ctx.textAlign = "right";
-      const clockW = ctx.measureText(clockStr).width + 10;
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(viewW - clockW - 4, 4, clockW, 16);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillText(clockStr, viewW - 8, 16);
-      ctx.restore();
+      // --- Pass 5: 시간대 색상 오버레이 (씬 전체에 단일 fillRect) ---
+      {
+        const tod = timeOfDay(clockRef.current.hour);
+        const ov = timeOverlay(tod);
+        if (ov.a > 0) {
+          ctx.fillStyle = `rgba(${ov.r},${ov.g},${ov.b},${ov.a})`;
+          ctx.fillRect(0, 0, viewW, viewH);
+        }
+      }
+
+      // --- HUD: 미니맵 (우상단, 플레이어 이동 시에만 의미 있게 변경됨) ---
+      if (showMinimapRef.current) {
+        const mmW = map.cols * MINIMAP_SCALE;
+        const mmX = viewW - mmW - MINIMAP_MARGIN;
+        const mmY = MINIMAP_MARGIN;
+        drawMinimap(
+          ctx,
+          map,
+          currentPlayer,
+          npcsRef.current.map((n) => ({ tile: n.tile, department: n.department })),
+          mmX,
+          mmY,
+          MINIMAP_SCALE,
+        );
+      }
 
       input.endFrame();
     };
@@ -645,11 +698,14 @@ export function PixelOffice() {
         />
         <VirtualDpad input={inputRef.current} />
 
-        {/* 구역 이름 HUD */}
+        {/* 구역 이름 HUD — 페이드인/아웃 */}
         {zoneHud && (
           <div
-            className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-lg bg-black/60 px-3 py-1 text-sm font-semibold text-white"
+            className="pointer-events-none absolute left-1/2 top-6 -translate-x-1/2 animate-fade-zone rounded-lg bg-black/65 px-4 py-1.5 text-sm font-semibold text-white"
             aria-live="polite"
+            style={{
+              animation: "zoneHudFade 2.3s ease forwards",
+            }}
           >
             {zoneHud}
           </div>
@@ -659,85 +715,46 @@ export function PixelOffice() {
         <div className="pointer-events-none absolute right-2 top-2 rounded bg-black/55 px-2 py-0.5 font-mono text-xs font-bold text-white">
           {clockDisplay}
         </div>
+
+        {/* NPC 대화 패널 — canvas 위에 절대 오버레이 */}
+        {talking && (
+          <OfficeTalkPanel
+            npc={talking.npc}
+            onClose={() => setTalking(null)}
+          />
+        )}
+
+        {/* CEO 전사 대시보드 — 사장실 책상 근접 시 자동 표시 */}
+        {showDashboard && !talking && (
+          <OfficeDashboard
+            npcs={dashboardNpcs}
+            clock={dashboardClock}
+            onClose={() => setShowDashboard(false)}
+          />
+        )}
       </div>
-
-      {/* 대화 패널 */}
-      {talking && (
-        <div className="rounded-xl border border-border bg-card p-3 text-sm">
-          <div className="mb-1.5 flex items-center justify-between">
-            <span className="font-semibold">{talking.npc.name}</span>
-            <span className="text-xs text-muted-foreground">
-              {talking.npc.role} · {talking.npc.department}
-            </span>
-            <button
-              type="button"
-              onClick={() => setTalking(null)}
-              className="ml-2 text-xs text-muted-foreground hover:text-foreground"
-            >
-              닫기
-            </button>
-          </div>
-          <p className="mb-2 text-muted-foreground">{talking.text}</p>
-
-          {/* 태스크 목록 */}
-          {talking.npc.tasks.length > 0 && (
-            <div className="space-y-1.5">
-              {talking.npc.tasks.map((task) => (
-                <div key={task.id} className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "shrink-0 text-xs font-medium w-16",
-                      task.status === "active" ? "text-primary" : "text-muted-foreground",
-                    )}
-                  >
-                    {task.status === "active" ? "진행 중" : "대기"}
-                  </span>
-                  <span className="min-w-0 truncate text-xs">{task.title}</span>
-                  {task.status === "active" && (
-                    <div className="ml-auto flex items-center gap-1 shrink-0">
-                      <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all"
-                          style={{ width: `${task.progress}%` }}
-                        />
-                      </div>
-                      <span className="tabular-nums text-xs text-muted-foreground w-8 text-right">
-                        {Math.floor(task.progress)}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 최근 완료 태스크 */}
-          {talking.npc.recentDone.length > 0 && (
-            <div className="mt-2 border-t border-border pt-2">
-              <p className="mb-1 text-xs font-medium text-muted-foreground">최근 완료</p>
-              {talking.npc.recentDone.map((task) => (
-                <div key={task.id} className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <span className="text-primary">✓</span>
-                  <span>{task.title}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           캔버스를 클릭해 포커스한 뒤 방향키/WASD로 대장오리를 움직여요. 직원 오리 옆에서 E를 누르면
-          지금 뭐 하는지 물어볼 수 있어요. 총 35명의 직원 오리가 각자 업무 중입니다.
+          지금 뭐 하는지 물어볼 수 있어요. M 키로 미니맵을 켜고 끌 수 있습니다.
         </p>
-        <button
-          type="button"
-          onClick={() => setPaused((p) => !p)}
-          className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {paused ? "시뮬 재개" : "시뮬 정지"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowMinimap((p) => !p)}
+            className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {showMinimap ? "미니맵 끄기" : "미니맵 켜기"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaused((p) => !p)}
+            className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {paused ? "시뮬 재개" : "시뮬 정지"}
+          </button>
+        </div>
       </div>
     </div>
   );
