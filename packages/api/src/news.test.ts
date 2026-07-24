@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Feed } from "@ldd/core";
-import { addFeed, collectFeed, normalizeUrl, summarizeArticle } from "./news";
+import { addFeed, collectFeed, discoverFeedUrl, normalizeUrl, summarizeArticle } from "./news";
 
 const USER_ID = "55555555-5555-4555-8555-555555555555";
 const FEED_ID = "66666666-6666-4666-8666-666666666666";
@@ -67,6 +67,29 @@ const TWO_ITEMS = `<rss><channel>
   <item><title>A</title><link>https://ex.com/a</link></item>
   <item><title>B</title><link>https://ex.com/b</link></item>
 </channel></rss>`;
+
+describe("discoverFeedUrl", () => {
+  it("HTML <link rel=alternate type=rss>에서 절대 URL을 찾는다", () => {
+    const html = `<html><head><link rel="alternate" type="application/rss+xml" href="https://news.hada.io/rss/news"></head></html>`;
+    expect(discoverFeedUrl(html, "https://news.hada.io/")).toBe(
+      "https://news.hada.io/rss/news",
+    );
+  });
+  it("상대 경로 href를 baseUrl 기준으로 절대화한다", () => {
+    const html = `<link rel="alternate" type="application/atom+xml" href="/feed.xml">`;
+    expect(discoverFeedUrl(html, "https://example.com/blog")).toBe(
+      "https://example.com/feed.xml",
+    );
+  });
+  it("속성 순서가 달라도(href 먼저) 찾는다", () => {
+    const html = `<link href="/rss" type="application/rss+xml" rel="alternate">`;
+    expect(discoverFeedUrl(html, "https://a.com")).toBe("https://a.com/rss");
+  });
+  it("RSS 링크가 없으면 null", () => {
+    expect(discoverFeedUrl("<html><head><title>x</title></head></html>", "https://a.com")).toBeNull();
+    expect(discoverFeedUrl(`<link rel="stylesheet" href="/s.css">`, "https://a.com")).toBeNull();
+  });
+});
 
 describe("normalizeUrl", () => {
   it("추적 파라미터(utm_/fbclid 등)를 제거한다", () => {

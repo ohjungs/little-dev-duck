@@ -106,6 +106,27 @@ export function normalizeUrl(raw: string): string {
   }
 }
 
+// HTML 페이지에서 RSS/Atom 피드 링크를 자동 발견한다. 사용자가 RSS 주소 대신 사이트 홈 URL
+// (예: https://news.hada.io/)을 등록해도 <link rel="alternate" type="...rss..."> 를 찾아 실제 피드로
+// 수집되게 한다("알아서 가져오기"). 상대 경로는 baseUrl 기준으로 절대화. 못 찾으면 null.
+export function discoverFeedUrl(html: string, baseUrl: string): string | null {
+  const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
+  for (const tag of linkTags) {
+    const type = /type=["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase() ?? "";
+    const rel = /rel=["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase() ?? "";
+    if (!/rss|atom|xml/.test(type)) continue;
+    if (rel && !rel.includes("alternate")) continue;
+    const href = /href=["']([^"']+)["']/i.exec(tag)?.[1];
+    if (!href) continue;
+    try {
+      return new URL(href, baseUrl).toString();
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 export async function addFeed(
   supabase: SupabaseClient,
   input: { url: string; title?: string | null; folder?: string | null },
@@ -228,7 +249,29 @@ export async function collectFeed(
     await supabase.from("feeds").update({ fail_count: 0 }).eq("id", feed.id);
   }
 
-  const items = parseRssItems(xml);
+  let items = parseRssItems(xml);
+  // RSS 항목이 0개이고 HTML 페이지로 보이면, <link rel=alternate>로 실제 피드를 찾아 한 번 더 시도한다
+  // (사용자가 사이트 홈 URL을 등록한 경우 자동 보정). 발견 시 feeds.url을 실제 피드로 갱신해 다음부턴 바로 수집.
+  if (items.length === 0 && /<html[\s>]/i.test(xml)) {
+    const discovered = discoverFeedUrl(xml, feed.url);
+    if (discovered && discovered !== feed.url) {
+      try {
+        const res2 = await doFetch(discovered, {
+          headers: { "user-agent": "LittleDevDuck/1.0 (+rss)" },
+        });
+        if (res2.ok && !PRIVATE_HOST.test(new URL(res2.url).hostname)) {
+          const xml2 = await res2.text();
+          const items2 = parseRssItems(xml2);
+          if (items2.length > 0) {
+            items = items2;
+            await supabase.from("feeds").update({ url: discovered }).eq("id", feed.id);
+          }
+        }
+      } catch {
+        // 자동 발견 실패는 무시(원래대로 0건 반환)
+      }
+    }
+  }
   let inserted = 0;
   for (const item of items) {
     // 정규화 URL 자체를 중복 판정 키로 쓴다(같은 기사=같은 정규화 URL → UNIQUE로 차단). 해시 불필요.
