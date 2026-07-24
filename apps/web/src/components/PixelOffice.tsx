@@ -42,6 +42,7 @@ import {
   type NpcTask,
 } from "@ldd/core";
 import { InputManager } from "@/lib/office-input";
+import { OfficeSoundManager } from "@/lib/office-sound";
 import { VirtualDpad } from "@/components/VirtualDpad";
 import { OfficeTalkPanel } from "@/components/OfficeTalkPanel";
 import { OfficeDashboard } from "@/components/OfficeDashboard";
@@ -229,6 +230,8 @@ export function PixelOffice() {
   const spritesLoadedRef = useRef(false);
 
   const inputRef = useRef<InputManager>(new InputManager());
+  const soundRef = useRef<OfficeSoundManager>(new OfficeSoundManager());
+  const lastFootstepRef = useRef<number>(0); // 발소리 쓰로틀 (200ms)
 
   const npcsRef = useRef<Npc[]>([]);
   const playerRef = useRef<Vec>({ x: 40, y: 17 });
@@ -239,6 +242,7 @@ export function PixelOffice() {
 
   const [talking, setTalking] = useState<TalkTarget | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [soundMuted, setSoundMuted] = useState(false);
   const [dashboardClock, setDashboardClock] = useState<GameClock>(createGameClock(CLOCK_START_HOUR));
   const [dashboardNpcs, setDashboardNpcs] = useState<Npc[]>([]);
   const [paused, setPaused] = useState(false);
@@ -301,6 +305,24 @@ export function PixelOffice() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     return inputRef.current.bindKeyboard(canvas);
+  }, []);
+
+  // BGM — 첫 사용자 제스처(클릭 또는 키다운)에서 AudioContext 초기화 후 시작
+  // autoplay 정책 준수: 제스처 없이 init하면 suspended 상태로 막힘
+  useEffect(() => {
+    const sound = soundRef.current;
+    const start = () => {
+      sound.startBgm();
+      window.removeEventListener("pointerdown", start);
+      window.removeEventListener("keydown", start);
+    };
+    window.addEventListener("pointerdown", start, { once: true });
+    window.addEventListener("keydown", start, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", start);
+      window.removeEventListener("keydown", start);
+      sound.dispose();
+    };
   }, []);
 
   // 캔버스 터치 탭 — NPC 탭하면 대화
@@ -411,6 +433,8 @@ export function PixelOffice() {
           setZoneHud(zone.label);
           if (zoneHudTimerRef.current) clearTimeout(zoneHudTimerRef.current);
           zoneHudTimerRef.current = setTimeout(() => setZoneHud(null), ZONE_HUD_MS);
+          // 새 구역 진입 시 문 소리
+          soundRef.current.playDoor();
         }
       }
 
@@ -443,8 +467,10 @@ export function PixelOffice() {
 
       // 입력 처리
       const input = inputRef.current;
+      const sound = soundRef.current;
       for (const dir of ["up", "down", "left", "right"] as const) {
         if (input.isPressed(dir)) {
+          const prevPos = { ...playerRef.current };
           playerRef.current = movePlayer(
             playerRef.current,
             dir,
@@ -452,17 +478,33 @@ export function PixelOffice() {
             map.rows,
             isBlockedFn,
           );
+          // 실제로 이동한 경우에만 발소리 (200ms 쓰로틀)
+          const moved =
+            playerRef.current.x !== prevPos.x ||
+            playerRef.current.y !== prevPos.y;
+          if (moved && t - lastFootstepRef.current > 200) {
+            sound.playFootstep();
+            lastFootstepRef.current = t;
+          }
           setTalking(null);
           break;
         }
       }
       if (input.consumeJustPressed("interact")) {
         const near = nearbyNpcRef.current;
-        if (near) setTalking({ npc: near, text: buildNpcDescription(near) });
+        if (near) {
+          setTalking({ npc: near, text: buildNpcDescription(near) });
+          sound.playInteract();
+        }
       }
       // M 키 — 미니맵 토글
       if (input.consumeJustPressed("minimap")) {
         setShowMinimap((prev) => !prev);
+      }
+      // N 키 — 사운드 뮤트 토글
+      if (input.consumeJustPressed("sound")) {
+        const nowMuted = sound.toggleMute();
+        setSoundMuted(nowMuted);
       }
 
       const ctx = canvas.getContext("2d");
@@ -737,9 +779,20 @@ export function PixelOffice() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           캔버스를 클릭해 포커스한 뒤 방향키/WASD로 대장오리를 움직여요. 직원 오리 옆에서 E를 누르면
-          지금 뭐 하는지 물어볼 수 있어요. M 키로 미니맵을 켜고 끌 수 있습니다.
+          지금 뭐 하는지 물어볼 수 있어요. M 키로 미니맵, N 키로 사운드를 켜고 끌 수 있습니다.
         </p>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const nowMuted = soundRef.current.toggleMute();
+              setSoundMuted(nowMuted);
+            }}
+            className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+            aria-label={soundMuted ? "사운드 켜기" : "사운드 끄기"}
+          >
+            {soundMuted ? "사운드 켜기" : "사운드 끄기"}
+          </button>
           <button
             type="button"
             onClick={() => setShowMinimap((p) => !p)}
