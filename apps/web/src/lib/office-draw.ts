@@ -259,17 +259,10 @@ export function drawDuck(
 
 // ---------------------------------------------------------------------------
 // Tileset floor rects — PixelOfficeAssets.png 소스 좌표
-// 바닥 타일은 row 2 (y=32) 의 파란 타일 영역에서 추출
-// ---------------------------------------------------------------------------
-// 파란 체크무늬 바닥 타일: row 2 col 4-5 영역 (y=32, x=64) — 16x16
-const FLOOR_TILE_A = { sx: 64,  sy: 32, sw: 16, sh: 16 }; // 밝은 파란 바닥
-const FLOOR_TILE_B = { sx: 80,  sy: 32, sw: 16, sh: 16 }; // 약간 어두운 파란 바닥
-// 복도/회색 바닥: row 2 col 8-9 (y=32, x=128) — 회색 타일
-const CORRIDOR_TILE_A = { sx: 128, sy: 32, sw: 16, sh: 16 };
-const CORRIDOR_TILE_B = { sx: 144, sy: 32, sw: 16, sh: 16 };
 // ---------------------------------------------------------------------------
 // drawFloorTile — floor surface (Floor, Corridor, Carpet, Door base)
-// tileset: PixelOfficeAssets.png — null이면 절차적 폴백 사용
+// 바닥은 항상 절차적 단색으로 그린다(PixelOfficeAssets에 전용 바닥 타일이 없어서). tileset 인자는
+// 시그니처 호환을 위해 유지하되 바닥에는 쓰지 않는다.
 // ---------------------------------------------------------------------------
 export function drawFloorTile(
   ctx: CanvasRenderingContext2D,
@@ -284,41 +277,10 @@ export function drawFloorTile(
 ): void {
   const even = (col + row) % 2 === 0;
 
-  // --- 타일셋 경로 ---
-  if (tileset) {
-    // 0 Floor — 파란 체크무늬 바닥
-    if (tileType === 0) {
-      const src = even ? FLOOR_TILE_A : FLOOR_TILE_B;
-      ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
-      return;
-    }
-    // 4 Door base — 문 밑 바닥 (노란 도어 타일)
-    if (tileType === 4) {
-      const src = even ? FLOOR_TILE_A : FLOOR_TILE_B;
-      ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
-      return;
-    }
-    // 5 Corridor — 회색 복도 타일
-    if (tileType === 5) {
-      const src = even ? CORRIDOR_TILE_A : CORRIDOR_TILE_B;
-      ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
-      return;
-    }
-    // 6 Carpet — 바닥 타일 + 색상 오버레이
-    if (tileType === 6) {
-      const src = even ? FLOOR_TILE_A : FLOOR_TILE_B;
-      ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
-      ctx.fillStyle = carpetColor ? carpetColor + "40" : "rgba(74,144,217,0.25)";
-      ctx.fillRect(x, y, tileSize, tileSize);
-      return;
-    }
-    // 기본: 파란 바닥
-    const src = even ? FLOOR_TILE_A : FLOOR_TILE_B;
-    ctx.drawImage(tileset, src.sx, src.sy, src.sw, src.sh, x, y, tileSize, tileSize);
-    return;
-  }
-
-  // --- 절차적 폴백 (tileset 없을 때) ---
+  // 이 타일셋(PixelOfficeAssets)에는 전용 바닥 타일이 없다(구름 배경 + 가구 위주). 예전엔 바닥을
+  // 타일셋의 (64,32) 등에서 샘플링했는데 그 좌표가 실제로는 의자/책상이라 바닥이 가구로 타일링돼
+  // "배경이 이상"했다. 바닥은 항상 절차적 단색(따뜻한 베이지 체크·복도·카펫)으로 그린다. 타일셋은
+  // 가구 렌더(drawFromTileset)에서만 쓴다. → 아래 절차적 렌더로 통일.
   // 0 Floor
   if (tileType === 0) {
     ctx.fillStyle = even ? "#EFE9DC" : "#E7E0CF";
