@@ -47,7 +47,7 @@ function CollapsibleWidget({
   children,
 }: CollapsibleWidgetProps) {
   return (
-    <div className={cn("rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow", className)}>
+    <div className={cn("group/widget rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow", className)}>
       {/* 접혔을 때만 보이는 제목 바 */}
       {collapsed && (
         <div className="flex items-center justify-between px-5 py-3">
@@ -63,16 +63,16 @@ function CollapsibleWidget({
         </div>
       )}
 
-      {/* 위젯 본체 + 펼쳐진 상태의 토글 버튼 */}
+      {/* 위젯 본체 + 펼쳐진 상태의 토글 버튼(hover 시에만 노출 — 위젯 자체 헤더 컨트롤과 상시 겹침 방지) */}
       {!collapsed && (
         <div className="relative">
           <button
             type="button"
             onClick={() => onToggle(id)}
             aria-label="접기"
-            className="absolute right-3 top-3 z-10 rounded p-0.5 hover:bg-muted transition-colors"
+            className="absolute right-2.5 top-2.5 z-10 rounded-md bg-card/80 p-0.5 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/widget:opacity-100"
           >
-            <ChevronDown className="size-4 transition-transform" />
+            <ChevronDown className="size-4" />
           </button>
           {children}
         </div>
