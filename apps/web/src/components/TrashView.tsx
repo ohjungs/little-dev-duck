@@ -11,11 +11,11 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // 휴지통에 들어간 시각을 상대적으로 표시(간단 — 일 단위). 정밀 포맷은 과설계(ponytail).
-function trashedAgo(iso: string | null): string {
-  if (!iso) return "";
+function trashedAgo(iso: string | null): { label: string; warn: boolean } {
+  if (!iso) return { label: "", warn: false };
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days <= 0) return "오늘 삭제";
-  return `${days}일 전 삭제`;
+  if (days <= 0) return { label: "오늘 삭제", warn: false };
+  return { label: `${days}일 전 삭제`, warn: days > 25 };
 }
 
 // 휴지통 뷰: soft delete된 페이지 목록 + 복원/영구삭제. 영구삭제는 되돌리기 불가라 확인 후 실행(안전 규칙).
@@ -116,9 +116,15 @@ export function TrashView() {
               <p className="truncate text-sm font-medium">
                 {page.title || "제목 없음"}
               </p>
-              <p className="text-xs text-muted-foreground">
-                {trashedAgo(page.trashedAt)}
-              </p>
+              {(() => {
+                const { label, warn } = trashedAgo(page.trashedAt);
+                return (
+                  <p className={`text-xs ${warn ? "text-destructive" : "text-muted-foreground"}`}>
+                    {label}
+                    {warn && " — 곧 자동 삭제됩니다"}
+                  </p>
+                );
+              })()}
             </div>
             <Button
               variant="ghost"

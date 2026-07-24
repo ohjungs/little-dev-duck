@@ -126,6 +126,7 @@ export function PageEditor({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showVersions, setShowVersions] = useState(false);
   const [versionMsg, setVersionMsg] = useState<string | null>(null);
+  const [textCopied, setTextCopied] = useState(false);
   // Phase 11: 이 페이지가 데이터베이스면 dbSchema 설정. 전환/스키마편집은 로컬 상태 + db_schema 저장.
   const [dbSchema, setDbSchema] = useState<DbSchema | null>(page.dbSchema);
 
@@ -300,6 +301,14 @@ export function PageEditor({
     URL.revokeObjectURL(url);
   };
 
+  // 페이지 본문을 일반 텍스트로 클립보드에 복사. 성공 피드백은 1.5초 후 원복.
+  const handleCopyText = () => {
+    void navigator.clipboard.writeText(plainText).then(() => {
+      setTextCopied(true);
+      setTimeout(() => setTextCopied(false), 1500);
+    });
+  };
+
   // 현재 상태를 버전 스냅샷으로 저장(T5). 대기 중 편집을 먼저 저장한 뒤 서버 상태에서 스냅샷을 뜬다
   // (버전은 실제 저장된 내용의 통짜 복사 — 무결성/소유권은 서버가 강제).
   const handleSaveVersion = async () => {
@@ -382,6 +391,15 @@ export function PageEditor({
           className="text-muted-foreground"
         >
           <Download className="size-3.5" /> Markdown 내보내기
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleCopyText}
+          className="text-muted-foreground"
+        >
+          {textCopied ? "복사됨!" : "텍스트 복사"}
         </Button>
         <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
           <Upload className="size-3.5" /> 가져오기
