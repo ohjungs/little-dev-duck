@@ -73,13 +73,13 @@ Phase 완료분은 실기 검증만 남음(코드+DB 전부 배포됨).**
 - [x] CommandPalette ARIA: listbox/option/activedescendant ✅ ef87a43
 - [x] unbounded query .limit(500) 7개 함수 ✅ ff066df
 - [x] page_versions 쓰기 상한: per-page 50건 ✅ 3c65108
-- [ ] apps/web/src/lib/ 테스트: vitest 미설정으로 이월
+- [ ] apps/web/src/lib/ 테스트: vitest 설정 + 순수함수 테스트 (진행 중)
 
 ### NICE (priority 3) — 후속
 
 - [x] 백링크 page_links 테이블 + API ✅ 91666c8 (UI 후속)
 - [x] 페이지 커버 cover_url 컬럼 + UI ✅ 6959510
-- [ ] Realtime 멀티서피스 동기화 (feature)
+- [x] Realtime 멀티서피스 동기화 ✅ 87263f0
 - [x] hover-revealed 버튼 focus-visible 링 ✅ 3c65108
 - [x] listPages SELECT 프로젝션: content 제외 ✅ 91666c8
 
@@ -88,56 +88,56 @@ Phase 완료분은 실기 검증만 남음(코드+DB 전부 배포됨).**
 > 아키텍처: docs/plans/pixel-office-expansion.md (9 Phase, 33 Task)
 > 사용자=CEO 오리, 9개 부서(개발/마케팅/디자인/인사/재무/영업/고객지원/QA/운영)
 
-### Phase A: 타일맵 기반 (선행 필수) → 스펙: docs/specs/2026-07-24-office-phase-a-tilemap.md
-- [ ] T-A1 타일맵 데이터 구조 (core 순수함수)
-- [ ] T-A2 카메라 뷰포트 시스템 (lerp follow, clamp)
-- [ ] T-A3 맵 빌더 + 80x60 오피스 맵 (9부서+사장실+로비+식당+회의실+서버실)
-- [ ] T-A4 고퀄 오리 (16x16px, 4방향, 상태별 포즈, 부서별 색상, CEO 왕관)
-- [ ] T-A5 PixelOffice.tsx 카메라 통합
-- [ ] T-A6 movePlayer 타일맵 연동
+### Phase A: 타일맵 기반 ✅ f7cedd9 + 2fd3e46
+- [x] T-A1 타일맵 데이터 구조 (TileType 24종, TileMap, 충돌/존)
+- [x] T-A2 카메라 뷰포트 시스템 (lerp follow, clamp, worldToScreen)
+- [x] T-A3 맵 빌더 40x30 컴팩트 (15존)
+- [x] T-A4 고퀄 오리 + 에셋 통합 (ducky spritesheet + PixelOffice 타일셋)
+- [x] T-A5 PixelOffice.tsx 카메라 통합 (ResizeObserver 반응형)
+- [x] T-A6 movePlayer 타일맵 충돌 연동
 
-### Phase B: 스프라이트 시스템
-- [ ] T-B1 스프라이트 시트 타입 + 로더
-- [ ] T-B2 오리 걷기 애니메이션 (4방향x4프레임)
-- [ ] T-B3 절차적 폴백 + 스프라이트 전환 렌더러
-- [ ] T-B4 가구/장식 타일 렌더링 (책상/의자/화분/컴퓨터/키보드/마우스/시계/팔레트/화장실 등)
+### Phase B: 스프라이트 시스템 ✅ db89c7b + 6959510
+- [x] T-B1 sprite-loader.ts (오리+가구+타일셋 비동기 로딩)
+- [x] T-B2 오리 spritesheet (ducky_2/3, 4방향x6프레임)
+- [x] T-B3 drawDuckSprite/drawHumanSprite + 절차적 폴백
+- [x] T-B4 TILESET_MAP 23 TileType 매핑 + 40종 가구 PNG
 
-### Phase C: 모바일 터치 → 스펙: docs/specs/2026-07-24-office-mobile-controls.md
-- [ ] T-C1 입력 추상화 (InputManager: 키보드+터치 통합)
-- [ ] T-C2 가상 D-pad 오버레이 (방향+A버튼)
-- [ ] T-C3 탭-투-인터랙트
-- [ ] T-C4 반응형 캔버스
+### Phase C: 모바일 터치 ✅ 35b1283
+- [x] T-C1 InputManager (키보드+터치 통합)
+- [x] T-C2 VirtualDpad (방향4+A, 48px, hold-to-repeat)
+- [x] T-C3 탭-투-인터랙트 (screenToWorld)
+- [x] T-C4 반응형 캔버스 (ResizeObserver)
 
-### Phase D: 부서 레이아웃
-- [ ] T-D1 부서 정의 (9부서 메타데이터)
-- [ ] T-D2 오피스 플로어플랜 (80x60 상세 레이아웃)
-- [ ] T-D3 부서별 가구 배치 (디테일: 모니터/서류/화이트보드/전화기/헤드셋 등)
-- [ ] T-D4 방 전환 + 문 시스템
+### Phase D: 부서 레이아웃 ✅ a59626c
+- [x] T-D1 9부서 메타데이터 (DEPT_REGISTRY, 35 오리이름)
+- [x] T-D2 40x30 컴팩트 플로어플랜
+- [x] T-D3 부서별 가구 배치 (furnishDesks)
+- [x] T-D4 방 전환 + 문 + 구역 HUD
 
-### Phase E: NPC 행동
-- [ ] T-E1 게임 시계 + 스케줄 (출근 9AM, 점심 12PM, 퇴근 6PM)
-- [ ] T-E2 NPC 상태머신 (walking/working/eating/chatting/leaving)
-- [ ] T-E3 A* 경로탐색
-- [ ] T-E4 NPC 개성 (이름/성격/작업 스타일/악세사리)
+### Phase E: NPC 행동 ✅ a59626c + ff066df
+- [x] T-E1 GameClock (1초=1분) + schedulePhase
+- [x] T-E2 NPC 상태머신 + simulateNpcTasks
+- [x] T-E3 A* 경로탐색 (office-pathfind.ts) + NPC 배회
+- [x] T-E4 NPC 개성 (이름/역할/부서별 악세사리/인간 스프라이트)
 
-### Phase F: CEO 상호작용 → 스펙: docs/specs/2026-07-24-office-interaction-system.md
-- [ ] T-F1 직원 대화 — 상세 업무 패널 (작업 목록, 진행률, 상태)
-- [ ] T-F2 NPC 작업 데이터 구조 + 시뮬레이터
-- [ ] T-F3 사장실 전사 대시보드 (활동 피드 + 부서별 카드)
-- [ ] T-F4 대화 선택지 (업무 현황/격려/지시/돌아가기)
+### Phase F: CEO 상호작용 ✅ 72d3001 + fa83a09
+- [x] T-F1 OfficeTalkPanel (작업 진행률바, 역할/부서)
+- [x] T-F2 NPC 작업 시뮬레이터 + 실데이터 연동
+- [x] T-F3 OfficeDashboard (9부서 카드 + 활동 피드)
+- [x] T-F4 OfficeManagementPanel (경영 시뮬: 자금/수익/평판)
 
-### Phase G: 비주얼 폴리시
-- [ ] T-G1 낮/밤 팔레트 전환
-- [ ] T-G2 미니맵 오버레이
-- [ ] T-G3 구역 이름 HUD
+### Phase G: 비주얼 폴리시 ✅ 72d3001
+- [x] T-G1 낮/밤 팔레트 전환 (timeOfDay + overlay)
+- [x] T-G2 미니맵 오버레이 (drawMinimap, M키 토글)
+- [x] T-G3 구역 이름 HUD (페이드 애니메이션)
 
-### Phase H: 사운드
-- [ ] T-H1 BGM (lo-fi 오피스)
-- [ ] T-H2 SFX (발소리/타이핑/문열기)
+### Phase H: 사운드 ✅ 37b6af5
+- [x] T-H1 BGM (Web Audio lo-fi 패드 코드)
+- [x] T-H2 SFX (footstep/interact/typing/door, N키 뮤트)
 
-### Phase I: 실이벤트 연동
-- [ ] T-I1 Claude Code hooks → 오피스 이벤트
-- [ ] T-I2 Tauri sidecar WebSocket
+### Phase I: 실이벤트 연동 — 인프라 필요
+- [ ] T-I1 Claude Code hooks → 오피스 이벤트 (Tauri 필요)
+- [ ] T-I2 Tauri sidecar WebSocket (Tauri 필요)
 
 ### 탈락 (교차검증 미통과)
 
