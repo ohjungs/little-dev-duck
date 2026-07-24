@@ -5,14 +5,15 @@ import { isQuietHour, type DuckMood } from "@ldd/core";
 import { pickClickPhrase, pickIdlePhrase, pickPhrase } from "./phrases";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
-// 2026-07-25 : 오리 렌더링 - 49MB GLB(3D) 교체 - SVG+CSS 애니메이션
-// 기존 3D 모델(/little_dev_duck.glb, 49MB)은 로딩이 수 초 걸리고 조명에 색이 씻겨 흰 덩어리처럼
-// 보였다("깨짐"). 즉시 로드되는 SVG 아기오리 + CSS 애니메이션으로 교체한다. 대사·기분·유휴·클릭·
-// 방해금지 로직은 그대로 보존하고, 눈 깜빡임/두리번/기분별 표정/터치 반응/축하 연출을 CSS로 표현.
-// 몸통 색(캐릭터 바이블 고정값 계열)은 노란 오리로 유지.
+// 2026-07-25 : 오리 렌더링 - 픽셀아트 스프라이트(ducky_2_spritesheet.png)
+// 49MB 3D GLB → SVG → 픽셀 스프라이트로 진화. 배포 웹 origin 루트의 /ducky_2_spritesheet.png
+// (192x128, 6열x4행, 32x32 프레임, 행0=down/1=left/2=right/3=up)를 CSS 스프라이트 애니메이션으로
+// 렌더. 4x 정수 스케일 + image-rendering:pixelated로 선명한 픽셀아트. 대사·기분·유휴·방해금지·클릭
+// 로직은 보존. 기분: happy=빠른 걸음+통통, sad=느림+기울임, neutral=보통. 클릭=폴짝(꽥) + 말풍선.
 
+const SPRITE_URL = "/ducky_2_spritesheet.png";
 const SPEECH_BUBBLE_DURATION_MS = 2000;
-const SQUISH_MS = 320;
+const HOP_MS = 420;
 
 const IDLE_MIN_MS = 12_000;
 const IDLE_MAX_MS = 24_000;
@@ -26,7 +27,7 @@ const MOOD_LABEL: Record<DuckMood, string> = {
 export interface DuckProps {
   height?: number;
   mood?: DuckMood;
-  // true가 되는 순간 짧은 레벨업 축하 연출(도약)을 재생한다. 기본 false(하위호환).
+  // true가 되는 순간 짧은 레벨업 축하 연출(폴짝)을 재생한다. 기본 false(하위호환).
   celebrate?: boolean;
   // Phase 12 T2 방해금지(DND). 이 시간대(로컬)엔 유휴 혼잣말을 억제한다(밤엔 오리도 잔다). null=끔.
   quietHours?: { start: number; end: number } | null;
@@ -42,9 +43,9 @@ export function Duck({
   const clickCountRef = useRef(0);
   const [phrase, setPhrase] = useState(() => pickPhrase(0));
   const [showBubble, setShowBubble] = useState(false);
-  const [squish, setSquish] = useState(false);
+  const [hop, setHop] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const squishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastInteractionRef = useRef(0);
   const quietHoursRef = useRef(quietHours);
   quietHoursRef.current = quietHours;
@@ -64,9 +65,9 @@ export function Duck({
     clickCountRef.current += 1;
     lastInteractionRef.current = Date.now();
     if (!reducedMotion) {
-      setSquish(true);
-      if (squishTimer.current) clearTimeout(squishTimer.current);
-      squishTimer.current = setTimeout(() => setSquish(false), SQUISH_MS);
+      setHop(true);
+      if (hopTimer.current) clearTimeout(hopTimer.current);
+      hopTimer.current = setTimeout(() => setHop(false), HOP_MS);
     }
   };
 
@@ -93,7 +94,7 @@ export function Duck({
   useEffect(() => {
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
-      if (squishTimer.current) clearTimeout(squishTimer.current);
+      if (hopTimer.current) clearTimeout(hopTimer.current);
     };
   }, []);
 
@@ -104,10 +105,9 @@ export function Duck({
     }
   };
 
-  // 모션 클래스: reduced-motion이면 애니메이션을 끄고 정적 자세만 유지한다.
-  const animClass = reducedMotion ? "" : `ldd-duck--anim ldd-duck--${mood}`;
-  const celebrateClass = celebrate && !reducedMotion ? "ldd-duck--celebrate" : "";
-  const squishClass = squish ? "ldd-duck--squish" : "";
+  const walkClass = reducedMotion ? "" : `ldd-duck-sprite--${mood}`;
+  const hopClass = hop ? "ldd-duck-hop--active" : "";
+  const celebrateClass = celebrate && !reducedMotion ? "ldd-duck-hop--celebrate" : "";
 
   return (
     <div
@@ -130,46 +130,12 @@ export function Duck({
         onClick={handleGreet}
         onKeyDown={onKeyDown}
         aria-label="오리 쓰다듬기"
-        className={`ldd-duck-btn ${celebrateClass}`}
+        className="ldd-duck-btn"
       >
-        <svg
-          viewBox="0 0 120 120"
-          className={`ldd-duck ${animClass} ${squishClass}`}
-          width="100%"
-          height="100%"
-          aria-hidden="true"
-        >
-          {/* 그림자 */}
-          <ellipse cx="60" cy="108" rx="26" ry="5" className="ldd-duck-shadow" />
-          {/* 발 */}
-          <g className="ldd-duck-feet">
-            <path d="M48 96 l-8 10 h16 z" className="ldd-duck-foot" />
-            <path d="M72 96 l-8 10 h16 z" className="ldd-duck-foot" />
-          </g>
-          {/* 몸통 */}
-          <ellipse cx="60" cy="74" rx="34" ry="30" className="ldd-duck-body" />
-          {/* 날개 */}
-          <ellipse cx="34" cy="74" rx="10" ry="16" className="ldd-duck-wing ldd-duck-wing--l" />
-          <ellipse cx="86" cy="74" rx="10" ry="16" className="ldd-duck-wing ldd-duck-wing--r" />
-          {/* 머리 */}
-          <circle cx="60" cy="40" r="26" className="ldd-duck-head" />
-          {/* 볼(happy일 때 도드라짐) */}
-          <circle cx="44" cy="46" r="5" className="ldd-duck-cheek" />
-          <circle cx="76" cy="46" r="5" className="ldd-duck-cheek" />
-          {/* 눈 */}
-          <g className="ldd-duck-eyes">
-            <circle cx="51" cy="38" r="4.5" className="ldd-duck-eye" />
-            <circle cx="69" cy="38" r="4.5" className="ldd-duck-eye" />
-            <circle cx="52.2" cy="36.8" r="1.5" className="ldd-duck-eye-shine" />
-            <circle cx="70.2" cy="36.8" r="1.5" className="ldd-duck-eye-shine" />
-          </g>
-          {/* 부리 */}
-          <ellipse cx="60" cy="50" rx="10" ry="6" className="ldd-duck-beak" />
-          {/* 머리 깃털 */}
-          <path d="M60 14 q-4 -8 2 -10 q6 -2 4 8 z" className="ldd-duck-tuft" />
-          {/* 눈물(sad일 때만) */}
-          <circle cx="51" cy="46" r="2.2" className="ldd-duck-tear" />
-        </svg>
+        <span className={`ldd-duck-hop ${hopClass} ${celebrateClass}`}>
+          <span className={`ldd-duck-sprite ${walkClass}`} />
+          <span className="ldd-duck-floor" />
+        </span>
       </button>
     </div>
   );
@@ -178,47 +144,39 @@ export function Duck({
 // 스타일은 컴포넌트에 인라인해 별도 CSS 파일/빌드 설정 없이 어디서든 동작하게 한다(패키지 자기완결).
 const DUCK_CSS = `
 .ldd-duck-stage{position:relative;display:flex;align-items:center;justify-content:center;}
-.ldd-duck-btn{background:none;border:none;padding:0;cursor:pointer;height:100%;display:flex;align-items:center;justify-content:center;outline:none;}
+.ldd-duck-btn{background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;outline:none;}
 .ldd-duck-btn:focus-visible{outline:2px solid var(--ring,#ca8a04);outline-offset:4px;border-radius:16px;}
-.ldd-duck{height:100%;width:auto;max-width:100%;transform-origin:60px 104px;transition:transform .18s ease;}
-.ldd-duck-shadow{fill:rgba(0,0,0,.14);}
-.ldd-duck-body{fill:#FFD23F;}
-.ldd-duck-head{fill:#FFDD55;}
-.ldd-duck-wing{fill:#F5C518;}
-.ldd-duck-foot{fill:#F59E0B;}
-.ldd-duck-beak{fill:#F97316;}
-.ldd-duck-tuft{fill:#F5C518;}
-.ldd-duck-eye{fill:#2B2118;}
-.ldd-duck-eye-shine{fill:#fff;}
-.ldd-duck-cheek{fill:#FDA4AF;opacity:0;transition:opacity .3s;}
-.ldd-duck-tear{fill:#7DD3FC;opacity:0;}
+.ldd-duck-hop{position:relative;display:inline-flex;flex-direction:column;align-items:center;transition:transform .12s ease;}
+.ldd-duck-sprite{
+  width:128px;height:128px;
+  background-image:url(${SPRITE_URL});
+  background-repeat:no-repeat;
+  background-size:768px 512px;      /* 4x: 시트 192x128 -> 768x512 */
+  background-position:0 0;           /* 행0 = down(정면) */
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+}
+.ldd-duck-floor{width:76px;height:9px;margin-top:-6px;border-radius:50%;background:rgba(0,0,0,.12);}
 
-/* 기분별 정적 자세(모션 없어도 유지) */
-.ldd-duck--sad{transform:rotate(-4deg) translateY(4px);}
-.ldd-duck--happy .ldd-duck-cheek{opacity:.85;}
-.ldd-duck--sad .ldd-duck-tear{opacity:.9;}
+/* 시트 레이아웃(실측): row0=idle 2프레임, row1=걷기 6프레임, 전부 우측면 뷰. 4x 스케일이라 행=128px 단위. */
+/* neutral: row0 2프레임 잔잔한 idle */
+.ldd-duck-sprite--neutral{background-position-y:0;animation:lddIdle 1.3s steps(2) infinite;}
+/* happy: row1 6프레임 신나는 뒤뚱걸음 */
+.ldd-duck-sprite--happy{background-position-y:-128px;animation:lddWaddle .7s steps(6) infinite;}
+/* sad: 정지 프레임 + 기울임(아래 hop 래퍼) */
+.ldd-duck-sprite--sad{background-position:0 0;}
+.ldd-duck-hop:has(.ldd-duck-sprite--happy){animation:lddBounce 1.4s ease-in-out infinite;}
+.ldd-duck-hop:has(.ldd-duck-sprite--sad){transform:rotate(-5deg);}
 
-/* 상시 유휴 애니메이션 */
-.ldd-duck--anim{animation:lddBob 3s ease-in-out infinite;}
-.ldd-duck--anim.ldd-duck--happy{animation:lddBob 1.7s ease-in-out infinite;}
-.ldd-duck--anim.ldd-duck--sad{animation:lddBobSad 4s ease-in-out infinite;}
-.ldd-duck--anim .ldd-duck-eyes{animation:lddBlink 4.5s infinite;transform-origin:60px 38px;}
-.ldd-duck--anim .ldd-duck-head{animation:lddLook 9s ease-in-out infinite;transform-origin:60px 40px;}
-.ldd-duck--anim.ldd-duck--sad .ldd-duck-tear{animation:lddTear 3.5s ease-in infinite;}
+/* 클릭 폴짝(꽥) / 레벨업 축하 */
+.ldd-duck-hop--active{animation:lddHop .42s ease !important;}
+.ldd-duck-hop--celebrate{animation:lddCelebrate .7s ease !important;}
 
-/* 클릭 시 찌부러짐(꽥) */
-.ldd-duck--squish{animation:lddSquish .32s ease;}
-
-/* 레벨업 축하: 도약 + 살짝 회전 */
-.ldd-duck--celebrate .ldd-duck{animation:lddHop .6s ease;}
-
-@keyframes lddBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
-@keyframes lddBobSad{0%,100%{transform:rotate(-4deg) translateY(4px)}50%{transform:rotate(-4deg) translateY(1px)}}
-@keyframes lddBlink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
-@keyframes lddLook{0%,40%,100%{transform:rotate(0)}55%{transform:rotate(6deg)}75%{transform:rotate(-6deg)}}
-@keyframes lddSquish{0%{transform:scale(1,1)}40%{transform:scale(1.18,.82)}70%{transform:scale(.94,1.06)}100%{transform:scale(1,1)}}
-@keyframes lddHop{0%{transform:translateY(0) rotate(0)}30%{transform:translateY(-22px) rotate(8deg)}60%{transform:translateY(-6px) rotate(-6deg)}100%{transform:translateY(0) rotate(0)}}
-@keyframes lddTear{0%,60%{opacity:0;transform:translateY(0)}70%{opacity:.9}100%{opacity:0;transform:translateY(10px)}}
+@keyframes lddIdle{from{background-position-x:0}to{background-position-x:-256px}}
+@keyframes lddWaddle{from{background-position-x:0}to{background-position-x:-768px}}
+@keyframes lddBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes lddHop{0%{transform:translateY(0) scale(1,1)}30%{transform:translateY(-18px) scale(.92,1.1)}55%{transform:translateY(0) scale(1.1,.9)}100%{transform:translateY(0) scale(1,1)}}
+@keyframes lddCelebrate{0%{transform:translateY(0) rotate(0)}25%{transform:translateY(-26px) rotate(-8deg)}50%{transform:translateY(-4px) rotate(8deg)}75%{transform:translateY(-14px) rotate(-4deg)}100%{transform:translateY(0) rotate(0)}}
 
 .ldd-duck-bubble{position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:2;
   background:var(--ldd-color-bg,#F6EFDD);color:var(--ldd-color-text,#352116);
@@ -226,6 +184,7 @@ const DUCK_CSS = `
   font-size:.85rem;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.12);pointer-events:none;}
 
 @media (prefers-reduced-motion: reduce){
-  .ldd-duck--anim,.ldd-duck--anim .ldd-duck-eyes,.ldd-duck--anim .ldd-duck-head,.ldd-duck--celebrate .ldd-duck,.ldd-duck--squish{animation:none !important;}
+  .ldd-duck-sprite--neutral,.ldd-duck-sprite--happy,.ldd-duck-hop--active,
+  .ldd-duck-hop--celebrate,.ldd-duck-hop:has(.ldd-duck-sprite--happy){animation:none !important;}
 }
 `;
