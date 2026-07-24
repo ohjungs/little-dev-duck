@@ -761,9 +761,10 @@ export function drawHumanSprite(
 ): void {
   const CHAR_W = 16;
   const CHAR_H = 16;
-  // Playwright로 타일셋 실측: 캐릭터 3종은 row 7(y=112) col 0-2에 있다. 기존 sy=48은 하늘(구름)이라
-  // NPC가 구름 조각으로 렌더돼 사실상 안 보였다("직원 없지"의 원인). → sy=112로 교정.
-  const col = (characterIndex % 3);
+  // Playwright로 타일셋 실측: 온전한 캐릭터는 row 7(y=112) col 0·1 두 종뿐이다. col 2는 반쪽만 있어
+  // 잘려 보이고, row 8 캐릭터는 16px 샘플에 머리만 잡힌다. → 온전한 2종만 순환 사용(직원이 반쪽으로
+  // 렌더되던 버그 제거). (기존 sy=48은 하늘/구름이라 NPC가 안 보이던 것을 앞서 sy=112로 교정함.)
+  const col = characterIndex % 2;
   const sx = col * CHAR_W;
   const sy = 112; // row 7 — 캐릭터
 
