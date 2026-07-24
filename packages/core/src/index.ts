@@ -249,3 +249,24 @@ export {
   stampRoom,
   connectCorridor,
 } from "./domain/office-map-builder";
+export {
+  DEPARTMENTS,
+  DEPT_REGISTRY,
+  DUCK_NAMES,
+  getDepartment,
+  type DepartmentId,
+  type DuckAccessory,
+  type Department,
+} from "./domain/office-department";
+export {
+  createGameClock,
+  tickClock,
+  formatClockTime,
+  schedulePhase,
+  phaseToWorkState,
+  simulateNpcTasks,
+  type NpcTask,
+  type NpcSchedulePhase,
+  type Npc,
+  type GameClock,
+} from "./domain/office-npc";
