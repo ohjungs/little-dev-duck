@@ -6,6 +6,7 @@ import {
   Download,
   Info,
   Keyboard,
+  Link2,
   LogOut,
   Mail,
   Moon,
@@ -32,6 +33,7 @@ import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
 import { GitHubMark } from "@/components/ui/github-mark";
 import { GmailLink } from "@/components/GmailLink";
+import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 import { DangerZone } from "@/components/DangerZone";
 import { ExportDataButton } from "@/components/ExportDataButton";
 import { LocalResetButton } from "@/components/LocalResetButton";
@@ -56,7 +58,7 @@ export default async function SettingsPage() {
   const provider = user?.app_metadata.provider ?? "이메일";
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6 md:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 md:px-6 lg:px-8">
       <div className="mb-6 flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">설정</h1>
         <p className="text-sm text-muted-foreground">
@@ -64,7 +66,8 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <div className="flex flex-col gap-4">
+      {/* 좁은 단일 컬럼 → 다단(masonry)으로 좌우를 꽉 채운다. 카드는 열 사이에서 잘리지 않게 break-inside-avoid. */}
+      <div className="columns-1 gap-4 md:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid">
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
@@ -133,49 +136,64 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* 외부 연동을 한 카드로 통합 — 서비스별로 흩어진 카드를 한곳에서 바로바로 연동. */}
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
-              <CalendarClock className="size-4 text-primary-accent" />
-              Google Calendar 연동
+              <Link2 className="size-4 text-primary-accent" />
+              외부 연동
             </CardTitle>
             <CardDescription>
-              로그인 방법과 무관하게 오리가 캘린더 일정을 조회·생성할 수 있게 합니다.
+              오리가 여러분의 서비스에 실제 작업을 수행하도록 연동합니다. 로그인 방법과 무관합니다.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <GoogleCalendarLink linked={googleLinked} />
+          <CardContent className="flex flex-col divide-y divide-border">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+              <div className="flex items-start gap-3">
+                <CalendarClock className="mt-0.5 size-5 shrink-0 text-primary-accent" />
+                <div>
+                  <p className="text-sm font-medium">Google Calendar</p>
+                  <p className="text-xs text-muted-foreground">일정 조회·생성</p>
+                </div>
+              </div>
+              <GoogleCalendarLink linked={googleLinked} />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div className="flex items-start gap-3">
+                <GitHubMark className="mt-0.5 size-5 shrink-0 text-primary-accent" />
+                <div>
+                  <p className="text-sm font-medium">GitHub 이슈</p>
+                  <p className="text-xs text-muted-foreground">이슈 조회·생성</p>
+                </div>
+              </div>
+              <GitHubIssuesLink linked={githubLinked} isPrimaryGithub={provider === "github"} />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
+              <div className="flex items-start gap-3">
+                <Mail className="mt-0.5 size-5 shrink-0 text-primary-accent" />
+                <div>
+                  <p className="text-sm font-medium">Gmail</p>
+                  <p className="text-xs text-muted-foreground">이메일 조회·휴지통 이동(영구삭제 없음)</p>
+                </div>
+              </div>
+              <GmailLink linked={gmailLinked} />
+            </div>
           </CardContent>
         </Card>
 
+        {/* GitHub 잔디(기여 캘린더) — 대시보드에서 설정으로 이동. GitHub 로그인 시 표시. */}
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
               <GitHubMark className="size-4 text-primary-accent" />
-              GitHub 이슈 연동
+              GitHub 잔디
             </CardTitle>
             <CardDescription>
-              로그인 방법과 무관하게 오리가 GitHub 이슈를 조회·생성할 수 있게 합니다.
+              GitHub 계정으로 로그인하면 최근 1년 기여 잔디를 볼 수 있어요.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <GitHubIssuesLink linked={githubLinked} isPrimaryGithub={provider === "github"} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex-col items-start gap-1">
-            <CardTitle>
-              <Mail className="size-4 text-primary-accent" />
-              Gmail 연동
-            </CardTitle>
-            <CardDescription>
-              오리가 최근 이메일을 조회하고 휴지통으로 이동할 수 있게 합니다. 영구삭제는 설계상
-              지원하지 않아요 — 항상 복구 가능한 휴지통 이동만 하고, 이동 전 승인을 거칩니다.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <GmailLink linked={gmailLinked} />
+            <GithubContributionWidget />
           </CardContent>
         </Card>
 

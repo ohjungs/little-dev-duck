@@ -6,7 +6,6 @@ import { MemoWidget } from "@/components/MemoWidget";
 import { CalendarWidget } from "@/components/CalendarWidget";
 import { HabitWidget } from "@/components/HabitWidget";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
-import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { DashboardGrid } from "@/components/DashboardGrid";
 import { LastPageLink } from "@/components/LastPageLink";
@@ -140,12 +139,6 @@ export default async function DashboardPage() {
             id: "calendar",
             label: "캘린더",
             children: <CalendarWidget />,
-          },
-          {
-            id: "github",
-            label: "GitHub 잔디",
-            className: "md:col-span-2 xl:col-span-3",
-            children: <GithubContributionWidget />,
           },
         ]}
       />
