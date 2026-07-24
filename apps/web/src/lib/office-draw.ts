@@ -738,39 +738,68 @@ export function drawFromTileset(
 }
 
 // ---------------------------------------------------------------------------
+// drawHumanSprite — PixelOfficeAssets.png 타일셋의 인간 캐릭터를 그린다
+// 캐릭터는 row 3 (y=48)에 위치, 각 16x16
+// characterIndex: 0-2 (타일셋에 보이는 3종류 캐릭터)
+// isIdle: true이면 반투명(0.45)으로 처리
+// ---------------------------------------------------------------------------
+export function drawHumanSprite(
+  ctx: CanvasRenderingContext2D,
+  tileset: HTMLImageElement,
+  x: number,
+  y: number,
+  tileSize: number,
+  characterIndex: number,
+  isIdle: boolean,
+): void {
+  const CHAR_W = 16;
+  const CHAR_H = 16;
+  // row 3 (y=48): 0=갈색머리 여성, 1=파란머리 여성, 2=주황머리 남성
+  const col = (characterIndex % 3);
+  const sx = col * CHAR_W;
+  const sy = 48; // row 3
+
+  if (isIdle) {
+    ctx.globalAlpha = 0.45;
+  }
+  ctx.drawImage(tileset, sx, sy, CHAR_W, CHAR_H, x, y, tileSize, tileSize);
+  ctx.globalAlpha = 1.0;
+}
+
+// ---------------------------------------------------------------------------
 // TILESET_MAP — TileType 번호 -> PixelOfficeAssets.png 소스 좌표
 // 타일셋 셀 좌표계: col*16, row*16 (좌상단 기준)
 // 게임 타일 크기 TILE=32 → 16px 셀을 2배 스케일해서 그린다
 // 불확실한 항목은 매핑에서 제외 — 폴백 프로시저럴 렌더러 사용
 // ---------------------------------------------------------------------------
-// 타일셋 육안 분석 (256x160, 16열 x 10행):
-//   row 0 (y=0)   : 다양한 색상의 의자들 (col 0-3 = 4종류)
-//   row 1 (y=16)  : 빨간/주황 소파 (col 0-7 가로형 가구)
-//   row 2 (y=32)  : 넓은 책상/카운터 영역 (회색-파란 톤)
-//   row 3 (y=48)  : 캐릭터 3종 + 고양이
-//   row 4 (y=64)  : 파란 서버랙 (col 0-1), 기타 장치들
-//   row 5 (y=80)  : 초록 소파 (col 0-3), 휴지통 (col 4-5), 소형 캐비닛
-//   row 6 (y=96)  : 이중 노란 문 (col 4-5), 소형 아이템 그리드
-//   row 7 (y=112) : 자판기 패널, 소형 장식품
-//   row 8 (y=128) : 화분/식물, 소파 변형, 소형 아이콘들
-//   row 9 (y=144) : 추가 아이템들
-// TileType 번호는 office-draw.ts switch 케이스와 일치:
-//   1=Wall, 2=Desk, 3=Chair, 4=Door, 7=Table, 8=Plant,
+// 2026-07-24 : 타일셋 육안 분석 (256x160, 16열 x 10행):
+//   row 0 (y=0)   : 다양한 색상의 의자 4종 (col 0-3), 우측은 소형 아이템
+//   row 1 (y=16)  : 빨간 긴 소파/카운터 (col 0-7), 파란 책상 상단
+//   row 2 (y=32)  : 파란 책상 (col 0-7), 회색 책상 (col 8-15)
+//   row 3 (y=48)  : 캐릭터 3종 (col 0-2) + 고양이 (col 3), 서버랙 등
+//   row 4 (y=64)  : 파란 서버랙 2개 (col 0-1), 자판기/장치 (col 2-)
+//   row 5 (y=80)  : 초록 소파 (col 0-3), 쓰레기통 (col 4), 소형 캐비닛
+//   row 6 (y=96)  : 소형 아이콘들, 노란 문 (col 4-5)
+//   row 7 (y=112) : 다양한 소형 오피스 장비
+//   row 8 (y=128) : 화분/식물, 소형 아이템
+//   row 9 (y=144) : 추가 장식 아이템
+// TileType: 1=Wall, 2=Desk, 3=Chair, 4=Door, 7=Table, 8=Plant,
 //   9=Bookshelf, 10=CoffeeMachine, 11=Whiteboard, 12=Server,
 //   16=Sofa, 17=VendingMachine, 18=WaterCooler, 19=Toilet
 export type TilesetRect = { sx: number; sy: number; sw: number; sh: number };
 
 export const TILESET_MAP: Partial<Record<number, TilesetRect>> = {
-  // Chair (row 0, col 0) — 첫 번째 파란 의자
+  // Chair — row 0, col 0 (파란 의자)
   3:  { sx: 0,   sy: 0,  sw: 16, sh: 16 },
-  // Table/meeting table (row 2, col 0) — 책상 상단 줄
-  7:  { sx: 0,   sy: 32, sw: 16, sh: 16 },
-  // Server rack (row 4, col 0-1) — 파란 서버 타워, 32x16 소스
+  // Desk — row 2, col 0 (파란 책상)
+  2:  { sx: 0,   sy: 32, sw: 16, sh: 16 },
+  // Table — row 2, col 4 (더 넓은 책상/테이블)
+  7:  { sx: 64,  sy: 32, sw: 16, sh: 16 },
+  // Server rack — row 4, col 0 (파란 서버랙)
   12: { sx: 0,   sy: 64, sw: 16, sh: 16 },
-  // Sofa green (row 5, col 0) — 초록 소파 왼쪽
+  // Sofa — row 5, col 0 (초록 소파)
   16: { sx: 0,   sy: 80, sw: 16, sh: 16 },
-  // Bin/trash (row 5, col 4) — 휴지통
-  // (TileType.FireExtinguisher = 23, 소형 빨간 아이템으로 대체)
+  // Trash/FireExtinguisher — row 5, col 4 (쓰레기통)
   23: { sx: 64,  sy: 80, sw: 16, sh: 16 },
 };
 

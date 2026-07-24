@@ -50,14 +50,14 @@ import { VirtualDpad } from "@/components/VirtualDpad";
 import { OfficeTalkPanel } from "@/components/OfficeTalkPanel";
 import { OfficeDashboard } from "@/components/OfficeDashboard";
 import { OfficeManagementPanel } from "@/components/OfficeManagementPanel";
-import { drawDuckSprite, drawFurnitureSprite, drawFloorTile, drawFurniture, drawFromTileset, drawMinimap, TILESET_MAP } from "@/lib/office-draw";
+import { drawDuckSprite, drawHumanSprite, drawFurnitureSprite, drawFloorTile, drawFurniture, drawFromTileset, drawMinimap, TILESET_MAP } from "@/lib/office-draw";
 import { loadAllSprites, type SpriteAssets } from "@/lib/sprite-loader";
 
 // ---------------------------------------------------------------------------
 // 상수
 // ---------------------------------------------------------------------------
 const TILE = 32;          // 오리 스프라이트 프레임 32x32와 맞춤
-const FRAME_MS = 120;     // ~8fps
+const FRAME_MS = 60;      // ~16fps (깜빡임 방지)
 const ZONE_HUD_MS = 2000;
 const CLOCK_START_HOUR = 8;
 const MINIMAP_SCALE = 2;  // 타일당 2px
@@ -139,7 +139,7 @@ function buildAllNpcs(map: TileMap): Npc[] {
   let globalId = 0;
 
   for (const dept of Object.values(DEPT_REGISTRY)) {
-    const walkable = walkableTilesInZone(map, dept.id);
+    const walkable = deskTilesInZone(map, dept.id);
     const templates = getTaskTemplates(dept.id);
 
     for (let i = 0; i < dept.headcount; i++) {
@@ -209,6 +209,23 @@ function walkableTilesInZone(map: TileMap, zoneId: string): Vec[] {
   return tiles;
 }
 
+// Chair 타일 위치 반환 — NPC를 책상 앞 의자에 배치하기 위함
+function deskTilesInZone(map: TileMap, zoneId: string): Vec[] {
+  const zone = map.zones.find((z) => z.id === zoneId);
+  if (!zone) return [];
+  const chairs: Vec[] = [];
+  for (let dy = 1; dy < zone.bounds.h - 1; dy++) {
+    for (let dx = 1; dx < zone.bounds.w - 1; dx++) {
+      const x = zone.bounds.x + dx;
+      const y = zone.bounds.y + dy;
+      if (getTile(map, x, y) === TileType.Chair) {
+        chairs.push({ x, y });
+      }
+    }
+  }
+  return chairs.length > 0 ? chairs : walkableTilesInZone(map, zoneId);
+}
+
 function ceoStartPos(map: TileMap): Vec {
   const ceo = map.zones.find((z) => z.id === "ceo-office");
   if (!ceo) return { x: 40, y: 17 };
@@ -227,9 +244,33 @@ type TalkTarget = {
 };
 
 // ---------------------------------------------------------------------------
+// 부서 ID -> 캐릭터 인덱스 (0-2, PixelOfficeAssets row 3 캐릭터)
+// ---------------------------------------------------------------------------
+const DEPT_CHAR_INDEX: Partial<Record<string, number>> = {
+  engineering: 0,
+  marketing:   1,
+  design:      2,
+  hr:          0,
+  finance:     1,
+  sales:       0,
+  support:     1,
+  qa:          2,
+  operations:  0,
+};
+
+// ---------------------------------------------------------------------------
+// Props — realTasks를 받으면 시뮬레이터 대신 실제 데이터 사용
+// ---------------------------------------------------------------------------
+type RealTask = { title: string; progress: number; department: string };
+
+type OfficeProps = {
+  realTasks?: RealTask[];
+};
+
+// ---------------------------------------------------------------------------
 // 메인 컴포넌트
 // ---------------------------------------------------------------------------
-export function PixelOffice() {
+export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -245,6 +286,8 @@ export function PixelOffice() {
   const npcsRef = useRef<Npc[]>([]);
   const playerRef = useRef<Vec>({ x: 40, y: 17 });
   const nearbyNpcRef = useRef<Npc | null>(null);
+  const playerFacingRef = useRef<"up" | "down" | "left" | "right">("down");
+  const playerMovingRef = useRef(false);
 
   const clockRef = useRef<GameClock>(createGameClock(CLOCK_START_HOUR));
   const lastTickRef = useRef<number>(0);
@@ -271,6 +314,7 @@ export function PixelOffice() {
   const [clockDisplay, setClockDisplay] = useState("08:00 ☀️ 오전");
 
   const pausedRef = useRef(false);
+  const showDashboardRef = useRef(false);
   const lastZoneRef = useRef<string | null>(null);
   const zoneHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showMinimapRef = useRef(true);
@@ -287,6 +331,10 @@ export function PixelOffice() {
   }, [paused]);
 
   useEffect(() => {
+    showDashboardRef.current = showDashboard;
+  }, [showDashboard]);
+
+  useEffect(() => {
     showMinimapRef.current = showMinimap;
   }, [showMinimap]);
 
@@ -295,8 +343,32 @@ export function PixelOffice() {
     const map = buildOfficeMap();
     mapRef.current = map;
     playerRef.current = ceoStartPos(map);
-    npcsRef.current = buildAllNpcs(map);
+    const npcs = buildAllNpcs(map);
+
+    // realTasks가 있으면 해당 부서 NPC에 배분
+    if (realTasks && realTasks.length > 0) {
+      // 부서별 인덱스 추적
+      const deptCounter: Record<string, number> = {};
+      for (const rt of realTasks) {
+        const deptNpcs = npcs.filter((n) => n.department === rt.department);
+        if (deptNpcs.length === 0) continue;
+        const idx = (deptCounter[rt.department] ?? 0) % deptNpcs.length;
+        deptCounter[rt.department] = idx + 1;
+        const npc = deptNpcs[idx];
+        if (!npc) continue;
+        // 실제 태스크를 NPC 태스크 목록 앞에 삽입
+        npc.tasks.unshift({
+          id: `real-${rt.department}-${idx}`,
+          title: rt.title,
+          status: "active",
+          progress: Math.max(0, Math.min(100, rt.progress)),
+        });
+      }
+    }
+
+    npcsRef.current = npcs;
     clockRef.current = createGameClock(CLOCK_START_HOUR);
+  // realTasks는 마운트 시 한 번만 반영 (빈 deps 의도적)
   }, []);
 
   // 스프라이트 비동기 로드
@@ -463,13 +535,6 @@ export function PixelOffice() {
         zoneId === "ceo-office" &&
         Math.abs(player.x - 9) <= 2 &&
         Math.abs(player.y - 15) <= 2;
-      if (atCeoDesk) {
-        setShowDashboard(true);
-        setDashboardClock(clockRef.current);
-        setDashboardNpcs([...npcsRef.current]);
-      } else {
-        setShowDashboard(false);
-      }
 
       // 클럭 표시 갱신 (매 초 단위) — 시간대 레이블 + 아이콘 포함
       {
@@ -494,8 +559,10 @@ export function PixelOffice() {
       // 입력 처리
       const input = inputRef.current;
       const sound = soundRef.current;
+      playerMovingRef.current = false;
       for (const dir of ["up", "down", "left", "right"] as const) {
         if (input.isPressed(dir)) {
+          playerFacingRef.current = dir;
           const prevPos = { ...playerRef.current };
           playerRef.current = movePlayer(
             playerRef.current,
@@ -508,6 +575,7 @@ export function PixelOffice() {
           const moved =
             playerRef.current.x !== prevPos.x ||
             playerRef.current.y !== prevPos.y;
+          if (moved) playerMovingRef.current = true;
           if (moved && t - lastFootstepRef.current > 200) {
             sound.playFootstep();
             lastFootstepRef.current = t;
@@ -517,10 +585,20 @@ export function PixelOffice() {
         }
       }
       if (input.consumeJustPressed("interact")) {
-        const near = nearbyNpcRef.current;
-        if (near) {
-          setTalking({ npc: near, text: buildNpcDescription(near) });
-          sound.playInteract();
+        if (atCeoDesk && !showDashboardRef.current) {
+          showDashboardRef.current = true;
+          setShowDashboard(true);
+          setDashboardClock(clockRef.current);
+          setDashboardNpcs([...npcsRef.current]);
+        } else if (showDashboardRef.current) {
+          showDashboardRef.current = false;
+          setShowDashboard(false);
+        } else {
+          const near = nearbyNpcRef.current;
+          if (near) {
+            setTalking({ npc: near, text: buildNpcDescription(near) });
+            sound.playInteract();
+          }
         }
       }
       // M 키 — 미니맵 토글
@@ -535,6 +613,8 @@ export function PixelOffice() {
       // ESC 키 — 패널 닫기
       if (input.consumeJustPressed("menu")) {
         setShowManagement(false);
+        showDashboardRef.current = false;
+        setShowDashboard(false);
         setTalking(null);
       }
       // TAB 키 — 경영 관리 패널 토글
@@ -635,8 +715,12 @@ export function PixelOffice() {
         }
       }
 
-      // --- Pass 3: NPC 오리 (Y순 정렬 — 앞쪽이 위에 그려짐) ---
-      const sortedNpcs = [...npcsRef.current].sort((a, b) => a.tile.y - b.tile.y);
+      // --- Pass 3: NPC (Y순 정렬 — 앞쪽이 위에 그려짐) ---
+      // offwork/commuting/leaving NPC는 그리지 않음 (퇴근 또는 아직 미출근)
+      const visibleNpcs = npcsRef.current.filter(
+        (n) => n.schedulePhase !== "offwork" && n.schedulePhase !== "commuting" && n.schedulePhase !== "leaving",
+      );
+      const sortedNpcs = [...visibleNpcs].sort((a, b) => a.tile.y - b.tile.y);
       for (const npc of sortedNpcs) {
         if (
           npc.tile.x < c0 || npc.tile.x >= c1 ||
@@ -647,19 +731,22 @@ export function PixelOffice() {
         const wy = npc.tile.y * TILE;
         const { x: sx, y: sy } = worldToScreen(cam, wx, wy);
 
-        // 스프라이트 렌더
-        const sheet = sprites?.duckYellow;
-        const animFrame = Math.floor(frame / 2) % 4;
-        const facing = npc.facing;
+        // 인간 캐릭터 스프라이트 렌더 (직원은 항상 인간 스프라이트)
+        const officeTileset = sprites?.officeTileset ?? null;
+        const charIdx = DEPT_CHAR_INDEX[npc.department] ?? 0;
+        // 점심/휴식 중이면 idle 처리 (반투명)
+        const isIdle = npc.schedulePhase === "lunch" || npc.schedulePhase === "break";
 
-        if (sheet) {
-          drawDuckSprite(ctx, sheet, sx, sy, TILE, facing, animFrame, DUCK_SCALE);
+        if (officeTileset) {
+          drawHumanSprite(ctx, officeTileset, sx, sy, TILE, charIdx, isIdle);
         } else {
           // 폴백: 색 원형
+          ctx.globalAlpha = isIdle ? 0.45 : 1.0;
           ctx.fillStyle = npc.accessoryColor || "#F6EFDD";
           ctx.beginPath();
           ctx.arc(sx + TILE / 2, sy + TILE / 2, TILE / 3, 0, Math.PI * 2);
           ctx.fill();
+          ctx.globalAlpha = 1.0;
         }
 
         // 이름 태그
@@ -695,9 +782,10 @@ export function PixelOffice() {
           }
         }
 
-        // 상태 아이콘
+        // 상태 아이콘 — idle(점심/휴식)이면 💤 표시
+        const stateIcon = isIdle ? "💤" : (STATE_ICON[npc.workState] ?? "❓");
         ctx.font = "10px serif";
-        ctx.fillText(STATE_ICON[npc.workState] ?? "❓", sx + TILE / 2, sy + TILE - 2);
+        ctx.fillText(stateIcon, sx + TILE / 2, sy + TILE - 2);
 
         ctx.restore();
       }
@@ -708,9 +796,10 @@ export function PixelOffice() {
       const { x: psx, y: psy } = worldToScreen(cam, pwx, pwy);
 
       const bossSheet = sprites?.duckBoss;
-      const bossFrame = Math.floor(frame / 2) % 4;
+      // 이동 중일 때만 걷기 애니메이션, 멈추면 idle (frame 0)
+      const bossFrame = playerMovingRef.current ? Math.floor(frame / 4) % 4 : 0;
       if (bossSheet) {
-        drawDuckSprite(ctx, bossSheet, psx, psy, TILE, "down", bossFrame, DUCK_SCALE);
+        drawDuckSprite(ctx, bossSheet, psx, psy, TILE, playerFacingRef.current, bossFrame, DUCK_SCALE);
       } else {
         ctx.fillStyle = "#FFD700";
         ctx.beginPath();
@@ -732,12 +821,16 @@ export function PixelOffice() {
       ctx.fillText(ceoLabel, ceoX, ceoY);
       ctx.restore();
 
-      // 인접 NPC 프롬프트
-      if (nearbyNpcRef.current) {
+      // 인접 NPC 또는 CEO 책상 프롬프트
+      const promptLabel = atCeoDesk
+        ? (showDashboardRef.current ? "E: 대시보드 닫기" : "E: 대시보드 열기")
+        : nearbyNpcRef.current
+          ? "E: 말 걸기"
+          : null;
+      if (promptLabel) {
         ctx.save();
         ctx.font = "bold 9px sans-serif";
         ctx.textAlign = "center";
-        const promptLabel = "E: 말 걸기";
         const pw2 = ctx.measureText(promptLabel).width + 6;
         ctx.fillStyle = "rgba(0,0,0,0.7)";
         ctx.fillRect(psx + TILE / 2 - pw2 / 2, psy - 20, pw2, 12);
@@ -765,7 +858,7 @@ export function PixelOffice() {
           ctx,
           map,
           currentPlayer,
-          npcsRef.current.map((n) => ({ tile: n.tile, department: n.department })),
+          visibleNpcs.map((n) => ({ tile: n.tile, department: n.department })),
           mmX,
           mmY,
           MINIMAP_SCALE,
