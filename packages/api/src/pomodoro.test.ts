@@ -78,7 +78,7 @@ function fakeSupabase(
       // pomodoro_sessions
       return {
         select: () => ({
-          order: async () => ({ data: [VALID_ROW], error: null }),
+          order: () => ({ limit: async () => ({ data: [VALID_ROW], error: null }) }),
           eq: () => ({
             single: async () => ({ data: COMPLETED_ROW, error: null }),
           }),
@@ -118,9 +118,11 @@ describe("listPomodoroSessions", () => {
       {
         from: () => ({
           select: () => ({
-            order: async () => ({
-              data: [{ ...VALID_ROW, duration_minutes: 0 }],
-              error: null,
+            order: () => ({
+              limit: async () => ({
+                data: [{ ...VALID_ROW, duration_minutes: 0 }],
+                error: null,
+              }),
             }),
           }),
         }),
@@ -135,9 +137,11 @@ describe("listPomodoroSessions", () => {
       {
         from: () => ({
           select: () => ({
-            order: async () => ({
-              data: null,
-              error: { message: "connection failed" },
+            order: () => ({
+              limit: async () => ({
+                data: null,
+                error: { message: "connection failed" },
+              }),
             }),
           }),
         }),

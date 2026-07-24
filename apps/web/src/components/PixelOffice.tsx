@@ -34,6 +34,9 @@ import {
   createCompany,
   tickCompany,
   formatMoney,
+  findPath,
+  pickWanderTarget,
+  wanderZone,
   type CompanyStats,
   type DuckWorkState,
   type TileMap,
@@ -296,6 +299,11 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   // 마지막으로 시간당 회사 틱을 실행한 게임 hour
   const lastCompanyHourRef = useRef<number>(CLOCK_START_HOUR);
 
+  // NPC 배회 경로 추적 (Npc 타입 미수정, 외부 Map 사용)
+  // nextMoveAt: 다음 타일 이동을 실행할 timestamp(ms). idleUntil: 목적지 도착 후 대기 종료 timestamp.
+  type NpcPathState = { path: Vec[]; index: number; nextMoveAt: number; idleUntil: number };
+  const npcPathsRef = useRef<Map<string, NpcPathState>>(new Map());
+
   const [talking, setTalking] = useState<TalkTarget | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showManagement, setShowManagement] = useState(false);
@@ -508,6 +516,99 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           const workState = phaseToWorkState(phase);
           const updated = simulateNpcTasks({ ...npc, schedulePhase: phase, workState }, clock, rand);
           return updated;
+        });
+      }
+
+      // NPC 배회 이동 (점심/휴식 NPC만. 300ms마다 한 타일씩 이동)
+      if (!pausedRef.current) {
+        // 배회 중인 NPC가 점유하는 타일 집합 (충돌 회피용)
+        const occupiedByWanderers = new Set<string>();
+        for (const npc of npcsRef.current) {
+          const phase = npc.schedulePhase;
+          if (phase === "lunch" || phase === "break") {
+            occupiedByWanderers.add(`${npc.tile.x},${npc.tile.y}`);
+          }
+        }
+
+        npcsRef.current = npcsRef.current.map((npc) => {
+          const phase = npc.schedulePhase;
+          // 배회 대상: lunch 또는 break
+          if (phase !== "lunch" && phase !== "break") {
+            // 배회하지 않는 NPC는 책상으로 복귀 (working/commuting/leaving/offwork)
+            if (phase === "working") {
+              npcPathsRef.current.delete(npc.id);
+              return { ...npc, tile: { ...npc.deskTile } };
+            }
+            return npc;
+          }
+
+          const pathState = npcPathsRef.current.get(npc.id);
+
+          // 대기 중이면 아직 이동하지 않음
+          if (pathState && t < pathState.idleUntil) return npc;
+
+          // 경로가 없거나 소진됐으면 새 목적지 계산
+          if (!pathState || pathState.index >= pathState.path.length) {
+            const zone = wanderZone(phase);
+            const target = pickWanderTarget(map, zone, rand);
+            if (!target) return npc;
+
+            // 현재 NPC 점유 타일을 occupied에서 제외하고 경로 계산 (자기 자신 제외)
+            const othersOccupied = new Set(occupiedByWanderers);
+            othersOccupied.delete(`${npc.tile.x},${npc.tile.y}`);
+
+            const path = findPath(map, npc.tile, target, 200, othersOccupied);
+            if (path.length <= 1) {
+              // 경로 없음 — 잠시 대기 후 재시도
+              npcPathsRef.current.set(npc.id, { path: [], index: 0, nextMoveAt: t + 800, idleUntil: t + 800 });
+              return npc;
+            }
+            npcPathsRef.current.set(npc.id, { path, index: 1, nextMoveAt: t, idleUntil: 0 });
+          }
+
+          const state = npcPathsRef.current.get(npc.id)!;
+
+          // 이동 시각 미달이면 대기
+          if (t < state.nextMoveAt) return npc;
+
+          const nextTile = state.path[state.index];
+          if (!nextTile) return npc;
+
+          // 목적지 타일이 다른 NPC에 점유됐으면 이동 보류
+          const nextKey = `${nextTile.x},${nextTile.y}`;
+          const isOccupied = [...npcsRef.current].some(
+            (other) => other.id !== npc.id && other.tile.x === nextTile.x && other.tile.y === nextTile.y,
+          );
+          if (isOccupied) {
+            // 다음 프레임에 재시도
+            state.nextMoveAt = t + 300;
+            return npc;
+          }
+
+          // 이동 방향 결정 → facing 갱신
+          const dx = nextTile.x - npc.tile.x;
+          const dy = nextTile.y - npc.tile.y;
+          let facing: Npc["facing"] = npc.facing;
+          if (dx > 0) facing = "right";
+          else if (dx < 0) facing = "left";
+          else if (dy > 0) facing = "down";
+          else if (dy < 0) facing = "up";
+
+          // 경로 인덱스 전진
+          state.index += 1;
+          state.nextMoveAt = t + 300; // 300ms per tile (플레이어보다 느림)
+
+          // 경로 소진 시 목적지 도착 — 잠시 아이들 대기 (1~3초 랜덤)
+          if (state.index >= state.path.length) {
+            const idleMs = 1000 + Math.floor(rand() * 2000);
+            state.idleUntil = t + idleMs;
+          }
+
+          // 점유 집합 업데이트 (같은 프레임 내 다른 NPC가 참조하도록)
+          occupiedByWanderers.delete(`${npc.tile.x},${npc.tile.y}`);
+          occupiedByWanderers.add(nextKey);
+
+          return { ...npc, tile: { ...nextTile }, facing };
         });
       }
 

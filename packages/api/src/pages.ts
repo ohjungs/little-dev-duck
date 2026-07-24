@@ -65,7 +65,8 @@ export async function listPages(supabase: SupabaseClient): Promise<Page[]> {
     .from("pages")
     .select("*")
     .eq("is_trashed", false)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(500);
   if (error) throw new Error(error.message);
   return (data as PageRow[]).map(fromRow);
 }
@@ -116,7 +117,8 @@ export async function listTrashedPages(supabase: SupabaseClient): Promise<Page[]
     .from("pages")
     .select("*")
     .eq("is_trashed", true)
-    .order("trashed_at", { ascending: false });
+    .order("trashed_at", { ascending: false })
+    .limit(500);
   if (error) throw new Error(error.message);
   return (data as PageRow[]).map(fromRow);
 }

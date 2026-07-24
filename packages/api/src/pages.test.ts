@@ -39,7 +39,7 @@ function fakeSupabase(overrides: Record<string, unknown> = {}) {
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: async () => ({ data: [VALID_ROW], error: null }),
+          order: () => ({ limit: async () => ({ data: [VALID_ROW], error: null }) }),
           maybeSingle: okSingle,
         }),
       }),
@@ -76,9 +76,11 @@ describe("listPages", () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            order: async () => ({
-              data: null,
-              error: { message: "boom" },
+            order: () => ({
+              limit: async () => ({
+                data: null,
+                error: { message: "boom" },
+              }),
             }),
           }),
         }),
@@ -408,7 +410,7 @@ describe("listTrashedPages", () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            order: async () => ({ data: [TRASHED_ROW], error: null }),
+            order: () => ({ limit: async () => ({ data: [TRASHED_ROW], error: null }) }),
           }),
         }),
       }),
@@ -424,7 +426,7 @@ describe("listTrashedPages", () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            order: async () => ({ data: null, error: { message: "trash-boom" } }),
+            order: () => ({ limit: async () => ({ data: null, error: { message: "trash-boom" } }) }),
           }),
         }),
       }),

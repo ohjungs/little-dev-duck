@@ -29,7 +29,8 @@ export async function listCalendarEvents(
   const { data, error } = await supabase
     .from("calendar_events")
     .select("*")
-    .order("start_at", { ascending: true });
+    .order("start_at", { ascending: true })
+    .limit(500);
 
   if (error) throw new Error(error.message);
   return (data as CalendarEventRow[]).map(fromRow);

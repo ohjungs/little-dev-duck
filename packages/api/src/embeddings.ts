@@ -94,19 +94,20 @@ export async function indexSource(
   }
 
   const vectors = await geminiEmbed(chunks, apiKey, fetchImpl);
-  for (let i = 0; i < chunks.length; i += 1) {
-    await upsertEmbedding(
-      supabase,
-      {
-        userId: input.userId,
-        sourceType: input.sourceType,
-        sourceId: input.sourceId,
-        chunkIndex: i,
-        content: chunks[i],
-      },
-      vectors[i],
-    );
-  }
+  // N번 개별 왕복 대신 단일 배치 upsert(N RTT → 1 RTT).
+  const rows = chunks.map((chunk, i) => ({
+    user_id: input.userId,
+    source_type: input.sourceType,
+    source_id: input.sourceId,
+    chunk_index: i,
+    content: chunk,
+    embedding: toVector(vectors[i]),
+    updated_at: new Date().toISOString(),
+  }));
+  const { error: batchError } = await supabase
+    .from("embeddings")
+    .upsert(rows, { onConflict: "user_id,source_type,source_id,chunk_index" });
+  if (batchError) throw new LddError("internal", batchError.message);
   // 이전보다 청크 수가 줄었으면 꼬리(chunk_index >= 새 청크 수) 잔여 행 삭제(upsert 성공 후에만).
   await deleteStaleChunks(
     supabase,

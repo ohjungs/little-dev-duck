@@ -25,7 +25,7 @@ function fakeSupabase(overrides: Record<string, unknown> = {}) {
     },
     from: () => ({
       select: () => ({
-        order: async () => ({ data: [VALID_ROW], error: null }),
+        order: () => ({ limit: async () => ({ data: [VALID_ROW], error: null }) }),
       }),
       insert: () => ({
         select: () => ({
@@ -61,9 +61,11 @@ describe("listCalendarEvents", () => {
     const supabase = fakeSupabase({
       from: () => ({
         select: () => ({
-          order: async () => ({
-            data: [{ ...VALID_ROW, title: "" }],
-            error: null,
+          order: () => ({
+            limit: async () => ({
+              data: [{ ...VALID_ROW, title: "" }],
+              error: null,
+            }),
           }),
         }),
       }),
@@ -75,9 +77,11 @@ describe("listCalendarEvents", () => {
     const supabase = fakeSupabase({
       from: () => ({
         select: () => ({
-          order: async () => ({
-            data: null,
-            error: { message: "connection failed" },
+          order: () => ({
+            limit: async () => ({
+              data: null,
+              error: { message: "connection failed" },
+            }),
           }),
         }),
       }),

@@ -19,7 +19,7 @@ function fakeSupabase(overrides: Record<string, unknown> = {}) {
     },
     from: () => ({
       select: () => ({
-        order: async () => ({ data: [VALID_ROW], error: null }),
+        order: () => ({ limit: async () => ({ data: [VALID_ROW], error: null }) }),
       }),
       insert: () => ({
         select: () => ({
@@ -53,9 +53,11 @@ describe("listMemos", () => {
     const supabase = fakeSupabase({
       from: () => ({
         select: () => ({
-          order: async () => ({
-            data: [{ ...VALID_ROW, title: "" }],
-            error: null,
+          order: () => ({
+            limit: async () => ({
+              data: [{ ...VALID_ROW, title: "" }],
+              error: null,
+            }),
           }),
         }),
       }),
@@ -210,7 +212,7 @@ describe("DB 에러 전파", () => {
     const supabase = fakeSupabase({
       from: () => ({
         select: () => ({
-          order: async () => ({ data: null, error: { message: "list-boom" } }),
+          order: () => ({ limit: async () => ({ data: null, error: { message: "list-boom" } }) }),
         }),
       }),
     });

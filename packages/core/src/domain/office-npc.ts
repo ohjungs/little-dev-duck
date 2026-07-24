@@ -3,7 +3,8 @@
 
 import type { DepartmentId } from "./office-department";
 import type { DuckWorkState } from "./office-event";
-import type { Vec } from "./office-tilemap";
+import type { TileMap, Vec } from "./office-tilemap";
+import { isBlocked } from "./office-tilemap";
 
 export type NpcTask = {
   id: string;
@@ -148,6 +149,35 @@ export function simulateNpcTasks(npc: Npc, clock: GameClock, rng: () => number):
     satisfaction: Math.round(newSatisfaction),
     productivity: Math.round(newProductivity),
   };
+}
+
+// 지정 존 내 랜덤 보행 가능 타일 반환. 존이 없거나 보행 가능 타일이 없으면 null.
+export function pickWanderTarget(
+  map: TileMap,
+  zoneId: string,
+  rng: () => number,
+): Vec | null {
+  const zone = map.zones.find(z => z.id === zoneId);
+  if (!zone) return null;
+  const walkable: Vec[] = [];
+  for (let dy = 1; dy < zone.bounds.h - 1; dy++) {
+    for (let dx = 1; dx < zone.bounds.w - 1; dx++) {
+      const x = zone.bounds.x + dx;
+      const y = zone.bounds.y + dy;
+      if (!isBlocked(map, x, y)) walkable.push({ x, y });
+    }
+  }
+  if (walkable.length === 0) return null;
+  return walkable[Math.floor(rng() * walkable.length)] ?? null;
+}
+
+// 스케줄 단계에 따라 NPC가 배회할 존 ID 결정
+export function wanderZone(phase: NpcSchedulePhase): string {
+  switch (phase) {
+    case "lunch": return "cafeteria";
+    case "break": return "lobby";
+    default: return "lobby";
+  }
 }
 
 // 부서별 태스크 템플릿(결정적 데이터 — LLM 없이 매핑)

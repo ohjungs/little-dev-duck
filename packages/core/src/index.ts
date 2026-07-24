@@ -266,11 +266,14 @@ export {
   phaseToWorkState,
   simulateNpcTasks,
   getTaskTemplates,
+  pickWanderTarget,
+  wanderZone,
   type NpcTask,
   type NpcSchedulePhase,
   type Npc,
   type GameClock,
 } from "./domain/office-npc";
+export { findPath } from "./domain/office-pathfind";
 export {
   timeOfDay,
   timeOverlay,

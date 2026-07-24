@@ -51,7 +51,8 @@ export async function listHabits(supabase: SupabaseClient): Promise<Habit[]> {
   const { data, error } = await supabase
     .from("habits")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(500);
 
   if (error) throw new Error(error.message);
   return (data as HabitRow[]).map(fromHabitRow);

@@ -103,8 +103,9 @@ describe("indexSource", () => {
   });
 
   it("텍스트를 청크 임베딩 후 upsert하고 청크 수 반환", async () => {
-    const upserts: Record<string, unknown>[] = [];
-    const supabase = fakeSupabase({ onUpsert: (p) => upserts.push(p) });
+    // indexSource는 이제 N번 개별 upsert 대신 단일 배치 upsert를 수행한다(rows 배열 1건).
+    const batchPayloads: unknown[][] = [];
+    const supabase = fakeSupabase({ onUpsert: (p) => batchPayloads.push(p as unknown as unknown[]) });
     const f = fakeFetch({ embeddings: [{ values: [0.1, 0.2] }] });
     const n = await indexSource(
       supabase,
@@ -113,9 +114,11 @@ describe("indexSource", () => {
       f,
     );
     expect(n).toBe(1);
-    expect(upserts).toHaveLength(1);
-    expect(upserts[0].content).toBe("할 일 내용");
-    expect(upserts[0].embedding).toBe("[0.1,0.2]");
+    expect(batchPayloads).toHaveLength(1); // 단일 배치 호출
+    const rows = batchPayloads[0] as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);          // 청크 1개
+    expect(rows[0].content).toBe("할 일 내용");
+    expect(rows[0].embedding).toBe("[0.1,0.2]");
   });
 
   it("임베딩 실패(429) 시 기존 인덱스를 삭제하지 않는다(데이터 유실 방지)", async () => {

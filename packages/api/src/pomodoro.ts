@@ -30,7 +30,8 @@ export async function listPomodoroSessions(
   const { data, error } = await supabase
     .from("pomodoro_sessions")
     .select("*")
-    .order("started_at", { ascending: false });
+    .order("started_at", { ascending: false })
+    .limit(500);
 
   if (error) throw new Error(error.message);
   return (data as PomodoroRow[]).map(fromRow);

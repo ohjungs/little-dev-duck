@@ -27,7 +27,8 @@ export async function listTodos(supabase: SupabaseClient): Promise<Todo[]> {
   const { data, error } = await supabase
     .from("todos")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(500);
 
   if (error) throw new Error(error.message);
   return (data as TodoRow[]).map(fromRow);

@@ -32,7 +32,8 @@ export async function listMemos(supabase: SupabaseClient): Promise<Memo[]> {
   const { data, error } = await supabase
     .from("memos")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(500);
 
   if (error) throw new Error(error.message);
   return (data as MemoRow[]).map(fromRow);
