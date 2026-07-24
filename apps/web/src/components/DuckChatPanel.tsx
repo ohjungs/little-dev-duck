@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { RefreshCw, Send, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Send, Sparkles, Trash2 } from "lucide-react";
 import { useDuckChat } from "@ldd/ai";
 import type { ToolCall } from "@ldd/core";
 import { cn } from "@/lib/utils";
@@ -17,14 +17,10 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // 오리 대화 패널(단일). RAG 질답과 에이전트 액션을 같은 대화창에서 자연스럽게 다룬다 —
 // /api/ai/agent가 라우팅·검색·도구 루프·폴백을 전부 처리하고, 여기선 입력·표시·승인 카드만 담당한다.
-type ReindexState = "idle" | "running" | "done" | "error";
 
-const REINDEX_LABEL: Record<ReindexState, string> = {
-  idle: "기존 메모·할일 인덱싱",
-  running: "인덱싱 중...",
-  done: "인덱싱 완료",
-  error: "다시 인덱싱",
-};
+// 기존 메모·할일 백필 인덱싱: 최초 1회만 자동 실행(버튼 없이). 성공 시 플래그를 남겨 재실행 안 함.
+// 신규 저장분은 CRUD 시점에 이미 인덱싱되므로, 백필은 사전 데이터에 대해 한 번이면 충분하다.
+const REINDEX_DONE_KEY = "ldd-reindex-backfilled";
 
 // 도구 이름을 사람이 읽을 라벨로. 카탈로그가 늘면 여기만 추가(어댑터 자체는 core에 라벨을 안 둠 —
 // Gemini 계약과 UI 표현을 분리).
@@ -83,20 +79,21 @@ export function DuckChatPanel() {
   const { messages, pending, error, pendingApproval, send, approve, cancel, clear } =
     useDuckChat();
   const [input, setInput] = useState("");
-  const [reindexState, setReindexState] = useState<ReindexState>("idle");
   const [confirmClear, setConfirmClear] = useState(false);
 
-  // 기존 메모·할일 일괄 인덱싱(백필). 저장 시 인덱싱은 신규분만 다루므로 최초 1회 필요.
-  const runReindex = async () => {
-    if (reindexState === "running") return;
-    setReindexState("running");
-    try {
-      const res = await fetch("/api/ai/reindex-all", { method: "POST" });
-      setReindexState(res.ok ? "done" : "error");
-    } catch {
-      setReindexState("error");
-    }
-  };
+  // 최초 1회 자동 백필 인덱싱(버튼 제거 — 사용자가 신경 쓸 필요 없이 알아서 연동).
+  // 실패하면 플래그를 남기지 않아 다음 세션에 자동 재시도한다(멱등 upsert).
+  useEffect(() => {
+    if (localStorage.getItem(REINDEX_DONE_KEY)) return;
+    void (async () => {
+      try {
+        const res = await fetch("/api/ai/reindex-all", { method: "POST" });
+        if (res.ok) localStorage.setItem(REINDEX_DONE_KEY, "1");
+      } catch {
+        // 다음 세션에 재시도
+      }
+    })();
+  }, []);
 
   const submit = async () => {
     const text = input.trim();
@@ -114,19 +111,6 @@ export function DuckChatPanel() {
           오리에게 물어보고 시키기
         </CardTitle>
         <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={runReindex}
-            disabled={reindexState === "running"}
-            title="이미 저장된 메모·할일을 검색 가능하게 만듭니다"
-          >
-            <RefreshCw
-              className={cn(reindexState === "running" && "animate-spin")}
-            />
-            {REINDEX_LABEL[reindexState]}
-          </Button>
           {messages.length > 0 && (
             <Button
               type="button"
