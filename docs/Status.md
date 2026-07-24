@@ -53,16 +53,17 @@ Phase 완료분은 실기 검증만 남음(코드+DB 전부 배포됨).**
 
 ### MUST (priority 1) — 즉시 수정
 
-- [ ] GEMINI_API_KEY 가드 5곳 → 공용 requireGeminiKey 헬퍼 추출 (code-quality) → 스펙: docs/specs/2026-07-24-security-hardening.md
-- [ ] SSRF 가드 강화: IPv6-mapped·redirect chain 방어 (security) → 스펙: docs/specs/2026-07-24-security-hardening.md
-- [ ] deleteFeed/setFeedStatus에 user_id 필터 추가 (defense-in-depth) → 스펙: docs/specs/2026-07-24-security-hardening.md
-- [ ] agent.ts INJECTION_GUARD를 Gemini systemInstruction 필드로 이동 (security) → 스펙: docs/specs/2026-07-24-security-hardening.md
-- [ ] embeddings RLS initplan: auth.uid() → (select auth.uid()) ALTER POLICY 4건 (performance) → 스펙: docs/specs/2026-07-24-security-hardening.md
-- [ ] sortRows/filterRows 테스트 추가 — 복잡 순수함수 0 커버리지 (test) → 스펙: docs/specs/2026-07-24-security-hardening.md
+- [x] GEMINI_API_KEY 가드 5곳 → 공용 requireGeminiKey 헬퍼 추출 ✅ 04c2a1a
+- [x] SSRF 가드 강화: IPv6-mapped·redirect chain 방어 ✅ 04c2a1a
+- [x] deleteFeed/setFeedStatus에 user_id 필터 추가 ✅ 04c2a1a
+- [x] agent.ts INJECTION_GUARD를 Gemini systemInstruction 필드로 이동 ✅ 04c2a1a
+- [x] embeddings RLS initplan: auth.uid() → (select auth.uid()) ✅ 04c2a1a + Supabase MCP
+- [x] sortRows/filterRows 테스트 추가 ✅ 04c2a1a
 
 ### SHOULD (priority 2) — 다음 차수
 
-- [ ] 오리 스탠드업 생성기: 24h 활동 → Gemini 요약 → 페이지 자동생성 (feature, 차별화) → 스펙: docs/specs/2026-07-24-duck-standup-generator.md
+- [x] 오리 스탠드업 생성기: 24h 활동 → Gemini 요약 → 페이지 자동생성 ✅ bedd1e5
+- [x] 습관 히트맵 + 뽀모도로 InsightsView 통계 ✅ cdd4083
 - [ ] 습관 히트맵: habit_checks 90일 시각화 (feature) → 스펙: docs/specs/2026-07-24-insights-enhancement.md
 - [ ] 뽀모도로 InsightsView 통계 타일 (feature) → 스펙: docs/specs/2026-07-24-insights-enhancement.md
 - [ ] 임베딩 upsert 배치화: N회 순차 → 1회 batch (performance, embeddings.ts:97)
@@ -82,6 +83,62 @@ Phase 완료분은 실기 검증만 남음(코드+DB 전부 배포됨).**
 - [ ] Realtime 멀티서피스 동기화 (feature)
 - [ ] hover-revealed 버튼 focus-visible 링 (a11y)
 - [ ] listPages SELECT 프로젝션: content 제외 (architecture)
+
+## 픽셀 오피스 대규모 확장 로드맵 (2026-07-24 /plan, 스타듀밸리급)
+
+> 아키텍처: docs/plans/pixel-office-expansion.md (9 Phase, 33 Task)
+> 사용자=CEO 오리, 9개 부서(개발/마케팅/디자인/인사/재무/영업/고객지원/QA/운영)
+
+### Phase A: 타일맵 기반 (선행 필수) → 스펙: docs/specs/2026-07-24-office-phase-a-tilemap.md
+- [ ] T-A1 타일맵 데이터 구조 (core 순수함수)
+- [ ] T-A2 카메라 뷰포트 시스템 (lerp follow, clamp)
+- [ ] T-A3 맵 빌더 + 80x60 오피스 맵 (9부서+사장실+로비+식당+회의실+서버실)
+- [ ] T-A4 고퀄 오리 (16x16px, 4방향, 상태별 포즈, 부서별 색상, CEO 왕관)
+- [ ] T-A5 PixelOffice.tsx 카메라 통합
+- [ ] T-A6 movePlayer 타일맵 연동
+
+### Phase B: 스프라이트 시스템
+- [ ] T-B1 스프라이트 시트 타입 + 로더
+- [ ] T-B2 오리 걷기 애니메이션 (4방향x4프레임)
+- [ ] T-B3 절차적 폴백 + 스프라이트 전환 렌더러
+- [ ] T-B4 가구/장식 타일 렌더링 (책상/의자/화분/컴퓨터/키보드/마우스/시계/팔레트/화장실 등)
+
+### Phase C: 모바일 터치 → 스펙: docs/specs/2026-07-24-office-mobile-controls.md
+- [ ] T-C1 입력 추상화 (InputManager: 키보드+터치 통합)
+- [ ] T-C2 가상 D-pad 오버레이 (방향+A버튼)
+- [ ] T-C3 탭-투-인터랙트
+- [ ] T-C4 반응형 캔버스
+
+### Phase D: 부서 레이아웃
+- [ ] T-D1 부서 정의 (9부서 메타데이터)
+- [ ] T-D2 오피스 플로어플랜 (80x60 상세 레이아웃)
+- [ ] T-D3 부서별 가구 배치 (디테일: 모니터/서류/화이트보드/전화기/헤드셋 등)
+- [ ] T-D4 방 전환 + 문 시스템
+
+### Phase E: NPC 행동
+- [ ] T-E1 게임 시계 + 스케줄 (출근 9AM, 점심 12PM, 퇴근 6PM)
+- [ ] T-E2 NPC 상태머신 (walking/working/eating/chatting/leaving)
+- [ ] T-E3 A* 경로탐색
+- [ ] T-E4 NPC 개성 (이름/성격/작업 스타일/악세사리)
+
+### Phase F: CEO 상호작용 → 스펙: docs/specs/2026-07-24-office-interaction-system.md
+- [ ] T-F1 직원 대화 — 상세 업무 패널 (작업 목록, 진행률, 상태)
+- [ ] T-F2 NPC 작업 데이터 구조 + 시뮬레이터
+- [ ] T-F3 사장실 전사 대시보드 (활동 피드 + 부서별 카드)
+- [ ] T-F4 대화 선택지 (업무 현황/격려/지시/돌아가기)
+
+### Phase G: 비주얼 폴리시
+- [ ] T-G1 낮/밤 팔레트 전환
+- [ ] T-G2 미니맵 오버레이
+- [ ] T-G3 구역 이름 HUD
+
+### Phase H: 사운드
+- [ ] T-H1 BGM (lo-fi 오피스)
+- [ ] T-H2 SFX (발소리/타이핑/문열기)
+
+### Phase I: 실이벤트 연동
+- [ ] T-I1 Claude Code hooks → 오피스 이벤트
+- [ ] T-I2 Tauri sidecar WebSocket
 
 ### 탈락 (교차검증 미통과)
 
