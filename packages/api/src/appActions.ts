@@ -140,20 +140,28 @@ export function createAppActionsAdapter(
   supabase: SupabaseClient,
   apiKey?: string,
 ): Adapter {
-  const reindex = (sourceType: EmbeddingSource, sourceId: string, text: string): void => {
+  // 응답 반환 전에 await한다 — Vercel 서버리스는 응답 후 fire-and-forget async를 끊을 수 있어
+  // void 백그라운드로 두면 인덱싱이 실행 안 될 수 있다. 대신 타임아웃 가드(4초)로 요청이 매달리지
+  // 않게 하고, 실패/타임아웃 시 조용히 넘긴다(항목은 이미 저장, 자동 백필이 다음 로드에 커버).
+  const REINDEX_TIMEOUT_MS = 4000;
+  const reindex = async (
+    sourceType: EmbeddingSource,
+    sourceId: string,
+    text: string,
+  ): Promise<void> => {
     if (!apiKey) return;
-    void (async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
-          await indexSource(supabase, apiKey, { userId: user.id, sourceType, sourceId, text });
-        }
-      } catch {
-        // 임베딩 실패는 무시 — 항목은 이미 저장됐고 다음 백필에서 인덱싱된다.
-      }
-    })();
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      await Promise.race([
+        indexSource(supabase, apiKey, { userId: user.id, sourceType, sourceId, text }),
+        new Promise<void>((resolve) => setTimeout(resolve, REINDEX_TIMEOUT_MS)),
+      ]);
+    } catch {
+      // 임베딩 실패는 무시 — 항목은 이미 저장됐고 다음 백필에서 인덱싱된다.
+    }
   };
 
   return {
@@ -163,7 +171,7 @@ export function createAppActionsAdapter(
         const parsed = todoArgs.safeParse(call.args);
         if (!parsed.success) return errorResult(call, "할 일 정보가 올바르지 않습니다.");
         const todo = await createTodo(supabase, { title: parsed.data.title });
-        reindex("todo", todo.id, `${todo.title} (미완료)`);
+        await reindex("todo", todo.id, `${todo.title} (미완료)`);
         return {
           id: call.id,
           name: call.name,
@@ -181,7 +189,7 @@ export function createAppActionsAdapter(
         }
         if (!found) return errorResult(call, "완료할 할 일을 찾지 못했어요.");
         const updated = await updateTodo(supabase, found.id, { isDone: true });
-        reindex("todo", updated.id, `${updated.title} (완료)`);
+        await reindex("todo", updated.id, `${updated.title} (완료)`);
         return {
           id: call.id,
           name: call.name,
@@ -193,7 +201,7 @@ export function createAppActionsAdapter(
         const parsed = memoArgs.safeParse(call.args);
         if (!parsed.success) return errorResult(call, "메모 내용이 올바르지 않습니다.");
         const memo = await createMemo(supabase, { content: parsed.data.content });
-        reindex("memo", memo.id, parsed.data.content);
+        await reindex("memo", memo.id, parsed.data.content);
         return {
           id: call.id,
           name: call.name,
@@ -208,7 +216,7 @@ export function createAppActionsAdapter(
           title: parsed.data.title,
           content: bodyToContent(parsed.data.body),
         });
-        reindex("page", page.id, parsed.data.body ?? parsed.data.title);
+        await reindex("page", page.id, parsed.data.body ?? parsed.data.title);
         return {
           id: call.id,
           name: call.name,
@@ -226,7 +234,7 @@ export function createAppActionsAdapter(
           startAt,
           endAt: null,
         });
-        reindex("calendar_event", event.id, event.title);
+        await reindex("calendar_event", event.id, event.title);
         return {
           id: call.id,
           name: call.name,
