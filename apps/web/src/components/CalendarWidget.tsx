@@ -51,6 +51,19 @@ function ddayVariant(startAt: string): "default" | "muted" | "secondary" {
   return "secondary";
 }
 
+// "오늘"/"내일"/"모레" 라벨. 그 외는 null — 호출부에서 조건 렌더링.
+function relativeLabel(startAt: string): string | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(startAt);
+  d.setHours(0, 0, 0, 0);
+  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  if (diff === 0) return "오늘";
+  if (diff === 1) return "내일";
+  if (diff === 2) return "모레";
+  return null;
+}
+
 function byStartAt(a: CalendarEvent, b: CalendarEvent): number {
   return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
 }
@@ -199,6 +212,7 @@ export function CalendarWidget() {
               const isToday = daysUntil(event.startAt, todayIso()) === 0;
               const startTime = formatEventTime(event.startAt);
               const endTime = event.endAt ? formatEventTime(event.endAt) : null;
+              const relLabel = relativeLabel(event.startAt);
               return (
                 <li
                   key={event.id}
@@ -221,9 +235,16 @@ export function CalendarWidget() {
                       </span>
                     )}
                   </div>
-                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                    {event.startAt.slice(0, 10)}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end">
+                    {relLabel && (
+                      <span className="text-[10px] font-medium text-primary leading-none mb-0.5">
+                        {relLabel}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {event.startAt.slice(0, 10)}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleDelete(event.id)}

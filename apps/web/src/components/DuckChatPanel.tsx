@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCw, Send, Sparkles } from "lucide-react";
+import { RefreshCw, Send, Sparkles, Trash2 } from "lucide-react";
 import { useDuckChat } from "@ldd/ai";
 import type { ToolCall } from "@ldd/core";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // 오리 대화 패널(단일). RAG 질답과 에이전트 액션을 같은 대화창에서 자연스럽게 다룬다 —
 // /api/ai/agent가 라우팅·검색·도구 루프·폴백을 전부 처리하고, 여기선 입력·표시·승인 카드만 담당한다.
@@ -79,10 +80,11 @@ function describeCall(call: ToolCall): string {
 }
 
 export function DuckChatPanel() {
-  const { messages, pending, error, pendingApproval, send, approve, cancel } =
+  const { messages, pending, error, pendingApproval, send, approve, cancel, clear } =
     useDuckChat();
   const [input, setInput] = useState("");
   const [reindexState, setReindexState] = useState<ReindexState>("idle");
+  const [confirmClear, setConfirmClear] = useState(false);
 
   // 기존 메모·할일 일괄 인덱싱(백필). 저장 시 인덱싱은 신규분만 다루므로 최초 1회 필요.
   const runReindex = async () => {
@@ -104,25 +106,40 @@ export function DuckChatPanel() {
   };
 
   return (
+    <>
     <Card data-testid="duck-chat" className="flex h-full flex-col">
       <CardHeader>
         <CardTitle>
           <Sparkles className="size-4 text-primary-accent" />
           오리에게 물어보고 시키기
         </CardTitle>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={runReindex}
-          disabled={reindexState === "running"}
-          title="이미 저장된 메모·할일을 검색 가능하게 만듭니다"
-        >
-          <RefreshCw
-            className={cn(reindexState === "running" && "animate-spin")}
-          />
-          {REINDEX_LABEL[reindexState]}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={runReindex}
+            disabled={reindexState === "running"}
+            title="이미 저장된 메모·할일을 검색 가능하게 만듭니다"
+          >
+            <RefreshCw
+              className={cn(reindexState === "running" && "animate-spin")}
+            />
+            {REINDEX_LABEL[reindexState]}
+          </Button>
+          {messages.length > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmClear(true)}
+              title="대화 내역을 지웁니다"
+            >
+              <Trash2 className="size-3.5" />
+              대화 지우기
+            </Button>
+          )}
+        </div>
       </CardHeader>
 
       <CardContent className="flex flex-1 flex-col">
@@ -220,5 +237,18 @@ export function DuckChatPanel() {
         </div>
       </CardContent>
     </Card>
+
+    <ConfirmDialog
+      open={confirmClear}
+      title="대화 지우기"
+      description="대화 내역을 모두 지울까요? 이 작업은 되돌릴 수 없습니다."
+      confirmLabel="지우기"
+      onConfirm={() => {
+        setConfirmClear(false);
+        clear();
+      }}
+      onCancel={() => setConfirmClear(false)}
+    />
+    </>
   );
 }

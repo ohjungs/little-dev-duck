@@ -47,6 +47,7 @@ export type UseDuckChatResult = {
   send: (text: string) => Promise<void>;
   approve: () => Promise<void>;
   cancel: () => void;
+  clear: () => void;
 };
 
 // 실행 결과 요약(순수함수, 훅 상태 관리와 분리해 테스트 대상으로).
@@ -145,5 +146,11 @@ export function useDuckChat(options: UseDuckChatOptions = {}): UseDuckChatResult
     addDuckMessage("알겠어요, 취소할게요.");
   }, [addDuckMessage]);
 
-  return { messages, pending, error, pendingApproval, send, approve, cancel };
+  const clear = useCallback(() => {
+    setMessages([]);
+    setPendingApproval(null);
+    setError(null);
+  }, []);
+
+  return { messages, pending, error, pendingApproval, send, approve, cancel, clear };
 }

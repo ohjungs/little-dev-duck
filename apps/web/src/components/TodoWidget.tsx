@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ListTodo, Pencil, Plus, X } from "lucide-react";
+import { Check, CheckCheck, ListTodo, Pencil, Plus, X } from "lucide-react";
 import {
   applyXpAward,
   createTodo,
@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WidgetSkeleton } from "@/components/Skeleton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -40,6 +41,7 @@ export function TodoWidget() {
   const [hideDone, setHideDone] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [confirmCompleteAll, setConfirmCompleteAll] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
@@ -201,8 +203,34 @@ export function TodoWidget() {
     : baseTodos;
   const remaining = baseTodos.filter((t) => !t.isDone).length;
   const doneCount = baseTodos.length - remaining;
+  // 현재 필터 기준으로 미완료 항목 — 전체 완료 버튼의 대상이다.
+  const incompleteVisible = visibleTodos.filter((t) => !t.isDone);
+
+  const handleCompleteAll = async () => {
+    if (incompleteVisible.length === 0) return;
+    setActionError(null);
+    // 낙관적 업데이트: UI를 먼저 완료 상태로 전환한다.
+    const prevTodos = todos;
+    const doneIds = new Set(incompleteVisible.map((t) => t.id));
+    setTodos((prev) => prev.map((t) => (doneIds.has(t.id) ? { ...t, isDone: true } : t)));
+    try {
+      await Promise.all(incompleteVisible.map((t) => updateTodo(supabase, t.id, { isDone: true })));
+      // RAG 재인덱싱(fire-and-forget) — 완료 상태를 임베딩에 반영.
+      for (const t of incompleteVisible) {
+        void reindexSource({
+          sourceType: "todo",
+          sourceId: t.id,
+          text: todoEmbedText(t.title, true),
+        });
+      }
+    } catch {
+      setTodos(prevTodos);
+      setActionError("일부 항목을 완료 처리하지 못했습니다.");
+    }
+  };
 
   return (
+    <>
     <Card data-testid="todo-widget" className="h-full">
       <CardHeader>
         <CardTitle>
@@ -226,6 +254,17 @@ export function TodoWidget() {
           </div>
         )}
         <div className="flex items-center gap-1">
+          {state === "ready" && incompleteVisible.length > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmCompleteAll(true)}
+            >
+              <CheckCheck className="size-3.5" />
+              전체 완료
+            </Button>
+          )}
           {state === "ready" && doneCount > 0 && (
             <Button
               type="button"
@@ -379,5 +418,18 @@ export function TodoWidget() {
         )}
       </CardContent>
     </Card>
+
+    <ConfirmDialog
+      open={confirmCompleteAll}
+      title="전체 완료"
+      description={`현재 표시된 미완료 항목 ${incompleteVisible.length}개를 모두 완료 처리할까요?`}
+      confirmLabel="전체 완료"
+      onConfirm={() => {
+        setConfirmCompleteAll(false);
+        void handleCompleteAll();
+      }}
+      onCancel={() => setConfirmCompleteAll(false)}
+    />
+    </>
   );
 }
