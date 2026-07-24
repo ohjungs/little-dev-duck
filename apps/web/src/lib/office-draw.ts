@@ -717,6 +717,64 @@ export function drawFurniture(
 }
 
 // ---------------------------------------------------------------------------
+// drawFromTileset — PixelOfficeAssets.png 타일셋에서 한 셀을 캔버스에 그린다
+// 타일셋: 256x160, 셀 단위 16x16 (16열 x 10행)
+// sx/sy: 타일셋 내 픽셀 좌표, sw/sh: 소스 크기 (16의 배수)
+// dx/dy/dw/dh: 캔버스 목적지 좌표 및 크기
+// ---------------------------------------------------------------------------
+export function drawFromTileset(
+  ctx: CanvasRenderingContext2D,
+  tileset: HTMLImageElement,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number,
+): void {
+  ctx.drawImage(tileset, sx, sy, sw, sh, dx, dy, dw, dh);
+}
+
+// ---------------------------------------------------------------------------
+// TILESET_MAP — TileType 번호 -> PixelOfficeAssets.png 소스 좌표
+// 타일셋 셀 좌표계: col*16, row*16 (좌상단 기준)
+// 게임 타일 크기 TILE=32 → 16px 셀을 2배 스케일해서 그린다
+// 불확실한 항목은 매핑에서 제외 — 폴백 프로시저럴 렌더러 사용
+// ---------------------------------------------------------------------------
+// 타일셋 육안 분석 (256x160, 16열 x 10행):
+//   row 0 (y=0)   : 다양한 색상의 의자들 (col 0-3 = 4종류)
+//   row 1 (y=16)  : 빨간/주황 소파 (col 0-7 가로형 가구)
+//   row 2 (y=32)  : 넓은 책상/카운터 영역 (회색-파란 톤)
+//   row 3 (y=48)  : 캐릭터 3종 + 고양이
+//   row 4 (y=64)  : 파란 서버랙 (col 0-1), 기타 장치들
+//   row 5 (y=80)  : 초록 소파 (col 0-3), 휴지통 (col 4-5), 소형 캐비닛
+//   row 6 (y=96)  : 이중 노란 문 (col 4-5), 소형 아이템 그리드
+//   row 7 (y=112) : 자판기 패널, 소형 장식품
+//   row 8 (y=128) : 화분/식물, 소파 변형, 소형 아이콘들
+//   row 9 (y=144) : 추가 아이템들
+// TileType 번호는 office-draw.ts switch 케이스와 일치:
+//   1=Wall, 2=Desk, 3=Chair, 4=Door, 7=Table, 8=Plant,
+//   9=Bookshelf, 10=CoffeeMachine, 11=Whiteboard, 12=Server,
+//   16=Sofa, 17=VendingMachine, 18=WaterCooler, 19=Toilet
+export type TilesetRect = { sx: number; sy: number; sw: number; sh: number };
+
+export const TILESET_MAP: Partial<Record<number, TilesetRect>> = {
+  // Chair (row 0, col 0) — 첫 번째 파란 의자
+  3:  { sx: 0,   sy: 0,  sw: 16, sh: 16 },
+  // Table/meeting table (row 2, col 0) — 책상 상단 줄
+  7:  { sx: 0,   sy: 32, sw: 16, sh: 16 },
+  // Server rack (row 4, col 0-1) — 파란 서버 타워, 32x16 소스
+  12: { sx: 0,   sy: 64, sw: 16, sh: 16 },
+  // Sofa green (row 5, col 0) — 초록 소파 왼쪽
+  16: { sx: 0,   sy: 80, sw: 16, sh: 16 },
+  // Bin/trash (row 5, col 4) — 휴지통
+  // (TileType.FireExtinguisher = 23, 소형 빨간 아이템으로 대체)
+  23: { sx: 64,  sy: 80, sw: 16, sh: 16 },
+};
+
+// ---------------------------------------------------------------------------
 // drawMinimap — 우상단 미니맵 오버레이 (단순 도트 렌더, 매 이동 시에만 호출)
 // x, y = 캔버스 기준 미니맵 좌상단 좌표
 // scale = 타일당 픽셀 수 (보통 2)

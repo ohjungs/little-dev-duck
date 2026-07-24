@@ -50,7 +50,7 @@ import { VirtualDpad } from "@/components/VirtualDpad";
 import { OfficeTalkPanel } from "@/components/OfficeTalkPanel";
 import { OfficeDashboard } from "@/components/OfficeDashboard";
 import { OfficeManagementPanel } from "@/components/OfficeManagementPanel";
-import { drawDuckSprite, drawFurnitureSprite, drawFloorTile, drawFurniture, drawMinimap } from "@/lib/office-draw";
+import { drawDuckSprite, drawFurnitureSprite, drawFloorTile, drawFurniture, drawFromTileset, drawMinimap, TILESET_MAP } from "@/lib/office-draw";
 import { loadAllSprites, type SpriteAssets } from "@/lib/sprite-loader";
 
 // ---------------------------------------------------------------------------
@@ -596,27 +596,40 @@ export function PixelOffice() {
           if (!isFurnitureTile(tt)) continue;
           const { x: sx, y: sy } = worldToScreen(cam, col * TILE, row * TILE);
 
-          // 스프라이트 우선, 없으면 폴백
-          const spriteName = TILE_TO_SPRITE[tt];
-          const spriteImg = sprites && spriteName ? sprites.furniture.get(spriteName) : undefined;
+          // 우선순위: 1) PixelOffice 타일셋  2) 개별 가구 스프라이트  3) 폴백 프로시저럴
+          const tilesetRect = TILESET_MAP[tt];
+          const officeTileset = sprites?.officeTileset ?? null;
 
-          if (spriteImg) {
-            drawFurnitureSprite(ctx, spriteImg, sx, sy, TILE);
+          if (tilesetRect && officeTileset) {
+            // 타일셋에서 16px 셀을 32px(2x)로 확대 출력
+            drawFromTileset(
+              ctx,
+              officeTileset,
+              tilesetRect.sx, tilesetRect.sy, tilesetRect.sw, tilesetRect.sh,
+              sx, sy, TILE, TILE,
+            );
           } else {
-            // 벽은 단색 블록
-            if (tt === TileType.Wall) {
-              ctx.fillStyle = "#5C5C5C";
-              ctx.fillRect(sx, sy, TILE, TILE);
-              ctx.fillStyle = "#7A7A7A";
-              ctx.fillRect(sx, sy, TILE, 2);
+            const spriteName = TILE_TO_SPRITE[tt];
+            const spriteImg = sprites && spriteName ? sprites.furniture.get(spriteName) : undefined;
+
+            if (spriteImg) {
+              drawFurnitureSprite(ctx, spriteImg, sx, sy, TILE);
             } else {
-              // 다른 가구는 기존 폴백 (office-draw 프로시저럴)
-              // TILE=32이므로 16px 폴백을 2배 스케일로 그린다
-              ctx.save();
-              ctx.translate(sx, sy);
-              ctx.scale(2, 2);
-              drawFurniture(ctx, 0, 0, tt, 16);
-              ctx.restore();
+              // 벽은 단색 블록
+              if (tt === TileType.Wall) {
+                ctx.fillStyle = "#5C5C5C";
+                ctx.fillRect(sx, sy, TILE, TILE);
+                ctx.fillStyle = "#7A7A7A";
+                ctx.fillRect(sx, sy, TILE, 2);
+              } else {
+                // 다른 가구는 기존 폴백 (office-draw 프로시저럴)
+                // TILE=32이므로 16px 폴백을 2배 스케일로 그린다
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.scale(2, 2);
+                drawFurniture(ctx, 0, 0, tt, 16);
+                ctx.restore();
+              }
             }
           }
         }

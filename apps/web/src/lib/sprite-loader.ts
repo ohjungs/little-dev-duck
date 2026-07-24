@@ -13,6 +13,7 @@ export type SpriteAssets = {
   duckYellow: HTMLImageElement;  // ducky_2_spritesheet.png — 일반 직원
   duckBoss: HTMLImageElement;    // ducky_3_spritesheet.png — CEO
   furniture: Map<string, HTMLImageElement>;
+  officeTileset: HTMLImageElement | null;  // PixelOfficeAssets.png — 256x160 오피스 타일셋
 };
 
 // 가구 파일명 목록 — /sprites/furniture/{name}.png 형식
@@ -52,5 +53,13 @@ export async function loadAllSprites(): Promise<SpriteAssets> {
     }),
   );
 
-  return { duckYellow, duckBoss, furniture };
+  // 2026-07-24 : PixelOfficeAssets 타일셋 로드 — 실패해도 null로 계속 동작
+  let officeTileset: HTMLImageElement | null = null;
+  try {
+    officeTileset = await loadImage("/sprites/pixel-office/PixelOfficeAssets.png");
+  } catch {
+    // 타일셋 없으면 폴백 렌더러 유지
+  }
+
+  return { duckYellow, duckBoss, furniture, officeTileset };
 }
