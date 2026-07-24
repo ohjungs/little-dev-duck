@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   LayoutDashboard,
   Newspaper,
@@ -31,6 +33,25 @@ function usePendingTodos(): boolean {
     });
   }, []);
   return hasPending;
+}
+
+const COLLAPSED_KEY = "sidebar-collapsed";
+
+// 사이드바 접힘 상태를 localStorage에 영속한다.
+// useState 지연 초기화로 SSR hydration mismatch 없이 클라이언트 값을 읽는다.
+function useSidebarCollapsed(): [boolean, () => void] {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(COLLAPSED_KEY) === "true";
+  });
+  const toggle = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(COLLAPSED_KEY, String(next));
+      return next;
+    });
+  };
+  return [collapsed, toggle];
 }
 
 // 사이드바 검색 버튼: Cmd+K 팔레트를 CustomEvent로 연다(팔레트가 전역에서 수신).
@@ -93,15 +114,36 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const hasPendingTodos = usePendingTodos();
+  const [collapsed, toggleCollapsed] = useSidebarCollapsed();
+
   return (
-    <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-1 border-r border-border bg-card/40 p-3 md:flex">
-      <div className="py-2">
-        <Brand />
+    <aside
+      className={cn(
+        "no-print sticky top-0 hidden h-screen shrink-0 flex-col gap-1 border-r border-border bg-card/40 p-3 transition-[width] duration-200 md:flex",
+        collapsed ? "w-16" : "w-60",
+      )}
+    >
+      <div className={cn("py-2", collapsed && "flex justify-center")}>
+        {collapsed ? (
+          <Link href="/" className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
+            <Image
+              src="/duck-logo.png"
+              alt="Little Dev Duck"
+              width={24}
+              height={24}
+              className="size-6 object-contain"
+            />
+          </Link>
+        ) : (
+          <Brand />
+        )}
       </div>
 
-      <div className="mt-2 px-0.5">
-        <SearchTrigger />
-      </div>
+      {!collapsed && (
+        <div className="mt-2 px-0.5">
+          <SearchTrigger />
+        </div>
+      )}
 
       <nav className="mt-2 flex flex-col gap-0.5">
         {NAV.map((item) => {
@@ -113,8 +155,10 @@ export function AppSidebar({
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                "flex items-center rounded-lg px-3 py-2 text-sm transition-colors",
+                collapsed ? "justify-center gap-0" : "gap-2.5",
                 active
                   ? "bg-secondary font-medium text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -128,14 +172,15 @@ export function AppSidebar({
                   <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive" />
                 )}
               </span>
-              {item.label}
+              {!collapsed && item.label}
             </Link>
           );
         })}
       </nav>
 
       <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
-        <div className="flex items-center gap-2.5 px-1">
+        {/* 사용자 정보: 접힌 상태에서는 아바타만 표시 */}
+        <div className={cn("flex items-center gap-2.5 px-1", collapsed && "justify-center")}>
           <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary ring-1 ring-border">
             <Image
               src="/duck-logo.png"
@@ -145,20 +190,37 @@ export function AppSidebar({
               className="size-8 object-cover"
             />
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{displayName}</p>
-            <p className="truncate text-xs text-muted-foreground">{email}</p>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{displayName}</p>
+              <p className="truncate text-xs text-muted-foreground">{email}</p>
+            </div>
+          )}
+        </div>
+        {!collapsed && (
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <WalkingModeToggle />
+            <form action="/auth/logout" method="post" className="ml-auto">
+              <Button type="submit" variant="ghost" size="sm">
+                로그아웃
+              </Button>
+            </form>
           </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <WalkingModeToggle />
-          <form action="/auth/logout" method="post" className="ml-auto">
-            <Button type="submit" variant="ghost" size="sm">
-              로그아웃
-            </Button>
-          </form>
-        </div>
+        )}
+        {/* 사이드바 접기/펼치기 토글 */}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+          className="flex w-full items-center justify-center rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          {collapsed ? (
+            <ChevronRight className="size-4" />
+          ) : (
+            <ChevronLeft className="size-4" />
+          )}
+        </button>
       </div>
     </aside>
   );
