@@ -1,13 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Bot,
-  CalendarCheck,
-  FileText,
-  LayoutDashboard,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { GitHubMark } from "@/components/ui/github-mark";
 
@@ -21,24 +14,19 @@ export const metadata = {
 // 여기 CTA가 /login(OAuth)으로 잇는다. 앱 셸 밖 독립 라우트라 (app) 인증 가드를 타지 않는다.
 const FEATURES = [
   {
-    icon: LayoutDashboard,
-    title: "위젯 대시보드",
-    body: "할 일·메모·커밋 잔디·습관을 한 화면에서. 필요한 것만, 산만하지 않게.",
-  },
-  {
-    icon: Bot,
-    title: "내 자료로 답하는 오리",
-    body: "메모와 페이지를 알고 답하는 RAG 비서. 검색이 아니라 대화로 꺼내 씁니다.",
-  },
-  {
-    icon: CalendarCheck,
-    title: "실제로 일하는 에이전트",
-    body: "일정 잡기, 이슈 만들기, 메일 정리까지. 승인 카드로 확인하고 오리가 대신 실행.",
-  },
-  {
-    icon: FileText,
+    emoji: "📝",
     title: "노션급 블록 에디터",
     body: "문서·표·보드 데이터베이스, 버전 기록과 전역 검색까지 갖춘 워크스페이스.",
+  },
+  {
+    emoji: "🦆",
+    title: "AI 오리 비서",
+    body: "AI 오리가 답하고 일을 시킴. 내 메모·페이지를 알고 외부 서비스까지 대신 실행.",
+  },
+  {
+    emoji: "🏡",
+    title: "픽셀 오피스",
+    body: "스타듀밸리 스타일 사무실. 위젯 모드로 할 일·커밋 잔디·메모를 한 화면에.",
   },
 ] as const;
 
@@ -84,7 +72,11 @@ export default function WelcomePage() {
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/login"
-              className={buttonVariants({ size: "lg", className: "group" })}
+              className={buttonVariants({
+                size: "lg",
+                className:
+                  "group h-14 px-8 text-base font-bold shadow-lg hover:shadow-primary/30",
+              })}
             >
               오리와 시작하기
               <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
@@ -120,16 +112,20 @@ export default function WelcomePage() {
         </div>
       </section>
 
-      {/* 기능 베이토 */}
+      {/* 기능 하이라이트 */}
       <section className="mx-auto w-full max-w-6xl px-5 pb-20 md:px-8">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {FEATURES.map(({ icon: Icon, title, body }) => (
+        <div className="grid gap-4 sm:grid-cols-3">
+          {FEATURES.map(({ emoji, title, body }) => (
             <div
               key={title}
               className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:shadow-lg"
             >
-              <span className="flex size-10 items-center justify-center rounded-xl bg-secondary text-primary-accent transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                <Icon className="size-5" />
+              <span
+                className="text-3xl leading-none"
+                role="img"
+                aria-hidden="true"
+              >
+                {emoji}
               </span>
               <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
               <p className="text-sm text-muted-foreground">{body}</p>
@@ -149,7 +145,11 @@ export default function WelcomePage() {
           </p>
           <Link
             href="/login"
-            className={buttonVariants({ size: "lg", className: "group" })}
+            className={buttonVariants({
+              size: "lg",
+              className:
+                "group h-14 px-8 text-base font-bold shadow-lg hover:shadow-primary/30",
+            })}
           >
             무료로 시작하기
             <ArrowRight className="transition-transform group-hover:translate-x-0.5" />

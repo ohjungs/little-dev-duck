@@ -1,0 +1,16 @@
+{
+  "name": "Little Dev Duck",
+  "short_name": "LDD",
+  "description": "3D 아기오리 AI 비서가 상주하는 개인 워크스페이스",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#F6EFDD",
+  "icons": [
+    {
+      "src": "/duck-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

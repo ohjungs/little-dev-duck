@@ -22,6 +22,15 @@ export const metadata: Metadata = {
   description: "3D 아기오리 AI 비서가 상주하는 개인 워크스페이스",
   keywords: ["productivity", "workspace", "AI", "duck", "notion alternative"],
   authors: [{ name: "Little Dev Duck" }],
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Little Dev Duck",
+  },
+  icons: {
+    apple: "/duck-logo.png",
+  },
   openGraph: {
     title: "Little Dev Duck",
     description: "3D 아기오리 AI 비서가 상주하는 개인 워크스페이스",

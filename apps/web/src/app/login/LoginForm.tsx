@@ -53,17 +53,20 @@ export function LoginForm() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-secondary/40 to-background p-6">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <div className="flex flex-col items-center gap-3 text-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <span className="text-5xl leading-none" role="img" aria-label="오리">
+            🦆
+          </span>
           <Image
             src="/duck-logo.png"
             alt="Little Dev Duck 로고"
-            width={80}
-            height={80}
+            width={72}
+            height={72}
             priority
             className="rounded-full ring-1 ring-border"
           />
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold tracking-tight">
+          <div className="space-y-1.5">
+            <h1 className="text-2xl font-bold tracking-tight">
               Little Dev Duck
             </h1>
             <p className="text-sm text-muted-foreground">
@@ -72,7 +75,7 @@ export function LoginForm() {
           </div>
         </div>
 
-        <div className="mt-7 flex flex-col gap-2.5">
+        <div className="mt-8 flex flex-col gap-3">
           <Button
             variant="outline"
             size="lg"
@@ -91,6 +94,13 @@ export function LoginForm() {
             GitHub로 계속하기
           </Button>
         </div>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          계정이 없으신가요?{" "}
+          <span className="font-medium text-foreground">
+            Google 또는 GitHub로 시작하세요
+          </span>
+        </p>
       </div>
 
       <p className="mt-6 text-xs text-muted-foreground">
