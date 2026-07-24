@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAppActionsAdapter, findTodoByTitle } from "./appActions";
+import { createAppActionsAdapter, coerceEventStart, findTodoByTitle } from "./appActions";
 
 // createTodo/createMemo는 supabase.auth.getUser + from().insert().select().single() 체인을 쓴다.
 // 최소 목으로 성공/검증 경로를 확인한다(외부 호출 0).
@@ -20,7 +20,13 @@ describe("createAppActionsAdapter", () => {
   it("카탈로그에 생성·완료 도구가 있고 전부 mutating(승인 필요)", () => {
     const a = createAppActionsAdapter(mockSupabase({}));
     const names = a.catalog.map((t) => t.name).sort();
-    expect(names).toEqual(["completeTodo", "createMemo", "createPage", "createTodo"]);
+    expect(names).toEqual([
+      "addCalendarEvent",
+      "completeTodo",
+      "createMemo",
+      "createPage",
+      "createTodo",
+    ]);
     expect(a.catalog.every((t) => t.kind === "mutating")).toBe(true);
   });
 
@@ -53,6 +59,21 @@ describe("createAppActionsAdapter", () => {
     const a = createAppActionsAdapter(mockSupabase({}));
     const res = await a.execute({ id: "c3", name: "deleteEverything", args: {} });
     expect(res.response.error).toBeDefined();
+  });
+});
+
+describe("coerceEventStart", () => {
+  it("offset 포함 ISO는 그대로 둔다", () => {
+    expect(coerceEventStart("2026-07-26T10:00:00+09:00")).toBe("2026-07-26T10:00:00+09:00");
+  });
+  it("날짜만 주면 KST 자정으로 보정", () => {
+    expect(coerceEventStart("2026-07-26")).toBe("2026-07-26T00:00:00+09:00");
+  });
+  it("offset 없는 시각은 KST로 간주", () => {
+    expect(coerceEventStart("2026-07-26T14:30")).toBe("2026-07-26T14:30:00+09:00");
+  });
+  it("파싱 불가는 null", () => {
+    expect(coerceEventStart("내일쯤")).toBeNull();
   });
 });
 

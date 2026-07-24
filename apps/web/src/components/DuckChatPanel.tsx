@@ -32,6 +32,7 @@ const TOOL_LABELS: Record<string, string> = {
   completeTodo: "할 일 완료",
   createMemo: "메모 작성",
   createPage: "페이지 만들기",
+  addCalendarEvent: "앱 캘린더에 일정 추가",
 };
 
 // 상대 시각 표시. createdAt은 ISO 8601 문자열(useDuckChat이 new Date().toISOString()으로 기록).
@@ -67,15 +68,16 @@ function describeCall(call: ToolCall): string {
     (typeof call.args.title === "string" ? call.args.title : null) ??
     (typeof call.args.subject === "string" ? call.args.subject : null) ??
     (typeof call.args.content === "string" ? call.args.content : null);
-  const start = formatWhen(call.args.start);
+  const start = formatWhen(call.args.start ?? call.args.startAt);
   const end = formatWhen(call.args.end);
   // GitHub 이슈 도구의 owner/repo — 어느 저장소에 만들지도 승인 판단에 필요한 정보(T5).
   const owner = typeof call.args.owner === "string" ? call.args.owner : null;
   const repo = typeof call.args.repo === "string" ? call.args.repo : null;
+  const when = start && end ? `${start} ~ ${end}` : start ? start : null;
   const parts = [
     owner && repo ? `${owner}/${repo}` : null,
     title ? `"${title}"` : null,
-    start && end ? `${start} ~ ${end}` : null,
+    when,
   ].filter(Boolean);
   return parts.length > 0 ? `${label}: ${parts.join(", ")}` : label;
 }

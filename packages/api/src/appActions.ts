@@ -5,6 +5,23 @@ import type { Adapter } from "./agent";
 import { createTodo, listTodos, updateTodo } from "./todos";
 import { createMemo } from "./memos";
 import { createPage } from "./pages";
+import { createCalendarEvent } from "./calendar";
+
+// LLM이 준 날짜/시각 문자열을 offset 포함 ISO(내부 캘린더 스키마 요구)로 보정한다. 순수함수 — 테스트 대상.
+// 지원: 완전 ISO(offset/Z 포함) 그대로, 'YYYY-MM-DD'→KST 자정, offset 없는 'YYYY-MM-DDTHH:mm(:ss)'→KST.
+export function coerceEventStart(raw: string): string | null {
+  const s = raw.trim();
+  if (/[+-]\d{2}:?\d{2}$|Z$/.test(s)) {
+    return Number.isNaN(new Date(s).getTime()) ? null : s;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s}T00:00:00+09:00`;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(s)) {
+    const withSec = s.length === 16 ? `${s}:00` : s;
+    return `${withSec}+09:00`;
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
 
 // 제목으로 할 일 1건을 찾는다: 정확 일치(대소문자 무시) 우선, 없으면 부분일치. 다중 일치는 "ambiguous",
 // 없으면 null. 순수함수라 테스트 대상 — completeTodo가 어느 항목을 완료할지 결정론적으로 고른다.
@@ -80,9 +97,26 @@ const completeTodoDecl: ToolDeclaration = {
   kind: "mutating",
 };
 
+const addEventDecl: ToolDeclaration = {
+  name: "addCalendarEvent",
+  description:
+    "앱 내 캘린더에 일정을 추가한다(Google 캘린더 연동과 별개인 앱 자체 캘린더). 시각은 offset 포함 " +
+    "ISO 8601(예: 2026-07-26T10:00:00+09:00)이 가장 정확하며, 날짜만(YYYY-MM-DD) 줘도 된다.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "일정 제목" },
+      startAt: { type: "string", description: "시작 시각/날짜(ISO 8601 또는 YYYY-MM-DD)" },
+    },
+    required: ["title", "startAt"],
+  },
+  kind: "mutating",
+};
+
 const todoArgs = z.object({ title: z.string().min(1).max(500) });
 const completeArgs = z.object({ title: z.string().min(1).max(500) });
 const memoArgs = z.object({ content: z.string().min(1).max(2000) });
+const eventArgs = z.object({ title: z.string().min(1).max(300), startAt: z.string().min(1) });
 const pageArgs = z.object({
   title: z.string().min(1).max(200),
   body: z.string().max(5000).optional(),
@@ -100,7 +134,7 @@ function errorResult(call: ToolCall, message: string): ToolResult {
 
 export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
   return {
-    catalog: [createTodoDecl, completeTodoDecl, createMemoDecl, createPageDecl],
+    catalog: [createTodoDecl, completeTodoDecl, createMemoDecl, createPageDecl, addEventDecl],
     async execute(call: ToolCall): Promise<ToolResult> {
       if (call.name === createTodoDecl.name) {
         const parsed = todoArgs.safeParse(call.args);
@@ -152,6 +186,23 @@ export function createAppActionsAdapter(supabase: SupabaseClient): Adapter {
           id: call.id,
           name: call.name,
           response: { created: { id: page.id, title: page.title } },
+        };
+      }
+
+      if (call.name === addEventDecl.name) {
+        const parsed = eventArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "일정 정보가 올바르지 않습니다.");
+        const startAt = coerceEventStart(parsed.data.startAt);
+        if (!startAt) return errorResult(call, "일정 시각을 이해하지 못했어요.");
+        const event = await createCalendarEvent(supabase, {
+          title: parsed.data.title,
+          startAt,
+          endAt: null,
+        });
+        return {
+          id: call.id,
+          name: call.name,
+          response: { created: { id: event.id, title: event.title, startAt: event.startAt } },
         };
       }
 
