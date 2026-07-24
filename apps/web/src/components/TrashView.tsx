@@ -24,6 +24,7 @@ export function TrashView() {
   const [pages, setPages] = useState<Page[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [pendingPurge, setPendingPurge] = useState<{ id: string; title: string } | null>(null);
+  const [pendingPurgeAll, setPendingPurgeAll] = useState(false);
 
   useEffect(() => {
     listTrashedPages(supabase).then(
@@ -71,6 +72,46 @@ export function TrashView() {
     }
   };
 
+  // 전체 복원: 각 페이지를 순차 복원하고 RAG 재인덱싱. 일부 실패해도 성공한 것은 목록에서 제거한다.
+  const handleRestoreAll = async () => {
+    const snapshot = [...pages];
+    setPages([]);
+    const failed: Page[] = [];
+    await Promise.allSettled(
+      snapshot.map(async (page) => {
+        try {
+          await restorePage(supabase, page.id);
+          void reindexSource({ sourceType: "page", sourceId: page.id, text: page.plainText });
+        } catch {
+          failed.push(page);
+        }
+      }),
+    );
+    if (failed.length > 0) {
+      setPages(failed);
+    }
+  };
+
+  // 전체 영구 삭제: 확인 후 실행. DB cascade로 하위 페이지도 삭제된다.
+  const confirmPurgeAll = async () => {
+    setPendingPurgeAll(false);
+    const snapshot = [...pages];
+    setPages([]);
+    const failed: Page[] = [];
+    await Promise.allSettled(
+      snapshot.map(async (page) => {
+        try {
+          await purgePage(supabase, page.id);
+        } catch {
+          failed.push(page);
+        }
+      }),
+    );
+    if (failed.length > 0) {
+      setPages(failed);
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-10">
       <div className="mb-6 flex items-center gap-3">
@@ -81,12 +122,29 @@ export function TrashView() {
         >
           <ArrowLeft className="size-4" />
         </Link>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">휴지통</h1>
+        <div className="flex-1">
+          <h1 className="text-xl font-bold tracking-tight">
+            휴지통{state === "ready" && pages.length > 0 ? ` (${pages.length}개)` : ""}
+          </h1>
           <p className="text-xs text-muted-foreground">
             삭제한 페이지를 복원하거나 영구 삭제합니다.
           </p>
         </div>
+        {state === "ready" && pages.length > 0 && (
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={handleRestoreAll}>
+              <RotateCcw className="size-3.5" /> 전체 복원
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPendingPurgeAll(true)}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="size-3.5" /> 전체 삭제
+            </Button>
+          </div>
+        )}
       </div>
 
       {state === "loading" && (
@@ -152,6 +210,14 @@ export function TrashView() {
         confirmLabel="영구 삭제"
         onConfirm={confirmPurge}
         onCancel={() => setPendingPurge(null)}
+      />
+      <ConfirmDialog
+        open={pendingPurgeAll}
+        title="전체 영구 삭제"
+        description={`휴지통의 페이지 ${pages.length}개를 모두 영구 삭제할까요? 하위 페이지도 함께 삭제되며 되돌릴 수 없습니다.`}
+        confirmLabel="전체 삭제"
+        onConfirm={confirmPurgeAll}
+        onCancel={() => setPendingPurgeAll(false)}
       />
     </div>
   );

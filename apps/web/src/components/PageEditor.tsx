@@ -118,6 +118,22 @@ export function PageEditor({
     return subscribeFavorites(sync);
   }, [page.id]);
 
+  // Ctrl+D / Cmd+D 단축키로 즐겨찾기 토글. 브라우저 기본 북마크 동작을 막는다.
+  const handleToggleFavorite = useCallback(() => {
+    toggleFavorite(page.id);
+  }, [page.id]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        handleToggleFavorite();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleToggleFavorite]);
+
   // 페이지 열람 시 최근 목록(localStorage MRU)에 기록 — 명령 팔레트 빠른 재접근용.
   useEffect(() => {
     recordRecentPage({ id: page.id, title: page.title, icon: page.icon });
