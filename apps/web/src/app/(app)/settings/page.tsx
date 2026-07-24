@@ -10,6 +10,7 @@ import {
   Mail,
   Moon,
   Palette,
+  RotateCcw,
   Trash2,
   User,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import { GitHubMark } from "@/components/ui/github-mark";
 import { GmailLink } from "@/components/GmailLink";
 import { DangerZone } from "@/components/DangerZone";
 import { ExportDataButton } from "@/components/ExportDataButton";
+import { LocalResetButton } from "@/components/LocalResetButton";
 
 export const dynamic = "force-dynamic";
 
@@ -256,6 +258,21 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <ExportDataButton />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <RotateCcw className="size-4 text-primary-accent" />
+              로컬 데이터 초기화
+            </CardTitle>
+            <CardDescription>
+              브라우저에 저장된 테마·즐겨찾기·최근 페이지 등 로컬 설정을 초기화합니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LocalResetButton />
           </CardContent>
         </Card>
 

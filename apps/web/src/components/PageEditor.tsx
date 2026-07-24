@@ -134,6 +134,16 @@ export function PageEditor({
     return () => window.removeEventListener("keydown", handler);
   }, [handleToggleFavorite]);
 
+  // 브라우저 탭 제목: 페이지 아이콘 + 제목. 언마운트 시 기본값으로 복원.
+  useEffect(() => {
+    document.title = icon
+      ? `${icon} ${title || "제목 없음"} — Little Dev Duck`
+      : `${title || "제목 없음"} — Little Dev Duck`;
+    return () => {
+      document.title = "Little Dev Duck";
+    };
+  }, [icon, title]);
+
   // 페이지 열람 시 최근 목록(localStorage MRU)에 기록 — 명령 팔레트 빠른 재접근용.
   useEffect(() => {
     recordRecentPage({ id: page.id, title: page.title, icon: page.icon });

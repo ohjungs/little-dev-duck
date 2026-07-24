@@ -230,7 +230,10 @@ export function InsightsView() {
     { label: "총 할 일", value: `${totalTodos}개 (완료 ${summary.todosDone})` },
     { label: "총 메모", value: `${summary.memoCount}개` },
     { label: "총 습관 체크", value: `${rawChecks.length}일` },
-    { label: "총 집중", value: `${totalFocusHours}시간` },
+    {
+      label: "총 집중",
+      value: pomStats ? formatMinutes(pomStats.totalMinutes) : "0분",
+    },
   ];
 
   return (
