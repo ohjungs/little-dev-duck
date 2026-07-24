@@ -3,6 +3,7 @@ import {
   Activity,
   Bell,
   CalendarClock,
+  Keyboard,
   LogOut,
   Mail,
   Moon,
@@ -208,6 +209,37 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Keyboard className="size-4 text-primary-accent" />
+              키보드 단축키
+            </CardTitle>
+            <CardDescription>자주 쓰는 단축키 목록입니다.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              {[
+                { label: "명령 팔레트", key: "Ctrl+K" },
+                { label: "페이지 검색", key: "Ctrl+K" },
+                { label: "오피스 이동", key: "방향키 / WASD" },
+                { label: "오피스 상호작용", key: "E" },
+                { label: "오피스 경영 패널", key: "Tab" },
+                { label: "오피스 미니맵", key: "M" },
+                { label: "오피스 사운드", key: "N" },
+                { label: "오피스 도움말", key: "?" },
+              ].map(({ label, key }) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{label}</span>
+                  <kbd className="inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground shadow-[0_1px_0_0] shadow-border">
+                    {key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         {user && (
           <Card className="border-destructive/30">
             <CardHeader className="flex-col items-start gap-1">
@@ -225,6 +257,8 @@ export default async function SettingsPage() {
           </Card>
         )}
       </div>
+
+      <p className="mt-8 text-xs text-muted-foreground">Little Dev Duck v1.0.0</p>
     </div>
   );
 }

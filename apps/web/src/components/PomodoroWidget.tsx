@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Play, Square, Timer } from "lucide-react";
 import {
   completePomodoro,
@@ -27,6 +27,23 @@ type LoadState = "loading" | "error" | "ready";
 const DURATION_OPTIONS = [25, 50] as const;
 const SECONDS_PER_MINUTE = 60;
 
+// 태그 이력 localStorage 키. max 20개 보관.
+const TAGS_KEY = "ldd-pomodoro-tags";
+
+function getSavedTags(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(TAGS_KEY) || "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+function saveTag(tag: string): void {
+  const tags = getSavedTags().filter((t) => t !== tag);
+  tags.unshift(tag);
+  localStorage.setItem(TAGS_KEY, JSON.stringify(tags.slice(0, 20)));
+}
+
 function formatMmss(totalSeconds: number): string {
   const mm = String(Math.floor(totalSeconds / SECONDS_PER_MINUTE)).padStart(
     2,
@@ -43,6 +60,18 @@ function localDateIso(iso: string): string {
   return new Date(iso).toLocaleDateString("sv-SE");
 }
 
+// 완료 시각을 "N분 전", "N시간 전" 형식으로 변환한다.
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1) return "방금";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}시간 전`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}일 전`;
+}
+
 export function PomodoroWidget() {
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [state, setState] = useState<LoadState>("loading");
@@ -54,6 +83,11 @@ export function PomodoroWidget() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [celebrate, setCelebrate] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // 태그 입력 상태
+  const [tagInput, setTagInput] = useState("");
+  const [tagFocused, setTagFocused] = useState(false);
+  const tagWrapperRef = useRef<HTMLDivElement>(null);
 
   const supabase = createClient();
 
@@ -121,8 +155,10 @@ export function PomodoroWidget() {
   const handleStart = async () => {
     setActionError(null);
     setCelebrate(false);
+    const tag = tagInput.trim() || null;
+    if (tag) saveTag(tag);
     try {
-      const session = await startPomodoro(supabase, { durationMinutes });
+      const session = await startPomodoro(supabase, { durationMinutes, tag });
       setActiveId(session.id);
       setRemaining(durationMinutes * SECONDS_PER_MINUTE);
       setRunning(true);
@@ -141,6 +177,19 @@ export function PomodoroWidget() {
   const todayCount = sessions.filter(
     (s) => s.completedAt && localDateIso(s.completedAt) === todayIso(),
   ).length;
+
+  // 최근 완료 세션 최대 5개 (completed_at 기준 내림차순은 listPomodoroSessions의 started_at 정렬 덕분에 유지됨)
+  const recentCompleted = sessions
+    .filter((s) => s.completedAt !== null)
+    .slice(0, 5);
+
+  // 자동완성 후보: 입력값을 포함하는 저장 태그 최대 5개
+  const tagSuggestions =
+    tagFocused && tagInput
+      ? getSavedTags()
+          .filter((t) => t.toLowerCase().includes(tagInput.toLowerCase()))
+          .slice(0, 5)
+      : [];
 
   return (
     <Card data-testid="pomodoro-widget" className="h-full">
@@ -210,6 +259,36 @@ export function PomodoroWidget() {
                 ))}
               </div>
             </div>
+
+            {/* 태그 입력 + 자동완성 드롭다운 */}
+            <div ref={tagWrapperRef} className="relative">
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onFocus={() => setTagFocused(true)}
+                onBlur={() => setTagFocused(false)}
+                placeholder="태그 (선택)"
+                maxLength={50}
+                className="w-full rounded-md border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              {tagSuggestions.length > 0 && (
+                <div className="absolute top-full z-10 mt-1 max-h-32 w-full overflow-y-auto rounded-md border bg-background shadow-lg">
+                  {tagSuggestions.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      // onMouseDown: blur 이전에 실행돼 tagFocused가 false가 되기 전에 값을 채운다.
+                      onMouseDown={() => setTagInput(t)}
+                      className="block w-full px-2 py-1 text-left text-xs hover:bg-accent"
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <Button type="button" onClick={handleStart} className="w-full">
               <Play className="fill-current" />
               시작
@@ -238,6 +317,35 @@ export function PomodoroWidget() {
             </span>
           )}
         </div>
+
+        {/* 최근 완료 세션 이력 */}
+        {recentCompleted.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-medium text-muted-foreground">최근 기록</p>
+            <ul className="flex flex-col gap-0.5">
+              {recentCompleted.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted/50"
+                >
+                  <span className="flex items-center gap-1.5 truncate">
+                    <span className="font-medium text-foreground">
+                      {s.durationMinutes}분
+                    </span>
+                    {s.tag && (
+                      <span className="truncate text-muted-foreground">
+                        #{s.tag}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 pl-2">
+                    {s.completedAt ? timeAgo(s.completedAt) : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
