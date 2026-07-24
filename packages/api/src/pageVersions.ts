@@ -45,6 +45,26 @@ export async function createPageVersion(
   if (pageError) throw new Error(pageError.message);
   const snapshot = pageRow as { title: string; content: unknown };
 
+  const { count } = await supabase
+    .from("page_versions")
+    .select("id", { count: "exact", head: true })
+    .eq("page_id", input.pageId);
+
+  if (count && count >= 50) {
+    const { data: oldest } = await supabase
+      .from("page_versions")
+      .select("id")
+      .eq("page_id", input.pageId)
+      .order("created_at", { ascending: true })
+      .limit(count - 49);
+    if (oldest && oldest.length > 0) {
+      await supabase
+        .from("page_versions")
+        .delete()
+        .in("id", oldest.map((v) => v.id));
+    }
+  }
+
   const { data, error } = await supabase
     .from("page_versions")
     .insert({

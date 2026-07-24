@@ -239,7 +239,7 @@ export function MemoWidget() {
                       type="button"
                       onClick={() => startEdit(memo)}
                       aria-label="수정"
-                      className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                      className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
                     >
                       <Pencil className="size-3.5" />
                     </button>
@@ -247,7 +247,7 @@ export function MemoWidget() {
                       type="button"
                       onClick={() => handleDelete(memo.id)}
                       aria-label="삭제"
-                      className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                      className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
                     >
                       <X className="size-3.5" />
                     </button>

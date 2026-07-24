@@ -191,7 +191,7 @@ export function CalendarWidget() {
                   type="button"
                   onClick={() => handleDelete(event.id)}
                   aria-label="삭제"
-                  className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                  className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
                 >
                   <X className="size-3.5" />
                 </button>
