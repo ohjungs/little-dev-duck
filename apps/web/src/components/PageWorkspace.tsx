@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -37,6 +37,19 @@ import {
 
 type TreeNode = Page & { children: TreeNode[] };
 
+function highlightMatch(title: string, query: string): React.ReactNode {
+  if (!query) return title;
+  const idx = title.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return title;
+  return (
+    <>
+      {title.slice(0, idx)}
+      <mark className="bg-primary/20 rounded px-0.5">{title.slice(idx, idx + query.length)}</mark>
+      {title.slice(idx + query.length)}
+    </>
+  );
+}
+
 // flat 목록 → 부모별 트리. 순서는 created_at asc(listPages)를 유지.
 function buildTree(pages: Page[]): TreeNode[] {
   const byId = new Map<string, TreeNode>();
@@ -55,6 +68,7 @@ function TreeRow({
   depth,
   activeId,
   favoriteIds,
+  searchQuery,
   onDelete,
   onDuplicate,
   onToggleFavorite,
@@ -63,6 +77,7 @@ function TreeRow({
   depth: number;
   activeId: string | null;
   favoriteIds: Set<string>;
+  searchQuery: string;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
   onToggleFavorite: (id: string) => void;
@@ -90,7 +105,9 @@ function TreeRow({
           ) : (
             <FileText className="size-3.5 shrink-0 opacity-70" />
           )}
-          <span className="truncate">{node.title || "제목 없음"}</span>
+          <span className="truncate">
+            {highlightMatch(node.title || "제목 없음", searchQuery)}
+          </span>
         </Link>
         <button
           type="button"
@@ -134,6 +151,7 @@ function TreeRow({
           depth={depth + 1}
           activeId={activeId}
           favoriteIds={favoriteIds}
+          searchQuery={searchQuery}
           onDelete={onDelete}
           onDuplicate={onDuplicate}
           onToggleFavorite={onToggleFavorite}
@@ -477,6 +495,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
               depth={0}
               activeId={pageId}
               favoriteIds={favoriteIds}
+              searchQuery={searchQuery}
               onDelete={handleDelete}
               onDuplicate={handleDuplicate}
               onToggleFavorite={toggleFavorite}
