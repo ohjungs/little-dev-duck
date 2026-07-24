@@ -22,6 +22,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WidgetSkeleton } from "@/components/Skeleton";
 
+function playCompletionSound(): void {
+  const ctx = new AudioContext();
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.value = 523; // C5
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.3, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.5);
+}
+
 // 집중 모드 플래그. DuckWidget 등 다른 컴포넌트가 이 이벤트를 수신해 알림을 억제한다.
 const FOCUS_MODE_KEY = "ldd-focus-mode";
 const FOCUS_CHANGED_EVENT = "ldd:focus-changed";
@@ -152,6 +166,7 @@ export function PomodoroWidget() {
         disableFocusMode();
         setRunning(false);
         setActiveId(null);
+        playCompletionSound();
         setCelebrate(true);
         await fetchSessions();
         // completePomodoro가 서버에서 XP를 적립하므로 오리 표시 갱신 신호를 보낸다.

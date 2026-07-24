@@ -22,6 +22,14 @@ function getGreeting(): string {
   return "좋은 저녁이에요";
 }
 
+function getTimeEmoji(): string {
+  const h = new Date().getHours();
+  if (h >= 6 && h < 12) return "\u{1F324}\uFE0F"; // 🌤 morning sun
+  if (h >= 12 && h < 18) return "\u2600\uFE0F";   // ☀ afternoon sun
+  if (h >= 18 && h < 22) return "\u{1F307}";      // 🌇 sunset
+  return "\u{1F319}";                              // 🌙 moon (22-5)
+}
+
 // 날짜 기반으로 하루 동안 일관된 동기부여 메시지를 고른다(무작위 아님).
 const MOTIVATIONS = [
   "오늘도 화이팅",
@@ -62,6 +70,7 @@ export default async function DashboardPage() {
   }).format(new Date());
 
   const greeting = getGreeting();
+  const timeEmoji = getTimeEmoji();
   const motivation = getDailyMotivation();
 
   return (
@@ -72,7 +81,7 @@ export default async function DashboardPage() {
           {dateLabel}
         </p>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {greeting}! {motivation}
+          {timeEmoji} {greeting}! {motivation}
         </h1>
         <p className="text-sm text-muted-foreground">
           안녕하세요, {displayName}님. 오늘도 오리와 함께 차근차근 시작해볼까요.

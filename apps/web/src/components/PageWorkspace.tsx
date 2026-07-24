@@ -37,6 +37,10 @@ import {
 
 type TreeNode = Page & { children: TreeNode[] };
 
+// 모듈 로드 시각. 렌더마다 Date.now()를 호출하면 purity 규칙 위반이므로 모듈 수준에서 1회 캡처한다.
+// "최근 24시간" 판단에 쓰이며 페이지 새로고침 없이 자정을 넘어도 표시가 고정되는 것은 허용 범위다.
+const MODULE_LOAD_MS = Date.now();
+
 function highlightMatch(title: string, query: string): React.ReactNode {
   if (!query) return title;
   const idx = title.toLowerCase().indexOf(query.toLowerCase());
@@ -69,6 +73,7 @@ function TreeRow({
   activeId,
   favoriteIds,
   searchQuery,
+  nowMs,
   onDelete,
   onDuplicate,
   onToggleFavorite,
@@ -78,12 +83,14 @@ function TreeRow({
   activeId: string | null;
   favoriteIds: Set<string>;
   searchQuery: string;
+  nowMs: number;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
   onToggleFavorite: (id: string) => void;
 }) {
   const active = node.id === activeId;
   const favorited = favoriteIds.has(node.id);
+  const isRecent = nowMs - new Date(node.updatedAt).getTime() < 86400000;
   return (
     <div>
       <div
@@ -108,6 +115,9 @@ function TreeRow({
           <span className="truncate">
             {highlightMatch(node.title || "제목 없음", searchQuery)}
           </span>
+          {isRecent && (
+            <span className="size-1.5 rounded-full bg-primary shrink-0" title="최근 수정됨" />
+          )}
         </Link>
         <button
           type="button"
@@ -152,6 +162,7 @@ function TreeRow({
           activeId={activeId}
           favoriteIds={favoriteIds}
           searchQuery={searchQuery}
+          nowMs={nowMs}
           onDelete={onDelete}
           onDuplicate={onDuplicate}
           onToggleFavorite={onToggleFavorite}
@@ -496,6 +507,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
               activeId={pageId}
               favoriteIds={favoriteIds}
               searchQuery={searchQuery}
+              nowMs={MODULE_LOAD_MS}
               onDelete={handleDelete}
               onDuplicate={handleDuplicate}
               onToggleFavorite={toggleFavorite}
