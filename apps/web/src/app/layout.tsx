@@ -38,7 +38,8 @@ export const metadata: Metadata = {
     locale: "ko_KR",
   },
   twitter: {
-    card: "summary",
+    // 루트 opengraph-image(1200x630)가 있으므로 큰 카드로 노출한다.
+    card: "summary_large_image",
     title: "Little Dev Duck",
     description: "3D 아기오리 AI 비서가 상주하는 개인 워크스페이스",
   },
