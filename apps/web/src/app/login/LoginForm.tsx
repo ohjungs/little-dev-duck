@@ -52,48 +52,54 @@ export function LoginForm() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-secondary/40 to-background p-6">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <div className="flex flex-col items-center gap-5 text-center">
-          {/* 오프닝 영상은 검은 배경을 품고 끝나므로, 카드 안에 박힌 극장 스크린처럼 테두리를 준다 */}
-          <div className="w-full max-w-[17rem] overflow-hidden rounded-2xl bg-black ring-1 ring-border">
-            <DuckVideo surface="login" className="w-full" />
-          </div>
+      {/* 2026-07-26 : 로그인 - 카드 색 - 오프닝 영상 정합
+          오프닝 영상은 검은 배경에 금빛 광선이 뻗는 시네마틱 구도라 배경을 투명하게 뺄 수 없다
+          (오리 외곽선이 진한 갈색이어서 어두운 배경과 함께 갉힌다). 그래서 반대로 카드를 영상의
+          배경색에 맞췄다 — 밝은 카드 안에 검은 사각형이 박히는 이질감을 없애기 위한 것이고,
+          테마 토큰 대신 고정 색을 쓰는 이유는 다크 모드의 --card(#221e18)가 영상 배경보다 밝아
+          같은 이음선이 다시 생기기 때문이다. 로그인은 전체화면 스플래시라 항상 어두워도 무리가 없다. */}
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-[#2b2620] bg-[#070705] shadow-lg">
+        {/* 영상을 카드 폭 전체로 붙여 좌우 경계를 없앤다. 남는 접합면은 영상 아래쪽 한 줄뿐이고,
+            카드 색을 영상 하단 실측색(#070705)과 같게 맞춰 그 줄도 보이지 않게 했다. */}
+        <DuckVideo surface="login" className="w-full" />
+
+        <div className="flex flex-col gap-5 px-8 pb-8 pt-5 text-center">
           <div className="space-y-1.5">
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight text-[#f4f0e6]">
               Little Dev Duck
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[#a09684]">
               아기오리 AI 비서와 함께하는 워크스페이스
             </p>
           </div>
-        </div>
 
-        <div className="mt-8 flex flex-col gap-3">
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full"
-            onClick={() => handleLogin("google")}
-          >
-            <GoogleMark />
-            Google로 계속하기
-          </Button>
-          <Button
-            size="lg"
-            className="w-full bg-[#1c1917] text-white hover:bg-[#1c1917]/90"
-            onClick={() => handleLogin("github")}
-          >
-            <GitHubMark />
-            GitHub로 계속하기
-          </Button>
-        </div>
+          <div className="flex flex-col gap-3">
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full border-transparent bg-white text-[#1f1b16] hover:bg-white/90"
+              onClick={() => handleLogin("google")}
+            >
+              <GoogleMark />
+              Google로 계속하기
+            </Button>
+            <Button
+              size="lg"
+              className="w-full border border-[#3d362c] bg-[#231f19] text-[#f4f0e6] hover:bg-[#2c271f]"
+              onClick={() => handleLogin("github")}
+            >
+              <GitHubMark />
+              GitHub로 계속하기
+            </Button>
+          </div>
 
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          계정이 없으신가요?{" "}
-          <span className="font-medium text-foreground">
-            Google 또는 GitHub로 시작하세요
-          </span>
-        </p>
+          <p className="text-sm text-[#8d8474]">
+            계정이 없으신가요?{" "}
+            <span className="font-medium text-[#e6e0d2]">
+              Google 또는 GitHub로 시작하세요
+            </span>
+          </p>
+        </div>
       </div>
 
       <p className="mt-6 text-xs text-muted-foreground">

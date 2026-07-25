@@ -102,12 +102,15 @@ export default function WelcomePage() {
         <div className="relative mx-auto w-full max-w-sm">
           <div className="absolute -inset-3 -z-10 rounded-[2rem] bg-primary/10 blur-2xl" />
           <div className="rounded-[1.75rem] border border-border bg-card p-8 shadow-2xl">
-            <div className="mx-auto aspect-square w-full max-w-[16rem] overflow-hidden rounded-2xl bg-secondary">
-              {/* 영상 배경이 찬 회색이라 그대로 두면 크림색 팔레트에서 튄다 — 살짝만 따뜻하게 */}
-              <DuckVideo
-                surface="welcome"
-                className="size-full sepia-[.14] saturate-[1.06]"
-              />
+            {/* 2026-07-26 : 랜딩 - 영상 배경 - 카드 정합
+                원본 영상 배경이 회색(#ADADAD~#C2C2C2)이라 카드 안에 회색 사각형이 박혀 보였다.
+                평평한 회색이고 오리는 크림·올리브라 색 거리가 충분해서 ffmpeg colorkey로 배경을
+                빼고 카드 색(#ffffff)을 구워 넣었다. 그래서 컨테이너도 bg-white로 고정한다 —
+                bg-secondary로 두면 구운 흰색과 다시 어긋난다. 이 화면엔 ThemeToggle이 없어 항상
+                라이트로 뜨지만, 앱에서 클라이언트 이동해 오면 .dark가 남을 수 있어 토큰 대신
+                고정 색을 쓴다(그 경우 흰 액자 패널로 보인다). */}
+            <div className="mx-auto aspect-square w-full max-w-[16rem] overflow-hidden rounded-2xl bg-white">
+              <DuckVideo surface="welcome" className="size-full" />
             </div>
           </div>
           <div className="absolute -left-4 top-6 rotate-[-6deg] rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium shadow-lg">
