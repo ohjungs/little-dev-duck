@@ -93,3 +93,42 @@ for (const vp of VIEWPORTS) {
     });
   }
 }
+
+// 2026-07-26 : 공개정적자원 - 미들웨어차단 (세 번째 재발)
+// 모든 페이지가 <link rel="manifest" href="/manifest.json">을 선언하는데, 미들웨어의 공개 경로
+// 목록에 없어 **인증 게이트가 303으로 돌려보내 매니페스트가 아예 안 읽혔다**(프로덕션 실측).
+// 앱 이름·아이콘·설치 프롬프트가 전부 무효가 된다.
+//
+// 같은 사고가 이미 두 번 있었다(OG 이미지, robots·sitemap — proxy.ts 주석에 기록돼 있다).
+// 리다이렉트는 4xx가 아니라서 "실패한 요청" 수집에도 안 걸린다 — 그래서 별도로 못박는다.
+test("HTML이 선언한 정적 자원이 인증 없이 실제로 받아진다", async ({ request }) => {
+  // 브라우저가 아니라 요청 단위로 본다(리다이렉트를 따라가면 200처럼 보이므로 추적을 끈다).
+  const res = await request.get("/manifest.json", { maxRedirects: 0 });
+  expect(res.status(), "매니페스트가 리다이렉트되면 앱 설치 정보가 통째로 무효다").toBe(200);
+  const body = await res.json();
+  expect(body.name ?? body.short_name, "매니페스트에 앱 이름이 있어야 한다").toBeTruthy();
+});
+
+// 같은 사고가 세 번 났다: OG 이미지, robots·sitemap, 그리고 매니페스트. 매번 "이 경로도
+// 공개로 열어야 했다"였고, 매번 프로덕션에서 발견했다. 개별 경로를 하나씩 못박는 대신
+// **HTML이 실제로 참조하는 자원 전부**를 확인한다 — 앞으로 무엇을 추가하든 자동으로 덮인다.
+test("공개 페이지가 참조하는 자원이 전부 인증 없이 받아진다", async ({ page, request }) => {
+  await page.goto("/welcome", { waitUntil: "domcontentloaded" });
+  const refs = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("link[href], script[src], img[src]"))
+      .map((el) => el.getAttribute("href") ?? el.getAttribute("src") ?? "")
+      // 같은 출처의 절대 경로만 본다(외부 CDN·data URI는 이 검사 대상이 아니다).
+      .filter((u) => u.startsWith("/")),
+  );
+  expect(refs.length, "참조가 하나도 안 잡히면 검사가 헛돈 것이다").toBeGreaterThan(0);
+
+  const blocked: string[] = [];
+  for (const url of [...new Set(refs)]) {
+    // Vercel 인프라 경로는 로컬에서 서빙되지 않는다(별도 사유, 위 주석 참조).
+    if (url.includes("/_vercel/")) continue;
+    // 리다이렉트를 따라가면 200처럼 보이므로 추적을 끈다 — 매니페스트 사고가 그렇게 숨었다.
+    const res = await request.get(url, { maxRedirects: 0 });
+    if (res.status() !== 200) blocked.push(`${res.status()} ${url}`);
+  }
+  expect(blocked, "인증 게이트나 404에 막힌 자원").toEqual([]);
+});

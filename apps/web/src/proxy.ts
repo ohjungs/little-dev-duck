@@ -23,6 +23,13 @@ const PUBLIC_PATHS = [
   "/opengraph-image",
   "/robots.txt",
   "/sitemap.xml",
+  // 2026-07-26 : PWA - 매니페스트 - 크롤러접근 (같은 사고 3번째)
+  // layout.tsx가 모든 페이지에 <link rel="manifest" href="/manifest.json">을 선언한다.
+  // 여기 없으면 인증 게이트가 303으로 돌려보내 **앱 이름·아이콘·설치 프롬프트가 전부 무효**가
+  // 된다(프로덕션 실측). matcher의 확장자 예외는 이미지·영상뿐이라 .json은 걸러지지 않는다.
+  // 리다이렉트는 4xx가 아니라 "실패한 요청" 수집에도 안 잡혀 조용히 넘어갔다 —
+  // 그래서 e2e에서 리다이렉트 추적을 끄고 200을 직접 확인한다(public-visual.spec.ts).
+  "/manifest.json",
 ];
 
 // Tauri WebView가 이 배포 URL을 그대로 로드하는 구조(옵션 A)라 Tauri 쪽 CSP 설정은
