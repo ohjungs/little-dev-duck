@@ -7,7 +7,9 @@ import {
   serializeRecurrence,
   selectEventsForDuck,
   selectTodosForDuck,
+  summarizeHabitsForDuck,
   todoEmbedText,
+  DUCK_HABIT_RANGE_DAYS,
 } from "@ldd/core";
 import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
@@ -15,7 +17,7 @@ import { createTodo, listTodos, updateTodo } from "./todos";
 import { createMemo } from "./memos";
 import { createPage } from "./pages";
 import { createCalendarEvent, listCalendarEvents } from "./calendar";
-import { checkHabit, listHabits } from "./habits";
+import { checkHabit, listHabits, listHabitChecksInRange } from "./habits";
 import { indexSource } from "./embeddings";
 
 // LLM이 준 날짜/시각 문자열을 offset 포함 ISO(내부 캘린더 스키마 요구)로 보정한다. 순수함수 — 테스트 대상.
@@ -183,6 +185,25 @@ const listEventsDecl: ToolDeclaration = {
   kind: "readonly",
 };
 
+const listHabitsDecl: ToolDeclaration = {
+  name: "listHabits",
+  description:
+    "사용자의 습관과 최근 수행 현황을 조회한다. '이번 주 운동 며칠 했어?', '요즘 습관 잘 지키고 있어?', " +
+    "'오늘 뭐 체크해야 해?'처럼 습관을 묻는 질문에 쓴다. 횟수를 세는 질문이므로 추측하지 말고 " +
+    "반드시 이 도구로 확인한 뒤 답한다. 각 습관의 오늘 체크 여부·연속일수·기간 내 횟수를 돌려준다.",
+  parameters: {
+    type: "object",
+    properties: {
+      rangeDays: {
+        type: "number",
+        description: "며칠치를 셀지(이번 주=7). 생략하면 7일",
+      },
+    },
+    required: [],
+  },
+  kind: "readonly",
+};
+
 const checkHabitDecl: ToolDeclaration = {
   name: "checkHabit",
   description:
@@ -221,6 +242,10 @@ export function coerceTodoDueDate(raw: string): string | null {
   return d.toISOString().slice(0, 10) === s ? iso : null;
 }
 const habitArgs = z.object({ title: z.string().min(1).max(100) });
+const listHabitsArgs = z.object({
+  rangeDays: z.number().int().min(1).max(365).optional(),
+});
+
 const listEventsArgs = z.object({
   withinDays: z.number().int().min(0).max(3650).optional(),
   includePast: z.boolean().optional(),
@@ -296,8 +321,32 @@ export function createAppActionsAdapter(
       checkHabitDecl,
       listTodosDecl,
       listEventsDecl,
+      listHabitsDecl,
     ],
     async execute(call: ToolCall): Promise<ToolResult> {
+      if (call.name === listHabitsDecl.name) {
+        const parsed = listHabitsArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "조회 조건이 올바르지 않습니다.");
+        const today = kstDateString(new Date());
+        const rangeDays = parsed.data.rangeDays ?? DUCK_HABIT_RANGE_DAYS;
+        // 체크는 기간보다 넉넉히 가져온다 — 연속일수는 기간 밖 이력까지 봐야 정확하다.
+        // today는 KST 날짜 문자열이고, 여기서는 그 문자열에 날짜만 빼는 순수 계산이다.
+        // UTC로 파싱해 UTC로 빼고 날짜 부분만 쓰므로 시간대가 개입할 여지가 없다
+        // (로컬 변환을 한 번도 거치지 않는다). 그래서 UTC 절단이 맞는 자리다.
+        const from = new Date(`${today}T00:00:00Z`);
+        from.setUTCDate(from.getUTCDate() - Math.max(rangeDays, 90));
+        const [habits, checks] = await Promise.all([
+          listHabits(supabase),
+          // eslint-disable-next-line no-restricted-syntax -- 위 주석 참조: 날짜 문자열 순수 계산
+          listHabitChecksInRange(supabase, from.toISOString().slice(0, 10), today),
+        ]);
+        return {
+          id: call.id,
+          name: call.name,
+          response: { habits: summarizeHabitsForDuck(habits, checks, today, rangeDays) },
+        };
+      }
+
       if (call.name === listEventsDecl.name) {
         const parsed = listEventsArgs.safeParse(call.args);
         if (!parsed.success) return errorResult(call, "조회 조건이 올바르지 않습니다.");

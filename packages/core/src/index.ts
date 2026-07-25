@@ -92,6 +92,11 @@ export {
   type DuckEventFilter,
 } from "./domain/event-query";
 export {
+  summarizeHabitsForDuck,
+  DUCK_HABIT_RANGE_DAYS,
+  type DuckHabitSummary,
+} from "./domain/habit-query";
+export {
   EMBEDDING_DIM,
   embeddingSourceSchema,
   embeddingChunkSchema,

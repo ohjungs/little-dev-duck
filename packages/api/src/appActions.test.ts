@@ -28,6 +28,7 @@ describe("createAppActionsAdapter", () => {
       "createPage",
       "createTodo",
       "listCalendarEvents",
+      "listHabits",
       "listTodos",
     ]);
     // 안전 계약: **데이터를 바꾸는 도구는 하나도 빠짐없이 승인 대기여야 한다**(T0-4).
@@ -504,6 +505,86 @@ describe("listCalendarEvents 조회 도구", () => {
       name: "listCalendarEvents",
       args: { withinDays: "일주일" },
     });
+    expect(res.response.error).toBeDefined();
+  });
+});
+
+// 2026-07-26 : 오리 - 습관조회 - 세는질문
+// 오리는 습관을 체크할 수는 있는데(checkHabit) 어떻게 하고 있는지는 못 말했다.
+// "이번 주 운동 며칠 했어?"는 세는 질문이라 벡터 검색으로는 원리상 못 푼다.
+function habitSummarySupabase(
+  habits: ReturnType<typeof HABIT_ROW>[],
+  checks: Record<string, unknown>[],
+): SupabaseClient {
+  return {
+    auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
+    // 실제 호출 순서를 그대로 흉내낸다 — habits는 select→order→limit,
+    // habit_checks는 select→gte→lte→order. 목이 순서를 틀리면 테스트가 구현이 아니라
+    // 목을 검사하게 된다.
+    from: (table: string) => {
+      const chain: Record<string, unknown> = {};
+      const isChecks = table === "habit_checks";
+      Object.assign(chain, {
+        select: () => chain,
+        eq: () => chain,
+        gte: () => chain,
+        lte: () => chain,
+        order: () =>
+          isChecks ? Promise.resolve({ data: checks, error: null }) : chain,
+        limit: () => Promise.resolve({ data: habits, error: null }),
+      });
+      return chain;
+    },
+  } as unknown as SupabaseClient;
+}
+
+// id는 habitCheckSchema가 uuid를 요구한다(스키마가 실제로 검증하고 있다는 뜻이라 그대로 맞춘다).
+let checkSeq = 0;
+const CHECK_ROW = (habitId: string, date: string) => ({
+  id: `66666666-6666-4666-8666-${String(checkSeq++).padStart(12, "0")}`,
+  habit_id: habitId,
+  user_id: "22222222-2222-4222-8222-222222222222",
+  checked_date: date,
+  created_at: "2026-07-26T00:00:00+00:00",
+});
+
+describe("listHabits 조회 도구", () => {
+  it("승인 없이 바로 실행되고 습관별 현황을 돌려준다", async () => {
+    const HID2 = "44444444-4444-4444-8444-444444444445";
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+    const a = createAppActionsAdapter(
+      habitSummarySupabase(
+        [HABIT_ROW(HID2, "아침 운동")],
+        [CHECK_ROW(HID2, today)],
+      ),
+    );
+    const res = await a.execute({ id: "c1", name: "listHabits", args: {} });
+    expect(res.response.error).toBeUndefined();
+    const habits = (res.response as {
+      habits: { title: string; checkedToday: boolean; doneInRange: number; rangeDays: number }[];
+    }).habits;
+    expect(habits).toHaveLength(1);
+    expect(habits[0].title).toBe("아침 운동");
+    expect(habits[0].checkedToday).toBe(true);
+    expect(habits[0].doneInRange).toBe(1);
+    // 분모를 함께 줘야 오리가 "7일 중 1일"처럼 말할 수 있다.
+    expect(habits[0].rangeDays).toBe(7);
+  });
+
+  it("체크가 없는 습관도 빠지지 않는다", async () => {
+    const HID3 = "44444444-4444-4444-8444-444444444446";
+    const a = createAppActionsAdapter(habitSummarySupabase([HABIT_ROW(HID3, "독서")], []));
+    const res = await a.execute({ id: "c1", name: "listHabits", args: {} });
+    const habits = (res.response as { habits: { title: string; doneInRange: number }[] }).habits;
+    // "요즘 뭐 안 하고 있지?"에 답하려면 0회인 습관이 보여야 한다.
+    expect(habits).toEqual([
+      expect.objectContaining({ title: "독서", doneInRange: 0 }),
+    ]);
+  });
+
+  it("조회 조건이 이상하면 실행하지 않고 오류로 답한다", async () => {
+    const a = createAppActionsAdapter(habitSummarySupabase([], []));
+    const res = await a.execute({ id: "c1", name: "listHabits", args: { rangeDays: "일주일" } });
     expect(res.response.error).toBeDefined();
   });
 });
