@@ -20,10 +20,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 // 오리 대화 패널(단일). RAG 질답과 에이전트 액션을 같은 대화창에서 자연스럽게 다룬다 —
 // /api/ai/agent가 라우팅·검색·도구 루프·폴백을 전부 처리하고, 여기선 입력·표시·승인 카드만 담당한다.
 
-// 색인이 안 된 항목을 이어서 처리할 위치. 완료 플래그는 두지 않는다 — 한 번 끝났다고
-// 영영 멈추면, 그 뒤 조용히 실패한 항목이 복구되지 않는다(2026-07-26 수정).
-const REINDEX_OFFSET_KEY = "ldd-reindex-offset";
-
 // 상대 시각 표시. createdAt은 ISO 8601 문자열(useDuckChat이 new Date().toISOString()으로 기록).
 // 외부 라이브러리 없이 인라인 계산 — 분 단위까지, 그 이상은 시각 그대로.
 export function DuckChatPanel() {
@@ -37,27 +33,20 @@ export function DuckChatPanel() {
   //
   // 2026-07-26 : 예전엔 "최초 1회"만 돌고 완료 플래그를 남겼다. 그런데 저장 시 색인은
   // fire-and-forget이라 조용히 실패한다(무료 티어 쿼터가 바닥나면 반드시). 플래그가 남은 뒤
-  // 실패한 항목은 **영영 오리에게 안 보였다.** 그래서 플래그를 없애고 매 세션 돌리되,
-  // 서버가 **빠진 것만** 고르게 했다 — 빠진 게 없으면 Gemini 호출이 0이라 쿼터를 쓰지 않는다.
+  // 실패한 항목은 **영영 오리에게 안 보였다.** 그래서 매 세션 돌리되 서버가 **빠진 것만**
+  // 고르게 했다 — 빠진 게 없으면 Gemini 호출이 0이라 쿼터를 쓰지 않는다.
   //
-  // 남은 게 있으면(200개 상한) 다음 세션에 이어서 돈다. 한 세션에 몰아 돌리지 않는 건
-  // 쿼터를 아끼기 위해서다.
+  // offset은 보내지 않는다. 이 모드는 대상 목록이 실행할 때마다 줄어들어 **그 자체가 진행
+  // 장치**다. 옛 offset을 줄어든 목록에 적용하면 앞부분을 건너뛰고 남았는데도 "다 됐다"가 된다.
+  // 한 번에 상한(200)까지만 하고 나머지는 다음 세션에 이어서 — 쿼터를 아끼기 위해서다.
   useEffect(() => {
     void (async () => {
       try {
-        const offset = Number(localStorage.getItem(REINDEX_OFFSET_KEY) ?? "0") || 0;
-        const res = await fetch("/api/ai/reindex-all", {
+        await fetch("/api/ai/reindex-all", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ offset }),
+          body: JSON.stringify({}),
         });
-        if (!res.ok) return; // 다음 세션에 같은 위치부터 재시도
-        const data = (await res.json()) as { nextOffset?: number; done?: boolean };
-        // 끝났으면 위치를 지운다 — 다음 세션엔 처음부터 "빠진 것"을 다시 훑는다(보통 0건).
-        if (data.done) localStorage.removeItem(REINDEX_OFFSET_KEY);
-        else if (typeof data.nextOffset === "number") {
-          localStorage.setItem(REINDEX_OFFSET_KEY, String(data.nextOffset));
-        }
       } catch {
         // 다음 세션에 재시도
       }

@@ -106,7 +106,12 @@ export async function POST(request: Request) {
               ),
             ),
           );
-    const plan = planReindex(targets, offset);
+    // 2026-07-26 : "빠진 것만" 모드는 실행할 때마다 대상이 **줄어든다** — 목록이 줄어드는 것
+    // 자체가 진행 장치라 offset이 필요 없다. 옛 offset을 줄어든 목록에 적용하면 앞부분을
+    // 통째로 건너뛰고, 그 상태로 done이 참이 되어 **남았는데 "다 됐다"**고 보고했다.
+    // offset은 목록이 고정된 "전부 다시"에서만 의미가 있다.
+    const start = mode === "all" ? offset : 0;
+    const plan = planReindex(targets, start);
     const items = plan.items;
 
     // 순차 처리: 무료 티어 RPM 보호 + 쿼터 소진 시 여기까지는 인덱싱 유지(indexSource가 던지면 중단).
@@ -120,8 +125,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       indexed,
       total: plan.total,
-      nextOffset: offset + indexed,
-      done: offset + indexed >= plan.total,
+      nextOffset: start + indexed,
+      done: start + indexed >= plan.total,
     });
   } catch (error) {
     console.error("AI reindex-all 실패", { userId: user.id, error });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { excludeIndexed, planReindex, REINDEX_MAX_ITEMS } from "../reindexPlan";
+import { excludeIndexed, indexedKey, planReindex, REINDEX_MAX_ITEMS } from "../reindexPlan";
 
 // 2026-07-26 : RAG - 백필 - 상한너머는영영안됨
 // 백필은 소스별 라운드로빈으로 섞은 뒤 앞에서 200개를 잘라 처리했다. 그런데 **매번 같은 앞
@@ -130,5 +130,62 @@ describe("excludeIndexed", () => {
 
   it("빈 입력에서 죽지 않는다", () => {
     expect(excludeIndexed([], new Set(["memo:a"]))).toEqual([]);
+  });
+});
+
+// 2026-07-26 : RAG - 미색인모드 - offset이건너뛰기를만듦
+// "빠진 것만" 모드는 실행할 때마다 대상 목록이 **줄어든다**. 그런데 클라이언트가 지난 회차의
+// offset을 그대로 넘기면, 줄어든 목록에 옛 위치가 적용돼 앞부분을 통째로 건너뛴다.
+// 게다가 그 상태에서 done이 참으로 계산돼 **아직 남았는데 "다 됐다"**고 보고했다.
+//
+// 목록이 줄어드는 것 자체가 진행 장치이므로, 이 모드에서는 offset이 필요 없다(항상 0).
+// offset은 목록이 고정된 "전부 다시" 모드에서만 의미가 있다.
+describe("빠진 것만 모드는 offset 없이 진행한다", () => {
+  const makeAll = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      sourceType: "memo" as const,
+      sourceId: `m${i}`,
+      text: `m${i}`,
+    }));
+
+  function runMissingRounds(total: number, rounds: number) {
+    const all = makeAll(total);
+    const indexed = new Set<string>();
+    const picked: number[] = [];
+    let done = false;
+    for (let r = 0; r < rounds && !done; r += 1) {
+      const targets = excludeIndexed([all], indexed);
+      // 핵심: 이 모드에서는 언제나 0에서 시작한다.
+      const plan = planReindex(targets, 0);
+      plan.items.forEach((i) => indexed.add(indexedKey(i.sourceType, i.sourceId)));
+      picked.push(plan.items.length);
+      done = plan.done;
+    }
+    return { picked, indexed: indexed.size, done };
+  }
+
+  it("회차마다 앞에서부터 채워 건너뛰지 않는다", () => {
+    const r = runMissingRounds(500, 5);
+    expect(r.picked).toEqual([200, 200, 100]);
+    expect(r.indexed).toBe(500);
+    expect(r.done).toBe(true);
+  });
+
+  it("남은 게 있으면 done이 참이 되지 않는다", () => {
+    const all = makeAll(500);
+    const plan = planReindex(excludeIndexed([all], new Set()), 0);
+    expect(plan.done).toBe(false);
+    expect(plan.total).toBe(500);
+  });
+
+  it("정확히 상한만큼 남았을 때 한 회차로 끝난다", () => {
+    const r = runMissingRounds(REINDEX_MAX_ITEMS, 3);
+    expect(r.picked).toEqual([REINDEX_MAX_ITEMS]);
+    expect(r.done).toBe(true);
+  });
+
+  it("빠진 게 없으면 처리 0에 done", () => {
+    const r = runMissingRounds(0, 2);
+    expect(r).toMatchObject({ picked: [0], done: true });
   });
 });
