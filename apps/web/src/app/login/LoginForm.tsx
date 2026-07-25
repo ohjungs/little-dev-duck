@@ -1,6 +1,6 @@
 "use client";
 
-import { DuckLogo } from "@/components/DuckLogo";
+import { DuckVideo } from "@/components/DuckVideo";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { GitHubMark } from "@/components/ui/github-mark";
@@ -53,8 +53,11 @@ export function LoginForm() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-secondary/40 to-background p-6">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <DuckLogo size={84} intro />
+        <div className="flex flex-col items-center gap-5 text-center">
+          {/* 오프닝 영상은 검은 배경을 품고 끝나므로, 카드 안에 박힌 극장 스크린처럼 테두리를 준다 */}
+          <div className="w-full max-w-[17rem] overflow-hidden rounded-2xl bg-black ring-1 ring-border">
+            <DuckVideo surface="login" className="w-full" />
+          </div>
           <div className="space-y-1.5">
             <h1 className="text-2xl font-bold tracking-tight">
               Little Dev Duck

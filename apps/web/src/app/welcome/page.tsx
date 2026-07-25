@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { DuckVideo } from "@/components/DuckVideo";
 import { GitHubMark } from "@/components/ui/github-mark";
 
 // 2026-07-26 : 보안 - CSP - 정적페이지nonce
@@ -101,15 +102,8 @@ export default function WelcomePage() {
         <div className="relative mx-auto w-full max-w-sm">
           <div className="absolute -inset-3 -z-10 rounded-[2rem] bg-primary/10 blur-2xl" />
           <div className="rounded-[1.75rem] border border-border bg-card p-8 shadow-2xl">
-            <div className="mx-auto flex aspect-square w-full max-w-[16rem] items-center justify-center rounded-2xl bg-secondary">
-              <Image
-                src="/duck-logo.png"
-                alt="Little Dev Duck 마스코트"
-                width={220}
-                height={220}
-                className="size-48 object-contain drop-shadow-md"
-                priority
-              />
+            <div className="mx-auto aspect-square w-full max-w-[16rem] overflow-hidden rounded-2xl bg-secondary">
+              <DuckVideo surface="welcome" className="size-full" />
             </div>
           </div>
           <div className="absolute -left-4 top-6 rotate-[-6deg] rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium shadow-lg">
