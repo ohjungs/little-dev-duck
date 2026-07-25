@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { allowRequest, createPage, generateStandup } from "@ldd/api";
-import { isLddError, userMessage } from "@ldd/core";
+import { isLddError, userMessage, kstDateString } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 import { requireGeminiKey } from "@/lib/apiHelpers";
 
@@ -35,7 +35,9 @@ export async function POST() {
       );
     }
 
-    const today = new Date().toISOString().slice(0, 10);
+    // 서버는 UTC로 돈다. toISOString()을 그대로 자르면 KST 00:00~09:00 사이에 페이지 제목이
+    // 어제 날짜로 붙는다(Phase 19에서 습관 체크가 밟았던 함정과 같다).
+    const today = kstDateString(new Date());
     const page = await createPage(supabase, {
       title: `스탠드업 ${today}`,
       content: [

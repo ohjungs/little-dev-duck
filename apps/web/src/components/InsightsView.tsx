@@ -37,6 +37,8 @@ import {
 } from "@ldd/core";
 import { HabitHeatmap } from "./HabitHeatmap";
 import { createClient } from "@/lib/supabase/client";
+import { todayIso } from "@/lib/today";
+import { activeStreak, shiftDate, weekBounds } from "@/lib/insightsDates";
 
 function StatTile({
   icon,
@@ -78,12 +80,10 @@ export function InsightsView() {
     const supabase = createClient();
     const run = async () => {
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const ninetyDaysAgo = (() => {
-          const d = new Date();
-          d.setDate(d.getDate() - 89);
-          return d.toISOString().slice(0, 10);
-        })();
+        // toISOString()은 UTC 날짜다. KST 00:00~09:00 사이엔 어제가 되어, 그 시간에 한
+        // 체크가 히트맵 범위 밖으로 빠졌다. 로컬 기준으로 계산한다.
+        const today = todayIso();
+        const ninetyDaysAgo = shiftDate(today, -89);
         const [todos, pages, memos, habits, articles, duck, pomSessions, checks] =
           await Promise.all([
             listTodos(supabase),
@@ -188,22 +188,9 @@ export function InsightsView() {
     for (const h of checks) {
       activeDates.add(h.checkedDate);
     }
-    let streak = 0;
-    const today = new Date();
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
-      if (activeDates.has(iso)) {
-        streak++;
-      } else if (i === 0) {
-        // 오늘 아직 활동 없음 — 어제부터 체크
-        continue;
-      } else {
-        break;
-      }
-    }
-    return streak;
+    // 날짜 계산은 lib으로 분리했다. 원래는 로컬 Date를 toISOString()으로 잘라 UTC 날짜를
+    // 얻었는데, 비교 대상 checkedDate는 로컬(KST) 날짜라 KST 새벽엔 스트릭이 어긋났다.
+    return activeStreak(activeDates, todayIso());
   }
 
   const streak = calculateStreak(rawTodos, rawChecks);
@@ -217,35 +204,20 @@ export function InsightsView() {
     }
   }
   for (const h of rawChecks) {
-    const day = new Date(h.checkedDate).getDay();
+    // `new Date("2026-07-26")`는 날짜만 있는 ISO라 **UTC로 해석**된다. 음수 오프셋 지역에선
+    // getDay()가 전날 요일을 준다. T00:00:00을 붙여 로컬로 파싱한다(HabitHeatmap과 같은 방식).
+    const day = new Date(`${h.checkedDate}T00:00:00`).getDay();
     dayOfWeekCounts[day]++;
   }
   const maxCount = Math.max(...dayOfWeekCounts);
   const bestDay = maxCount > 0 ? dayLabels[dayOfWeekCounts.indexOf(maxCount)] : null;
 
-  // 이번 주(월~일) / 지난 주 ISO 날짜 범위를 계산한다.
-  const weekBounds = (() => {
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const offsetToMonday = (dayOfWeek + 6) % 7;
-    const thisMonday = new Date(now);
-    thisMonday.setDate(now.getDate() - offsetToMonday);
-    thisMonday.setHours(0, 0, 0, 0);
-    const lastMonday = new Date(thisMonday);
-    lastMonday.setDate(thisMonday.getDate() - 7);
-    const lastSunday = new Date(thisMonday);
-    lastSunday.setDate(thisMonday.getDate() - 1);
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    return {
-      thisStart: fmt(thisMonday),
-      thisEnd: fmt(now),
-      lastStart: fmt(lastMonday),
-      lastEnd: fmt(lastSunday),
-    };
-  })();
+  // 이번 주(월~오늘) / 지난 주(월~일) 범위. 원래는 로컬 자정 Date를 toISOString()으로 잘라
+  // **일요일**을 시작일로 내놓고 있었다(KST 기준 창이 통째로 하루 밀림) — lib으로 분리해 고쳤다.
+  const bounds = weekBounds(todayIso());
 
   const weeklyComparison = (() => {
-    const { thisStart, thisEnd, lastStart, lastEnd } = weekBounds;
+    const { thisStart, thisEnd, lastStart, lastEnd } = bounds;
     const thisTodos = rawTodos.filter(
       (t) =>
         t.isDone &&

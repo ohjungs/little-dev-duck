@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   formatStandupPrompt,
+  kstDateString,
   formatWeeklyDigestLines,
   hasActivity,
   weeklyDigestTitle,
@@ -86,7 +87,9 @@ export async function generateStandup(
   );
   if (!hasActivity(input)) return null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  // 서버(Vercel)는 UTC로 돈다. toISOString()을 그대로 자르면 KST 00:00~09:00 사이에
+  // 스탠드업이 **어제 날짜**로 적힌다(Phase 19에서 습관 체크가 밟았던 함정과 같다).
+  const today = kstDateString(new Date());
   const prompt = formatStandupPrompt(input, today);
   const content = await geminiGenerate(prompt, geminiKey, fetchImpl);
   return { content };
