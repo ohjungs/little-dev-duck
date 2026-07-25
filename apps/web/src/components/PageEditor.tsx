@@ -28,6 +28,7 @@ import type { Block } from "@blocknote/core";
 import {
   createDefaultDbSchema,
   extractPlainText,
+  pageEmbedText,
   pageStats,
   type DbSchema,
   type Page,
@@ -305,7 +306,9 @@ export function PageEditor({
         void reindexSource({
           sourceType: "page",
           sourceId: page.id,
-          text: updated.plainText,
+          // 데이터베이스 행의 속성값은 plain_text에 안 들어간다 — 임베딩엔 함께 넣어야
+          // 오리가 "진행 중인 프로젝트"처럼 값 기반 질문에 답할 수 있다.
+          text: pageEmbedText(updated.plainText, updated.rowProps),
         });
         return updated;
       }),

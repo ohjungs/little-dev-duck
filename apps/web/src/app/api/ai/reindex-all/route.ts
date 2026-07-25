@@ -8,6 +8,7 @@ import {
   listPages,
   listTodos,
 } from "@ldd/api";
+import { pageEmbedText } from "@ldd/core";
 import type { EmbeddingSource } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 import { todoEmbedText } from "@/lib/embedText";
@@ -72,7 +73,8 @@ export async function POST() {
       pages.map((p) => ({
         sourceType: "page",
         sourceId: p.id,
-        text: p.plainText,
+        // 행 속성값은 plain_text에 없다 — 백필에서도 함께 넣어야 기존 데이터가 검색된다.
+        text: pageEmbedText(p.plainText, p.rowProps),
       })),
     ];
     const items: ReindexItem[] = [];

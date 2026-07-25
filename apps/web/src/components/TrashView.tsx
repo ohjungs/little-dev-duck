@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { listTrashedPages, purgePage, restorePage } from "@ldd/api";
+import { pageEmbedText } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
@@ -81,7 +82,11 @@ export function TrashView() {
       snapshot.map(async (page) => {
         try {
           await restorePage(supabase, page.id);
-          void reindexSource({ sourceType: "page", sourceId: page.id, text: page.plainText });
+          void reindexSource({
+            sourceType: "page",
+            sourceId: page.id,
+            text: pageEmbedText(page.plainText, page.rowProps),
+          });
         } catch {
           failed.push(page);
         }

@@ -346,3 +346,4 @@ export {
   type CompanyStats,
   type EmployeeStats,
 } from "./domain/office-company";
+export { pageEmbedText } from "./domain/page-embed";
