@@ -1,8 +1,14 @@
 # Status.md — 현재 Phase 진행 현황
 
-> ## ⏭ 다음 세션 이어서 하기 (2026-07-25 `/loop` 자율 — baseline 검증)
-> **이번 `/loop` 반복 결과: 전체 스위트 green 재확인 후 정직 보고.** test 11/11 패키지(core 196 / api 245 /
-> web 115 / ai 10 / mascot 5) · lint 11/11 · build 6/6, 전부 turbo 캐시 히트. 미커밋 변경 없음.
+> ## ⏭ 다음 세션 이어서 하기 (2026-07-25 `/loop-eng` 자율 — 시트 파일명 규약 core 추출)
+> **이번 `/loop-eng` 반복 결과(5db76b9): office-characters.ts sheetUrl의 파일명 매핑을 core
+> `characterSheetFileName`로 추출 + 디스크 실제 파일명 8개를 계약 테스트로 잠금.** 파일명 불일치는 로더가
+> catch로 조용히 폴백해 화면으로만 발견되던 표면(e5168b5 우향프레임 버그와 같은 부류) — 결정론적 회귀 차단.
+> 검증: core 377 tests(+3)·tsc / web tsc / core·web(변경파일) lint GREEN. 미테스트 lib 잔여
+> (office-draw·sprite-loader·office-sound·realtime·apiHelpers)는 재확인 결과 전부 canvas/DOM/WebAudio/
+> Supabase realtime/NextResponse = 순수 로직 아님(추출 대상 소진 재확인). 미커밋 변경 없음(zip 제외).
+>
+> **직전 `/loop` 반복 결과(baseline 검증)**: test 11/11 패키지 · lint 11/11 · build 6/6, 전부 turbo 캐시 히트.
 > **2026-07-24 인계 이후 실제 진행(git log, Status 최상단이 그간 stale했음)**: 픽셀 오피스 스레드 계속 —
 > Modern Interiors 통합(39924fc) → 직원 스프라이트 좌향 반전 수정(e5168b5) / 앱-액션 자동 RAG 인덱싱
 > (ce81445·9a8f4ce) / web lib 순수함수 테스트 추출(bookmarkedArticles a44ce0c).
