@@ -377,11 +377,18 @@ describe("createTodo 마감일·반복 (Phase 23)", () => {
 // 동시에 **쓰기 도구가 실수로 readonly로 새면 승인 없이 데이터가 바뀐다** — 위 카탈로그
 // 테스트가 그쪽을 막고, 여기서는 조회가 실제로 값을 돌려주는지 본다.
 function todoListSupabase(rows: Record<string, unknown>[]): SupabaseClient {
-  const chain = {
+  // 오리 조회는 조건을 DB로 내린다(duckQueries) — eq/gte/lte 체인이 실제로 호출되므로
+  // 목도 그 형태를 그대로 흉내내야 한다. 목이 실제 호출 순서를 모르면 테스트가 구현이 아니라
+  // 목을 검사하게 된다(2026-07-26에 습관 목에서 이미 겪었다).
+  const chain: Record<string, unknown> = {};
+  Object.assign(chain, {
     select: () => chain,
+    eq: () => chain,
+    gte: () => chain,
+    lte: () => chain,
     order: () => chain,
     limit: () => Promise.resolve({ data: rows, error: null }),
-  };
+  });
   return {
     auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
     from: () => chain,
@@ -441,11 +448,15 @@ describe("listTodos 조회 도구", () => {
 // 구글 캘린더 어댑터엔 조회 도구가 있었지만 **앱 자체 캘린더엔 없어서**, 연동하지 않은
 // 사용자(기본 상태)의 일정은 오리가 볼 방법이 아예 없었다.
 function eventListSupabase(rows: Record<string, unknown>[]): SupabaseClient {
-  const chain = {
+  const chain: Record<string, unknown> = {};
+  Object.assign(chain, {
     select: () => chain,
+    eq: () => chain,
+    gte: () => chain,
+    lte: () => chain,
     order: () => chain,
     limit: () => Promise.resolve({ data: rows, error: null }),
-  };
+  });
   return {
     auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
     from: () => chain,

@@ -153,3 +153,5 @@ export {
 } from "./standup";
 
 export { listBacklinks, updatePageLinks } from "./pageLinks";
+
+export { listTodosForDuck, listEventsForDuck } from "./duckQueries";

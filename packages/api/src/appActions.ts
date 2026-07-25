@@ -14,9 +14,10 @@ import {
 import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
 import { createTodo, listTodos, updateTodo } from "./todos";
+import { listEventsForDuck, listTodosForDuck } from "./duckQueries";
 import { createMemo } from "./memos";
 import { createPage } from "./pages";
-import { createCalendarEvent, listCalendarEvents } from "./calendar";
+import { createCalendarEvent } from "./calendar";
 import { checkHabit, listHabits, listHabitChecksInRange } from "./habits";
 import { indexSource } from "./embeddings";
 
@@ -351,8 +352,10 @@ export function createAppActionsAdapter(
         const parsed = listEventsArgs.safeParse(call.args);
         if (!parsed.success) return errorResult(call, "조회 조건이 올바르지 않습니다.");
         const today = kstDateString(new Date());
+        // 같은 이유로 DB에서 거른다. listCalendarEvents는 start_at 오름차순 500이라
+        // 과거 일정이 창을 채우면 다가올 일정이 아예 안 들어온다.
         const selected = selectEventsForDuck(
-          await listCalendarEvents(supabase),
+          await listEventsForDuck(supabase, parsed.data, today),
           parsed.data,
           today,
         );
@@ -375,7 +378,13 @@ export function createAppActionsAdapter(
         if (!parsed.success) return errorResult(call, "조회 조건이 올바르지 않습니다.");
         // 서버는 UTC로 돌아 new Date()로 "오늘"을 만들면 KST 새벽에 어제가 된다.
         const today = kstDateString(new Date());
-        const selected = selectTodosForDuck(await listTodos(supabase), parsed.data, today);
+        // 조건을 DB로 내려 받는다. listTodos는 최신 500개 창이라 오래된 항목이 빠진다
+        // (duckQueries.ts 참조). core 선별기는 정렬·상한만 맡는다.
+        const selected = selectTodosForDuck(
+          await listTodosForDuck(supabase, parsed.data, today),
+          parsed.data,
+          today,
+        );
         return {
           id: call.id,
           name: call.name,
