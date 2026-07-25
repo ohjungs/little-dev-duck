@@ -170,6 +170,138 @@ export function findUnrevokedDefiners(files: MigrationFile[]): string[] {
     .sort();
 }
 
+// 2026-07-26 : 스키마 - 코드↔마이그레이션 - 컬럼대조
+// 이 저장소의 api 테스트는 가짜 supabase 클라이언트를 쓴다 — **컬럼 이름 오타를 원리적으로
+// 못 잡는다.** 없는 컬럼을 payload에 담으면 PostgREST가 요청 전체를 거부하므로, 오타 하나가
+// 그 테이블 쓰기를 통째로 죽인다(2026-07-26 todos.recurrence 사고와 같은 실패 모양).
+// 코드가 쓰는 컬럼이 마이그레이션에 선언돼 있는지 정적으로 대조한다.
+
+function balanced(src: string, openIndex: number): string {
+  let depth = 0;
+  for (let i = openIndex; i < src.length; i += 1) {
+    if (src[i] === "{" || src[i] === "(") depth += 1;
+    else if (src[i] === "}" || src[i] === ")") {
+      depth -= 1;
+      if (depth === 0) return src.slice(openIndex, i + 1);
+    }
+  }
+  return src.slice(openIndex);
+}
+
+// create table 본문의 컬럼 + alter table ... add column.
+export function collectDeclaredColumns(
+  files: MigrationFile[],
+): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  const add = (table: string, col: string) => {
+    const set = out.get(table) ?? new Set<string>();
+    set.add(col);
+    out.set(table, set);
+  };
+
+  for (const { sql } of files) {
+    for (const m of sql.matchAll(RE_CREATE_TABLE)) {
+      const table = m[1];
+      out.set(table, out.get(table) ?? new Set());
+      const body = tableBody(sql, m.index + m[0].length - 1);
+      let depth = 0;
+      for (const line of body.split("\n")) {
+        if (depth === 0) {
+          // 테이블 제약(primary/unique/check/...)이 아니라 "컬럼명 타입" 형태만 취한다.
+          const cm = /^\s*([a-z_][a-z0-9_]*)\s+\S/.exec(line);
+          if (cm && !/^(primary|unique|check|constraint|foreign|exclude)$/i.test(cm[1])) {
+            add(table, cm[1]);
+          }
+        }
+        depth += (line.match(/\(/g)?.length ?? 0) - (line.match(/\)/g)?.length ?? 0);
+      }
+    }
+    for (const m of sql.matchAll(/alter\s+table\s+(?:only\s+)?public\.(\w+)([\s\S]*?);/gi)) {
+      for (const a of m[2].matchAll(/add\s+column\s+(?:if\s+not\s+exists\s+)?(\w+)/gi)) {
+        add(m[1], a[1]);
+      }
+    }
+  }
+  return out;
+}
+
+export type SourceFile = { name: string; code: string };
+export type UndeclaredWrite = {
+  file: string;
+  table: string;
+  op: string;
+  columns: string[];
+};
+
+// payload 객체에서 컬럼으로 쓰이는 키를 모은다. 최상위 키와, 조건부 스프레드
+// `...(x ? { col: v } : {})` 안의 키를 함께 본다(두 형태 모두 실제 컬럼으로 나간다).
+// 값이 객체인 경우의 내부 키(예: JSON 컬럼 내용)는 컬럼이 아니므로 제외된다.
+function payloadColumns(obj: string): Set<string> {
+  const keys = new Set<string>();
+
+  // 중괄호 깊이는 위치별로 따로 센다. 깊이와 키를 한 정규식의 교대(alternation)로 잡으면
+  // 여는 `{`가 소비돼 **바로 뒤 첫 키를 놓친다**(처음 짤 때 실제로 그랬다 — 검사가 조용히
+  // 약해지는 부류의 실수라 특히 위험하다).
+  const collectTop = (src: string) => {
+    const depthAt: number[] = [];
+    let depth = 0;
+    for (let i = 0; i < src.length; i += 1) {
+      if (src[i] === "{") depth += 1;
+      depthAt[i] = depth;
+      if (src[i] === "}") depth -= 1;
+    }
+    for (const m of src.matchAll(/([a-z_][a-z0-9_]*)\s*:/g)) {
+      if (depthAt[m.index] === 1) keys.add(m[1]);
+    }
+  };
+
+  collectTop(obj);
+  for (const s of obj.matchAll(/\.\.\.\(/g)) {
+    const spread = balanced(obj, s.index + 3);
+    for (const inner of spread.matchAll(/\{/g)) {
+      collectTop(balanced(spread, inner.index));
+    }
+  }
+  return keys;
+}
+
+// 각 변이 호출을 **바로 앞의** `.from("table")`에 묶는다. 파일을 앞에서부터 훑어
+// 마지막으로 본 테이블을 쓴다 — 창(window)으로 앞을 내다보면 뒤에 오는 다른 테이블의
+// 삽입을 엉뚱한 테이블로 오귀속한다(실제로 처음 짤 때 그렇게 틀렸다).
+export function findUndeclaredWrites(
+  sources: SourceFile[],
+  declared: Map<string, Set<string>>,
+): UndeclaredWrite[] {
+  const found: UndeclaredWrite[] = [];
+  for (const { name, code } of sources) {
+    const events: { at: number; kind: string; value: string | number }[] = [];
+    for (const m of code.matchAll(/\.from\((["'`])(\w+)\1\)/g)) {
+      events.push({ at: m.index, kind: "from", value: m[2] });
+    }
+    for (const m of code.matchAll(/\.(insert|update|upsert)\(\s*\{/g)) {
+      events.push({ at: m.index, kind: m[1], value: m.index + m[0].length - 1 });
+    }
+    events.sort((a, b) => a.at - b.at);
+
+    let table: string | null = null;
+    for (const e of events) {
+      if (e.kind === "from") {
+        table = e.value as string;
+        continue;
+      }
+      const known = table ? declared.get(table) : undefined;
+      if (!table || !known) continue; // 마이그레이션이 만들지 않은 테이블(외부 스키마 등)은 대상 밖
+      const columns = [...payloadColumns(balanced(code, e.value as number))]
+        .filter((c) => !known.has(c))
+        .sort();
+      if (columns.length > 0) {
+        found.push({ file: name, table, op: e.kind, columns });
+      }
+    }
+  }
+  return found;
+}
+
 // 마이그레이션마다 짝이 되는 롤백 스크립트가 있어야 한다(CLAUDE.md 5절).
 export function findMissingRollbacks(
   migrationNames: string[],

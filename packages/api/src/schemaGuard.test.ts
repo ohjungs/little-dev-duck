@@ -3,12 +3,15 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  collectDeclaredColumns,
   collectSchemaFacts,
   findMissingRollbacks,
+  findUndeclaredWrites,
   findUnrevokedDefiners,
   findViolations,
   purgeReachable,
   type MigrationFile,
+  type SourceFile,
 } from "./schemaGuard";
 
 // 경로는 cwd가 아니라 이 파일 기준으로 잡는다. cwd에 의존하면 실행 위치가 바뀌는 순간
@@ -16,6 +19,16 @@ import {
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const MIGRATIONS_DIR = path.join(REPO_ROOT, "supabase", "migrations");
 const ROLLBACK_DIR = path.join(REPO_ROOT, "supabase", "rollback");
+const API_SRC_DIR = fileURLToPath(new URL("./", import.meta.url));
+
+function loadApiSources(): SourceFile[] {
+  return readdirSync(API_SRC_DIR)
+    .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+    .map((name) => ({
+      name,
+      code: readFileSync(path.join(API_SRC_DIR, name), "utf-8"),
+    }));
+}
 
 function sqlFiles(dir: string): string[] {
   return readdirSync(dir).filter((f) => f.endsWith(".sql"));
@@ -66,6 +79,23 @@ describe("스키마 안전 계약 (실제 마이그레이션)", () => {
     // anon에게 직접 부여된 권한이 남는다 — award_xp가 이 함정에 빠져 로그인 없이 남의 XP를
     // 바꿀 수 있었다(Phase 24). 의도적 공개는 PUBLIC_BY_DESIGN에 근거와 함께 둔다.
     expect(findUnrevokedDefiners(migrations)).toEqual([]);
+  });
+
+  it("api 코드가 쓰는 컬럼이 전부 마이그레이션에 선언돼 있다", () => {
+    // 이 패키지의 테스트는 가짜 supabase 클라이언트를 써서 **컬럼 오타를 원리적으로 못 잡는다.**
+    // 없는 컬럼이 payload에 있으면 PostgREST가 요청 전체를 거부하므로 오타 하나가 그 테이블
+    // 쓰기를 통째로 죽인다(2026-07-26 todos.recurrence 사고와 같은 실패 모양).
+    const sources = loadApiSources();
+    expect(sources.length).toBeGreaterThan(5); // 실제로 읽었는지 먼저 확인
+    expect(findUndeclaredWrites(sources, collectDeclaredColumns(migrations))).toEqual([]);
+  });
+
+  it("컬럼 선언 파서가 주요 테이블을 실제로 읽어낸다", () => {
+    // 0개를 읽고 위 검사가 공짜로 통과하는 상황을 배제한다.
+    const declared = collectDeclaredColumns(migrations);
+    expect(declared.get("todos")).toContain("due_date");
+    expect(declared.get("pages")).toContain("is_trashed");
+    expect(declared.get("pages")).toContain("cover_url"); // alter table add column 경로
   });
 
   it("모든 마이그레이션에 짝이 되는 롤백 스크립트가 있다", () => {
@@ -279,5 +309,65 @@ describe("SECURITY DEFINER 검사가 위반을 잡는다", () => {
       },
     ];
     expect(findUnrevokedDefiners(files)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 컬럼 대조 검사도 위반을 실제로 잡는지 (메타 검증)
+// ---------------------------------------------------------------------------
+describe("컬럼 대조 검사가 위반을 잡는다", () => {
+  const migration: MigrationFile[] = [
+    {
+      name: "0001.sql",
+      sql: `
+        create table public.notes (
+          id uuid primary key,
+          user_id uuid not null,
+          body text,
+          unique (user_id, body)
+        );
+        alter table public.notes add column if not exists pinned boolean;
+      `,
+    },
+  ];
+  const declared = collectDeclaredColumns(migration);
+  const src = (code: string): SourceFile[] => [{ name: "x.ts", code }];
+
+  it("선언된 컬럼만 쓰면 통과한다", () => {
+    const files = src(`supabase.from("notes").insert({ user_id: u, body: b, pinned: true })`);
+    expect(findUndeclaredWrites(files, declared)).toEqual([]);
+  });
+
+  it("오타 난 컬럼을 잡는다", () => {
+    const files = src(`supabase.from("notes").insert({ user_id: u, bodyy: b })`);
+    expect(findUndeclaredWrites(files, declared)).toEqual([
+      { file: "x.ts", table: "notes", op: "insert", columns: ["bodyy"] },
+    ]);
+  });
+
+  it("조건부 스프레드 안의 컬럼도 검사한다", () => {
+    // `...(x ? { col: v } : {})`도 실제 컬럼으로 나간다 — 여기 숨은 오타를 놓치면 안 된다.
+    const files = src(`supabase.from("notes").update({ ...(x ? { boddy: v } : {}) })`);
+    expect(findUndeclaredWrites(files, declared)[0].columns).toEqual(["boddy"]);
+  });
+
+  it("값이 객체인 경우 그 내부 키는 컬럼으로 보지 않는다", () => {
+    const files = src(`supabase.from("notes").insert({ body: { nested: 1 } })`);
+    expect(findUndeclaredWrites(files, declared)).toEqual([]);
+  });
+
+  it("변이는 바로 앞의 from에 묶인다 (뒤 테이블로 오귀속 금지)", () => {
+    // 창(window)으로 앞을 내다보면 뒤에 오는 다른 테이블의 삽입을 엉뚱한 테이블에 붙인다.
+    const files = src(`
+      supabase.from("notes").select("*");
+      supabase.from("other").insert({ whatever: 1 });
+    `);
+    // other는 마이그레이션에 없는 테이블이라 대상 밖 — notes 위반으로 잡히면 안 된다.
+    expect(findUndeclaredWrites(files, declared)).toEqual([]);
+  });
+
+  it("제약 정의를 컬럼으로 착각하지 않는다", () => {
+    expect(declared.get("notes")).not.toContain("unique");
+    expect(declared.get("notes")).not.toContain("primary");
   });
 });
