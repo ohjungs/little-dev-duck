@@ -9,6 +9,7 @@ import {
 } from "@ldd/api";
 import type { PomodoroSession } from "@ldd/core";
 import { cn } from "@/lib/utils";
+import { timeAgo } from "@/lib/timeAgo";
 import { createClient } from "@/lib/supabase/client";
 import { emitXpChanged } from "@/lib/xpSignal";
 import { todayIso } from "@/lib/today";
@@ -93,17 +94,6 @@ function localDateIso(iso: string): string {
 }
 
 // 완료 시각을 "N분 전", "N시간 전" 형식으로 변환한다.
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return "방금";
-  if (diffMin < 60) return `${diffMin}분 전`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}시간 전`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay}일 전`;
-}
-
 export function PomodoroWidget() {
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [state, setState] = useState<LoadState>("loading");

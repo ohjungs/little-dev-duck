@@ -31,7 +31,12 @@ export interface HeatmapDay {
 
 // YYYY-MM-DD 문자열 날짜에서 i일을 뺀 날짜를 YYYY-MM-DD로 반환한다.
 // toISOString()은 UTC 변환으로 로컬 타임존에서 날짜가 바뀔 수 있어 사용하지 않는다.
-function shiftDate(yyyy_mm_dd: string, daysBack: number): string {
+// 2026-07-26 : 날짜 - 이름충돌 - 반대의미
+// 이 함수의 원래 이름은 apps/web/lib/insightsDates.ts의 함수와 같았는데 **부호가 반대였다**
+// (그쪽은 더하기, 여기는 빼기). 같은 이름이 반대 의미면 한쪽을 읽고 다른 쪽을 쓰다
+// 부호를 뒤집는 실수가 난다 — 이 저장소는 날짜 부호 실수로 이미 여러 번 깨졌다.
+// 로직은 그대로 두고 이름이 방향을 말하게 한다.
+function daysAgo(yyyy_mm_dd: string, daysBack: number): string {
   const [y, m, d] = yyyy_mm_dd.split("-").map(Number);
   const date = new Date(y, (m ?? 1) - 1, (d ?? 1) - daysBack);
   const yy = date.getFullYear();
@@ -50,7 +55,7 @@ export function habitHeatmapData(
     countByDate.set(c.checkedDate, (countByDate.get(c.checkedDate) ?? 0) + 1);
   const result: HeatmapDay[] = [];
   for (let i = days - 1; i >= 0; i--) {
-    const iso = shiftDate(today, i);
+    const iso = daysAgo(today, i);
     result.push({ date: iso, count: countByDate.get(iso) ?? 0 });
   }
   return result;

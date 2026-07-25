@@ -2,9 +2,9 @@
 // 할 일 하나에 붙일 반복 주기 선택지. "매주"·"매월"은 그 할 일의 마감일(없으면 오늘)이 무슨
 // 요일/며칠인지에 따라 달라지므로 항목마다 다시 만든다.
 
-import { describeRecurrence } from "@ldd/core";
+import { describeRecurrence, DAY_CODES } from "@ldd/core";
 
-const DAY_CODES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
+
 
 export type RecurrenceOption = { value: string; label: string };
 

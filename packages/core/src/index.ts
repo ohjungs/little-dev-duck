@@ -30,6 +30,7 @@ export {
   startOfWeek,
 } from "./domain/date-util";
 export {
+  DAY_CODES,
   parseRecurrence,
   serializeRecurrence,
   nextOccurrence,

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Sparkles, Trash2 } from "lucide-react";
 import { describeCall } from "@/lib/approvalLabel";
+import { timeAgo } from "@/lib/timeAgo";
 import { DUCK_EXAMPLES } from "@/lib/duckExamples";
 import { useDuckChat } from "@ldd/ai";
 import { cn } from "@/lib/utils";
@@ -25,17 +26,6 @@ const REINDEX_DONE_KEY = "ldd-reindex-backfilled";
 
 // 상대 시각 표시. createdAt은 ISO 8601 문자열(useDuckChat이 new Date().toISOString()으로 기록).
 // 외부 라이브러리 없이 인라인 계산 — 분 단위까지, 그 이상은 시각 그대로.
-function timeAgo(createdAt: string): string {
-  const diffMs = Date.now() - new Date(createdAt).getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return "방금";
-  if (diffMin < 60) return `${diffMin}분 전`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}시간 전`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay}일 전`;
-}
-
 export function DuckChatPanel() {
   const { messages, pending, error, pendingApproval, send, approve, cancel, clear } =
     useDuckChat();

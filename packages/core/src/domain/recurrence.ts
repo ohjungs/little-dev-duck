@@ -13,7 +13,10 @@ export type RecurrenceRule =
 const MAX_INTERVAL = 99;
 
 // RRULE 요일 약어 ↔ JS getDay()(0=일요일). 순서가 곧 요일 번호다.
-const DAY_CODES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
+// BYDAY 코드. UI(recurrenceOptions.ts)가 이 코드로 규칙 문자열을 만들고 여기서 파싱하므로
+// **양쪽이 같은 목록을 봐야 한다.** 각자 갖고 있으면 한쪽만 바뀌었을 때 UI가 만든 규칙을
+// 파서가 거부해 반복 일정이 조용히 안 걸린다(같은 부류를 이 세션에서 이미 겪었다 — 임베딩 문구).
+export const DAY_CODES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 function parseInterval(raw: string | undefined): number | null {
