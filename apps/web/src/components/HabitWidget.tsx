@@ -347,7 +347,7 @@ export function HabitWidget() {
                     type="checkbox"
                     checked={isCheckedToday}
                     onChange={() => handleToggle(habit)}
-                    aria-label="오늘 체크"
+                    aria-label={`${habit.title} 오늘 체크`}
                     className="size-4 shrink-0 cursor-pointer accent-primary"
                   />
                   <span className="flex-1 text-sm">{habit.title}</span>

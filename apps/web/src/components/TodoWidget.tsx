@@ -521,10 +521,13 @@ export function TodoWidget() {
                       <ChevronDown className="size-3" />
                     </button>
                   </div>
+                  {/* 제목은 옆 span에 있지만, 체크박스로 탭하면 자기 이름만 읽힌다.
+                      이름이 없으면 "체크박스"라고만 들려 어느 할 일인지 알 수 없다. */}
                   <input
                     type="checkbox"
                     checked={todo.isDone}
                     onChange={() => handleToggle(todo)}
+                    aria-label={`${todo.title} 완료`}
                     className="size-4 shrink-0 cursor-pointer accent-primary"
                   />
                   <span className="flex flex-1 flex-col gap-0.5 min-w-0">
