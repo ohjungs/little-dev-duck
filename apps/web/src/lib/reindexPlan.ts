@@ -51,3 +51,29 @@ export function planReindex(
   const nextOffset = start + items.length;
   return { items, total: all.length, nextOffset, done: nextOffset >= all.length };
 }
+
+// 2026-07-26 : RAG - 색인실패 - 조용한영구누락
+// 항목 저장 시 색인(reindexSource)은 fire-and-forget이라 실패해도 조용히 넘어간다 —
+// 무료 티어 쿼터가 바닥나면 반드시 일어난다. 예전엔 자동 백필이 한 번 끝나면 완료 플래그를
+// 남기고 다시 돌지 않아, **그때 실패한 항목은 영영 오리에게 안 보였다.**
+//
+// "전부 다시" 대신 **빠진 것만** 고른다. 빠진 게 없으면 Gemini 호출이 0이라 매 세션 돌려도
+// 쿼터를 쓰지 않고, 실패분은 다음 세션에 스스로 복구된다.
+//
+// 한계(정직하게): 이미 색인된 항목의 **내용이 낡은** 경우는 여기서 안 고쳐진다
+// (예: 임베딩 문구에 날짜를 추가한 변경). 그건 /admin의 전체 재색인 버튼이 담당한다.
+
+/** `${sourceType}:${sourceId}` 형태의 키. 타입이 다르면 같은 id라도 다른 항목이다. */
+export function indexedKey(sourceType: string, sourceId: string): string {
+  return `${sourceType}:${sourceId}`;
+}
+
+/** 이미 색인된 항목을 제외한다. 소스별 구조(라운드로빈 대상)는 그대로 유지한다. */
+export function excludeIndexed(
+  bySource: ReindexItem[][],
+  indexed: ReadonlySet<string>,
+): ReindexItem[][] {
+  return bySource.map((src) =>
+    src.filter((i) => !indexed.has(indexedKey(i.sourceType, i.sourceId))),
+  );
+}

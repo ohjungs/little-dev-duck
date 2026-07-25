@@ -66,6 +66,7 @@ export {
   deleteSourceEmbeddings,
   indexSource,
   searchEmbeddings,
+  listIndexedSourceIds,
   type IndexSourceInput,
 } from "./embeddings";
 

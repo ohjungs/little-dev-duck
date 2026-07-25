@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planReindex, REINDEX_MAX_ITEMS } from "../reindexPlan";
+import { excludeIndexed, planReindex, REINDEX_MAX_ITEMS } from "../reindexPlan";
 
 // 2026-07-26 : RAG - 백필 - 상한너머는영영안됨
 // 백필은 소스별 라운드로빈으로 섞은 뒤 앞에서 200개를 잘라 처리했다. 그런데 **매번 같은 앞
@@ -72,5 +72,63 @@ describe("planReindex", () => {
 
   it("전부 빈 소스여도 done이다", () => {
     expect(planReindex([[], []], 0).done).toBe(true);
+  });
+});
+
+// 2026-07-26 : RAG - 색인실패 - 조용한영구누락
+// 항목 저장 시 색인(reindexSource)은 fire-and-forget이라 **실패해도 조용히 넘어간다**
+// (무료 티어 쿼터가 바닥나면 반드시 일어난다). 그런데 자동 백필은 한 번 끝나면 완료 플래그를
+// 남기고 다시 돌지 않아서, 그때 실패한 항목은 **영영 오리에게 안 보인다.**
+//
+// 그래서 "전부 다시" 대신 **빠진 것만** 고르게 한다. 빠진 게 없으면 Gemini 호출이 0이라
+// 매 세션 돌려도 쿼터를 쓰지 않고, 실패분은 다음 세션에 스스로 복구된다.
+describe("excludeIndexed", () => {
+  const item = (type: "memo" | "todo", id: string) => ({
+    sourceType: type,
+    sourceId: id,
+    text: id,
+  });
+
+  it("이미 색인된 항목을 뺀다", () => {
+    const out = excludeIndexed(
+      [[item("memo", "a"), item("memo", "b")]],
+      new Set(["memo:a"]),
+    );
+    expect(out[0].map((i) => i.sourceId)).toEqual(["b"]);
+  });
+
+  it("소스 타입이 다르면 같은 id라도 다른 항목으로 본다", () => {
+    const out = excludeIndexed(
+      [[item("memo", "x")], [item("todo", "x")]],
+      new Set(["memo:x"]),
+    );
+    expect(out.flat().map((i) => `${i.sourceType}:${i.sourceId}`)).toEqual(["todo:x"]);
+  });
+
+  it("색인된 게 없으면 그대로 둔다", () => {
+    const src = [[item("memo", "a")], [item("todo", "b")]];
+    expect(excludeIndexed(src, new Set()).flat()).toHaveLength(2);
+  });
+
+  it("전부 색인돼 있으면 빈 계획이 되고 done이다", () => {
+    const remaining = excludeIndexed([[item("memo", "a")]], new Set(["memo:a"]));
+    const plan = planReindex(remaining, 0);
+    expect(plan.items).toEqual([]);
+    expect(plan.done).toBe(true);
+    expect(plan.total).toBe(0);
+  });
+
+  it("소스별 구조(라운드로빈 대상)를 유지한다", () => {
+    const out = excludeIndexed(
+      [[item("memo", "a"), item("memo", "b")], [item("todo", "c")]],
+      new Set(["memo:a"]),
+    );
+    expect(out).toHaveLength(2);
+    expect(out[0].map((i) => i.sourceId)).toEqual(["b"]);
+    expect(out[1].map((i) => i.sourceId)).toEqual(["c"]);
+  });
+
+  it("빈 입력에서 죽지 않는다", () => {
+    expect(excludeIndexed([], new Set(["memo:a"]))).toEqual([]);
   });
 });

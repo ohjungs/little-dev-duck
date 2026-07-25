@@ -7,13 +7,14 @@ import {
   listMemos,
   listPages,
   listTodos,
+  listIndexedSourceIds,
 } from "@ldd/api";
 import { pageEmbedText,
   todoEmbedText,
   calendarEventEmbedText,
 } from "@ldd/core";
 import type { EmbeddingSource } from "@ldd/core";
-import { planReindex, type ReindexItem } from "@/lib/reindexPlan";
+import { excludeIndexed, indexedKey, planReindex, type ReindexItem } from "@/lib/reindexPlan";
 import { createClient } from "@/lib/supabase/server";
 import { requireGeminiKey } from "@/lib/apiHelpers";
 
@@ -46,9 +47,14 @@ export async function POST(request: Request) {
 
   // 이어서 처리할 위치. 클라이언트가 지난 실행의 nextOffset을 그대로 돌려보낸다.
   let offset = 0;
+  // mode="missing"(기본): 아직 색인되지 않은 항목만. 저장 시 색인이 조용히 실패한 것을
+  // 다음 세션에 스스로 복구한다 — 빠진 게 없으면 Gemini 호출이 0이라 쿼터를 안 쓴다.
+  // mode="all": 전부 다시(예: 임베딩 문구가 바뀌어 기존 것이 낡았을 때, /admin 버튼).
+  let mode: "missing" | "all" = "missing";
   try {
-    const body = (await request.json()) as { offset?: unknown };
+    const body = (await request.json()) as { offset?: unknown; mode?: unknown };
     if (typeof body?.offset === "number") offset = body.offset;
+    if (body?.mode === "all") mode = "all";
   } catch {
     // 본문이 없거나 JSON이 아니면 처음부터 — 기존 호출(본문 없음)과 호환된다.
   }
@@ -89,7 +95,18 @@ export async function POST(request: Request) {
     ];
     // offset부터 이어서 처리한다. 예전엔 매번 앞 200개만 잡아 **그 뒤는 영영 색인되지
     // 않았다**(자동 백필도, 버튼을 여러 번 눌러도). 순서는 실행마다 같아야 offset이 의미를 갖는다.
-    const plan = planReindex(bySource, offset);
+    const targets =
+      mode === "all"
+        ? bySource
+        : excludeIndexed(
+            bySource,
+            new Set(
+              (await listIndexedSourceIds(supabase)).map((r) =>
+                indexedKey(r.sourceType, r.sourceId),
+              ),
+            ),
+          );
+    const plan = planReindex(targets, offset);
     const items = plan.items;
 
     // 순차 처리: 무료 티어 RPM 보호 + 쿼터 소진 시 여기까지는 인덱싱 유지(indexSource가 던지면 중단).

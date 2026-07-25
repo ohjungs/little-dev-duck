@@ -22,7 +22,11 @@ export function ReindexButton() {
     if (state === "running") return;
     setState("running");
     try {
-      const res = await fetch("/api/ai/reindex-all", { method: "POST" });
+      const res = await fetch("/api/ai/reindex-all", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // 버튼은 **전부 다시**다 — 임베딩 문구가 바뀌어 기존 것이 낡았을 때 쓰는 수단이다
+        // (자동 복구는 빠진 것만 처리하므로 낡은 내용은 갱신하지 않는다).
+        body: JSON.stringify({ mode: "all" }) });
       setState(res.ok ? "done" : "error");
     } catch {
       setState("error");

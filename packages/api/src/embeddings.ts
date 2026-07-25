@@ -80,6 +80,24 @@ export type IndexSourceInput = {
 // 텍스트를 청크→임베딩→upsert. 저장 시 인덱싱의 핵심(슬라이스 B/C가 호출). 빈 텍스트면 기존 임베딩 삭제.
 // 반환: 저장된 청크 수. **임베딩(실패 가능 지점: 쿼터·네트워크)을 먼저 성공시킨 뒤에만 기존 인덱스를
 // 갱신**한다 — geminiEmbed가 던지면 기존 임베딩은 그대로 보존돼 재인덱싱 실패로 검색이 유실되지 않는다.
+// 2026-07-26 : RAG - 색인실패 - 빠진것만복구
+// 저장 시 색인은 fire-and-forget이라 실패해도 조용히 넘어간다(무료 티어 쿼터 소진 시 반드시
+// 일어난다). 어떤 항목이 이미 색인됐는지 알아야 **빠진 것만** 다시 시도할 수 있다.
+// 벡터가 아니라 식별자만 읽으므로 가볍다(RLS로 본인 것만 조회된다).
+export async function listIndexedSourceIds(
+  supabase: SupabaseClient,
+  limit = 5000,
+): Promise<{ sourceType: string; sourceId: string }[]> {
+  const { data, error } = await supabase
+    .from("embeddings")
+    .select("source_type, source_id")
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as { source_type: string; source_id: string }[];
+  // 한 소스가 여러 청크를 가지므로 중복이 나온다 — 호출부가 Set으로 쓰기 좋게 그대로 준다.
+  return rows.map((r) => ({ sourceType: r.source_type, sourceId: r.source_id }));
+}
+
 export async function indexSource(
   supabase: SupabaseClient,
   apiKey: string,
