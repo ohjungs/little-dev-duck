@@ -1,5 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { epochDay, startOfWeek, toLocalDateString } from "./date-util";
+import {
+  epochDay,
+  kstDateString,
+  startOfWeek,
+  toLocalDateString,
+} from "./date-util";
+
+// 서버(UTC)에서 쓰는 KST 날짜. 테스트 머신 타임존과 무관하게 성립하도록 UTC 순간으로 고정한다.
+describe("kstDateString", () => {
+  it("KST 자정 직전은 그 전날이다", () => {
+    // 2026-07-20T14:59:59Z = KST 2026-07-20 23:59:59
+    expect(kstDateString(new Date("2026-07-20T14:59:59Z"))).toBe("2026-07-20");
+  });
+
+  it("KST 자정을 넘기면 다음 날이다", () => {
+    // 2026-07-20T15:00:00Z = KST 2026-07-21 00:00:00
+    expect(kstDateString(new Date("2026-07-20T15:00:00Z"))).toBe("2026-07-21");
+  });
+
+  it("UTC 기준으로는 아직 전날인 시각도 KST로는 오늘이다(서버 UTC 함정)", () => {
+    // UTC 2026-07-20 16:00 → KST 07-21 01:00. toISOString()을 썼다면 07-20이 나왔을 것.
+    const d = new Date("2026-07-20T16:00:00Z");
+    expect(d.toISOString().slice(0, 10)).toBe("2026-07-20");
+    expect(kstDateString(d)).toBe("2026-07-21");
+  });
+
+  it("YYYY-MM-DD 형식이고 월·일이 두 자리다", () => {
+    expect(kstDateString(new Date("2026-01-05T00:00:00Z"))).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/,
+    );
+    expect(kstDateString(new Date("2026-01-04T15:00:00Z"))).toBe("2026-01-05");
+  });
+
+  it("연말 경계에서도 맞다", () => {
+    // 2026-12-31T15:00Z = KST 2027-01-01 00:00
+    expect(kstDateString(new Date("2026-12-31T15:00:00Z"))).toBe("2027-01-01");
+  });
+});
 
 describe("epochDay", () => {
   it("하루 차이는 1이다", () => {

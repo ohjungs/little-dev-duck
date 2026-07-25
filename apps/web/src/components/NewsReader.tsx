@@ -25,7 +25,14 @@ import {
   listFeeds,
   setFeedStatus,
 } from "@ldd/api";
-import { clusterArticles, type Article, type Feed } from "@ldd/core";
+import {
+  clusterArticles,
+  feedTopics,
+  RECOMMENDED_FEEDS,
+  unregisteredFeeds,
+  type Article,
+  type Feed,
+} from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { timeAgo } from "@/lib/timeAgo";
 import { cn } from "@/lib/utils";
@@ -186,6 +193,8 @@ export function NewsReader() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [url, setUrl] = useState("");
+  // 추천 피드 추가 중인 URL(중복 클릭 방지 + 버튼 라벨).
+  const [addingUrl, setAddingUrl] = useState<string | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [grouped, setGrouped] = useState(false);
@@ -204,6 +213,11 @@ export function NewsReader() {
     return subscribeReadArticles(sync);
   }, []);
   const readSet = useMemo(() => new Set(readIds), [readIds]);
+  // 이미 등록한 피드는 추천에서 뺀다(core 순수함수 — 끝 슬래시·대소문자 차이 흡수).
+  const suggestions = useMemo(
+    () => unregisteredFeeds(RECOMMENDED_FEEDS, feeds.map((f) => f.url)),
+    [feeds],
+  );
 
   // 북마크 상태(localStorage) 동기화.
   useEffect(() => {
@@ -289,6 +303,20 @@ export function NewsReader() {
       setNote(
         err instanceof Error ? err.message : "피드 추가에 실패했어요.",
       );
+    }
+  };
+
+  // 추천 피드 1클릭 추가. 기존 addFeed(SSRF 가드 포함)를 그대로 쓴다.
+  const onAddRecommended = async (feedUrl: string) => {
+    setNote(null);
+    setAddingUrl(feedUrl);
+    try {
+      await addFeed(createClient(), { url: feedUrl });
+      await load();
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "피드 추가에 실패했어요.");
+    } finally {
+      setAddingUrl(null);
     }
   };
 
@@ -386,6 +414,32 @@ export function NewsReader() {
             피드 추가
           </Button>
         </form>
+        {/* Phase 19 T2: 아직 등록 안 한 추천 피드만 노출. 다 등록하면 섹션 자체가 사라진다. */}
+        {suggestions.length > 0 && (
+          <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
+            <span className="text-xs font-medium text-muted-foreground">
+              추천 피드
+            </span>
+            {feedTopics(suggestions).map((topic) => (
+              <div key={topic} className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground/70">{topic}</span>
+                {suggestions
+                  .filter((f) => f.topic === topic)
+                  .map((f) => (
+                    <button
+                      key={f.url}
+                      type="button"
+                      disabled={addingUrl !== null}
+                      onClick={() => onAddRecommended(f.url)}
+                      className="rounded-full border border-border px-2.5 py-1 text-xs transition-colors hover:bg-accent disabled:opacity-50"
+                    >
+                      {addingUrl === f.url ? "추가 중..." : `+ ${f.title}`}
+                    </button>
+                  ))}
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
             {feeds.length}개 피드 ·{" "}

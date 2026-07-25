@@ -1,11 +1,13 @@
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { kstDateString } from "@ldd/core";
 import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
 import { createTodo, listTodos, updateTodo } from "./todos";
 import { createMemo } from "./memos";
 import { createPage } from "./pages";
 import { createCalendarEvent } from "./calendar";
+import { checkHabit, listHabits } from "./habits";
 import { indexSource } from "./embeddings";
 
 // LLM이 준 날짜/시각 문자열을 offset 포함 ISO(내부 캘린더 스키마 요구)로 보정한다. 순수함수 — 테스트 대상.
@@ -114,7 +116,23 @@ const addEventDecl: ToolDeclaration = {
   kind: "mutating",
 };
 
+const checkHabitDecl: ToolDeclaration = {
+  name: "checkHabit",
+  description:
+    "이미 등록된 습관을 오늘 수행한 것으로 체크한다. 사용자가 '운동 체크해줘', '오늘 독서 했어'처럼 " +
+    "말할 때 그 습관을 제목으로 찾아 체크. 새 습관을 만드는 게 아니다.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "체크할 습관의 제목(또는 일부)" },
+    },
+    required: ["title"],
+  },
+  kind: "mutating",
+};
+
 const todoArgs = z.object({ title: z.string().min(1).max(500) });
+const habitArgs = z.object({ title: z.string().min(1).max(100) });
 const completeArgs = z.object({ title: z.string().min(1).max(500) });
 const memoArgs = z.object({ content: z.string().min(1).max(2000) });
 const eventArgs = z.object({ title: z.string().min(1).max(300), startAt: z.string().min(1) });
@@ -127,6 +145,12 @@ const pageArgs = z.object({
 function bodyToContent(body: string | undefined): unknown {
   if (!body) return [];
   return [{ type: "paragraph", content: [{ type: "text", text: body, styles: {} }] }];
+}
+
+// Postgres 유일 제약 위반(23505). supabase-js는 코드를 메시지에 담아 Error로 던지므로 문자열로 본다.
+export function isDuplicateCheck(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return msg.includes("23505") || msg.includes("duplicate key");
 }
 
 function errorResult(call: ToolCall, message: string): ToolResult {
@@ -165,7 +189,14 @@ export function createAppActionsAdapter(
   };
 
   return {
-    catalog: [createTodoDecl, completeTodoDecl, createMemoDecl, createPageDecl, addEventDecl],
+    catalog: [
+      createTodoDecl,
+      completeTodoDecl,
+      createMemoDecl,
+      createPageDecl,
+      addEventDecl,
+      checkHabitDecl,
+    ],
     async execute(call: ToolCall): Promise<ToolResult> {
       if (call.name === createTodoDecl.name) {
         const parsed = todoArgs.safeParse(call.args);
@@ -239,6 +270,39 @@ export function createAppActionsAdapter(
           id: call.id,
           name: call.name,
           response: { created: { id: event.id, title: event.title, startAt: event.startAt } },
+        };
+      }
+
+      if (call.name === checkHabitDecl.name) {
+        const parsed = habitArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "습관 정보가 올바르지 않습니다.");
+        const found = findTodoByTitle(await listHabits(supabase), parsed.data.title);
+        if (found === "ambiguous") {
+          return errorResult(
+            call,
+            "체크할 습관이 여러 개 일치해요. 더 정확한 제목으로 알려주세요.",
+          );
+        }
+        if (!found) return errorResult(call, "그런 습관을 찾지 못했어요.");
+        // 서버는 UTC라 new Date()로 날짜를 만들면 KST 새벽에 어제로 기록된다.
+        const today = kstDateString(new Date());
+        try {
+          await checkHabit(supabase, found.id, today);
+        } catch (e) {
+          // (habit_id, checked_date) 유일 제약 — 이미 오늘 체크됨. 에러가 아니라 멱등 성공으로 답한다.
+          if (isDuplicateCheck(e)) {
+            return {
+              id: call.id,
+              name: call.name,
+              response: { alreadyChecked: { title: found.title, date: today } },
+            };
+          }
+          throw e;
+        }
+        return {
+          id: call.id,
+          name: call.name,
+          response: { checked: { id: found.id, title: found.title, date: today } },
         };
       }
 

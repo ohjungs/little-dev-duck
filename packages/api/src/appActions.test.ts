@@ -22,6 +22,7 @@ describe("createAppActionsAdapter", () => {
     const names = a.catalog.map((t) => t.name).sort();
     expect(names).toEqual([
       "addCalendarEvent",
+      "checkHabit",
       "completeTodo",
       "createMemo",
       "createPage",
@@ -96,5 +97,133 @@ describe("findTodoByTitle", () => {
   it("없으면 null", () => {
     expect(findTodoByTitle(todos, "없는할일")).toBeNull();
     expect(findTodoByTitle(todos, "  ")).toBeNull();
+  });
+});
+
+
+// Phase 19 T1: 습관 체크 액션. listHabits(select→order→limit)와 checkHabit(insert→select→single)을
+// 한 목에서 태워야 해서 전용 목을 쓴다.
+const HABIT_ROW = (id: string, title: string) => ({
+  id,
+  user_id: "22222222-2222-4222-8222-222222222222",
+  title,
+  frequency: "daily" as const,
+  times_per_week: null,
+  created_at: "2026-07-25T00:00:00+00:00",
+  updated_at: "2026-07-25T00:00:00+00:00",
+});
+
+function habitSupabase(opts: {
+  habits: ReturnType<typeof HABIT_ROW>[];
+  insertError?: string;
+  onInsert?: (payload: Record<string, unknown>) => void;
+}): SupabaseClient {
+  return {
+    auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
+    rpc: () => Promise.resolve({ data: null, error: null }),
+    from: (table: string) => {
+      const chain: Record<string, unknown> = {};
+      Object.assign(chain, {
+        select: () => chain,
+        eq: () => chain,
+        order: () => chain,
+        limit: () => Promise.resolve({ data: opts.habits, error: null }),
+        insert: (payload: Record<string, unknown>) => {
+          if (table === "habit_checks") opts.onInsert?.(payload);
+          return chain;
+        },
+        single: () =>
+          Promise.resolve(
+            opts.insertError
+              ? { data: null, error: { message: opts.insertError } }
+              : {
+                  data: {
+                    id: "33333333-3333-4333-8333-333333333333",
+                    habit_id: opts.habits[0]?.id,
+                    user_id: "22222222-2222-4222-8222-222222222222",
+                    checked_date: "2026-07-26",
+                    created_at: "2026-07-26T00:00:00+00:00",
+                  },
+                  error: null,
+                },
+          ),
+      });
+      return chain;
+    },
+  } as unknown as SupabaseClient;
+}
+
+const HID = "44444444-4444-4444-8444-444444444444";
+const call = (title: string) => ({ id: "c1", name: "checkHabit", args: { title } });
+
+describe("checkHabit 액션", () => {
+  it("제목으로 습관을 찾아 오늘 체크한다", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const a = createAppActionsAdapter(
+      habitSupabase({
+        habits: [HABIT_ROW(HID, "아침 운동")],
+        onInsert: (p) => {
+          captured = p;
+        },
+      }),
+    );
+    const res = await a.execute(call("운동"));
+    expect(res.response).toMatchObject({ checked: { title: "아침 운동" } });
+    expect(captured?.habit_id).toBe(HID);
+    // 서버가 UTC여도 KST 기준 날짜여야 한다
+    expect(String(captured?.checked_date)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("이미 오늘 체크된 습관이면 에러가 아니라 '이미 체크됨'으로 답한다(멱등)", async () => {
+    const a = createAppActionsAdapter(
+      habitSupabase({
+        habits: [HABIT_ROW(HID, "아침 운동")],
+        insertError: 'duplicate key value violates unique constraint (23505)',
+      }),
+    );
+    const res = await a.execute(call("아침 운동"));
+    expect(res.response).toMatchObject({ alreadyChecked: { title: "아침 운동" } });
+    expect(res.response).not.toHaveProperty("error");
+  });
+
+  it("여러 개 일치하면 아무것도 바꾸지 않고 되묻는다", async () => {
+    let inserted = false;
+    const a = createAppActionsAdapter(
+      habitSupabase({
+        habits: [HABIT_ROW(HID, "아침 운동"), HABIT_ROW("55555555-5555-4555-8555-555555555555", "저녁 운동")],
+        onInsert: () => {
+          inserted = true;
+        },
+      }),
+    );
+    const res = await a.execute(call("운동"));
+    expect(String((res.response as { error?: string }).error)).toContain("여러 개");
+    expect(inserted).toBe(false);
+  });
+
+  it("못 찾으면 아무것도 바꾸지 않는다", async () => {
+    let inserted = false;
+    const a = createAppActionsAdapter(
+      habitSupabase({
+        habits: [HABIT_ROW(HID, "아침 운동")],
+        onInsert: () => {
+          inserted = true;
+        },
+      }),
+    );
+    const res = await a.execute(call("명상"));
+    expect((res.response as { error?: string }).error).toBeTruthy();
+    expect(inserted).toBe(false);
+  });
+
+  it("빈 제목은 실행 전에 막는다", async () => {
+    const a = createAppActionsAdapter(habitSupabase({ habits: [HABIT_ROW(HID, "아침 운동")] }));
+    const res = await a.execute({ id: "c1", name: "checkHabit", args: { title: "" } });
+    expect((res.response as { error?: string }).error).toBeTruthy();
+  });
+
+  it("체크 도구도 mutating이라 승인 게이트를 탄다", () => {
+    const a = createAppActionsAdapter(habitSupabase({ habits: [] }));
+    expect(a.catalog.find((t) => t.name === "checkHabit")?.kind).toBe("mutating");
   });
 });

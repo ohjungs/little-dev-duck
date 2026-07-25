@@ -13,6 +13,20 @@ export function toLocalDateString(date: Date): string {
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
 }
 
+// 2026-07-26 : 날짜 - 서버KST - 하루경계
+// 서버(Vercel)는 UTC로 돈다. 서버에서 `new Date()`로 "오늘"을 만들면 KST 00:00~09:00 사이에 하루 전
+// 날짜가 나온다 — 오리가 "오늘 습관 체크"를 어제 날짜에 기록하는 식의 버그가 된다.
+// 클라이언트는 로컬 타임존이 곧 사용자 시간대라 toLocalDateString을 쓰고, 서버는 이 함수를 쓴다.
+// en-CA 로캘이 YYYY-MM-DD를 주므로 문자열 조립 없이 안전하다.
+export function kstDateString(now: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
 // 그 날짜가 속한 주의 월요일(로컬 기준). 주간 단위 산출물(회고·다이제스트)이 요일과 무관하게
 // 같은 주차 키를 갖게 한다. 일요일은 그 주의 마지막 날로 본다(ISO-8601).
 export function startOfWeek(date: Date): Date {

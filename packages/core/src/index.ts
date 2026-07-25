@@ -26,6 +26,7 @@ export {
 export {
   epochDay,
   toLocalDateString,
+  kstDateString,
   startOfWeek,
 } from "./domain/date-util";
 export { isQuietHour } from "./domain/quiet-hours";
@@ -211,6 +212,12 @@ export {
   type Article,
   type RssItem,
 } from "./domain/news";
+export {
+  RECOMMENDED_FEEDS,
+  feedTopics,
+  unregisteredFeeds,
+  type RecommendedFeed,
+} from "./domain/news-feeds";
 export {
   tokenizeForCluster,
   clusterArticles,
