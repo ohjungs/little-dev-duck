@@ -297,7 +297,9 @@ describe("createTodo 마감일·반복 (Phase 23)", () => {
     const a = createAppActionsAdapter(client);
     await a.execute({ id: "c3", name: "createTodo", args: { title: "장보기" } });
     expect(inserts.at(-1)!.due_date).toBeNull();
-    expect(inserts.at(-1)!.recurrence).toBeNull();
+    // recurrence는 값이 있을 때만 payload에 들어간다 — 마이그레이션 적용 전 DB에 그 컬럼이
+    // 없어서, null이라도 실어 보내면 할 일 추가 자체가 거부된다.
+    expect(Object.keys(inserts.at(-1)!)).not.toContain("recurrence");
   });
 
   it("모델이 지어낸 반복 문법은 저장하지 않고 오류를 돌려준다", async () => {

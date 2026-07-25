@@ -58,7 +58,10 @@ export async function createTodo(
       user_id: user.id,
       title: input.title,
       due_date: input.dueDate ?? null,
-      recurrence: input.recurrence ?? null,
+      // 값이 있을 때만 넣는다. 마이그레이션 적용 전 DB에는 recurrence 컬럼이 없고, insert
+      // payload에 없는 컬럼을 담으면 PostgREST가 요청 전체를 거부한다 — 반복을 쓰지 않는
+      // 평범한 할 일 추가까지 통째로 실패한다. 키를 빼면 이전과 완전히 같은 payload가 된다.
+      ...(input.recurrence ? { recurrence: input.recurrence } : {}),
     })
     .select()
     .single();
@@ -155,7 +158,8 @@ export async function restoreTodo(
       title: todo.title,
       is_done: todo.isDone,
       due_date: todo.dueDate,
-      recurrence: todo.recurrence,
+      // createTodo와 같은 이유로 값이 있을 때만 넣는다(마이그레이션 전 DB 호환).
+      ...(todo.recurrence ? { recurrence: todo.recurrence } : {}),
       created_at: todo.createdAt,
       updated_at: todo.updatedAt,
     })

@@ -142,10 +142,14 @@ describe("반복 할 일 완료 (Phase 20 T3)", () => {
     expect(updates.at(-1)!.recurrence).toBe("FREQ=WEEKLY;BYDAY=TU");
   });
 
-  it("createTodo에 반복이 없으면 null로 저장한다", async () => {
+  it("createTodo에 반복이 없으면 payload에 키를 넣지 않는다", async () => {
+    // 이 테스트는 원래 "null로 저장한다"였다. 그런데 그 동작이 곧 결함이었다 —
+    // 마이그레이션 적용 전 DB에는 recurrence 컬럼이 없어서, null이라도 키를 실어 보내면
+    // PostgREST가 요청 전체를 거부해 **평범한 할 일 추가까지 실패한다.**
+    // 잘못된 동작을 고정하고 있던 단언이라 올바른 계약으로 교체했다.
     const { client, updates } = recordingSupabase(VALID_ROW);
     await createTodo(client, { title: "회의" });
-    expect(updates.at(-1)!.recurrence).toBeNull();
+    expect(Object.keys(updates.at(-1)!)).not.toContain("recurrence");
   });
 
   it("updateTodo로 반복을 해제할 수 있다", async () => {
@@ -357,5 +361,58 @@ describe("DB 에러 전파", () => {
     await expect(deleteTodo(supabase, VALID_ROW.id)).rejects.toThrow(
       "delete-boom",
     );
+  });
+});
+
+describe("recurrence 컬럼이 없는 DB에서도 깨지지 않는다 (하위호환)", () => {
+  // 마이그레이션 적용 전에는 todos에 recurrence 컬럼이 없다. insert payload에 없는 컬럼을
+  // 담아 보내면 PostgREST가 거부하므로, **반복을 안 쓰는 할 일 추가까지 통째로 실패한다.**
+  // 값이 없으면 키 자체를 넣지 않아 마이그레이션 전 payload와 완전히 같게 만든다.
+  const deleted = {
+    id: VALID_ROW.id,
+    userId: VALID_ROW.user_id,
+    title: "우유 사기",
+    isDone: false,
+    dueDate: null,
+    recurrence: null,
+    createdAt: VALID_ROW.created_at,
+    updatedAt: VALID_ROW.updated_at,
+  };
+
+  it("createTodo: 반복을 안 주면 payload에 recurrence 키가 없다", async () => {
+    const { client, updates } = recordingSupabase(VALID_ROW);
+    await createTodo(client, { title: "우유 사기" });
+    expect(Object.keys(updates.at(-1)!)).not.toContain("recurrence");
+  });
+
+  it("createTodo: 반복을 주면 그때만 키가 들어간다", async () => {
+    const { client, updates } = recordingSupabase(VALID_ROW);
+    await createTodo(client, { title: "회의", recurrence: "FREQ=DAILY" });
+    expect(updates.at(-1)!.recurrence).toBe("FREQ=DAILY");
+  });
+
+  it("createTodo: 반복을 명시적으로 null로 주면 키를 넣지 않는다", async () => {
+    // 오리 도구(appActions)가 "반복 없음"을 null로 넘긴다 — 이 경로도 안전해야 한다.
+    const { client, updates } = recordingSupabase(VALID_ROW);
+    await createTodo(client, { title: "회의", recurrence: null });
+    expect(Object.keys(updates.at(-1)!)).not.toContain("recurrence");
+  });
+
+  it("restoreTodo: 반복이 없던 항목은 payload에 키가 없다", async () => {
+    const { client, updates } = recordingSupabase(VALID_ROW);
+    await restoreTodo(client, deleted);
+    expect(Object.keys(updates.at(-1)!)).not.toContain("recurrence");
+  });
+
+  it("restoreTodo: 반복이 있던 항목은 키가 들어간다", async () => {
+    const { client, updates } = recordingSupabase(VALID_ROW);
+    await restoreTodo(client, { ...deleted, recurrence: "FREQ=DAILY" });
+    expect(updates.at(-1)!.recurrence).toBe("FREQ=DAILY");
+  });
+
+  it("createTodo: due_date는 종전대로 항상 넣는다 (기존 컬럼이라 안전)", async () => {
+    const { client, updates } = recordingSupabase(VALID_ROW);
+    await createTodo(client, { title: "우유 사기" });
+    expect(Object.keys(updates.at(-1)!)).toContain("due_date");
   });
 });
