@@ -122,8 +122,13 @@ export async function proxy(request: NextRequest) {
   return withSecurityHeaders(response, csp);
 }
 
+// 2026-07-26 : 보안 - 미들웨어 - 플랫폼경로제외
+// `_vercel`을 제외하는 이유: Vercel Analytics가 받아오는 `/_vercel/insights/script.js`가 인증 게이트에
+// 걸려 303으로 /welcome(HTML)을 돌려받고, 브라우저가 "MIME type text/html is not executable"로 거부한다
+// (실측). 비로그인 방문자의 랜딩 유입 지표가 통째로 누락된다. 플랫폼이 소유한 경로라 사용자 데이터가
+// 없고, 인증으로 가려서 얻을 것도 없다.
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|_vercel|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

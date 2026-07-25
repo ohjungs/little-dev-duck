@@ -4,6 +4,15 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { GitHubMark } from "@/components/ui/github-mark";
 
+// 2026-07-26 : 보안 - CSP - 정적페이지nonce
+// 동적 렌더를 강제하는 이유는 성능이 아니라 CSP다. proxy.ts가 요청마다 nonce를 발급하고
+// script-src에 'strict-dynamic'을 넣는데(=`'self'`가 무시됨), 정적 프리렌더 HTML에는 그
+// 요청별 nonce를 심을 방법이 없어 이 페이지의 모든 스크립트가 차단됐다(실측: nonce 0개,
+// 콘솔 23건 차단 → 하이드레이션·Vercel Analytics 사망 = 랜딩 유입 지표 측정 불가).
+// 대안이던 "정적 공개 경로만 CSP 완화"는 보안 미들웨어에 분기를 넣는 쪽이라 채택하지 않았다.
+// 랜딩 트래픽 규모에서 per-request 렌더 비용은 무시할 수준.
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Little Dev Duck — 오리가 사는 개인 워크스페이스",
   description:
