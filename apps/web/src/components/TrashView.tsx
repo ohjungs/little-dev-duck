@@ -26,6 +26,8 @@ export function TrashView() {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [pendingPurge, setPendingPurge] = useState<{ id: string; title: string } | null>(null);
   const [pendingPurgeAll, setPendingPurgeAll] = useState(false);
+  // 롤백으로 항목이 되살아나긴 하지만, 그것만으로는 "왜 다시 나타났는지" 알 수 없다.
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     listTrashedPages(supabase).then(
@@ -39,6 +41,7 @@ export function TrashView() {
 
   const handleRestore = async (id: string, plainText: string) => {
     const removed = pages.find((x) => x.id === id);
+    setActionError(null);
     setPages((p) => p.filter((x) => x.id !== id));
     try {
       await restorePage(supabase, id);
@@ -49,6 +52,7 @@ export function TrashView() {
       if (removed) {
         setPages((p) => (p.some((x) => x.id === id) ? p : [...p, removed]));
       }
+      setActionError("복원하지 못했습니다. 다시 시도해 주세요.");
     }
   };
 
@@ -62,6 +66,7 @@ export function TrashView() {
     if (!pendingPurge) return;
     const { id } = pendingPurge;
     setPendingPurge(null);
+    setActionError(null);
     const removed = pages.find((x) => x.id === id);
     setPages((p) => p.filter((x) => x.id !== id));
     try {
@@ -70,6 +75,7 @@ export function TrashView() {
       if (removed) {
         setPages((p) => (p.some((x) => x.id === id) ? p : [...p, removed]));
       }
+      setActionError("영구 삭제하지 못했습니다. 다시 시도해 주세요.");
     }
   };
 
@@ -151,6 +157,12 @@ export function TrashView() {
           </div>
         )}
       </div>
+
+      {actionError && (
+        <p role="alert" className="pt-3 text-xs text-destructive">
+          {actionError}
+        </p>
+      )}
 
       {state === "loading" && (
         <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">

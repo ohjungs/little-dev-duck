@@ -183,6 +183,11 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const [pages, setPages] = useState<Page[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [newMenuOpen, setNewMenuOpen] = useState(false);
+  // 2026-07-26 : 페이지 - 실패안내 - 조용한실패차단
+  // 생성·복제·내보내기가 실패하면 페이지도 안 생기고 안내도 없어, 사용자 입장에서는
+  // **클릭이 먹지 않은 것과 구별되지 않았다.** "재시도 가능"은 재시도해야 한다는 걸
+  // 알려줬을 때만 성립한다. 위젯들이 쓰는 actionError 관용을 그대로 따른다.
+  const [actionError, setActionError] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortMode, setSortMode] = useState<"updated" | "name" | "created">("updated");
@@ -275,6 +280,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
 
   const handleCreate = async (template?: PageTemplate) => {
     setNewMenuOpen(false);
+    setActionError(null);
     try {
       const created = await createPage(supabase, {
         // 날짜가 붙는 템플릿(일일 노트·주간 회고)은 만든 시점 기준으로 제목을 정한다.
@@ -285,7 +291,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
       setPages((prev) => [...prev, created]);
       router.push(`/pages/${created.id}`);
     } catch {
-      // 재시도 가능 — 조용히 무시
+      setActionError("페이지를 만들지 못했습니다. 다시 시도해 주세요.");
     }
   };
 
@@ -296,6 +302,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const handleDuplicate = async (id: string) => {
     const src = pages.find((p) => p.id === id);
     if (!src) return;
+    setActionError(null);
     try {
       const created = await createPage(supabase, {
         title: `${src.title || "제목 없음"} (사본)`,
@@ -307,12 +314,13 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
       setPages((prev) => [...prev, created]);
       router.push(`/pages/${created.id}`);
     } catch {
-      // 재시도 가능 — 조용히 무시
+      setActionError("페이지를 복제하지 못했습니다. 다시 시도해 주세요.");
     }
   };
 
   const handleDelete = async (id: string) => {
     const removed = pages.find((x) => x.id === id);
+    setActionError(null);
     setPages((p) => p.filter((x) => x.id !== id));
     try {
       await softDeletePage(supabase, id);
@@ -325,11 +333,14 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
       if (removed) {
         setPages((p) => (p.some((x) => x.id === id) ? p : [...p, removed]));
       }
+      // 되살아난 항목만으로는 "왜 다시 나타났는지"를 알 수 없다.
+      setActionError("페이지를 휴지통으로 보내지 못했습니다. 다시 시도해 주세요.");
     }
   };
 
   // 전체 페이지(휴지통 포함)를 JSON 파일로 내려받는 수동 백업(T6). 무료 원칙상 스케줄러 대신 수동.
   const handleBackup = async () => {
+    setActionError(null);
     try {
       const [active, trashed] = await Promise.all([
         listPages(supabase),
@@ -350,7 +361,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      // 재시도 가능 — 조용히 무시
+      setActionError("내보내기에 실패했습니다. 다시 시도해 주세요.");
     }
   };
 
@@ -414,6 +425,11 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
             </>
           )}
         </div>
+        {actionError && (
+          <p role="alert" className="px-3 pb-2 text-xs text-destructive">
+            {actionError}
+          </p>
+        )}
         <div className="px-2 pb-2">
           <div className="relative flex items-center">
             <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />

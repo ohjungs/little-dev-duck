@@ -27,6 +27,7 @@ export function VersionHistory({
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [pendingVersion, setPendingVersion] = useState<PageVersion | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   // 마운트되면 항상 열린 모달 — Esc 닫기 + 포커스 트랩/복원.
   const dialogRef = useModalA11y<HTMLDivElement>(true, onClose);
 
@@ -66,7 +67,11 @@ export function VersionHistory({
       // 복원은 명시적·드문 액션이라 에디터를 재초기화하기 위해 새로고침(클라이언트 상태 통짜 갱신).
       window.location.reload();
     } catch {
+      // 성공하면 페이지가 새로고침되므로, 실패했는데 아무 말도 안 하면 화면상 **아무 일도 일어나지
+      // 않은 것과 구별되지 않는다.** 복원은 현재 본문을 덮어쓰는 되돌리기 어려운 조작이라
+      // "됐는지 안 됐는지 모르는" 상태로 두면 안 된다.
       setRestoringId(null);
+      setActionError("복원하지 못했습니다. 다시 시도해 주세요.");
     }
   };
 
@@ -92,6 +97,12 @@ export function VersionHistory({
             버전 기록{state === "ready" && versions.length > 0 ? ` (${versions.length}개)` : ""}
           </span>
         </div>
+
+        {actionError && (
+          <p role="alert" className="px-4 pt-3 text-xs text-destructive">
+            {actionError}
+          </p>
+        )}
 
         <div className="max-h-[55vh] overflow-y-auto p-2">
           {state === "loading" && (
