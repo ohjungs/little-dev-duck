@@ -84,18 +84,36 @@ export type IndexSourceInput = {
 // 저장 시 색인은 fire-and-forget이라 실패해도 조용히 넘어간다(무료 티어 쿼터 소진 시 반드시
 // 일어난다). 어떤 항목이 이미 색인됐는지 알아야 **빠진 것만** 다시 시도할 수 있다.
 // 벡터가 아니라 식별자만 읽으므로 가볍다(RLS로 본인 것만 조회된다).
+//
+// **페이지를 넘겨 끝까지 읽는다.** 처음엔 한 번에 5000행만 읽었는데, 행은 소스가 아니라
+// **청크**다 — chunkText가 1200자마다 자르므로 긴 페이지 하나가 수십 행이 된다. 상한에 걸리면
+// 이미 색인된 소스가 목록에서 빠지고, 호출부가 그걸 "미색인"으로 보고 **매 세션 재색인**해
+// 쿼터를 계속 태운다. unique(user_id, source_type, source_id, chunk_index) 순서로 넘기면
+// 페이지가 겹치거나 빠지지 않는다.
+const ID_PAGE_SIZE = 1000;
+
 export async function listIndexedSourceIds(
   supabase: SupabaseClient,
-  limit = 5000,
+  maxRows = 100_000,
 ): Promise<{ sourceType: string; sourceId: string }[]> {
-  const { data, error } = await supabase
-    .from("embeddings")
-    .select("source_type, source_id")
-    .limit(limit);
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as { source_type: string; source_id: string }[];
+  const out: { sourceType: string; sourceId: string }[] = [];
+  for (let from = 0; from < maxRows; from += ID_PAGE_SIZE) {
+    const size = Math.min(ID_PAGE_SIZE, maxRows - from);
+    const { data, error } = await supabase
+      .from("embeddings")
+      .select("source_type, source_id")
+      .order("source_type", { ascending: true })
+      .order("source_id", { ascending: true })
+      .order("chunk_index", { ascending: true })
+      .range(from, from + size - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as { source_type: string; source_id: string }[];
+    for (const r of rows) out.push({ sourceType: r.source_type, sourceId: r.source_id });
+    // 요청한 만큼 못 받았으면 마지막 페이지다.
+    if (rows.length < size) break;
+  }
   // 한 소스가 여러 청크를 가지므로 중복이 나온다 — 호출부가 Set으로 쓰기 좋게 그대로 준다.
-  return rows.map((r) => ({ sourceType: r.source_type, sourceId: r.source_id }));
+  return out;
 }
 
 export async function indexSource(
