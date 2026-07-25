@@ -1,5 +1,23 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ⏭ 다음 세션 이어서 하기 (2026-07-25 `/loop` 자율 — baseline 검증)
+> **이번 `/loop` 반복 결과: 전체 스위트 green 재확인 후 정직 보고.** test 11/11 패키지(core 196 / api 245 /
+> web 115 / ai 10 / mascot 5) · lint 11/11 · build 6/6, 전부 turbo 캐시 히트. 미커밋 변경 없음.
+> **2026-07-24 인계 이후 실제 진행(git log, Status 최상단이 그간 stale했음)**: 픽셀 오피스 스레드 계속 —
+> Modern Interiors 통합(39924fc) → 직원 스프라이트 좌향 반전 수정(e5168b5) / 앱-액션 자동 RAG 인덱싱
+> (ce81445·9a8f4ce) / web lib 순수함수 테스트 추출(bookmarkedArticles a44ce0c).
+> **자율 코드-완결 스코프 재확인 = 소진**: web lib 잔여 미테스트 파일(office-draw·realtime·sprite-loader·
+> office-sound·apiHelpers)은 전부 canvas/DOM/env — 순수 로직 아님(순수분은 이미 core로 추출·테스트). core
+> office 도메인 11파일 전부 대응 테스트 존재. 활성 오피스 작업은 시각 폴리시(최근 버그 2건 다 육안 발견)라
+> 자율 검증 불가.
+> **더 진행하려면 사용자 필요(unblock 목록)**: ① OAuth 기기 실기검증(Google Calendar/GitHub/Gmail 어댑터)
+> ② Sentry 계정(13 T5) ③ i18n 착수 승인(13 T6, 대규모) ④ Tauri sidecar/hooks·RN 기기(오피스 실이벤트 연동)
+> ⑤ 픽셀 오피스 시각 폴리시 육안 검증. **인프라(db push)는 2026-07-24 Supabase MCP로 전건 적용 완료 — 더는 블로커 아님.**
+> **미추적 파일**: `apps/web/public/Modern_Interiors_Free_v2.2.zip`(1.1MB 원본 아카이브) — 추출 스프라이트는
+> 39924fc에 커밋됨. 직전 커밋이 추출본만 넣은 의도를 존중해 zip은 미커밋 유지. 커밋/gitignore/삭제는 사용자 판단
+> (public/에 이미 다른 zip 2개는 추적 중이라 관례 상충 — 자율 미결정).
+> **재개**: `/next-step` 또는 `/loop /next-step`. 새 스코프·인프라가 열리면 즉시 재개.
+
 > ## ⏭ 다음 세션 이어서 하기 (2026-07-24 ~08:2x 인계)
 > **이번 `/loop` 자율 세션 결과: 33개 커밋(기능 32 + a11y 1)을 6회에 걸쳐 origin/main 배포, CI 6회 전부 green,
 > 미푸시 0.** 코드로 완결 가능한 노션-격차 고가치 기능(프로젝트 자체 gap-analysis + FEATURES.md 146항 전수
