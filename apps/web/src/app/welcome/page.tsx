@@ -103,7 +103,11 @@ export default function WelcomePage() {
           <div className="absolute -inset-3 -z-10 rounded-[2rem] bg-primary/10 blur-2xl" />
           <div className="rounded-[1.75rem] border border-border bg-card p-8 shadow-2xl">
             <div className="mx-auto aspect-square w-full max-w-[16rem] overflow-hidden rounded-2xl bg-secondary">
-              <DuckVideo surface="welcome" className="size-full" />
+              {/* 영상 배경이 찬 회색이라 그대로 두면 크림색 팔레트에서 튄다 — 살짝만 따뜻하게 */}
+              <DuckVideo
+                surface="welcome"
+                className="size-full sepia-[.14] saturate-[1.06]"
+              />
             </div>
           </div>
           <div className="absolute -left-4 top-6 rotate-[-6deg] rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium shadow-lg">

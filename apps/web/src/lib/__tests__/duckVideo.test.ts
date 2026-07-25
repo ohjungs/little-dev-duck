@@ -4,7 +4,6 @@ import path from "node:path";
 import {
   DUCK_QUACK_EMBLEM_BOUNDS,
   coverRect,
-  getDuckVideoPlayback,
   getDuckVideoSpec,
   objectPositionCss,
 } from "../duckVideo";
@@ -89,12 +88,3 @@ describe("objectPositionCss", () => {
   });
 });
 
-describe("getDuckVideoPlayback", () => {
-  it("움직임 줄이기가 켜지면 자동재생하지 않고 내려받지도 않는다", () => {
-    expect(getDuckVideoPlayback(true)).toEqual({ autoPlay: false, preload: "none" });
-  });
-
-  it("평소에는 자동재생하고 미리 받아 둔다", () => {
-    expect(getDuckVideoPlayback(false)).toEqual({ autoPlay: true, preload: "auto" });
-  });
-});

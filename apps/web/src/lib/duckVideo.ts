@@ -79,12 +79,8 @@ export function objectPositionCss({ x, y }: Ratio2D): string {
   return `${x * 100}% ${y * 100}%`;
 }
 
-/** 움직임 줄이기 설정에서는 자동재생도, 사전 다운로드도 하지 않는다(포스터만 보여 준다). */
-export function getDuckVideoPlayback(reducedMotion: boolean): {
-  autoPlay: boolean;
-  preload: "none" | "auto";
-} {
-  return reducedMotion
-    ? { autoPlay: false, preload: "none" }
-    : { autoPlay: true, preload: "auto" };
-}
+// 재생 정책은 여기에 값으로 두지 않는다 - autoPlay 속성으로는 표현할 수 없기 때문이다.
+// 서버 렌더와 하이드레이션 첫 렌더는 사용자의 움직임 줄이기 설정을 알 수 없어 autoPlay=true로
+// 시작하는데, 그 사이 재생이 시작되면 뒤늦게 속성을 false로 바꿔도 멈추지 않는다(실측: 2.4MB일
+// 때는 느려서 우연히 막혔고 576KB로 줄이자 재생됐다). 그래서 DuckVideo는 autoPlay를 쓰지 않고
+// 설정을 확인한 뒤 play()를 직접 부른다.

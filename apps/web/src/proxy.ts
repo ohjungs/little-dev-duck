@@ -131,8 +131,13 @@ export async function proxy(request: NextRequest) {
 // 걸려 303으로 /welcome(HTML)을 돌려받고, 브라우저가 "MIME type text/html is not executable"로 거부한다
 // (실측). 비로그인 방문자의 랜딩 유입 지표가 통째로 누락된다. 플랫폼이 소유한 경로라 사용자 데이터가
 // 없고, 인증으로 가려서 얻을 것도 없다.
+// 2026-07-26 : 공개자산 - 오리영상 - 인증게이트
+// mp4/webm이 확장자 예외에 없으면 /duck-quack.mp4 같은 요청이 인증 게이트에 걸려 303으로
+// /welcome(HTML)을 돌려받는다. <video>는 HTML을 디코드할 수 없어 networkState=NO_SOURCE로
+// 죽고, 비로그인 화면인 /login·/welcome의 오리 영상이 통째로 안 뜬다(실측으로 발견 —
+// 이미지 확장자만 예외였고 영상은 빠져 있었다). 사용자 데이터가 없는 브랜드 자산이다.
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|_vercel|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|_vercel|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)",
   ],
 };
