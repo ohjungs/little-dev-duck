@@ -92,6 +92,10 @@ export {
   type PageVersion,
 } from "./domain/page";
 export { pageStats, type PageStats } from "./domain/page-stats";
+export {
+  publicPageMetaCopy,
+  PUBLIC_PAGE_META_LIMITS,
+} from "./domain/public-page-meta";
 export { rowsToCsv } from "./domain/db-export";
 export {
   dashboardSummary,

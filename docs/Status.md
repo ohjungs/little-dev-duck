@@ -1,5 +1,12 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ⏭ 신규 로드맵 발굴됨 (2026-07-25 `/loop-eng` SCOPE — 마케팅팀 주도)
+> **로드맵 소진(Phase 1~17 + 감사 22 + 픽셀오피스 A~I) → 정지 대신 marketing-skills로 신규 로드맵 생성.**
+> **Phase 18 — 공유·성장 루프**(docs/plans/phase_18.md): 노션 패리티가 아니라 제품 고유 강점(공개 페이지
+> 공유·오리·픽셀오피스)을 AARRR 성장 루프로 전환. 무료 원칙·단일 사용자 모델 준수. T1 공개페이지 바이럴
+> 루프(powered-by 배지 + OG 이미지 자동생성) → T2 시작 템플릿 갤러리 → T3 빈 상태 코치 → T4 오리 주간
+> 다이제스트 → T5 발견성/SEO. 탈락: 멀티유저 referral·수익화(무료원칙·YAGNI). **다음: T1부터 BUILD.**
+>
 > ## ⏭ 다음 세션 이어서 하기 (2026-07-25 `/loop-eng` 자율 — 시트 파일명 규약 core 추출)
 > **이번 `/loop-eng` 반복 결과(5db76b9): office-characters.ts sheetUrl의 파일명 매핑을 core
 > `characterSheetFileName`로 추출 + 디스크 실제 파일명 8개를 계약 테스트로 잠금.** 파일명 불일치는 로더가
