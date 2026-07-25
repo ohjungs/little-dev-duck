@@ -141,3 +141,60 @@ test.describe("반복 할 일 (Phase 20)", () => {
     expect(overflow).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 마감일 (Phase 26) — "오늘 마감" 필터가 실제로 쓸 수 있게 됐는지
+// ---------------------------------------------------------------------------
+test.describe("할 일 마감일 (Phase 26)", () => {
+  test.skip(
+    !hasAuthState,
+    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
+  );
+  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/rest/v1/todos*", async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(rows),
+      });
+    });
+  });
+
+  test("마감일이 설정된 항목에 날짜가 보인다", async ({ page }) => {
+    await page.goto("/");
+    // rows[0]의 due_date는 2026-07-28. 오늘/내일/어제가 아니면 "7월 28일" 형태.
+    const item = page.getByTestId(`todo-${TODO_ID}`);
+    await expect(item).toContainText("월");
+  });
+
+  test("마감일이 없는 항목에는 날짜 표시가 없다", async ({ page }) => {
+    await page.goto("/");
+    const item = page.getByTestId(`todo-${PLAIN_ID}`);
+    await expect(item.locator('input[type="date"]')).toHaveValue("");
+  });
+
+  test("마감일 입력은 아이콘 크기를 넘지 않는다 (제목 공간 잠식 금지)", async ({ page }) => {
+    // input[type=date]는 기본 폭이 넓다 — 안 보여도 모든 행의 제목을 좁힌다.
+    await page.goto("/");
+    const box = await page
+      .getByTestId(`todo-${PLAIN_ID}`)
+      .locator('input[type="date"]')
+      .boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeLessThanOrEqual(24);
+  });
+
+  test("마감일 입력값이 저장된 날짜와 일치한다 (하루 밀림 금지)", async ({ page }) => {
+    // UTC 자정 저장값을 로컬 변환에 태우면 시간대에 따라 하루가 밀린다.
+    await page.goto("/");
+    await expect(
+      page.getByTestId(`todo-${TODO_ID}`).locator('input[type="date"]'),
+    ).toHaveValue("2026-07-28");
+  });
+});

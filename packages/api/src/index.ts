@@ -80,7 +80,9 @@ export {
   type AgentResult,
 } from "./agent";
 export { createGoogleCalendarAdapter } from "./googleCalendar";
-export { createAppActionsAdapter } from "./appActions";
+// coerceTodoDueDate는 화면에서도 쓴다. 저장 형식(UTC 자정) 규약을 화면에서 다시 만들면
+// 두 곳에서 갈라지므로, 테스트까지 있는 이 하나를 공유한다.
+export { createAppActionsAdapter, coerceTodoDueDate } from "./appActions";
 export {
   saveGoogleTokens,
   getGoogleTokens,

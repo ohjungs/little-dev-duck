@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, CheckCheck, ChevronDown, ChevronUp, ListTodo, Pencil, Plus, Repeat, X } from "lucide-react";
+import { CalendarDays, Check, CheckCheck, ChevronDown, ChevronUp, ListTodo, Pencil, Plus, Repeat, X } from "lucide-react";
 import {
   applyXpAward,
+  coerceTodoDueDate,
   createTodo,
   deleteTodo,
   listTodos,
@@ -16,6 +17,7 @@ import {
   recurrenceOptions,
   withCurrentRecurrence,
 } from "@/lib/recurrenceOptions";
+import { dueDateInputValue, dueDateLabel } from "@/lib/dueDateLabel";
 import { todoEmbedText } from "@/lib/embedText";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeTable } from "@/lib/realtime";
@@ -178,6 +180,25 @@ export function TodoWidget() {
     } catch {
       setTodos(prevTodos);
       setActionError("변경하지 못했습니다.");
+    }
+  };
+
+  const handleDueDateChange = async (todo: Todo, value: string) => {
+    // 저장 형식(UTC 자정) 변환은 api의 coerceTodoDueDate 하나만 쓴다 — 화면에서 다시 만들면
+    // 규약이 두 곳에서 갈라지고, 그때부터 "오늘 마감" 필터가 조용히 어긋난다.
+    const dueDate = value === "" ? null : coerceTodoDueDate(value);
+    if (value !== "" && !dueDate) {
+      setActionError("날짜를 이해하지 못했습니다.");
+      return;
+    }
+    const prevTodos = todos;
+    setTodos((prev) => prev.map((t) => (t.id === todo.id ? { ...t, dueDate } : t)));
+    setActionError(null);
+    try {
+      await updateTodo(supabase, todo.id, { dueDate });
+    } catch {
+      setTodos(prevTodos);
+      setActionError("마감일을 바꾸지 못했습니다.");
     }
   };
 
@@ -518,6 +539,12 @@ export function TodoWidget() {
                     </span>
                     <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 leading-none">
                       {timeAgo(todo.createdAt)}
+                      {dueDateLabel(todo.dueDate, today) && (
+                        <span className="inline-flex items-center gap-0.5">
+                          <CalendarDays className="size-2.5" aria-hidden />
+                          {dueDateLabel(todo.dueDate, today)}
+                        </span>
+                      )}
                       {describeRecurrence(todo.recurrence) && (
                         <span className="inline-flex items-center gap-0.5 text-primary-accent">
                           <Repeat className="size-2.5" aria-hidden />
@@ -525,6 +552,30 @@ export function TodoWidget() {
                         </span>
                       )}
                     </span>
+                  </span>
+                  {/* 마감일. input[type=date]는 기본 폭이 넓어 안 보여도 모든 행의 제목
+                      공간을 잠식한다(반복 select에서 이미 겪은 문제) — 아이콘 크기로 고정하고
+                      값은 옆 배지가 보여준다. */}
+                  <span
+                    className={
+                      "relative inline-flex size-4 shrink-0 items-center justify-center rounded transition-opacity focus-within:opacity-100 focus-within:ring-2 focus-within:ring-ring group-hover:opacity-100 " +
+                      (todo.dueDate ? "opacity-100" : "opacity-0")
+                    }
+                  >
+                    <CalendarDays
+                      aria-hidden
+                      className={
+                        "size-3.5 " +
+                        (todo.dueDate ? "text-primary-accent" : "text-muted-foreground")
+                      }
+                    />
+                    <input
+                      type="date"
+                      value={dueDateInputValue(todo.dueDate)}
+                      onChange={(e) => void handleDueDateChange(todo, e.target.value)}
+                      aria-label={`${todo.title} 마감일`}
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                    />
                   </span>
                   {/* 반복 주기. 설정된 항목은 상시 노출(왜 안 사라지는지 알 수 있어야 한다),
                       안 걸린 항목은 hover/포커스 때만 — 수정·삭제 버튼과 같은 규칙.
