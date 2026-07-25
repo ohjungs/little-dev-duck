@@ -109,13 +109,21 @@ UI가 붙는 T1~T4는 `/loop-eng` 4-1대로 Playwright로 항목별 스크린샷
     `dbEmptyMessage`(순수함수, 5 tests)로 원본 개수·필터 유무를 보고 사실대로 안내한다.
   - 남김(의도적): 캘린더 위젯 "아직 일정이 없어요"는 위젯 특성상 CTA 자리가 마땅치 않아 보류.
 
-- [~] **T4 오리 주간 다이제스트 (2026-07-26, `/loop-eng`)** — 순수 트리거 로직만 완료, UI 미배선.
+- [x] **T4 오리 주간 다이제스트 (2026-07-26, `/loop-eng`)** — 수직 슬라이스 완료(육안 미검증).
   - [x] core `weekly-digest.ts`: `digestWeekKey`(요약 대상 = **지난 주** 월요일 — 이번 주를 요약하면
     주 중간 다이제스트가 반쪽이 된다), `previousWeekRange`(집계 쿼리 경계), `shouldCreateDigest`
     (중복 생성 방지 + 저장 키 오염·기기 시계 되돌림 방어). 13 tests.
-  - [ ] 남음: 지난 주 활동 집계(dashboard.ts 재사용) → 페이지 생성 → 방해금지·일일 상한 통과 시 알림 1건,
-    주차 키 localStorage 저장. **기존 스탠드업 생성기(bedd1e5, 일간·LLM)와 별개** — 재사용 지점은
-    "활동 집계 → 페이지 본문" 부분이며 주간 집계 함수가 없어 추가 필요.
+  - [x] 집계: api `gatherActivity(supabase, since, until?)` — 기존 스탠드업의 24시간 수집을 기간 인자로
+    일반화(스탠드업 호출부는 until 없이 그대로라 동작 불변). `generateWeeklyDigest`가 지난 주 구간을
+    **로컬 자정 기준**으로 만들어 조회(ISO 그대로 넘기면 UTC 해석으로 하루 밀림). +4 api tests.
+  - [x] 본문: core `formatWeeklyDigestLines` — **LLM 미사용**. 스탠드업(일간)이 이미 Gemini 요약을
+    담당하고, 주간 다이제스트는 쿼터가 없거나 소진돼도 반드시 떠야 하는 복귀 훅이라 수치 요약으로
+    충분하다. 일정 5건 초과 시 절단(요약이 일정 목록에 뒤덮이지 않게). +10 core tests.
+  - [x] 배선: web `WeeklyDigestTrigger`(화면 없는 배경 컴포넌트, `(app)/layout.tsx`에 마운트 —
+    DesktopCollectorSync와 같은 패턴). 방문이 트리거(서버 스케줄러 없음 = 무료 원칙).
+    주차 키 localStorage + **서버 제목 중복 검사**(localStorage는 기기별이라 데스크톱·브라우저
+    병용 시 중복 생성됨 — 제목에 기간이 박혀 있어 서버에서 잡는다). 실패는 조용히(배경 작업).
+    알림은 기존 notifyDuck 재사용(방해금지·일일 상한 준수). +7 web tests.
 
 - [x] **T5 발견성/SEO 표면 (2026-07-26, `/loop-eng`)** — 완료·실서버 검증됨.
   - `robots.ts`(deny-by-default: `Disallow: /` + /welcome·/p/·/opengraph-image만 allow) + `sitemap.ts`

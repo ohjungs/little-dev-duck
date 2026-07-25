@@ -140,6 +140,10 @@ export {
   type CollectDeps,
 } from "./news";
 
-export { generateStandup } from "./standup";
+export {
+  generateStandup,
+  generateWeeklyDigest,
+  gatherActivity,
+} from "./standup";
 
 export { listBacklinks, updatePageLinks } from "./pageLinks";

@@ -105,6 +105,9 @@ export {
   digestWeekKey,
   previousWeekRange,
   shouldCreateDigest,
+  formatWeeklyDigestLines,
+  weeklyDigestTitle,
+  type DigestRange,
 } from "./domain/weekly-digest";
 export { rowsToCsv } from "./domain/db-export";
 export {

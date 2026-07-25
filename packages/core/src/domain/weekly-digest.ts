@@ -1,4 +1,5 @@
 import { startOfWeek, toLocalDateString } from "./date-util";
+import type { StandupInput } from "./standup";
 
 // 오리 주간 다이제스트(Phase 18 T4)의 트리거 판정. 순수함수 — 실제 집계·페이지 생성·알림은 호출부.
 //
@@ -43,4 +44,44 @@ export function shouldCreateDigest(input: {
   const targetMs = Date.parse(`${target}T00:00:00Z`);
   if (Number.isNaN(lastMs)) return true;
   return targetMs - lastMs >= WEEK_MS;
+}
+
+export type DigestRange = { start: string; end: string };
+
+export function weeklyDigestTitle(range: DigestRange): string {
+  return `주간 다이제스트 ${range.start} ~ ${range.end}`;
+}
+
+// 일정 제목을 본문에 몇 개까지 늘어놓을지. 넘으면 개수만 알린다 — 일정이 많은 주에
+// 다이제스트가 일정 목록으로 뒤덮이면 요약이 아니다.
+const MAX_LISTED_EVENTS = 5;
+
+// 2026-07-26 : 리텐션 - 주간다이제스트 - 본문
+// LLM을 쓰지 않는다. 스탠드업(일간)이 이미 Gemini 요약을 담당하고, 주간 다이제스트는 무료 쿼터가
+// 없거나 소진돼도 반드시 떠야 하는 복귀 훅이다. 수치 요약만으로도 "지난 주 뭐 했더라"는 충족된다.
+// 각 원소가 한 줄(=블록 하나)이라 줄 안에 개행이 남으면 안 된다.
+export function formatWeeklyDigestLines(
+  input: StandupInput,
+  range: DigestRange,
+): string[] {
+  const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
+  const events = input.calendarEvents.map(oneLine).filter(Boolean);
+  const eventsLine =
+    events.length === 0
+      ? "일정: 없음"
+      : events.length > MAX_LISTED_EVENTS
+        ? `일정: ${events.slice(0, MAX_LISTED_EVENTS).join(", ")} 외 ${events.length - MAX_LISTED_EVENTS}건 (총 ${events.length}건)`
+        : `일정: ${events.join(", ")} (총 ${events.length}건)`;
+
+  return [
+    `지난 주(${range.start} ~ ${range.end}) 기록이에요. 한 주 수고했어요.`,
+    "지난 주 요약",
+    `할 일: ${input.todosTotal}개 중 ${input.todosCompleted}개 완료`,
+    `습관 체크: ${input.habitsChecked}회`,
+    `집중: ${input.pomodoroSessions}회, 총 ${input.pomodoroMinutes}분`,
+    `페이지 편집: ${input.pagesEdited}건`,
+    eventsLine,
+    "이번 주 계획",
+    "",
+  ];
 }

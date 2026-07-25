@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar, AppMobileBar } from "@/components/AppNav";
 import { DesktopCollectorSync } from "@/components/DesktopCollectorSync";
+import { WeeklyDigestTrigger } from "@/components/WeeklyDigestTrigger";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ShortcutsHelp } from "@/components/ShortcutsHelp";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -49,6 +50,8 @@ export default async function AppLayout({
       </div>
       <ScrollToTop />
       <DesktopCollectorSync />
+      {/* Phase 18 T4: 화면 없는 배경 트리거 — 지난 주 다이제스트가 없으면 한 번 만든다. */}
+      <WeeklyDigestTrigger />
       <CommandPalette />
       <ShortcutsHelp />
     </div>
