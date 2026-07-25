@@ -82,7 +82,27 @@ pnpm exec playwright open http://localhost:3100/login --save-storage=e2e/.auth/u
 
 ---
 
-## 5. 선택 사항 — 문서 정리
+## 5. 방문자 통계가 한 건도 안 쌓이고 있습니다 — 토글 하나
+
+Vercel 대시보드 → 프로젝트 `web` → **Analytics 탭 → Enable**.
+
+`<Analytics />`는 이미 모든 페이지에 붙어 있는데(`apps/web/src/app/layout.tsx:69`),
+프로젝트에서 Web Analytics가 **꺼져 있어** 스크립트가 404입니다. Vercel API가 그대로
+답했습니다 — `web_analytics_not_enabled`. 같은 프로젝트의 Speed Insights 스크립트는 200이라
+인프라 문제가 아니라 이 기능만 꺼진 상태입니다.
+
+지금까지 **페이지뷰·유입이 하나도 기록되지 않았습니다.** 덤으로 방문자마다 브라우저 콘솔에
+404가 하나씩 남습니다. 켜면 그 시점부터 쌓이기 시작합니다(과거분은 복구되지 않습니다).
+
+코드 쪽은 손댈 게 없어 그대로 뒀습니다 — `<Analytics />`를 떼면 나중에 켜도 안 걷힙니다.
+→ 근거·재현: [screenshots/2026-07-26/public-surfaces/index.md](screenshots/2026-07-26/public-surfaces/index.md)
+
+참고로 Speed Insights는 서버가 스크립트를 서빙하는데 앱이 안 쓰고 있습니다(`@vercel/speed-insights`
+미설치). 쓰려면 의존성 추가가 필요해 **임의로 넣지 않았습니다** — 원하시면 말씀해 주세요.
+
+---
+
+## 6. 선택 사항 — 문서 정리
 
 `docs/Status.md`가 **1348줄**입니다. 완료된 Phase 서술을 `History.md`로 옮기면 짧아지는데,
 **문서 삭제는 임의로 하지 않았습니다.** 정리를 원하시면 말씀해 주세요.
