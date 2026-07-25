@@ -1,8 +1,11 @@
 # E2E (Playwright)
 
-`pnpm exec playwright test` — apps/web에서 실행. `playwright.config.ts`가 포트 3100에서
-자체 dev 서버를 띄운다(로컬 개발 서버가 보통 쓰는 3000과 겹치지 않게 분리 — 다른 프로세스와의
-포트 충돌 방지).
+**`pnpm e2e`로 실행한다** (= `next build && playwright test`). `playwright.config.ts`의
+webServer는 `next start` — 즉 **미리 빌드된 결과물**을 서빙하는 프로덕션 서버다(dev 서버가
+아니라서 hot reload가 없다). 그래서 `playwright test`만 단독으로 부르면 **소스를 고쳐도 직전
+빌드가 그대로 서빙되어** 통과/실패가 실제 코드와 어긋난다(2026-07-26에 실제로 겪음 —
+메타데이터를 고쳤는데 옛 값이 계속 나왔다). 앱 소스를 건드렸으면 반드시 빌드를 먼저 한다.
+포트는 3100 (로컬 개발 서버가 보통 쓰는 3000과 겹치지 않게 분리 — 포트 충돌 방지).
 
 `auth-redirect.spec.ts`, `responsive.spec.ts`(로그인 페이지 부분)는 로그인 없이 바로 돈다.
 `widgets.spec.ts`(투두/메모), `todo-recurrence.spec.ts`(반복 할 일),

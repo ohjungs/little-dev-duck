@@ -14,8 +14,13 @@ import { GitHubMark } from "@/components/ui/github-mark";
 // 랜딩 트래픽 규모에서 per-request 렌더 비용은 무시할 수준.
 export const dynamic = "force-dynamic";
 
+// title에 브랜드를 직접 붙이지 않는다 — root layout의 title.template("%s — Little Dev Duck")이
+// 문자열 title에 자동으로 붙이므로 직접 붙이면 브랜드가 두 번 나온다.
+// (2026-07-26 프로덕션 실측: "Little Dev Duck — 오리가 사는 개인 워크스페이스 — Little Dev Duck".
+//  같은 규칙이 p/[slug]에는 주석으로 적혀 있었는데 이 페이지만 어기고 있었다.
+//  랜딩은 검색 결과·브라우저 탭에 그대로 노출되는 유일한 공개 진입점이다.)
 export const metadata = {
-  title: "Little Dev Duck — 오리가 사는 개인 워크스페이스",
+  title: "오리가 사는 개인 워크스페이스",
   description:
     "3D 아기오리 AI 비서가 상주하는 개인 워크스페이스. 위젯 대시보드, 노션급 블록 에디터, 내 자료로 답하고 실제 작업을 대신하는 오리.",
 };

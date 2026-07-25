@@ -80,6 +80,13 @@ for (const vp of VIEWPORTS) {
           document.documentElement.clientWidth,
       );
       expect(overflow, "가로 overflow").toBe(false);
+
+      // root layout의 title.template("%s — Little Dev Duck")이 브랜드를 자동으로 붙이므로
+      // 페이지가 title에 브랜드를 또 넣으면 두 번 나온다. 소스를 파싱하지 않고 **브라우저가
+      // 실제로 받는 값**으로 검사한다 — 2026-07-26 프로덕션에서 랜딩이 이 상태였다.
+      const title = await page.title();
+      const brandCount = title.split("Little Dev Duck").length - 1;
+      expect(brandCount, `제목에 브랜드 중복: ${title}`).toBe(1);
       // 실패 응답을 먼저 본다 — 콘솔 메시지엔 URL이 없어 이쪽이 진단에 쓸모 있다.
       expect(failedResponses, "실패한 요청").toEqual([]);
       expect(realConsoleErrors, "콘솔 오류").toEqual([]);

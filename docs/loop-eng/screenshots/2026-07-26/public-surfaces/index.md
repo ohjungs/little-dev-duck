@@ -38,7 +38,25 @@
 
 조치: Vercel 대시보드 토글이라 코드로 못 고친다 → `docs/loop-eng/PENDING.md`.
 
-### 2. 레이아웃 — 이상 없음
+### 2. 랜딩 제목에 브랜드가 두 번 나왔다 [확인됨·수정함]
+
+프로덕션 실측:
+
+```
+<title>Little Dev Duck — 오리가 사는 개인 워크스페이스 — Little Dev Duck</title>
+```
+
+root layout이 `title.template: "%s — Little Dev Duck"`으로 브랜드를 자동으로 붙이는데
+`welcome/page.tsx`가 title에 브랜드를 또 넣고 있었다. 검색 결과·브라우저 탭·북마크에
+그대로 노출되는 값이고, 랜딩은 유일한 공개 진입점이다.
+
+같은 규칙이 `p/[slug]/page.tsx:19`에는 **주석으로 이미 적혀 있었다** — 규칙은 알고 있었는데
+강제하는 장치가 없어 다른 페이지가 어겼다. 그래서 소스 파싱이 아니라 **브라우저가 실제로
+받는 `<title>` 값**으로 검사하도록 `public-visual.spec.ts`에 가드를 넣었다.
+
+수정 후: `오리가 사는 개인 워크스페이스 — Little Dev Duck`.
+
+### 3. 레이아웃 — 이상 없음
 
 데스크톱·모바일 네 조합 모두 가로 overflow 없음. `/_vercel/*` 외 실패 요청 없음,
 콘솔 오류 없음.
