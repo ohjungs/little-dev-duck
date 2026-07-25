@@ -23,7 +23,11 @@ export {
   type DuckMoodInput,
   type TodayTodoTally,
 } from "./domain/duck-mood";
-export { epochDay } from "./domain/date-util";
+export {
+  epochDay,
+  toLocalDateString,
+  startOfWeek,
+} from "./domain/date-util";
 export { isQuietHour } from "./domain/quiet-hours";
 export { nextDailyCount, type DailyCount } from "./domain/notify-budget";
 export {

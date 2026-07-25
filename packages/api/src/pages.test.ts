@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createDefaultDbSchema } from "@ldd/core";
 import {
   createPage,
   getPage,
@@ -172,6 +173,58 @@ describe("createPage", () => {
     });
     expect(captured?.plain_text).toBe("안녕");
     expect(captured?.title).toBe("노트");
+  });
+
+  // Phase 18 T2: 시작 템플릿이 데이터베이스 페이지를 한 번에 만든다(2단계 생성 시 중간 실패로
+  // 열 없는 빈 페이지가 남는 걸 방지).
+  it("dbSchema를 주면 db_schema로 함께 저장한다", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      auth: {
+        getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }),
+      },
+      from: () => ({
+        insert: (payload: Record<string, unknown>) => {
+          captured = payload;
+          return { select: () => ({ single: okSingle }) };
+        },
+      }),
+    });
+    const dbSchema = createDefaultDbSchema();
+    await createPage(supabase, { title: "트래커", dbSchema });
+    expect(captured?.db_schema).toEqual(dbSchema);
+  });
+
+  it("dbSchema를 안 주면 db_schema 키 자체를 넣지 않는다(기존 동작 보존)", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const supabase = fakeSupabase({
+      auth: {
+        getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }),
+      },
+      from: () => ({
+        insert: (payload: Record<string, unknown>) => {
+          captured = payload;
+          return { select: () => ({ single: okSingle }) };
+        },
+      }),
+    });
+    await createPage(supabase, { title: "일반 페이지" });
+    expect(captured).not.toHaveProperty("db_schema");
+  });
+
+  it("잘못된 모양의 dbSchema는 저장 전에 막는다(신뢰 경계)", async () => {
+    const supabase = fakeSupabase({
+      auth: {
+        getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }),
+      },
+    });
+    await expect(
+      createPage(supabase, {
+        title: "깨진 스키마",
+        // views가 최소 1개여야 한다
+        dbSchema: { properties: [], views: [] } as never,
+      }),
+    ).rejects.toThrow();
   });
 });
 

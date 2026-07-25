@@ -28,7 +28,11 @@ import { subscribeTable } from "@/lib/realtime";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PageEditor } from "@/components/PageEditor";
-import { PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
+import {
+  PAGE_TEMPLATES,
+  templateTitle,
+  type PageTemplate,
+} from "@/lib/pageTemplates";
 import {
   getFavorites,
   subscribeFavorites,
@@ -273,8 +277,10 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
     setNewMenuOpen(false);
     try {
       const created = await createPage(supabase, {
-        title: template?.title ?? "",
+        // 날짜가 붙는 템플릿(일일 노트·주간 회고)은 만든 시점 기준으로 제목을 정한다.
+        title: template ? templateTitle(template, new Date()) : "",
         content: template?.content ?? [],
+        dbSchema: template?.dbSchema,
       });
       setPages((prev) => [...prev, created]);
       router.push(`/pages/${created.id}`);
@@ -283,8 +289,10 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
     }
   };
 
-  // 페이지 복제: 제목/본문/아이콘/부모를 복사해 새 페이지 생성 후 이동. db_schema는 createPage 계약상
-  // 미포함이라 데이터베이스 페이지는 일반 페이지로 복제됨(자식·스키마 미복사 — 알려진 제약).
+  // 페이지 복제: 제목/본문/아이콘/부모/DB 스키마를 복사해 새 페이지 생성 후 이동.
+  // 2026-07-26 : 페이지 - 복제 - 스키마보존
+  // 예전엔 createPage가 dbSchema를 못 받아 데이터베이스 페이지가 열 없는 일반 페이지로 복제됐다.
+  // Phase 18 T2에서 계약이 확장돼 스키마(열·뷰)까지 함께 복제한다. 행(자식 페이지)은 여전히 미복사.
   const handleDuplicate = async (id: string) => {
     const src = pages.find((p) => p.id === id);
     if (!src) return;
@@ -294,6 +302,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
         content: src.content,
         icon: src.icon,
         parentId: src.parentId,
+        dbSchema: src.dbSchema ?? undefined,
       });
       setPages((prev) => [...prev, created]);
       router.push(`/pages/${created.id}`);
@@ -495,9 +504,25 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
             </p>
           )}
           {state === "ready" && tree.length === 0 && (
-            <p className="px-2 py-2 text-sm text-muted-foreground">
-              {searchQuery ? "검색 결과가 없습니다." : "아직 페이지가 없습니다."}
-            </p>
+            // 2026-07-26 : 활성화 - 빈상태 - 다음행동 (Phase 18 T2/T3)
+            // 빈 목록이 막다른 문장으로 끝나지 않게 다음 행동을 준다. 템플릿은 이미 있었지만
+            // 헤더 + 버튼 안에만 숨어 있어 처음 온 사람이 찾지 못했다.
+            <div className="px-2 py-2 text-sm text-muted-foreground">
+              {searchQuery ? (
+                "검색 결과가 없습니다."
+              ) : (
+                <>
+                  <p>아직 페이지가 없어요.</p>
+                  <button
+                    type="button"
+                    onClick={() => setNewMenuOpen(true)}
+                    className="mt-1.5 rounded-md text-left text-primary underline-offset-4 hover:underline focus-visible:underline"
+                  >
+                    템플릿으로 시작하기 →
+                  </button>
+                </>
+              )}
+            </div>
           )}
           {tree.map((node) => (
             <TreeRow

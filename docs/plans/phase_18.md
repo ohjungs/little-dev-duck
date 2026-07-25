@@ -83,3 +83,17 @@ UI가 붙는 T1~T4는 `/loop-eng` 4-1대로 Playwright로 항목별 스크린샷
 
 > **주의(동시성)**: 이 Phase는 두 세션(SCOPE 생성 세션 + `/next-step` 인계 세션)이 같은 워킹 디렉터리에서
 > 겹쳐 진행됨. 9-1/9-4 위반 위험 — 하나의 루프만 운용 권장.
+
+- [x] **T2 시작 템플릿 갤러리 (2026-07-26, `/loop-eng`)** — 기능 완료, 화면 육안 미검증(8-1 보류).
+  - **계획 수정 사유(인벤토리)**: 계획은 "core에 `page-templates.ts` 신설"이었으나, 착수 후
+    `apps/web/src/lib/pageTemplates.ts`에 템플릿 7종이 **이미 존재**함을 발견(회의록·일일 노트·할 일·
+    주간 회고·프로젝트 계획·개발 노트·빈 페이지). core 신설분은 재구현이라 폐기하고 기존 모듈을 확장.
+    계획서의 5종 중 일일 저널·주간 회고·스탠드업은 기존 템플릿과 실질 중복이라 신설하지 않았다.
+  - **실제로 없던 것만 추가**: ① DB 템플릿 2종(프로젝트 트래커·독서 목록) — 기존 시스템엔 dbSchema
+    개념이 없었다 ② 날짜 제목(`templateTitle`, day/week) ③ 빈 상태 노출(CTA).
+  - **계약 확장**: `createPage`에 `dbSchema` 추가(rowProps와 같은 zod 선검증). 2단계 생성 시 중간
+    실패로 열 없는 페이지가 남는 걸 피한다. 부수 효과로 데이터베이스 페이지 **복제 시 스키마 유실
+    버그** 해소(행=자식 페이지는 여전히 미복사 — 알려진 제약).
+  - **공용화**: 로컬 날짜 포맷이 dashboard.ts·notify.ts·today.ts에 중복돼 있어 core `date-util`에
+    `toLocalDateString`·`startOfWeek` 추가(+13 tests). web의 기존 복제 2곳 정리는 후속.
+  - 검증: core 403 / api 248 / web 127 tests · 전 패키지 tsc · lint · next build GREEN.

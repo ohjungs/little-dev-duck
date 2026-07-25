@@ -147,6 +147,9 @@ export type CreatePageInput = {
   icon?: string | null;
   // Phase 11: 보드에서 "+ 새 행"이 그룹값을 프리셋해 행(자식 페이지)을 만들 때 사용.
   rowProps?: RowProps;
+  // Phase 18 T2: 시작 템플릿이 데이터베이스 페이지(열·뷰가 미리 잡힌 상태)를 한 번에 만들 때 사용.
+  // createPage → updatePage 2단계로 하면 중간에 실패했을 때 열이 없는 빈 페이지가 남는다.
+  dbSchema?: DbSchema;
 };
 
 export async function createPage(
@@ -162,6 +165,7 @@ export async function createPage(
   // 쓰기 전 검증: 잘못된 모양이 저장되면 읽기 경로가 그 필드를 기본값으로 강등해 데이터가 조용히
   // 유실되므로, 애초에 저장 시점에 막는다(신뢰 경계 — 보안 리뷰 HIGH). 실패 시 zod가 throw.
   if (input.rowProps !== undefined) rowPropsSchema.parse(input.rowProps);
+  if (input.dbSchema !== undefined) dbSchemaSchema.parse(input.dbSchema);
   const { data, error } = await supabase
     .from("pages")
     .insert({
@@ -173,6 +177,7 @@ export async function createPage(
       plain_text: extractPlainText(content),
       icon: input.icon ?? null,
       ...(input.rowProps !== undefined ? { row_props: input.rowProps } : {}),
+      ...(input.dbSchema !== undefined ? { db_schema: input.dbSchema } : {}),
     })
     .select()
     .single();
