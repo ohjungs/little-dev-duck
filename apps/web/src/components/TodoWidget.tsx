@@ -11,14 +11,15 @@ import {
   restoreTodo,
   updateTodo,
 } from "@ldd/api";
-import { describeRecurrence, type Todo } from "@ldd/core";
+import { describeRecurrence, type Todo,
+  todoEmbedText,
+} from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import {
   recurrenceOptions,
   withCurrentRecurrence,
 } from "@/lib/recurrenceOptions";
 import { dueDateInputValue, dueDateLabel } from "@/lib/dueDateLabel";
-import { todoEmbedText } from "@/lib/embedText";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeTable } from "@/lib/realtime";
 import { emitTodosChanged } from "@/lib/todoSignal";
@@ -139,7 +140,7 @@ export function TodoWidget() {
       void reindexSource({
         sourceType: "todo",
         sourceId: created.id,
-        text: todoEmbedText(title, false),
+        text: todoEmbedText(created.title, created.isDone, created.dueDate),
       });
     } catch {
       setActionError("추가하지 못했습니다.");
@@ -161,7 +162,7 @@ export function TodoWidget() {
       void reindexSource({
         sourceType: "todo",
         sourceId: todo.id,
-        text: todoEmbedText(updated.title, updated.isDone),
+        text: todoEmbedText(updated.title, updated.isDone, updated.dueDate),
       });
       if (willBeDone) {
         // 할일 완료 시 오리 XP 적립(원천: 할일 완료). 적립/신호 실패는 완료 자체를 되돌리지 않는다.
@@ -227,7 +228,7 @@ export function TodoWidget() {
       void reindexSource({
         sourceType: "todo",
         sourceId: todo.id,
-        text: todoEmbedText(todo.title, todo.isDone),
+        text: todoEmbedText(todo.title, todo.isDone, todo.dueDate),
       });
       // 오리 기분 신호는 todos가 바뀔 때 도는 effect가 이미 발행한다(중복 호출 불필요).
     } catch {
@@ -261,7 +262,8 @@ export function TodoWidget() {
     const title = editTitle.trim();
     if (!title) return;
     const prevTodos = todos;
-    const isDone = prevTodos.find((t) => t.id === id)?.isDone ?? false;
+    const existing = prevTodos.find((t) => t.id === id);
+    const isDone = existing?.isDone ?? false;
     setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
     try {
       await updateTodo(supabase, id, { title });
@@ -269,7 +271,7 @@ export function TodoWidget() {
       void reindexSource({
         sourceType: "todo",
         sourceId: id,
-        text: todoEmbedText(title, isDone),
+        text: todoEmbedText(title, isDone, existing?.dueDate ?? null),
       });
     } catch {
       setTodos(prevTodos);
@@ -326,7 +328,7 @@ export function TodoWidget() {
         void reindexSource({
           sourceType: "todo",
           sourceId: t.id,
-          text: todoEmbedText(t.title, true),
+          text: todoEmbedText(t.title, true, t.dueDate),
         });
       }
     } catch {

@@ -1,6 +1,12 @@
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { kstDateString, parseRecurrence, serializeRecurrence } from "@ldd/core";
+import {
+  calendarEventEmbedText,
+  kstDateString,
+  parseRecurrence,
+  serializeRecurrence,
+  todoEmbedText,
+} from "@ldd/core";
 import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
 import { createTodo, listTodos, updateTodo } from "./todos";
@@ -259,7 +265,7 @@ export function createAppActionsAdapter(
           dueDate,
           recurrence,
         });
-        await reindex("todo", todo.id, `${todo.title} (미완료)`);
+        await reindex("todo", todo.id, todoEmbedText(todo.title, todo.isDone, todo.dueDate));
         return {
           id: call.id,
           name: call.name,
@@ -277,7 +283,7 @@ export function createAppActionsAdapter(
         }
         if (!found) return errorResult(call, "완료할 할 일을 찾지 못했어요.");
         const updated = await updateTodo(supabase, found.id, { isDone: true });
-        await reindex("todo", updated.id, `${updated.title} (완료)`);
+        await reindex("todo", updated.id, todoEmbedText(updated.title, updated.isDone, updated.dueDate));
         return {
           id: call.id,
           name: call.name,
@@ -322,7 +328,7 @@ export function createAppActionsAdapter(
           startAt,
           endAt: null,
         });
-        await reindex("calendar_event", event.id, event.title);
+        await reindex("calendar_event", event.id, calendarEventEmbedText(event.title, event.startAt, event.endAt));
         return {
           id: call.id,
           name: call.name,

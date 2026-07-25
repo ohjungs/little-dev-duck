@@ -7,7 +7,11 @@ import {
   deleteCalendarEvent,
   listCalendarEvents,
 } from "@ldd/api";
-import { daysUntil, type CalendarEvent } from "@ldd/core";
+import {
+  calendarEventEmbedText,
+  daysUntil,
+  type CalendarEvent,
+} from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { eventStartAt, isEndBeforeStart } from "@/lib/eventDateTime";
@@ -161,7 +165,11 @@ export function CalendarWidget() {
       const created = await createCalendarEvent(supabase, { title, startAt, endAt });
       setEvents((prev) => [...prev, created].sort(byStartAt));
       // RAG 인덱싱(fire-and-forget).
-      void reindexSource({ sourceType: "calendar_event", sourceId: created.id, text: title });
+      void reindexSource({
+        sourceType: "calendar_event",
+        sourceId: created.id,
+        text: calendarEventEmbedText(created.title, created.startAt, created.endAt),
+      });
     } catch {
       setActionError("추가하지 못했습니다.");
     }

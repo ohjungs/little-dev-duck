@@ -8,10 +8,12 @@ import {
   listPages,
   listTodos,
 } from "@ldd/api";
-import { pageEmbedText } from "@ldd/core";
+import { pageEmbedText,
+  todoEmbedText,
+  calendarEventEmbedText,
+} from "@ldd/core";
 import type { EmbeddingSource } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
-import { todoEmbedText } from "@/lib/embedText";
 import { requireGeminiKey } from "@/lib/apiHelpers";
 
 export const dynamic = "force-dynamic";
@@ -62,13 +64,13 @@ export async function POST() {
       todos.map((t) => ({
         sourceType: "todo",
         sourceId: t.id,
-        text: todoEmbedText(t.title, t.isDone),
+        text: todoEmbedText(t.title, t.isDone, t.dueDate),
       })),
       habits.map((h) => ({ sourceType: "habit", sourceId: h.id, text: h.title })),
       events.map((e) => ({
         sourceType: "calendar_event",
         sourceId: e.id,
-        text: e.title,
+        text: calendarEventEmbedText(e.title, e.startAt, e.endAt),
       })),
       pages.map((p) => ({
         sourceType: "page",

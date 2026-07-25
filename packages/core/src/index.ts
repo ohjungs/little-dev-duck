@@ -80,6 +80,7 @@ export {
   quotaWindowMessage,
   type QuotaWindow,
 } from "./domain/quota";
+export { todoEmbedText, calendarEventEmbedText } from "./domain/embed-text";
 export {
   EMBEDDING_DIM,
   embeddingSourceSchema,
