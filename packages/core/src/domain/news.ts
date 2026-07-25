@@ -93,12 +93,23 @@ export function parseRssItems(xml: string): RssItem[] {
       firstTag(block, "pubDate") ??
       firstTag(block, "published") ??
       firstTag(block, "updated");
-    const rawSnippet = firstTag(block, "description") ?? firstTag(block, "summary");
+    // 2026-07-26 실측: 추천 피드 9개를 실제로 파싱해 보니 GeekNews만 요약이 30/30 전부 비었다.
+    // GeekNews(Atom)는 <content>를 쓰는데 여기서 description/summary만 봤기 때문이다.
+    // 요약이 없으면 화면 미리보기가 비고, Gemini 3줄 요약도 제목만으로 만들어진다.
+    // 규격상 summary(발췌)/description이 우선이고 content(전문)는 없을 때의 대체다.
+    const rawSnippet =
+      firstTag(block, "description") ??
+      firstTag(block, "summary") ??
+      firstTag(block, "content:encoded") ??
+      firstTag(block, "content");
     items.push({
       title,
       link,
       publishedAt: pub ? toIso(pub) : null,
-      snippet: rawSnippet ? stripTags(rawSnippet).slice(0, 500) : null,
+      // 태그를 걷어낸 뒤 **한 번 더** 엔티티를 푼다. 피드가 HTML을 이스케이프하고 XML로 또
+      // 이스케이프하는 경우(`--&amp;gt;`)가 흔해서, 한 번만 풀면 `&gt;`가 화면에 그대로 뜬다
+      // (실측: DEV Community). 걷어낸 뒤 남은 엔티티는 HTML 본문의 것이므로 푸는 게 맞다.
+      snippet: rawSnippet ? decodeEntities(stripTags(rawSnippet)).slice(0, 500) : null,
     });
   }
   return items;

@@ -21,6 +21,9 @@ describe("kstDateString", () => {
   it("UTC 기준으로는 아직 전날인 시각도 KST로는 오늘이다(서버 UTC 함정)", () => {
     // UTC 2026-07-20 16:00 → KST 07-21 01:00. toISOString()을 썼다면 07-20이 나왔을 것.
     const d = new Date("2026-07-20T16:00:00Z");
+    // 이 테스트의 요지가 "toISOString()을 쓰면 이렇게 어긋난다"를 보여주는 것이다.
+    // 금지 대상을 일부러 호출해 kstDateString과의 대비를 드러낸다.
+    // eslint-disable-next-line no-restricted-syntax -- 위 사유(함정 자체를 시연)
     expect(d.toISOString().slice(0, 10)).toBe("2026-07-20");
     expect(kstDateString(d)).toBe("2026-07-21");
   });
