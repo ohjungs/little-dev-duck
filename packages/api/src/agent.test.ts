@@ -338,3 +338,75 @@ describe("composeAdapters", () => {
     expect(result.response).toHaveProperty("error");
   });
 });
+
+// 2026-07-26 : 오리 - 혼합턴 - 조회절반유실 수정
+// "이번 주 마감 알려주고 장보기도 추가해줘"처럼 조회+변경이 섞여 오면, 전에는 변경만 승인
+// 카드로 올리고 **조회 질문에는 아예 답하지 않았다**(auto 호출이 조용히 버려짐).
+// 조회를 먼저 실행해 답을 만들고, 변경은 그대로 승인 대기로 올린다.
+//
+// **절대 깎으면 안 되는 것**: 변경 도구는 승인 전에 실행되지 않는다(T0-4). 아래 첫 테스트가 그걸 지킨다.
+describe("조회와 변경이 섞인 턴", () => {
+  it("조회는 실행하고 변경은 실행하지 않는다", async () => {
+    const { fetchImpl } = scriptedFetch([
+      ok([
+        { functionCall: { name: "listEvents", args: {}, id: "r1" } },
+        { functionCall: { name: "createEvent", args: { title: "회의" }, id: "w1" } },
+      ]),
+      ok([{ text: "이번 주엔 일정이 없어요." }]),
+    ]);
+    const executed: string[] = [];
+    const adapter = mockAdapter(async (call) => {
+      executed.push(call.name);
+      return { id: call.id, name: call.name, response: { events: [] } };
+    });
+    const result = await runAgentTurn("일정 알려주고 회의도 잡아줘", adapter, "key", fetchImpl);
+
+    expect(executed).toEqual(["listEvents"]);
+    expect(executed).not.toContain("createEvent");
+    expect(result.status).toBe("approval_pending");
+  });
+
+  it("조회 답변을 승인 카드와 함께 돌려준다", async () => {
+    const { fetchImpl } = scriptedFetch([
+      ok([
+        { functionCall: { name: "listEvents", args: {}, id: "r1" } },
+        { functionCall: { name: "createEvent", args: { title: "회의" }, id: "w1" } },
+      ]),
+      ok([{ text: "이번 주엔 일정이 없어요." }]),
+    ]);
+    const result = await runAgentTurn("일정 알려주고 회의도 잡아줘", mockAdapter(), "key", fetchImpl);
+    expect(result.status).toBe("approval_pending");
+    if (result.status === "approval_pending") {
+      expect(result.calls.map((c) => c.name)).toEqual(["createEvent"]);
+      expect(result.text).toContain("일정이 없어요");
+    }
+  });
+
+  it("변경만 있는 턴은 예전처럼 즉시 반환한다(Gemini 재호출 없음)", async () => {
+    const { fetchImpl, calls } = scriptedFetch([
+      ok([{ functionCall: { name: "createEvent", args: { title: "회의" }, id: "w1" } }]),
+    ]);
+    const result = await runAgentTurn("회의 잡아줘", mockAdapter(), "key", fetchImpl);
+    expect(result.status).toBe("approval_pending");
+    if (result.status === "approval_pending") expect(result.text).toBeUndefined();
+    expect(calls()).toBe(1);
+  });
+
+  it("조회 뒤 모델이 변경을 다시 내밀어도 승인 대기로 끝난다(무한 루프 없음)", async () => {
+    const { fetchImpl } = scriptedFetch([
+      ok([
+        { functionCall: { name: "listEvents", args: {}, id: "r1" } },
+        { functionCall: { name: "createEvent", args: { title: "회의" }, id: "w1" } },
+      ]),
+      ok([{ functionCall: { name: "createEvent", args: { title: "회의" }, id: "w2" } }]),
+    ]);
+    let created = false;
+    const adapter = mockAdapter(async (call) => {
+      if (call.name === "createEvent") created = true;
+      return { id: call.id, name: call.name, response: { events: [] } };
+    });
+    const result = await runAgentTurn("일정 알려주고 회의도 잡아줘", adapter, "key", fetchImpl);
+    expect(created).toBe(false);
+    expect(result.status).toBe("approval_pending");
+  });
+});

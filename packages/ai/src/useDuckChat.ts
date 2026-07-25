@@ -7,13 +7,15 @@ import { ruleReply, type ChatMessage, type ToolCall, type ToolResult } from "@ld
 export type DuckChatResponse =
   | { status: "rule" }
   | { status: "final"; text: string }
-  | { status: "approval_pending"; calls: ToolCall[] }
+  // text: 같은 턴에 섞여 온 조회의 답(있을 때만). 승인 카드와 별개로 오리가 먼저 말한다.
+  | { status: "approval_pending"; calls: ToolCall[]; text?: string }
   | { status: "unavailable"; message: string };
 
 const DEFAULT_RULE_REPLY =
   "꽥? 그건 아직 잘 모르겠어요. 메모나 할 일을 적어두면 기억해둘게요!";
 
-// 서버 응답 → 오리가 말할 내용. approval_pending은 메시지가 아니라 승인 카드로 표현하므로 null.
+// 서버 응답 → 오리가 말할 내용. approval_pending은 승인 카드로 표현하므로 여기선 null이다
+// (섞여 온 조회 답 text는 훅에서 별도 메시지로 먼저 출력한다 — 카드와 답은 다른 표현이다).
 // 순수함수라 테스트 대상(훅의 상태 관리는 얇게 유지, Phase 8 resolveDuckReply와 동일 취지).
 export function resolveDuckMessage(
   response: DuckChatResponse,
@@ -129,6 +131,9 @@ export function useDuckChat(options: UseDuckChatOptions = {}): UseDuckChatResult
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as DuckChatResponse;
         if (data.status === "approval_pending") {
+          // 조회+변경이 섞인 턴이면 조회 답을 먼저 말한 뒤 승인 카드를 띄운다.
+          // 이걸 빠뜨리면 서버가 만든 답이 화면에 닿지 않아 조회 질문이 무시된 것처럼 보인다.
+          if (data.text) addDuckMessage(data.text);
           setPendingApproval(data.calls);
         } else if (data.status === "rule") {
           // rule 분기: 인사·감사 등 사회적 발화를 먼저 알아듣고(무료·즉시), 아니면 idle 대사/기본 폴백.

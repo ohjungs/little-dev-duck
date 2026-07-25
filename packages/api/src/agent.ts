@@ -21,7 +21,8 @@ export interface Adapter {
 // 한 발화 처리 결과. 최종 답이 나오면 final, mutating 도구가 걸리면 승인 대기(실행 보류).
 export type AgentResult =
   | { status: "final"; text: string }
-  | { status: "approval_pending"; calls: ToolCall[] };
+  // text: 같은 턴에 섞여 온 조회(readonly)의 답. 조회가 없었으면 없다.
+  | { status: "approval_pending"; calls: ToolCall[]; text?: string };
 
 // 도구 카탈로그가 없을 때(예: Google 미연동) 쓰는 빈 어댑터 — tools 없이 순수 RAG 대화로만 동작하게 한다.
 // catalog가 비어 있으면 Gemini에 tools 자체를 안 보내므로(runAgentTurn) execute는 절대 호출되지 않는다.
@@ -160,6 +161,10 @@ export async function runAgentTurn(
     { role: "user", parts: [{ text: question }] },
   ];
 
+  // 같은 턴에 조회와 변경이 섞여 오면, 변경은 여기 담아 두고 조회를 먼저 처리한다.
+  // **담아 두기만 하고 절대 실행하지 않는다** — 실행은 사용자 승인 뒤 executeApprovedCalls만 한다(T0-4).
+  let pendingApproval: ToolCall[] | null = null;
+
   for (let i = 0; i < AGENT_MAX_ITERATIONS; i++) {
     const res = await fetchImpl(
       `${GEMINI_BASE}/models/${GEMINI_GEN_MODEL}:generateContent`,
@@ -179,23 +184,26 @@ export async function runAgentTurn(
     if (calls.length === 0) {
       const text = extractText(parts);
       if (!text) throw new LddError("upstream", "gemini agent 빈 응답");
+      // 조회 답이 나왔는데 승인 대기가 남아 있으면 둘 다 돌려준다 — 예전엔 조회 쪽이 통째로 사라졌다.
+      if (pendingApproval) {
+        return { status: "approval_pending", calls: pendingApproval, text };
+      }
       return { status: "final", text };
     }
 
     const { auto, approval, unknown } = partitionToolCalls(calls, adapter.catalog);
 
-    // mutating이 하나라도 있으면 실행하지 않고 승인 대기로 반환한다(파괴적/외부발송 자동 실행 금지).
-    // 2026-07-26 : 오리 - 혼합턴 - 조회절반유실(미해결)
-    // 같은 턴에 섞여 온 auto(readonly)/unknown 호출은 여기서 실행·보고되지 않고 **버려진다**
-    // (예: "이번 주 마감 알려주고 장보기도 추가해줘"의 조회 절반 — 오리가 그 질문엔 아예 답하지 않는다).
-    //
-    // 원래 주석은 "조회 도구가 없어 실사용 빈도가 낮다"를 근거로 이 처리를 미뤘는데,
-    // **listTodos가 생기면서 그 전제가 깨졌다.** 이제 혼합 턴이 실제로 일어날 수 있다.
-    // 다만 auto 결과를 approval_pending 응답에 실어 보내려면 계약(DuckChatResponse)과 승인 카드
-    // UI가 함께 바뀌어야 해서, 여기서 급히 반쪽으로 고치지 않고 별도 작업으로 남긴다
-    // (docs/loop-eng/manual-verification.md 23번). 지금은 조회만 하는 턴은 정상 동작한다.
+    // 2026-07-26 : 오리 - 혼합턴 - 조회절반유실 수정
+    // mutating은 어떤 경우에도 여기서 실행하지 않는다(파괴적/외부발송 자동 실행 금지, T0-4).
+    // 예전엔 mutating이 하나라도 있으면 **같은 턴의 조회(auto)를 통째로 버리고** 즉시 반환해서,
+    // "이번 주 마감 알려주고 장보기도 추가해줘"의 조회 절반에 오리가 아예 답하지 않았다.
+    // 이제는 조회를 먼저 실행해 답을 만들고, 변경은 담아 뒀다가 승인 카드로 함께 올린다.
     if (approval.length > 0) {
-      return { status: "approval_pending", calls: approval };
+      pendingApproval = approval;
+      // 조회가 함께 오지 않았으면 예전 그대로 즉시 반환한다(불필요한 Gemini 재호출 없음).
+      if (auto.length === 0 && unknown.length === 0) {
+        return { status: "approval_pending", calls: pendingApproval };
+      }
     }
 
     // 모델의 함수 호출 turn을 대화에 기록 — parts를 우리가 파싱한 값(name/args/id)으로 재구성하지 않고
@@ -216,6 +224,18 @@ export async function runAgentTurn(
         response: { error: "알 수 없는 도구입니다(실행 거부)." },
       });
     }
+    // Gemini는 functionCall 개수만큼 functionResponse를 기대한다. 승인 대기 호출을 빼놓으면
+    // 다음 턴이 거부되므로, 실행하지 않았다는 사실을 그대로 회신한다(실행은 여전히 안 한다).
+    for (const call of approval) {
+      results.push({
+        id: call.id,
+        name: call.name,
+        response: {
+          pendingApproval: true,
+          note: "사용자 승인 대기 중이라 아직 실행하지 않았다. 승인 후 실행되니 지금은 조회 결과만 답하고, 이 작업은 다시 호출하지 마라.",
+        },
+      });
+    }
 
     // 함수 결과를 되먹인다. functionResponse를 담는 content의 role은 Gemini 규격상 "user"(실측).
     contents.push({
@@ -227,6 +247,10 @@ export async function runAgentTurn(
   }
 
   // 상한 소진 = 마지막 안전장치(도구 루프가 수렴하지 않음).
+  // 승인 대기가 남아 있으면 버리지 않고 돌려준다 — 사용자가 요청한 변경이 조용히 사라지면 안 된다.
+  if (pendingApproval) {
+    return { status: "approval_pending", calls: pendingApproval };
+  }
   throw new LddError(
     "upstream",
     `에이전트 루프가 ${AGENT_MAX_ITERATIONS}회 상한을 초과했습니다`,

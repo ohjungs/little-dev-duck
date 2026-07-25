@@ -105,3 +105,26 @@ describe("summarizeResults", () => {
     expect(summarizeResults(results)).toBe("일부 작업을 완료하지 못했어요.");
   });
 });
+
+// 2026-07-26 : 오리 - 혼합턴 - 조회답이화면까지
+// 서버가 조회 답(text)을 만들어 보내도 훅이 무시하면 사용자 눈에는 여전히 "조회 질문을 씹었다".
+// 계약에 text가 있다는 사실만으로는 부족해서, 표시 대상인지를 여기서 잠근다.
+describe("approval_pending의 조회 답", () => {
+  it("text가 있으면 오리가 말할 내용으로 취급하지 않는다(카드와 별개 경로)", () => {
+    const res: DuckChatResponse = {
+      status: "approval_pending",
+      calls: [{ id: "c1", name: "createTodo", args: { title: "장보기" } }],
+      text: "이번 주 마감은 보고서예요.",
+    };
+    // resolveDuckMessage는 승인 카드용이라 null이 맞다 — text는 훅이 별도 메시지로 낸다.
+    expect(resolveDuckMessage(res)).toBeNull();
+  });
+
+  it("text 없이도 계약이 성립한다(변경만 있는 턴)", () => {
+    const res: DuckChatResponse = {
+      status: "approval_pending",
+      calls: [{ id: "c1", name: "createTodo", args: { title: "장보기" } }],
+    };
+    expect(resolveDuckMessage(res)).toBeNull();
+  });
+});
