@@ -133,6 +133,43 @@ export function findViolations(facts: SchemaFacts): Violations {
   };
 }
 
+// 2026-07-26 : 보안 - SECURITY DEFINER - anon노출검사
+// Supabase는 public 스키마에 만든 함수에 anon·authenticated 실행 권한을 **기본으로** 준다.
+// `REVOKE ALL ... FROM public`(의사 롤)만 써도 anon에게 직접 부여된 권한은 남는다 —
+// award_xp가 정확히 이 함정에 빠져 로그인 없이 남의 XP를 바꿀 수 있는 상태였다(Phase 24).
+// SECURITY DEFINER는 RLS를 우회하므로 anon 노출은 특히 위험하다. 롤을 명시해 회수했는지 본다.
+//
+// 의도적으로 공개하는 함수는 여기 적고 근거를 남긴다. 목록에 없는 채로 anon에 열리면 실패한다.
+export const PUBLIC_BY_DESIGN = new Map<string, string>([
+  [
+    "get_public_page",
+    "Phase 12 T1: 비로그인 방문자가 공개 페이지를 읽는 통로. 열거를 막으려고 slug 하나당 한 건만 돌려준다.",
+  ],
+]);
+
+export function findUnrevokedDefiners(files: MigrationFile[]): string[] {
+  const defined = new Set<string>();
+  const revoked = new Set<string>();
+
+  for (const { sql } of files) {
+    for (const m of sql.matchAll(
+      /(?:create|replace)\s+function\s+public\.(\w+)\s*\([\s\S]*?security\s+definer/gi,
+    )) {
+      defined.add(m[1]);
+    }
+    // anon을 이름으로 지목해 회수했는가. `FROM public`만으로는 부족하다.
+    for (const m of sql.matchAll(
+      /revoke\s+[\s\S]*?on\s+function\s+public\.(\w+)\s*\([^)]*\)\s+from\s+([^;]+);/gi,
+    )) {
+      if (/\banon\b/i.test(m[2])) revoked.add(m[1]);
+    }
+  }
+
+  return [...defined]
+    .filter((fn) => !revoked.has(fn) && !PUBLIC_BY_DESIGN.has(fn))
+    .sort();
+}
+
 // 마이그레이션마다 짝이 되는 롤백 스크립트가 있어야 한다(CLAUDE.md 5절).
 export function findMissingRollbacks(
   migrationNames: string[],

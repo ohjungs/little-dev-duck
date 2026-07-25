@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   collectSchemaFacts,
   findMissingRollbacks,
+  findUnrevokedDefiners,
   findViolations,
   purgeReachable,
   type MigrationFile,
@@ -58,6 +59,13 @@ describe("스키마 안전 계약 (실제 마이그레이션)", () => {
     // 이 사실이 깨지면(예: FK를 set null로 바꾸면) 위 검사가 실패해야 한다는 걸 못박는다.
     expect(facts.purgedDirectly.has("page_links")).toBe(false);
     expect(purgeReachable(facts).has("page_links")).toBe(true);
+  });
+
+  it("SECURITY DEFINER 함수는 anon 실행 권한을 명시적으로 회수한다", () => {
+    // Supabase는 public 스키마 함수에 anon 권한을 기본 부여한다. `FROM public`만 회수하면
+    // anon에게 직접 부여된 권한이 남는다 — award_xp가 이 함정에 빠져 로그인 없이 남의 XP를
+    // 바꿀 수 있었다(Phase 24). 의도적 공개는 PUBLIC_BY_DESIGN에 근거와 함께 둔다.
+    expect(findUnrevokedDefiners(migrations)).toEqual([]);
   });
 
   it("모든 마이그레이션에 짝이 되는 롤백 스크립트가 있다", () => {
@@ -219,5 +227,57 @@ describe("검사가 위반을 실제로 잡는다", () => {
         ["0002_b_down.sql", "0001_a_down.sql"],
       ),
     ).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SECURITY DEFINER anon 노출 검사도 위반을 실제로 잡는지 (메타 검증)
+// ---------------------------------------------------------------------------
+describe("SECURITY DEFINER 검사가 위반을 잡는다", () => {
+  const fn = (name: string, tail = "") => ({
+    name: `9999_${name}.sql`,
+    sql: `
+      create function public.${name}(p_id uuid)
+      returns void
+      language plpgsql
+      security definer
+      set search_path = public
+      as $$ begin end; $$;
+      ${tail}
+    `,
+  });
+
+  it("회수가 없으면 잡는다", () => {
+    expect(findUnrevokedDefiners([fn("risky")])).toEqual(["risky"]);
+  });
+
+  it("FROM public만 회수한 건 부족하다고 본다", () => {
+    // 실제로 award_xp가 이렇게 돼 있었고, anon 권한이 그대로 남아 있었다.
+    const files = [
+      fn("risky", "revoke all on function public.risky(uuid) from public;"),
+    ];
+    expect(findUnrevokedDefiners(files)).toEqual(["risky"]);
+  });
+
+  it("anon을 지목해 회수하면 통과한다", () => {
+    const files = [
+      fn("safe", "revoke all on function public.safe(uuid) from public, anon;"),
+    ];
+    expect(findUnrevokedDefiners(files)).toEqual([]);
+  });
+
+  it("의도적 공개 함수는 allowlist로 통과한다", () => {
+    expect(findUnrevokedDefiners([fn("get_public_page")])).toEqual([]);
+  });
+
+  it("SECURITY INVOKER 함수는 대상이 아니다", () => {
+    const files = [
+      {
+        name: "9999_invoker.sql",
+        sql: `create function public.plain(p_id uuid) returns void
+              language sql as $$ select 1; $$;`,
+      },
+    ];
+    expect(findUnrevokedDefiners(files)).toEqual([]);
   });
 });
