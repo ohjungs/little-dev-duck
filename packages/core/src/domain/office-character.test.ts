@@ -6,6 +6,7 @@ import {
   CHAR_DIR_ORDER,
   charDirSlot,
   charSourceX,
+  characterSheetFileName,
   assignLook,
 } from "./office-character";
 
@@ -35,6 +36,38 @@ describe("office-character 프레임 기하", () => {
 
   it("스트립은 24프레임(4방향 x 6)이다", () => {
     expect(CHAR_DIR_ORDER.length * CHAR_FRAMES_PER_DIR).toBe(24);
+  });
+});
+
+describe("characterSheetFileName 에셋 파일명 계약", () => {
+  // 디스크의 실제 파일명(apps/web/public/sprites/modern-interiors/characters/)과 1:1 대응.
+  // 이 계약이 깨지면 로더가 조용히 폴백해 화면으로만 발견되므로 여기서 고정한다.
+  it("idle은 {Name}_idle_anim_16x16.png, run은 {Name}_run_16x16.png다", () => {
+    expect(characterSheetFileName("adam", "idle")).toBe("Adam_idle_anim_16x16.png");
+    expect(characterSheetFileName("adam", "run")).toBe("Adam_run_16x16.png");
+  });
+
+  it("첫 글자를 대문자로 올린다(파일 시스템 대소문자 일치)", () => {
+    expect(characterSheetFileName("amelia", "idle")).toBe("Amelia_idle_anim_16x16.png");
+    expect(characterSheetFileName("bob", "run")).toBe("Bob_run_16x16.png");
+  });
+
+  it("네 캐릭터 전부 실제 존재하는 8개 파일명을 만든다", () => {
+    const expected = [
+      "Adam_idle_anim_16x16.png",
+      "Adam_run_16x16.png",
+      "Alex_idle_anim_16x16.png",
+      "Alex_run_16x16.png",
+      "Amelia_idle_anim_16x16.png",
+      "Amelia_run_16x16.png",
+      "Bob_idle_anim_16x16.png",
+      "Bob_run_16x16.png",
+    ];
+    const actual = OFFICE_CHARACTERS.flatMap((c) => [
+      characterSheetFileName(c, "idle"),
+      characterSheetFileName(c, "run"),
+    ]);
+    expect(actual).toEqual(expected);
   });
 });
 

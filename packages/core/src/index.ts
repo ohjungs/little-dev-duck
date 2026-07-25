@@ -268,6 +268,7 @@ export {
   CHAR_DIR_ORDER,
   charDirSlot,
   charSourceX,
+  characterSheetFileName,
   assignLook,
   type OfficeCharacterId,
   type CharFacing,

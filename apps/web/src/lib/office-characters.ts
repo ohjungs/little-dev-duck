@@ -6,6 +6,7 @@ import {
   OFFICE_CHARACTERS,
   CHAR_FRAME_H,
   charSourceX,
+  characterSheetFileName,
   type OfficeCharacterId,
   type CharAnim,
   type CharFacing,
@@ -14,11 +15,9 @@ import { loadImage } from "./sprite-loader";
 
 const BASE = "/sprites/modern-interiors/characters";
 
-// 캐릭터 파일명 매핑 — Adam_idle_anim_16x16.png / Adam_run_16x16.png
+// 파일명 규약(대소문자·접미사)은 core가 소유·테스트 — 여기선 BASE 경로만 붙인다.
 function sheetUrl(char: OfficeCharacterId, anim: CharAnim): string {
-  const name = char.charAt(0).toUpperCase() + char.slice(1); // adam -> Adam
-  const suffix = anim === "idle" ? "idle_anim" : "run";
-  return `${BASE}/${name}_${suffix}_16x16.png`;
+  return `${BASE}/${characterSheetFileName(char, anim)}`;
 }
 
 export type CharacterAssets = {

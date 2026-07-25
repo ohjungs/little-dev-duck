@@ -20,6 +20,16 @@ export type CharFacing = (typeof CHAR_DIR_ORDER)[number];
 // 애니메이션 종류 — idle(자리/대기) / run(이동)
 export type CharAnim = "idle" | "run";
 
+// 캐릭터 스프라이트 시트 파일명. 에셋 규격(파일 상단 주석) 그대로:
+//   idle -> {Name}_idle_anim_16x16.png / run -> {Name}_run_16x16.png (Name=첫 글자 대문자).
+// 조용한 실패 표면 — 이름이 틀리면 로더가 catch로 무시하고 폴백 렌더러로 넘어가 화면으로만 발견된다.
+// URL 경로(BASE)는 브라우저 로더의 몫이라 여기선 파일명만 결정론적으로 만든다.
+export function characterSheetFileName(char: OfficeCharacterId, anim: CharAnim): string {
+  const name = char.charAt(0).toUpperCase() + char.slice(1); // adam -> Adam
+  const suffix = anim === "idle" ? "idle_anim" : "run";
+  return `${name}_${suffix}_16x16.png`;
+}
+
 // facing -> 스트립 내 방향 슬롯(0-3)
 export function charDirSlot(facing: CharFacing): number {
   const i = CHAR_DIR_ORDER.indexOf(facing);
