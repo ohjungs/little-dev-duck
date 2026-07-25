@@ -39,6 +39,7 @@ import { HabitHeatmap } from "./HabitHeatmap";
 import { createClient } from "@/lib/supabase/client";
 import { todayIso } from "@/lib/today";
 import { activeStreak, shiftDate, weekBounds } from "@/lib/insightsDates";
+import { localDateKey } from "@/lib/localDateKey";
 
 function StatTile({
   icon,
@@ -183,7 +184,9 @@ export function InsightsView() {
   function calculateStreak(todos: Todo[], checks: HabitCheck[]): number {
     const activeDates = new Set<string>();
     for (const t of todos) {
-      if (t.isDone && t.updatedAt) activeDates.add(t.updatedAt.slice(0, 10));
+      // updatedAt은 타임스탬프다. slice(0,10)은 UTC 날짜라 같은 Set에 담기는
+      // checkedDate(로컬 날짜)와 기준이 어긋난다 — KST 새벽 완료분이 전날로 셌다.
+      if (t.isDone && t.updatedAt) activeDates.add(localDateKey(t.updatedAt));
     }
     for (const h of checks) {
       activeDates.add(h.checkedDate);
@@ -199,7 +202,7 @@ export function InsightsView() {
   const dayOfWeekCounts = [0, 0, 0, 0, 0, 0, 0];
   for (const t of rawTodos) {
     if (t.isDone && t.updatedAt) {
-      const day = new Date(t.updatedAt).getDay();
+      const day = new Date(`${localDateKey(t.updatedAt)}T00:00:00`).getDay();
       dayOfWeekCounts[day]++;
     }
   }
@@ -222,15 +225,15 @@ export function InsightsView() {
       (t) =>
         t.isDone &&
         t.updatedAt &&
-        t.updatedAt.slice(0, 10) >= thisStart &&
-        t.updatedAt.slice(0, 10) <= thisEnd,
+        localDateKey(t.updatedAt) >= thisStart &&
+        localDateKey(t.updatedAt) <= thisEnd,
     ).length;
     const lastTodos = rawTodos.filter(
       (t) =>
         t.isDone &&
         t.updatedAt &&
-        t.updatedAt.slice(0, 10) >= lastStart &&
-        t.updatedAt.slice(0, 10) <= lastEnd,
+        localDateKey(t.updatedAt) >= lastStart &&
+        localDateKey(t.updatedAt) <= lastEnd,
     ).length;
     const thisHabits = new Set(
       rawChecks

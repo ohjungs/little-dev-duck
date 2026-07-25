@@ -11,6 +11,7 @@ import { daysUntil, type CalendarEvent } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { eventStartAt, isEndBeforeStart } from "@/lib/eventDateTime";
+import { localDateKey } from "@/lib/localDateKey";
 import { todayIso } from "@/lib/today";
 import {
   Card,
@@ -38,7 +39,9 @@ function formatEventTime(startAt: string): string | null {
 
 // D-day 라벨: 0=오늘, 양수=D-N(다가옴), 음수=D+N(지남).
 function ddayLabel(startAt: string): string {
-  const diff = daysUntil(startAt, todayIso());
+  // startAt은 타임스탬프다. daysUntil은 문자열 앞 10자리(=UTC 날짜)를 쓰므로 로컬 자정
+  // 저장값을 그대로 넘기면 KST에서 하루 밀린다 — 로컬 날짜 키로 바꿔 넘긴다.
+  const diff = daysUntil(localDateKey(startAt), todayIso());
   if (diff === 0) return "오늘";
   if (diff > 0) return `D-${diff}`;
   return `D+${-diff} 지남`;
@@ -46,7 +49,9 @@ function ddayLabel(startAt: string): string {
 
 // 오늘=강조, 지난 일정=흐리게, 다가오는 일정=기본.
 function ddayVariant(startAt: string): "default" | "muted" | "secondary" {
-  const diff = daysUntil(startAt, todayIso());
+  // startAt은 타임스탬프다. daysUntil은 문자열 앞 10자리(=UTC 날짜)를 쓰므로 로컬 자정
+  // 저장값을 그대로 넘기면 KST에서 하루 밀린다 — 로컬 날짜 키로 바꿔 넘긴다.
+  const diff = daysUntil(localDateKey(startAt), todayIso());
   if (diff === 0) return "default";
   if (diff < 0) return "muted";
   return "secondary";
@@ -67,12 +72,6 @@ function relativeLabel(startAt: string): string | null {
 
 function byStartAt(a: CalendarEvent, b: CalendarEvent): number {
   return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
-}
-
-// 이벤트 시각(ISO)의 로컬 달력 날짜 키(YYYY-MM-DD). 브라우저 로컬(사용자=KST) 기준이라 서버 UTC 문제 없음.
-function localDateKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function ymdKey(y: number, m0: number, day: number): string {
@@ -186,7 +185,7 @@ export function CalendarWidget() {
     const k = localDateKey(e.startAt);
     eventsByDay.set(k, (eventsByDay.get(k) ?? 0) + 1);
   }
-  const todayKey = localDateKey(new Date().toISOString());
+  const todayKey = todayIso();
   const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const cells: (number | null)[] = [
@@ -371,7 +370,7 @@ export function CalendarWidget() {
         {state === "ready" && visibleEvents.length > 0 && (
           <ul className="flex flex-col gap-1">
             {visibleEvents.map((event) => {
-              const isToday = daysUntil(event.startAt, todayIso()) === 0;
+              const isToday = daysUntil(localDateKey(event.startAt), todayIso()) === 0;
               const startTime = formatEventTime(event.startAt);
               const endTime = event.endAt ? formatEventTime(event.endAt) : null;
               const relLabel = relativeLabel(event.startAt);
@@ -404,7 +403,7 @@ export function CalendarWidget() {
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {event.startAt.slice(0, 10)}
+                      {localDateKey(event.startAt)}
                     </span>
                   </div>
                   <button
