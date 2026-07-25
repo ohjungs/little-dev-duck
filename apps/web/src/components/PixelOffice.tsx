@@ -48,6 +48,7 @@ import {
   type NpcTask,
   type CharacterLook,
   type CharFacing,
+  type OfficeTask,
 } from "@ldd/core";
 import { InputManager } from "@/lib/office-input";
 import { OfficeSoundManager } from "@/lib/office-sound";
@@ -268,10 +269,8 @@ type TalkTarget = {
 // ---------------------------------------------------------------------------
 // Props — realTasks를 받으면 시뮬레이터 대신 실제 데이터 사용
 // ---------------------------------------------------------------------------
-type RealTask = { title: string; progress: number; department: string };
-
 type OfficeProps = {
-  realTasks?: RealTask[];
+  realTasks?: OfficeTask[];
 };
 
 // ---------------------------------------------------------------------------

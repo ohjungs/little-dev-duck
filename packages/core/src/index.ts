@@ -292,6 +292,11 @@ export {
 } from "./domain/office-npc";
 export { findPath } from "./domain/office-pathfind";
 export {
+  mapWorkspaceToOfficeTasks,
+  OFFICE_TASK_LIMITS,
+  type OfficeTask,
+} from "./domain/office-tasks";
+export {
   timeOfDay,
   timeOverlay,
   shouldWindowsGlow,
