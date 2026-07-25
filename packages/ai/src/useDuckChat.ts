@@ -50,11 +50,37 @@ export type UseDuckChatResult = {
   clear: () => void;
 };
 
+// 2026-07-26 : 오리 - 승인실행 - 실패이유전달
+// 이전엔 실패 시 "일부 작업을 완료하지 못했어요."만 말하고 **어댑터가 준 이유를 버렸다.**
+// 사용자는 무엇을 고쳐야 할지 알 수 없었다 — 예: "그런 습관을 찾지 못했어요"라면 이름을 바꿔
+// 다시 말하면 되는데, 그 사실이 전달되지 않았다.
+//
+// 이유를 그대로 보여도 안전하다: response.error에 담기는 문자열은 appActions.errorResult가
+// 손으로 쓴 한국어 문구뿐이고, 외부 API 예외는 승인 라우트 바깥 catch로 빠져 여기 오지 않는다
+// (2026-07-26 전 호출 지점 확인). 그래도 계약이 깨질 때를 대비해 길이·개수 상한을 둔다.
+const MAX_REASON_LEN = 120;
+const MAX_REASONS = 3;
+
 // 실행 결과 요약(순수함수, 훅 상태 관리와 분리해 테스트 대상으로).
 export function summarizeResults(results: ToolResult[]): string {
-  const errors = results.filter((r) => typeof r.response.error === "string");
-  if (errors.length > 0) return "일부 작업을 완료하지 못했어요.";
-  return "완료했어요!";
+  // 실패 판정은 error 키의 존재로 한다 — 문자열이 아니어도 성공으로 둔갑하면 안 된다.
+  const failed = results.filter((r) => r.response.error != null);
+  if (failed.length === 0) return "완료했어요!";
+
+  const reasons = [
+    ...new Set(
+      failed
+        .map((r) => r.response.error)
+        .filter((e): e is string => typeof e === "string" && e.trim().length > 0)
+        .map((e) => e.trim().slice(0, MAX_REASON_LEN)),
+    ),
+  ].slice(0, MAX_REASONS);
+
+  const succeeded = results.length - failed.length;
+  const head = succeeded > 0 ? `${succeeded}개는 처리했어요. ` : "";
+  // 이유를 하나도 못 건졌으면(계약 위반·빈 문자열) 원본을 억지로 노출하지 않고 일반 문구로.
+  if (reasons.length === 0) return `${head}일부 작업을 완료하지 못했어요.`;
+  return `${head}${reasons.join(" ")}`;
 }
 
 // 오리 대화 훅(단일). RAG 질답(Phase 8)과 에이전트 액션(Phase 10)을 한 대화창에서 자연스럽게 다룬다 —
