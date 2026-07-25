@@ -29,6 +29,13 @@ export {
   kstDateString,
   startOfWeek,
 } from "./domain/date-util";
+export {
+  parseRecurrence,
+  serializeRecurrence,
+  nextOccurrence,
+  describeRecurrence,
+  type RecurrenceRule,
+} from "./domain/recurrence";
 export { isQuietHour } from "./domain/quiet-hours";
 export { nextDailyCount, type DailyCount } from "./domain/notify-budget";
 export {
