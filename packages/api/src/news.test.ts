@@ -254,3 +254,70 @@ describe("summarizeArticle", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("한 번에 저장하는 기사 수 상한 (실측으로 발견)", () => {
+  // 2026-07-26 실측: 추천 피드 9개를 실제로 받아 우리 파서로 돌려 봤더니
+  // Vercel 2.9MB/1378건, OpenAI 636KB/1050건이 나왔다. collectFeed는 파싱된 항목을
+  // **개수 제한 없이 한 건씩 순차 insert**하므로, 추천 칩 한 번 누르면 1378번 왕복한다.
+  // 서버리스 실행시간 안에 끝나지 않고 DB도 두들긴다.
+  function manyItems(n: number): string {
+    const items = Array.from(
+      { length: n },
+      (_, i) => `<item><title>T${i}</title><link>https://ex.com/${i}</link></item>`,
+    ).join("");
+    return `<rss><channel>${items}</channel></rss>`;
+  }
+
+  it("항목이 아무리 많아도 상한까지만 저장한다", async () => {
+    const { supabase, state } = fakeSupabase();
+    const result = await collectFeed(supabase, baseFeed(), {
+      fetchImpl: xmlResponse(manyItems(1378)),
+    });
+    expect(state.articleInserts.length).toBeLessThanOrEqual(50);
+    expect(result.inserted).toBeLessThanOrEqual(50);
+  });
+
+  it("상한 이하인 피드는 전부 저장한다 (회귀 금지)", async () => {
+    const { supabase, state } = fakeSupabase();
+    await collectFeed(supabase, baseFeed(), { fetchImpl: xmlResponse(manyItems(12)) });
+    expect(state.articleInserts).toHaveLength(12);
+  });
+
+  it("문서 순서(최신 우선)를 지켜 앞에서부터 자른다", async () => {
+    // RSS는 관례상 최신이 앞이다. 뒤에서 자르면 오래된 것만 남는다.
+    const { supabase, state } = fakeSupabase();
+    await collectFeed(supabase, baseFeed(), { fetchImpl: xmlResponse(manyItems(100)) });
+    expect(state.articleInserts[0].title).toBe("T0");
+    expect(state.articleInserts.at(-1)!.title).toBe("T49");
+  });
+
+  it("응답이 지나치게 크면 받지 않고 실패로 센다", async () => {
+    // 피드 URL은 사용자가 자유롭게 넣는다. 크기를 안 보면 서버가 통째로 버퍼링한다.
+    const { supabase, state } = fakeSupabase();
+    const hugeHeader = async () =>
+      ({
+        ok: true,
+        url: "https://ex.com/rss",
+        headers: { get: (k: string) => (k.toLowerCase() === "content-length" ? "9999999" : null) },
+        text: async () => "<rss></rss>",
+      }) as unknown as Response;
+    const result = await collectFeed(supabase, baseFeed(), { fetchImpl: hugeHeader });
+    expect(result.inserted).toBe(0);
+    expect(state.articleInserts).toHaveLength(0);
+    // 가져오기 실패와 같은 취급 — 연속 실패가 쌓이면 자동 일시정지된다.
+    expect(state.feedUpdates.at(-1)!.fail_count).toBe(1);
+  });
+
+  it("Content-Length가 없으면 막지 않는다 (정상 피드 회귀 금지)", async () => {
+    const { supabase, state } = fakeSupabase();
+    const noHeader = async () =>
+      ({
+        ok: true,
+        url: "https://ex.com/rss",
+        headers: { get: () => null },
+        text: async () => TWO_ITEMS,
+      }) as unknown as Response;
+    await collectFeed(supabase, baseFeed(), { fetchImpl: noHeader });
+    expect(state.articleInserts).toHaveLength(2);
+  });
+});

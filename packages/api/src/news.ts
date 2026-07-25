@@ -215,6 +215,11 @@ export type CollectDeps = {
   fetchImpl?: typeof fetch;
 };
 
+// 한 번의 수집에서 저장할 최대 기사 수. 상한 근거는 collectFeed 안의 주석 참조(실측).
+const MAX_ITEMS_PER_COLLECT = 50;
+// 피드 응답 크기 상한(선언된 Content-Length 기준). 실측 최대가 2.9MB였다.
+const MAX_FEED_BYTES = 5 * 1024 * 1024;
+
 // 피드 1개 수집: fetch→파싱→정규화·해시→중복 제외 insert. 실패 시 fail_count 증가·임계 도달 시
 // 자동 일시정지. 성공 시 fail_count 리셋. 반환: 새로 저장한 기사 수 + 이번에 일시정지됐는지.
 export async function collectFeed(
@@ -231,6 +236,12 @@ export async function collectFeed(
       headers: { "user-agent": "LittleDevDuck/1.0 (+rss)" },
     });
     if (!res.ok) throw new Error(`feed HTTP ${res.status}`);
+    // 피드 URL은 사용자가 자유롭게 넣는다. 크기를 안 보면 서버가 응답을 통째로 버퍼링한다.
+    // 2026-07-26 실측에서 Vercel 피드가 2.9MB였다 — 악의적 URL이면 훨씬 커질 수 있다.
+    // Content-Length가 없는 응답까지 막으려면 스트리밍이 필요한데, 정상 피드를 막을 위험이
+    // 있어 여기선 **헤더가 있을 때만** 차단한다(그 이상은 항목 상한이 받아낸다).
+    const declared = Number(res.headers?.get?.("content-length") ?? 0);
+    if (declared > MAX_FEED_BYTES) throw new Error(`feed too large: ${declared}`);
     // 2026-07-24: redirect chain SSRF 방어 — 최종 도착지가 사설 대역이면 차단.
     const resolvedHost = new URL(res.url).hostname;
     if (PRIVATE_HOST.test(resolvedHost)) throw new Error("사설 주소로 리다이렉트됨");
@@ -278,7 +289,12 @@ export async function collectFeed(
     }
   }
   let inserted = 0;
-  for (const item of items) {
+  // 2026-07-26 실측: 추천 피드를 실제로 받아 파서에 넣어 보니 Vercel 1378건, OpenAI 1050건이
+  // 나왔다(전체 아카이브를 그대로 내보내는 피드가 있다). 상한이 없으면 추천 칩 한 번에
+  // 1378번 왕복 insert가 돌아 서버리스 실행시간 안에 끝나지 않는다.
+  // RSS는 관례상 최신이 앞이므로 **앞에서부터** 자른다 — 뒤에서 자르면 오래된 것만 남는다.
+  // 정상 피드 중 가장 많은 게 50건(GeekNews)이라 그 선에서 자르면 잃는 게 없다.
+  for (const item of items.slice(0, MAX_ITEMS_PER_COLLECT)) {
     // 정규화 URL 자체를 중복 판정 키로 쓴다(같은 기사=같은 정규화 URL → UNIQUE로 차단). 해시 불필요.
     const urlHash = normalizeUrl(item.link);
     const { error } = await supabase.from("articles").insert({
