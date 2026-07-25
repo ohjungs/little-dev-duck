@@ -48,6 +48,29 @@ describe("routeUtterance", () => {
     expect(routeUtterance("내일 회의잡아줘")).toBe("llm");
     expect(routeUtterance("취소해줘")).toBe("llm");
   });
+
+  // 2026-07-26 실측: 실제 사용자 문장을 라우터에 통과시켜 보니, "줘"로 끝나지 않는 짧은 명령이
+  // 전부 rule(캔 답변)로 새고 있었다. **Phase 19가 명세에 적어둔 트리거 문장 "오늘 독서 했어"도
+  // 도달하지 못했다** — 도구는 만들어 두고 입구에서 막고 있던 셈이다.
+  // 대상은 도구 카탈로그에 실제로 있는 동작(할 일 추가·완료, 메모, 페이지, 일정, 습관 체크)으로 좁힌다.
+  it("'줘' 없는 짧은 명령도 LLM으로 간다", () => {
+    expect(routeUtterance("오늘 독서 했어")).toBe("llm"); // 습관 체크(Phase 19 명세 문장)
+    expect(routeUtterance("운동 체크해")).toBe("llm");
+    expect(routeUtterance("장보기 추가")).toBe("llm");
+    expect(routeUtterance("장보기 완료")).toBe("llm");
+    expect(routeUtterance("장보기 끝냈어")).toBe("llm");
+    expect(routeUtterance("회의록 메모")).toBe("llm");
+    expect(routeUtterance("메모해")).toBe("llm");
+    expect(routeUtterance("페이지 만들어")).toBe("llm");
+    expect(routeUtterance("내일 3시 회의 등록")).toBe("llm");
+  });
+
+  it("사회적 발화는 여전히 룰이다 (쿼터 낭비 금지 — 회귀 금지)", () => {
+    // 명령 힌트를 넓히면서 인사까지 LLM으로 새면 무료 쿼터가 인사에 소모된다.
+    for (const t of ["안녕", "하이", "고마워", "잘가", "귀엽다", "좋아", "ㅋㅋㅋ", "ㅇㅇ"]) {
+      expect(routeUtterance(t), t).toBe("rule");
+    }
+  });
 });
 
 describe("buildRagPrompt", () => {

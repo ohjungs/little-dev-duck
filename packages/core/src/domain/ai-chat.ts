@@ -20,11 +20,23 @@ const GREETING = /^(안녕|하이|hi|hello|헤이|hey|반가|잘\s?가|바이|by
 const QUESTION_HINT =
   /[?？]|뭐|무엇|어디|언제|얼마|몇|누구|왜|어때|어떻게|알려|찾아|정리|요약|보여|추천|일정|할\s?일|언제까지|마감|줘/;
 
+// 2026-07-26 : 오리 - 발화라우팅 - 명령힌트
+// 실제 사용자 문장을 라우터에 통과시켜 보니, "줘"로 끝나지 않는 짧은 명령이 전부 rule(캔 답변)로
+// 새고 있었다 — **Phase 19가 명세에 적어둔 트리거 문장 "오늘 독서 했어"조차 도달하지 못했다.**
+// 도구는 만들어 두고 입구에서 막고 있던 셈이다.
+//
+// 힌트를 무작정 넓히지 않고 **도구 카탈로그에 실제로 있는 동작**의 어휘로 좁힌다:
+// 할 일 추가·완료, 메모 작성, 페이지 생성, 일정 추가, 습관 체크.
+// 잘못 llm으로 보내면 무료 쿼터를 조금 쓰고, 잘못 rule로 보내면 **기능이 아예 동작하지 않는다** —
+// 비용이 비대칭이라 애매하면 llm 쪽으로 기운다. 다만 인사·감탄은 GREETING이 먼저 걸러낸다.
+const COMMAND_HINT =
+  /추가|등록|만들|생성|작성|적어|기록|메모|체크|완료|끝냈|끝났|했어|잡아|예약|시작해/;
+
 export function routeUtterance(input: string): UtteranceRoute {
   const text = input.trim();
   if (text.length === 0) return "rule";
   if (text.length <= 8 && GREETING.test(text)) return "rule";
-  if (QUESTION_HINT.test(text)) return "llm";
+  if (QUESTION_HINT.test(text) || COMMAND_HINT.test(text)) return "llm";
   // 길고 서술적이면 대화 의도로 보고 LLM, 아주 짧으면 룰.
   return text.length > 12 ? "llm" : "rule";
 }
