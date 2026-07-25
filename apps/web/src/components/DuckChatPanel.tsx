@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Send, Sparkles, Trash2 } from "lucide-react";
+import { describeCall } from "@/lib/approvalLabel";
 import { useDuckChat } from "@ldd/ai";
 import type { ToolCall } from "@ldd/core";
 import { cn } from "@/lib/utils";
@@ -22,20 +23,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 // 신규 저장분은 CRUD 시점에 이미 인덱싱되므로, 백필은 사전 데이터에 대해 한 번이면 충분하다.
 const REINDEX_DONE_KEY = "ldd-reindex-backfilled";
 
-// 도구 이름을 사람이 읽을 라벨로. 카탈로그가 늘면 여기만 추가(어댑터 자체는 core에 라벨을 안 둠 —
-// Gemini 계약과 UI 표현을 분리).
-const TOOL_LABELS: Record<string, string> = {
-  createCalendarEvent: "캘린더 일정 만들기",
-  createGithubIssue: "GitHub 이슈 만들기",
-  trashEmail: "이메일 휴지통으로 이동",
-  createTodo: "할 일 추가",
-  completeTodo: "할 일 완료",
-  createMemo: "메모 작성",
-  createPage: "페이지 만들기",
-  addCalendarEvent: "앱 캘린더에 일정 추가",
-  checkHabit: "습관 체크",
-};
-
 // 상대 시각 표시. createdAt은 ISO 8601 문자열(useDuckChat이 new Date().toISOString()으로 기록).
 // 외부 라이브러리 없이 인라인 계산 — 분 단위까지, 그 이상은 시각 그대로.
 function timeAgo(createdAt: string): string {
@@ -47,40 +34,6 @@ function timeAgo(createdAt: string): string {
   if (diffHr < 24) return `${diffHr}시간 전`;
   const diffDay = Math.floor(diffHr / 24);
   return `${diffDay}일 전`;
-}
-
-function formatWhen(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
-}
-
-// 승인 카드는 사용자가 정확히 무엇을 승인하는지 안전하게 판단할 수 있어야 한다(CLAUDE.md 5절 안전 규칙
-// + T0-4 승인 게이트 취지) — 도구명뿐 아니라 LLM이 채운 실제 파라미터(제목/시간)를 전부 노출한다.
-// 제목·시간은 LLM 산출이라 신뢰 불가한 텍스트일 수 있으므로 지시문처럼 렌더링하지 않고 순수 텍스트로만
-// 표시(HTML 삽입 없음, React가 이스케이프) — 승인 카드 자체가 프롬프트 인젝션의 실행 표면이 되지 않게.
-function describeCall(call: ToolCall): string {
-  const label = TOOL_LABELS[call.name] ?? call.name;
-  // title(캘린더/GitHub 이슈)과 subject(Gmail, T6 — messageId만으론 사람이 어느 메일인지 알 수 없어
-  // listRecentEmails에서 본 제목을 표시용으로만 되돌려 받는다)는 둘 다 "이 승인이 무엇에 대한 것인지"
-  // 보여주는 같은 역할이라 하나로 합쳐 표시한다.
-  const title =
-    (typeof call.args.title === "string" ? call.args.title : null) ??
-    (typeof call.args.subject === "string" ? call.args.subject : null) ??
-    (typeof call.args.content === "string" ? call.args.content : null);
-  const start = formatWhen(call.args.start ?? call.args.startAt);
-  const end = formatWhen(call.args.end);
-  // GitHub 이슈 도구의 owner/repo — 어느 저장소에 만들지도 승인 판단에 필요한 정보(T5).
-  const owner = typeof call.args.owner === "string" ? call.args.owner : null;
-  const repo = typeof call.args.repo === "string" ? call.args.repo : null;
-  const when = start && end ? `${start} ~ ${end}` : start ? start : null;
-  const parts = [
-    owner && repo ? `${owner}/${repo}` : null,
-    title ? `"${title}"` : null,
-    when,
-  ].filter(Boolean);
-  return parts.length > 0 ? `${label}: ${parts.join(", ")}` : label;
 }
 
 export function DuckChatPanel() {

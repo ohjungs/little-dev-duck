@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { kstDateString } from "@ldd/core";
+import { kstDateString, parseRecurrence, serializeRecurrence } from "@ldd/core";
 import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
 import { createTodo, listTodos, updateTodo } from "./todos";
@@ -54,6 +54,18 @@ const createTodoDecl: ToolDeclaration = {
     type: "object",
     properties: {
       title: { type: "string", description: "할 일 내용(간결하게)" },
+      // 시각까지 받지 않는다. 모델이 타임스탬프를 만들면 시각·타임존을 지어내고, 그건
+      // 실제로 터졌던 버그다(요청한 '내일'이 11일 뒤 일정으로 생성됨).
+      dueDate: {
+        type: "string",
+        description:
+          "마감 날짜(YYYY-MM-DD). 사용자가 날짜를 말했을 때만 채운다. 시각은 넣지 않는다.",
+      },
+      recurrence: {
+        type: "string",
+        description:
+          "반복 주기. 매일=FREQ=DAILY, N일마다=FREQ=DAILY;INTERVAL=N, 매주 특정 요일=FREQ=WEEKLY;BYDAY=MO(SU,MO,TU,WE,TH,FR,SA 중), 매월 특정일=FREQ=MONTHLY;BYMONTHDAY=15. 이 형식 외에는 쓰지 않는다.",
+      },
     },
     required: ["title"],
   },
@@ -131,7 +143,24 @@ const checkHabitDecl: ToolDeclaration = {
   kind: "mutating",
 };
 
-const todoArgs = z.object({ title: z.string().min(1).max(500) });
+const todoArgs = z.object({
+  title: z.string().min(1).max(500),
+  dueDate: z.string().optional(),
+  recurrence: z.string().optional(),
+});
+
+// 'YYYY-MM-DD' → 저장용 ISO. **UTC 자정으로 맞춘다.** 할 일 화면은 오늘 필터를
+// `dueDate.slice(0, 10) === todayIso()`(문자열 앞 10자리)로 판정하는데, KST 자정으로
+// 저장하면 UTC로는 전날 15:00이라 잘라낸 날짜가 하루 앞선다. 달력에 없는 날짜(2026-02-30)는
+// Date 생성자가 조용히 다음 달로 굴려버리므로 되돌려 대조해 걸러낸다.
+export function coerceTodoDueDate(raw: string): string | null {
+  const s = raw.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const iso = `${s}T00:00:00.000Z`;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10) === s ? iso : null;
+}
 const habitArgs = z.object({ title: z.string().min(1).max(100) });
 const completeArgs = z.object({ title: z.string().min(1).max(500) });
 const memoArgs = z.object({ content: z.string().min(1).max(2000) });
@@ -201,7 +230,31 @@ export function createAppActionsAdapter(
       if (call.name === createTodoDecl.name) {
         const parsed = todoArgs.safeParse(call.args);
         if (!parsed.success) return errorResult(call, "할 일 정보가 올바르지 않습니다.");
-        const todo = await createTodo(supabase, { title: parsed.data.title });
+
+        // 형식이 어긋나면 조용히 버리지 않고 오류로 돌려준다 — 버리면 사용자는 마감일·반복이
+        // 걸린 줄 알고 넘어간다.
+        let dueDate: string | null = null;
+        if (parsed.data.dueDate !== undefined) {
+          dueDate = coerceTodoDueDate(parsed.data.dueDate);
+          if (!dueDate) {
+            return errorResult(call, "마감일은 YYYY-MM-DD 형식의 실제 날짜여야 합니다.");
+          }
+        }
+
+        let recurrence: string | null = null;
+        if (parsed.data.recurrence !== undefined) {
+          // 모델이 FREQ=BIWEEKLY 같은 없는 규칙을 지어낼 수 있다. 파서를 통과한 것만 저장한다.
+          const rule = parseRecurrence(parsed.data.recurrence);
+          if (!rule) return errorResult(call, "반복 주기를 이해하지 못했습니다.");
+          // 파서가 정규화한 형태로 되돌려 저장한다(요일 순서·대소문자 편차 제거).
+          recurrence = serializeRecurrence(rule);
+        }
+
+        const todo = await createTodo(supabase, {
+          title: parsed.data.title,
+          dueDate,
+          recurrence,
+        });
         await reindex("todo", todo.id, `${todo.title} (미완료)`);
         return {
           id: call.id,

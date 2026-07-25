@@ -227,3 +227,136 @@ describe("checkHabit 액션", () => {
     expect(a.catalog.find((t) => t.name === "checkHabit")?.kind).toBe("mutating");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 23 — createTodo 도구의 마감일·반복
+// ---------------------------------------------------------------------------
+describe("createTodo 마감일·반복 (Phase 23)", () => {
+  const TID = "11111111-1111-4111-8111-111111111111";
+  const UID = "22222222-2222-4222-8222-222222222222";
+
+  // insert에 실제로 넘어간 payload를 들여다본다.
+  function recordingSupabase() {
+    const inserts: Record<string, unknown>[] = [];
+    const chain = {
+      insert: (payload: Record<string, unknown>) => {
+        inserts.push(payload);
+        return chain;
+      },
+      select: () => chain,
+      single: () =>
+        Promise.resolve({
+          data: {
+            id: TID,
+            user_id: UID,
+            title: "장보기",
+            is_done: false,
+            due_date: null,
+            recurrence: null,
+            created_at: "2026-07-26T00:00:00.000Z",
+            updated_at: "2026-07-26T00:00:00.000Z",
+          },
+          error: null,
+        }),
+    };
+    const client = {
+      auth: { getUser: () => Promise.resolve({ data: { user: { id: UID } } }) },
+      from: () => chain,
+    } as unknown as SupabaseClient;
+    return { client, inserts };
+  }
+
+  it("마감일을 UTC 자정으로 저장한다", async () => {
+    // 할 일 화면은 dueDate.slice(0, 10)으로 오늘을 판정한다. KST 자정으로 저장하면 UTC로는
+    // 전날 15:00이라 잘라낸 날짜가 하루 앞선다 — 규약을 여기서 못박는다.
+    const { client, inserts } = recordingSupabase();
+    const a = createAppActionsAdapter(client);
+    const res = await a.execute({
+      id: "c1",
+      name: "createTodo",
+      args: { title: "장보기", dueDate: "2026-07-28" },
+    });
+    expect(res.response).not.toHaveProperty("error");
+    expect(inserts.at(-1)!.due_date).toBe("2026-07-28T00:00:00.000Z");
+    expect(String(inserts.at(-1)!.due_date).slice(0, 10)).toBe("2026-07-28");
+  });
+
+  it("반복 규칙을 저장한다", async () => {
+    const { client, inserts } = recordingSupabase();
+    const a = createAppActionsAdapter(client);
+    await a.execute({
+      id: "c2",
+      name: "createTodo",
+      args: { title: "회의", recurrence: "FREQ=WEEKLY;BYDAY=TU" },
+    });
+    expect(inserts.at(-1)!.recurrence).toBe("FREQ=WEEKLY;BYDAY=TU");
+  });
+
+  it("제목만 주면 기존과 똑같이 동작한다 (회귀 금지)", async () => {
+    const { client, inserts } = recordingSupabase();
+    const a = createAppActionsAdapter(client);
+    await a.execute({ id: "c3", name: "createTodo", args: { title: "장보기" } });
+    expect(inserts.at(-1)!.due_date).toBeNull();
+    expect(inserts.at(-1)!.recurrence).toBeNull();
+  });
+
+  it("모델이 지어낸 반복 문법은 저장하지 않고 오류를 돌려준다", async () => {
+    // 조용히 버리면 사용자는 반복이 걸린 줄 안다.
+    const { client, inserts } = recordingSupabase();
+    const a = createAppActionsAdapter(client);
+    const res = await a.execute({
+      id: "c4",
+      name: "createTodo",
+      args: { title: "회의", recurrence: "FREQ=BIWEEKLY" },
+    });
+    expect(res.response).toHaveProperty("error");
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("타임스탬프 형식 마감일은 거부한다", async () => {
+    // 모델이 시각·타임존을 지어내면 피드백 iter5의 "11일 뒤 일정" 버그가 재발한다.
+    const { client, inserts } = recordingSupabase();
+    const a = createAppActionsAdapter(client);
+    const res = await a.execute({
+      id: "c5",
+      name: "createTodo",
+      args: { title: "장보기", dueDate: "2026-07-28T10:00:00Z" },
+    });
+    expect(res.response).toHaveProperty("error");
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("달력에 없는 날짜는 거부한다", async () => {
+    const { client, inserts } = recordingSupabase();
+    const a = createAppActionsAdapter(client);
+    const res = await a.execute({
+      id: "c6",
+      name: "createTodo",
+      args: { title: "장보기", dueDate: "2026-02-30" },
+    });
+    expect(res.response).toHaveProperty("error");
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("마감일 없이 반복만 주는 것도 허용한다", async () => {
+    // 첫 완료 때 rolloverDueDate가 오늘 기준으로 다음 회차를 잡는다.
+    const { client, inserts } = recordingSupabase();
+    const a = createAppActionsAdapter(client);
+    const res = await a.execute({
+      id: "c7",
+      name: "createTodo",
+      args: { title: "스트레칭", recurrence: "FREQ=DAILY" },
+    });
+    expect(res.response).not.toHaveProperty("error");
+    expect(inserts.at(-1)!.due_date).toBeNull();
+    expect(inserts.at(-1)!.recurrence).toBe("FREQ=DAILY");
+  });
+
+  it("도구 선언이 마감일·반복을 알린다", async () => {
+    const a = createAppActionsAdapter(mockSupabase({}));
+    const decl = a.catalog.find((t) => t.name === "createTodo")!;
+    const props = decl.parameters.properties as Record<string, unknown>;
+    expect(Object.keys(props).sort()).toEqual(["dueDate", "recurrence", "title"]);
+    expect(decl.parameters.required).toEqual(["title"]);
+  });
+});

@@ -329,6 +329,8 @@ export function MemoWidget() {
                     onChange={(e) => setEditContent(e.target.value)}
                     rows={4}
                     autoFocus
+                    // 수정 모드엔 placeholder가 없어 스크린리더가 이름 없는 입력란으로 읽는다.
+                    aria-label="메모 내용 수정"
                     className="flex-1 resize-none bg-transparent text-sm focus-visible:outline-none"
                   />
                   <div className="flex justify-end gap-1">
