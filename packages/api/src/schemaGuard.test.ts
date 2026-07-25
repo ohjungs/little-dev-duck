@@ -4,12 +4,16 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   collectDeclaredColumns,
+  collectFunctionNames,
   collectSchemaFacts,
   findMissingRollbacks,
   findUndeclaredWrites,
+  findUnknownRpcs,
+  findUnknownTables,
   findUnrevokedDefiners,
   findViolations,
   purgeReachable,
+  stripComments,
   type MigrationFile,
   type SourceFile,
 } from "./schemaGuard";
@@ -96,6 +100,17 @@ describe("스키마 안전 계약 (실제 마이그레이션)", () => {
     expect(declared.get("todos")).toContain("due_date");
     expect(declared.get("pages")).toContain("is_trashed");
     expect(declared.get("pages")).toContain("cover_url"); // alter table add column 경로
+  });
+
+  it("코드가 참조하는 테이블이 전부 마이그레이션에 있다", () => {
+    // 테이블명 오타는 런타임에만 터지고, 가짜 클라이언트 테스트는 이름을 검사하지 않는다.
+    expect(findUnknownTables(loadApiSources(), collectDeclaredColumns(migrations))).toEqual([]);
+  });
+
+  it("코드가 호출하는 RPC가 전부 마이그레이션에 있다", () => {
+    const fns = collectFunctionNames(migrations);
+    expect(fns.size).toBeGreaterThan(3); // 실제로 읽었는지 먼저 확인
+    expect(findUnknownRpcs(loadApiSources(), fns)).toEqual([]);
   });
 
   it("모든 마이그레이션에 짝이 되는 롤백 스크립트가 있다", () => {
@@ -369,5 +384,70 @@ describe("컬럼 대조 검사가 위반을 잡는다", () => {
   it("제약 정의를 컬럼으로 착각하지 않는다", () => {
     expect(declared.get("notes")).not.toContain("unique");
     expect(declared.get("notes")).not.toContain("primary");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 테이블·RPC 이름 검사와 주석 처리 (메타 검증)
+// ---------------------------------------------------------------------------
+describe("테이블·RPC 이름 검사", () => {
+  const migration: MigrationFile[] = [
+    {
+      name: "0001.sql",
+      sql: `
+        create table public.notes (id uuid primary key, body text);
+        create function public.do_thing() returns void language sql as $$ select 1; $$;
+      `,
+    },
+  ];
+  const declared = collectDeclaredColumns(migration);
+  const fns = collectFunctionNames(migration);
+  const src = (code: string): SourceFile[] => [{ name: "x.ts", code }];
+
+  it("선언된 테이블은 통과한다", () => {
+    expect(findUnknownTables(src(`supabase.from("notes").select()`), declared)).toEqual([]);
+  });
+
+  it("테이블명 오타를 잡는다", () => {
+    expect(findUnknownTables(src(`supabase.from("notess").select()`), declared)).toEqual([
+      { file: "x.ts", table: "notess" },
+    ]);
+  });
+
+  it("선언된 RPC는 통과한다", () => {
+    expect(findUnknownRpcs(src(`supabase.rpc("do_thing")`), fns)).toEqual([]);
+  });
+
+  it("RPC 이름 오타를 잡는다", () => {
+    expect(findUnknownRpcs(src(`supabase.rpc("do_thingg", {})`), fns)).toEqual([
+      { file: "x.ts", rpc: "do_thingg" },
+    ]);
+  });
+
+  it("주석 안의 예시는 실제 호출로 보지 않는다", () => {
+    // 이 파일 자신의 주석이 실제로 오탐을 만들었다 — 없는 위반을 내는 검사는 곧 무시된다.
+    const files = src(`
+      // 각 변이를 바로 앞의 .from("table")에 묶는다
+      /* supabase.rpc("legacy_thing") 은 예전 방식 */
+      supabase.from("notes").select();
+    `);
+    expect(findUnknownTables(files, declared)).toEqual([]);
+    expect(findUnknownRpcs(files, fns)).toEqual([]);
+  });
+});
+
+describe("stripComments", () => {
+  it("한 줄 주석을 지운다", () => {
+    expect(stripComments('const a = 1; // from("x")').trim()).toBe("const a = 1;");
+  });
+
+  it("여러 줄에 걸친 블록 주석을 지운다", () => {
+    const code = ["a;", "/* from(\"x\")", "여러 줄 */", "b;"].join("\n");
+    expect(stripComments(code).replace(/\s+/g, " ").trim()).toBe("a; b;");
+  });
+
+  it("URL의 //는 건드리지 않는다", () => {
+    const code = 'const u = "https://example.com/a";';
+    expect(stripComments(code)).toBe(code);
   });
 });

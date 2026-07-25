@@ -226,6 +226,52 @@ export function collectDeclaredColumns(
 }
 
 export type SourceFile = { name: string; code: string };
+
+// 주석을 지운 뒤에 훑는다. 주석 안의 예시 코드(`.from("table")` 같은)를 실제 호출로 착각하면
+// 없는 위반이 생기고, 없는 위반을 내는 검사는 곧 무시된다 — 실제로 이 파일 자신의 주석이
+// 그 오탐을 만들었다. 문자열 리터럴 안의 `//`는 URL 등에서 흔하므로 건드리지 않는다.
+export function stripComments(code: string): string {
+  return code
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, "$1");
+}
+
+// 마이그레이션이 만들지 않은 테이블을 참조하면 런타임에만 터진다(오타 한 글자면 그 기능이
+// 통째로 죽는다). 가짜 클라이언트 테스트는 테이블명을 검사하지 않으므로 여기서 잡는다.
+export function findUnknownTables(
+  sources: SourceFile[],
+  declared: Map<string, Set<string>>,
+): { file: string; table: string }[] {
+  const found: { file: string; table: string }[] = [];
+  for (const { name, code } of sources) {
+    for (const m of stripComments(code).matchAll(/\.from\((["'`])(\w+)\1\)/g)) {
+      if (!declared.has(m[2])) found.push({ file: name, table: m[2] });
+    }
+  }
+  return found;
+}
+
+// RPC도 마찬가지 — 이름이 틀리면 호출이 통째로 실패한다.
+export function findUnknownRpcs(
+  sources: SourceFile[],
+  functions: Set<string>,
+): { file: string; rpc: string }[] {
+  const found: { file: string; rpc: string }[] = [];
+  for (const { name, code } of sources) {
+    for (const m of stripComments(code).matchAll(/\.rpc\((["'`])(\w+)\1/g)) {
+      if (!functions.has(m[2])) found.push({ file: name, rpc: m[2] });
+    }
+  }
+  return found;
+}
+
+export function collectFunctionNames(files: MigrationFile[]): Set<string> {
+  const out = new Set<string>();
+  for (const { sql } of files) {
+    for (const m of sql.matchAll(/function\s+public\.(\w+)\s*\(/gi)) out.add(m[1]);
+  }
+  return out;
+}
 export type UndeclaredWrite = {
   file: string;
   table: string;
@@ -273,7 +319,8 @@ export function findUndeclaredWrites(
   declared: Map<string, Set<string>>,
 ): UndeclaredWrite[] {
   const found: UndeclaredWrite[] = [];
-  for (const { name, code } of sources) {
+  for (const { name, code: raw } of sources) {
+    const code = stripComments(raw);
     const events: { at: number; kind: string; value: string | number }[] = [];
     for (const m of code.matchAll(/\.from\((["'`])(\w+)\1\)/g)) {
       events.push({ at: m.index, kind: "from", value: m[2] });
