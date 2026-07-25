@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, SquareArrowOutUpRight, Trash2 } from "lucide-react";
 import type { Page, PropertyDef, RowPropValue } from "@ldd/core";
+import { dbEmptyMessage } from "@/lib/dbEmptyState";
 import { PropertyCell } from "./PropertyCell";
 import { DbPropertyMenu } from "./DbPropertyMenu";
 
@@ -72,8 +73,13 @@ export function DbTableView({
   onAddRow,
   onDeleteRow,
   onEditProperty,
+  totalRows,
+  hasFilters,
 }: {
+  // rows는 필터·정렬을 거친 표시 행이다. 빈 상태 문구를 정확히 쓰려면 원본 개수도 필요하다.
   rows: Page[];
+  totalRows: number;
+  hasFilters: boolean;
   properties: PropertyDef[];
   onOpenRow: (id: string) => void;
   onTitleChange: (rowId: string, title: string) => void;
@@ -147,7 +153,7 @@ export function DbTableView({
                 colSpan={properties.length + 1}
                 className="px-3 py-6 text-center text-sm text-muted-foreground"
               >
-                아직 행이 없습니다.
+                {dbEmptyMessage({ total: totalRows, hasFilters })}
               </td>
             </tr>
           )}

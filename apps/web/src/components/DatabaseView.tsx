@@ -499,6 +499,8 @@ export function DatabaseView({
       ) : (
         <DbTableView
           rows={visibleRows}
+          totalRows={(rows ?? []).length}
+          hasFilters={(view.filters ?? []).length > 0}
           properties={visibleProperties}
           onOpenRow={openRow}
           onTitleChange={handleTitleChange}
