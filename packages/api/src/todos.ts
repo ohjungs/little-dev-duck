@@ -133,6 +133,41 @@ export async function updateTodo(
   return fromRow(data as TodoRow);
 }
 
+// 방금 지운 할 일을 **같은 id로** 되살린다(삭제 직후 "되돌리기"용).
+// 새 id로 다시 만들면 순서(localStorage의 id 배열)와 RAG 임베딩(sourceId)이 끊기므로
+// 행을 통째로 그대로 넣는다. 삭제 자체는 이미 진짜로 일어난 뒤다 — 보류 상태를 두지 않는다.
+export async function restoreTodo(
+  supabase: SupabaseClient,
+  todo: Todo,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase
+    .from("todos")
+    .insert({
+      id: todo.id,
+      // 인자로 온 userId는 쓰지 않는다. 남의 id를 실어 보내 남의 데이터를 만들 수 없어야 한다
+      // (RLS가 막지만 계약에서도 막는다).
+      user_id: user.id,
+      title: todo.title,
+      is_done: todo.isDone,
+      due_date: todo.dueDate,
+      recurrence: todo.recurrence,
+      created_at: todo.createdAt,
+      updated_at: todo.updatedAt,
+    })
+    .select()
+    .single();
+
+  // 되돌리기를 두 번 누르는 건 흔하다. 이미 살아 있으면 목적은 달성된 것이므로 성공으로 본다.
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}
+
 export async function deleteTodo(
   supabase: SupabaseClient,
   id: string,

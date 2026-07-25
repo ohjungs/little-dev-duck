@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createTodo, deleteTodo, listTodos, updateTodo } from "./todos";
+import {
+  createTodo,
+  deleteTodo,
+  listTodos,
+  restoreTodo,
+  updateTodo,
+} from "./todos";
 
 const VALID_ROW = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -152,6 +158,84 @@ describe("반복 할 일 완료 (Phase 20 T3)", () => {
     // 마이그레이션 적용 전 응답이나 오래된 캐시에는 recurrence 키 자체가 없다.
     const result = await listTodos(fakeSupabase());
     expect(result[0].recurrence).toBeNull();
+  });
+});
+
+describe("restoreTodo (Phase 21 T1)", () => {
+  const deleted = {
+    id: VALID_ROW.id,
+    userId: VALID_ROW.user_id,
+    title: "우유 사기",
+    isDone: false,
+    dueDate: null,
+    recurrence: "FREQ=DAILY",
+    createdAt: VALID_ROW.created_at,
+    updatedAt: VALID_ROW.updated_at,
+  };
+
+  it("id와 생성시각까지 그대로 되살린다", async () => {
+    // 새 id로 다시 만들면 할 일 순서(localStorage의 id 배열)와 RAG 임베딩이 끊긴다.
+    const { client, updates } = recordingSupabase(VALID_ROW);
+    await restoreTodo(client, deleted);
+
+    const payload = updates.at(-1)!;
+    expect(payload.id).toBe(VALID_ROW.id);
+    expect(payload.created_at).toBe(VALID_ROW.created_at);
+    expect(payload.title).toBe("우유 사기");
+    expect(payload.recurrence).toBe("FREQ=DAILY");
+  });
+
+  it("user_id는 인자가 아니라 로그인 사용자로 채운다", async () => {
+    // 남의 user_id를 실어 보내 남의 데이터를 만들 수 없어야 한다(RLS가 막지만 계약에서도 막는다).
+    const { client, updates } = recordingSupabase(VALID_ROW);
+    await restoreTodo(client, {
+      ...deleted,
+      userId: "99999999-9999-4999-8999-999999999999",
+    });
+    expect(updates.at(-1)!.user_id).toBe(VALID_ROW.user_id);
+  });
+
+  it("이미 있는 id면 에러가 아니라 멱등 성공이다", async () => {
+    // 되돌리기를 두 번 누르는 건 흔하다. 유일 제약 위반(23505)을 성공으로 흡수한다.
+    const client = {
+      auth: { getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }) },
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({ data: null, error: { code: "23505" } }),
+          }),
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    await expect(restoreTodo(client, deleted)).resolves.toBeUndefined();
+  });
+
+  it("로그인 상태가 아니면 거부한다", async () => {
+    const client = {
+      auth: { getUser: async () => ({ data: { user: null } }) },
+      from: () => ({}),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    await expect(restoreTodo(client, deleted)).rejects.toThrow("로그인");
+  });
+
+  it("다른 DB 에러는 그대로 던진다", async () => {
+    const client = {
+      auth: { getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }) },
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({
+              data: null,
+              error: { code: "42501", message: "restore-boom" },
+            }),
+          }),
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    await expect(restoreTodo(client, deleted)).rejects.toThrow("restore-boom");
   });
 });
 

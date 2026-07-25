@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createMemo, deleteMemo, listMemos, updateMemo } from "./memos";
+import {
+  createMemo,
+  deleteMemo,
+  listMemos,
+  restoreMemo,
+  updateMemo,
+} from "./memos";
 
 const VALID_ROW = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -262,5 +268,92 @@ describe("DB 에러 전파", () => {
     await expect(deleteMemo(supabase, VALID_ROW.id)).rejects.toThrow(
       "delete-boom",
     );
+  });
+});
+
+describe("restoreMemo (Phase 21 T1)", () => {
+  const deleted = {
+    id: VALID_ROW.id,
+    userId: VALID_ROW.user_id,
+    title: "회의 메모",
+    content: "다음 스프린트 계획",
+    createdAt: VALID_ROW.created_at,
+    updatedAt: VALID_ROW.updated_at,
+  };
+
+  function recording() {
+    const inserts: Record<string, unknown>[] = [];
+    const client = {
+      auth: { getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }) },
+      from: () => ({
+        insert: (payload: Record<string, unknown>) => {
+          inserts.push(payload);
+          return {
+            select: () => ({ single: async () => ({ data: VALID_ROW, error: null }) }),
+          };
+        },
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    return { client, inserts };
+  }
+
+  it("id와 생성시각까지 그대로 되살린다", async () => {
+    const { client, inserts } = recording();
+    await restoreMemo(client, deleted);
+    expect(inserts.at(-1)!.id).toBe(VALID_ROW.id);
+    expect(inserts.at(-1)!.created_at).toBe(VALID_ROW.created_at);
+    expect(inserts.at(-1)!.content).toBe("다음 스프린트 계획");
+  });
+
+  it("user_id는 인자가 아니라 로그인 사용자로 채운다", async () => {
+    const { client, inserts } = recording();
+    await restoreMemo(client, {
+      ...deleted,
+      userId: "99999999-9999-4999-8999-999999999999",
+    });
+    expect(inserts.at(-1)!.user_id).toBe(VALID_ROW.user_id);
+  });
+
+  it("이미 있는 id면 에러가 아니라 멱등 성공이다", async () => {
+    const client = {
+      auth: { getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }) },
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({ data: null, error: { code: "23505" } }),
+          }),
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    await expect(restoreMemo(client, deleted)).resolves.toBeUndefined();
+  });
+
+  it("로그인 상태가 아니면 거부한다", async () => {
+    const client = {
+      auth: { getUser: async () => ({ data: { user: null } }) },
+      from: () => ({}),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    await expect(restoreMemo(client, deleted)).rejects.toThrow("로그인");
+  });
+
+  it("다른 DB 에러는 그대로 던진다", async () => {
+    const client = {
+      auth: { getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }) },
+      from: () => ({
+        insert: () => ({
+          select: () => ({
+            single: async () => ({
+              data: null,
+              error: { code: "42501", message: "restore-boom" },
+            }),
+          }),
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    await expect(restoreMemo(client, deleted)).rejects.toThrow("restore-boom");
   });
 });

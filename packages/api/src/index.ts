@@ -3,6 +3,7 @@ export {
   createTodo,
   updateTodo,
   deleteTodo,
+  restoreTodo,
   type CreateTodoInput,
   type UpdateTodoInput,
 } from "./todos";
@@ -12,6 +13,7 @@ export {
   createMemo,
   updateMemo,
   deleteMemo,
+  restoreMemo,
   type CreateMemoInput,
   type UpdateMemoInput,
 } from "./memos";

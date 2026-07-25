@@ -92,6 +92,36 @@ export async function updateMemo(
   return fromRow(data as MemoRow);
 }
 
+// 방금 지운 메모를 **같은 id로** 되살린다(삭제 직후 "되돌리기"용). 근거·주의사항은
+// todos.ts의 restoreTodo와 동일하다.
+export async function restoreMemo(
+  supabase: SupabaseClient,
+  memo: Memo,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase
+    .from("memos")
+    .insert({
+      id: memo.id,
+      // 인자로 온 userId는 쓰지 않는다(남의 데이터를 만들 수 없어야 한다).
+      user_id: user.id,
+      title: memo.title,
+      content: memo.content,
+      created_at: memo.createdAt,
+      updated_at: memo.updatedAt,
+    })
+    .select()
+    .single();
+
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}
+
 export async function deleteMemo(
   supabase: SupabaseClient,
   id: string,
