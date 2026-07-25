@@ -114,12 +114,34 @@ test("HTML이 선언한 정적 자원이 인증 없이 실제로 받아진다", 
 // **HTML이 실제로 참조하는 자원 전부**를 확인한다 — 앞으로 무엇을 추가하든 자동으로 덮인다.
 test("공개 페이지가 참조하는 자원이 전부 인증 없이 받아진다", async ({ page, request }) => {
   await page.goto("/welcome", { waitUntil: "domcontentloaded" });
-  const refs = await page.evaluate(() =>
-    Array.from(document.querySelectorAll("link[href], script[src], img[src]"))
-      .map((el) => el.getAttribute("href") ?? el.getAttribute("src") ?? "")
-      // 같은 출처의 절대 경로만 본다(외부 CDN·data URI는 이 검사 대상이 아니다).
-      .filter((u) => u.startsWith("/")),
-  );
+  const refs = await page.evaluate(() => {
+    const raw = [
+      ...Array.from(document.querySelectorAll("link[href], script[src], img[src]")).map(
+        (el) => el.getAttribute("href") ?? el.getAttribute("src") ?? "",
+      ),
+      // og:image·twitter:image는 <meta>라 위 선택자에 안 걸린다. **이 부류의 첫 사고가
+      // 바로 OG 이미지였는데**(공유 카드가 통째로 안 뜸) 가드가 그걸 못 덮고 있었다.
+      ...Array.from(
+        document.querySelectorAll('meta[property="og:image"], meta[name="twitter:image"]'),
+      ).map((el) => el.getAttribute("content") ?? ""),
+    ];
+    // 메타데이터의 절대 URL은 metadataBase 기준이라 테스트 서버와 포트가 다르다
+    // (실측: localhost:3000). 호스트가 localhost면 경로만 떼어 이 서버에 물어본다.
+    // 진짜 외부 호스트(CDN 등)는 이 검사 대상이 아니다.
+    return raw
+      .map((u) => {
+        if (u.startsWith("/")) return u;
+        try {
+          const parsed = new URL(u);
+          return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
+            ? parsed.pathname + parsed.search
+            : "";
+        } catch {
+          return ""; // data: URI 등
+        }
+      })
+      .filter((u) => u.startsWith("/"));
+  });
   expect(refs.length, "참조가 하나도 안 잡히면 검사가 헛돈 것이다").toBeGreaterThan(0);
 
   const blocked: string[] = [];
