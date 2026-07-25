@@ -62,23 +62,37 @@ export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
              "작업 없음"}
           </p>
         ) : (
-          activeTasks.map((task) => (
-            <div key={task.id} className="mb-2 last:mb-0">
-              <div className="flex justify-between text-xs">
-                <span className="truncate mr-2">{task.title}</span>
-                <span className="text-muted-foreground shrink-0">{Math.round(task.progress)}%</span>
+          activeTasks.map((task) => {
+            // id가 "real-"로 시작하면 사용자의 실제 데이터(투두/페이지/습관/일정)에서 온 업무다.
+            const isReal = task.id.startsWith("real-");
+            return (
+              <div key={task.id} className="mb-2 last:mb-0">
+                <div className="flex justify-between text-xs">
+                  <span className="truncate mr-2 flex items-center gap-1">
+                    {isReal && (
+                      <span
+                        className="shrink-0 rounded px-1 text-[9px] font-bold text-white"
+                        style={{ backgroundColor: getDeptColor(npc.department) }}
+                      >
+                        내 업무
+                      </span>
+                    )}
+                    <span className="truncate">{task.title}</span>
+                  </span>
+                  <span className="text-muted-foreground shrink-0">{Math.round(task.progress)}%</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full mt-0.5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${task.progress}%`,
+                      backgroundColor: getDeptColor(npc.department),
+                    }}
+                  />
+                </div>
               </div>
-              <div className="h-1.5 bg-muted rounded-full mt-0.5 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${task.progress}%`,
-                    backgroundColor: getDeptColor(npc.department),
-                  }}
-                />
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
 
         {/* 대기 태스크 */}

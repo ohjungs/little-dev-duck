@@ -7,6 +7,7 @@ import {
   type TileMap,
   type Zone,
 } from "./office-tilemap";
+import { DEPT_REGISTRY, type DepartmentId } from "./office-department";
 
 // Stamp a room: fill interior with floor, draw walls around border, punch doors
 export function stampRoom(
@@ -44,177 +45,202 @@ export function connectCorridor(
   fillRect(map, toX, minY, width, maxY - minY + width, TileType.Corridor);
 }
 
-// Place rows of desks with chairs inside a room
+// ---------------------------------------------------------------------------
+// 2026-07-25 : 대형 데이터 기반 플로어플랜 재작성.
+// 기존 40x30 압축 맵(부서당 책상 1~2개)을 60x48 큰 스케일로 교체.
+// 각 부서방은 정원(headcount)만큼 책상을 3열 그리드로 배치하고, 부서별로 카펫(Carpet)을 깔아
+// 렌더에서 부서 색으로 칠한다. 복도 격자로 모든 방이 연결된다.
+// ---------------------------------------------------------------------------
+
+const MAP_W = 60;
+const MAP_H = 48;
+
+// 부서방 그리드: 4열 x 3행. 방 크기 13x10(내부 11x8 → 책상 3열 x 2행 = 최대 6석).
+const ROOM_W = 13;
+const ROOM_H = 10;
+const COL_PITCH = 15; // ROOM_W + 2(복도 폭)
+const ROW_PITCH = 12; // ROOM_H + 2(복도 폭)
+const GRID_X0 = 1;
+const GRID_Y0 = 8; // 로비(0..5) + 복도(6..7) 아래
+
+const LOBBY_H = 6;
+
+type SlotKind = "ceo" | "dept" | "cafeteria" | "meeting";
+type Slot = { id: string; label: string; kind: SlotKind };
+
+// 그리드 슬롯 배치(행 우선). 9개 부서 + 사장실 + 식당 + 회의실 = 12칸.
+const GRID_SLOTS: Slot[] = [
+  { id: "ceo-office", label: "사장실", kind: "ceo" },
+  { id: "engineering", label: "개발팀", kind: "dept" },
+  { id: "design", label: "디자인팀", kind: "dept" },
+  { id: "marketing", label: "마케팅팀", kind: "dept" },
+  { id: "qa", label: "QA팀", kind: "dept" },
+  { id: "hr", label: "인사팀", kind: "dept" },
+  { id: "finance", label: "재무팀", kind: "dept" },
+  { id: "sales", label: "영업팀", kind: "dept" },
+  { id: "support", label: "고객지원팀", kind: "dept" },
+  { id: "operations", label: "운영팀", kind: "dept" },
+  { id: "cafeteria", label: "식당", kind: "cafeteria" },
+  { id: "meeting-room", label: "회의실", kind: "meeting" },
+];
+
+function slotOrigin(index: number): { x: number; y: number } {
+  const col = index % 4;
+  const row = Math.floor(index / 4);
+  return { x: GRID_X0 + col * COL_PITCH, y: GRID_Y0 + row * ROW_PITCH };
+}
+
+// 방 내부에 책상 그리드 배치(desk + monitor + chair 세트). 최대 3열 x 2행 = 6석.
+// 반환: 실제로 배치된 책상 수.
 function furnishDesks(
   map: TileMap,
-  x: number,
-  y: number,
+  rx: number,
+  ry: number,
   count: number,
-  cols: number,
-): void {
-  for (let i = 0; i < count; i++) {
-    const row = Math.floor(i / cols);
-    const col = i % cols;
-    const dx = x + 2 + col * 4;
-    const dy = y + 2 + row * 3;
-    setTile(map, dx, dy, TileType.Desk);
-    setTile(map, dx + 1, dy, TileType.Monitor);
-    setTile(map, dx, dy + 1, TileType.Chair);
+): number {
+  const colXs = [rx + 2, rx + 6, rx + 10]; // 3열
+  const rowYs = [ry + 2, ry + 5]; // 2행
+  let placed = 0;
+  for (let i = 0; i < count && i < colXs.length * rowYs.length; i++) {
+    const cx = colXs[i % colXs.length]!;
+    const cy = rowYs[Math.floor(i / colXs.length)]!;
+    setTile(map, cx, cy, TileType.Desk);
+    setTile(map, cx + 1, cy, TileType.Monitor);
+    setTile(map, cx, cy + 1, TileType.Chair);
+    placed++;
+  }
+  return placed;
+}
+
+// 부서 특성 가구 — 방 하단 공간에 배치(책상과 겹치지 않게 ry+rh-2 행 사용).
+const DEPT_FEATURE: Partial<Record<DepartmentId, number>> = {
+  engineering: TileType.Server,
+  design: TileType.Whiteboard,
+  qa: TileType.Whiteboard,
+  marketing: TileType.Whiteboard,
+  finance: TileType.Bookshelf,
+  hr: TileType.Sofa,
+  sales: TileType.Bookshelf,
+  support: TileType.Printer,
+  operations: TileType.Bookshelf,
+};
+
+function furnishDeptRoom(map: TileMap, id: DepartmentId, rx: number, ry: number): void {
+  const dept = DEPT_REGISTRY[id];
+  furnishDesks(map, rx, ry, dept.headcount);
+  // 화분(좌하 코너) + 부서 특성 가구(우하 코너)
+  setTile(map, rx + 1, ry + ROOM_H - 2, TileType.Plant);
+  const feature = DEPT_FEATURE[id];
+  if (feature !== undefined) {
+    setTile(map, rx + ROOM_W - 2, ry + ROOM_H - 2, feature);
   }
 }
 
-// Build the compact 40x30 office map with all departments
+// Build the large 60x48 office map with all departments
 export function buildOfficeMap(): TileMap {
-  const map = createTileMap(40, 30);
-  fillRect(map, 0, 0, 40, 30, TileType.Wall);
+  const map = createTileMap(MAP_W, MAP_H);
+  fillRect(map, 0, 0, MAP_W, MAP_H, TileType.Wall);
 
-  // ===== ROW 1: LOBBY (top, full width, y=0..4) =====
-  // Stamp lobby without doors first; doors are re-placed after corridor fills
-  // to prevent the corridor fillRect at y=4 from overwriting them.
-  stampRoom(map, 0, 0, 40, 5,
-    { id: "lobby", label: "로비", bounds: { x: 0, y: 0, w: 40, h: 5 } },
+  // ===== LOBBY (top, full width, y=0..5) =====
+  stampRoom(map, 0, 0, MAP_W, LOBBY_H,
+    { id: "lobby", label: "로비", bounds: { x: 0, y: 0, w: MAP_W, h: LOBBY_H } },
     []);
-  setTile(map, 18, 2, TileType.Reception);
-  setTile(map, 19, 2, TileType.Reception);
-  setTile(map, 20, 2, TileType.Reception);
+  // 리셉션 데스크(중앙) + 소파 + 화분
+  setTile(map, 28, 2, TileType.Reception);
+  setTile(map, 29, 2, TileType.Reception);
+  setTile(map, 30, 2, TileType.Reception);
+  setTile(map, 31, 2, TileType.Reception);
   setTile(map, 3, 2, TileType.Plant);
-  setTile(map, 36, 2, TileType.Plant);
-  setTile(map, 6, 3, TileType.Sofa);
-  setTile(map, 7, 3, TileType.Sofa);
-  setTile(map, 32, 3, TileType.Sofa);
-  setTile(map, 33, 3, TileType.Sofa);
+  setTile(map, 56, 2, TileType.Plant);
+  setTile(map, 8, 3, TileType.Sofa);
+  setTile(map, 9, 3, TileType.Sofa);
+  setTile(map, 50, 3, TileType.Sofa);
+  setTile(map, 51, 3, TileType.Sofa);
+  setTile(map, 4, 2, TileType.Clock);
 
-  // ===== VERTICAL CORRIDORS (x=8..9 and x=30..31, y=4..24) =====
-  fillRect(map, 8, 4, 2, 21, TileType.Corridor); // left corridor
-  fillRect(map, 30, 4, 2, 21, TileType.Corridor); // right corridor
+  // ===== CORRIDOR LATTICE =====
+  // 수평 복도: 로비 아래(6), 그리드 행 사이(18,30), 그리드 아래(42)
+  for (const cy of [6, 18, 30, 42]) {
+    fillRect(map, 1, cy, MAP_W - 2, 2, TileType.Corridor);
+  }
+  // 수직 복도: 열 사이 간격(x=14,29,44), 좌우 가장자리(x=... 방이 붙어있어 불필요)
+  for (const cx of [14, 29, 44]) {
+    fillRect(map, cx, 6, 2, 38, TileType.Corridor);
+  }
 
-  // ===== HORIZONTAL CORRIDORS =====
-  fillRect(map, 0, 4, 40, 1, TileType.Corridor);  // top (y=4)
-  fillRect(map, 0, 10, 40, 1, TileType.Corridor); // mid1 (y=10)
-  fillRect(map, 0, 15, 40, 1, TileType.Corridor); // mid2 (y=15)
-  fillRect(map, 0, 21, 40, 1, TileType.Corridor); // mid3 (y=21)
-  fillRect(map, 0, 25, 40, 1, TileType.Corridor); // bottom (y=25)
+  // ===== GRID ROOMS (부서 + 사장실 + 식당 + 회의실) =====
+  GRID_SLOTS.forEach((slot, index) => {
+    const { x, y } = slotOrigin(index);
+    const zone: Zone = {
+      id: slot.id,
+      label: slot.label,
+      bounds: { x, y, w: ROOM_W, h: ROOM_H },
+    };
+    const floor = slot.kind === "dept" ? TileType.Carpet : TileType.Floor;
+    stampRoom(map, x, y, ROOM_W, ROOM_H, zone, [], floor);
 
-  // Re-place lobby doors AFTER corridor fills so y=4 corridor does not overwrite them
-  setTile(map, 19, 4, TileType.Door);
-  setTile(map, 20, 4, TileType.Door);
+    if (slot.kind === "dept") {
+      furnishDeptRoom(map, slot.id as DepartmentId, x, y);
+    } else if (slot.kind === "ceo") {
+      // 사장실 — 큰 책상 + 의자 + 소파 + 책장 + 화분
+      setTile(map, x + 3, y + 3, TileType.Desk);
+      setTile(map, x + 4, y + 3, TileType.Monitor);
+      setTile(map, x + 3, y + 4, TileType.Chair);
+      setTile(map, x + 2, y + 3, TileType.Plant);
+      setTile(map, x + ROOM_W - 3, y + 2, TileType.Bookshelf);
+      setTile(map, x + 2, y + ROOM_H - 2, TileType.Sofa);
+      setTile(map, x + 3, y + ROOM_H - 2, TileType.Sofa);
+    } else if (slot.kind === "cafeteria") {
+      // 식당 — 테이블 여러 개 + 커피머신 + 자판기 + 정수기
+      setTile(map, x + 2, y + 3, TileType.Table);
+      setTile(map, x + 5, y + 3, TileType.Table);
+      setTile(map, x + 8, y + 3, TileType.Table);
+      setTile(map, x + 2, y + 6, TileType.Table);
+      setTile(map, x + 5, y + 6, TileType.Table);
+      setTile(map, x + ROOM_W - 2, y + 2, TileType.CoffeeMachine);
+      setTile(map, x + ROOM_W - 2, y + 4, TileType.VendingMachine);
+      setTile(map, x + ROOM_W - 2, y + 6, TileType.WaterCooler);
+    } else if (slot.kind === "meeting") {
+      // 회의실 — 대형 테이블 + 의자 둘러앉기 + 화이트보드
+      fillRect(map, x + 4, y + 3, 4, 3, TileType.Table);
+      setTile(map, x + 3, y + 3, TileType.Chair);
+      setTile(map, x + 8, y + 3, TileType.Chair);
+      setTile(map, x + 3, y + 5, TileType.Chair);
+      setTile(map, x + 8, y + 5, TileType.Chair);
+      setTile(map, x + 5, y + ROOM_H - 2, TileType.Whiteboard);
+    }
+  });
 
-  // ===== ROW 2: CEO + ENGINEERING + DESIGN + MARKETING (y=5..9) =====
-  // Rooms are 5 tiles tall (y=5..9). Interior rows: y=6..8 (3 usable rows).
-  // furnishDesks row-0: dy=y+2=7, row-1: dy=y+5=10 → overflows into corridor y=10.
-  // Therefore all row-2 dept rooms use a single desk row (cols=count, capped at 2
-  // per 10-tile-wide room to stay within the interior x bounds).
+  // ===== BOTTOM BAND: 서버실 + 화장실 (y=43..46) =====
+  const bandY = 43;
+  const bandH = 4;
+  stampRoom(map, 1, bandY, 24, bandH,
+    { id: "server-room", label: "서버실", bounds: { x: 1, y: bandY, w: 24, h: bandH } },
+    []);
+  setTile(map, 3, bandY + 1, TileType.Server);
+  setTile(map, 5, bandY + 1, TileType.Server);
+  setTile(map, 7, bandY + 1, TileType.Server);
+  setTile(map, 9, bandY + 1, TileType.Server);
 
-  // CEO office (x=0..7, y=5..9) — manual furniture only, no furnishDesks
-  stampRoom(map, 0, 5, 8, 5,
-    { id: "ceo-office", label: "사장실", bounds: { x: 0, y: 5, w: 8, h: 5 } },
-    [{ x: 7, y: 7 }]);
-  setTile(map, 3, 7, TileType.Desk);
-  setTile(map, 4, 7, TileType.Monitor);
-  setTile(map, 3, 8, TileType.Chair);
-  setTile(map, 2, 7, TileType.Plant);
-  setTile(map, 6, 6, TileType.Bookshelf);
+  stampRoom(map, 26, bandY, 20, bandH,
+    { id: "restroom", label: "화장실", bounds: { x: 26, y: bandY, w: 20, h: bandH } },
+    []);
+  setTile(map, 28, bandY + 1, TileType.Toilet);
+  setTile(map, 31, bandY + 1, TileType.Toilet);
+  setTile(map, 34, bandY + 1, TileType.WaterCooler);
 
-  // Engineering (x=10..19, y=5..9) — 2 desks fit in single row
-  stampRoom(map, 10, 5, 10, 5,
-    { id: "engineering", label: "개발팀", bounds: { x: 10, y: 5, w: 10, h: 5 } },
-    [{ x: 14, y: 9 }], TileType.Carpet);
-  furnishDesks(map, 10, 5, 2, 2);
-  setTile(map, 16, 7, TileType.Whiteboard);
-
-  // Design (x=20..29, y=5..9) — 2 desks fit in single row
-  stampRoom(map, 20, 5, 10, 5,
-    { id: "design", label: "디자인팀", bounds: { x: 20, y: 5, w: 10, h: 5 } },
-    [{ x: 24, y: 9 }], TileType.Carpet);
-  furnishDesks(map, 20, 5, 2, 2);
-
-  // Marketing (x=32..39, y=5..9) — 1 desk fits in single row (w=8 → col=0 only)
-  stampRoom(map, 32, 5, 8, 5,
-    { id: "marketing", label: "마케팅팀", bounds: { x: 32, y: 5, w: 8, h: 5 } },
-    [{ x: 35, y: 9 }], TileType.Carpet);
-  furnishDesks(map, 32, 5, 1, 1);
-
-  // ===== ROW 3: HR + CAFETERIA + MEETING (y=11..14) =====
-  // Rooms h=4: interior y=12..13. Single desk row at dy=y+2=13 fits; row-1 dy=16 overflows.
-
-  // HR (x=0..7, y=11..14) — 1 desk (w=8 → col=0 only; h=4 → 1 row only)
-  stampRoom(map, 0, 11, 8, 4,
-    { id: "hr", label: "인사팀", bounds: { x: 0, y: 11, w: 8, h: 4 } },
-    [{ x: 7, y: 12 }], TileType.Carpet);
-  furnishDesks(map, 0, 11, 1, 1);
-
-  // Cafeteria (x=10..29, y=11..14)
-  stampRoom(map, 10, 11, 20, 4,
-    { id: "cafeteria", label: "식당", bounds: { x: 10, y: 11, w: 20, h: 4 } },
-    [{ x: 19, y: 11 }]);
-  setTile(map, 13, 13, TileType.Table);
-  setTile(map, 17, 13, TileType.Table);
-  setTile(map, 21, 13, TileType.Table);
-  setTile(map, 25, 13, TileType.CoffeeMachine);
-  setTile(map, 27, 13, TileType.VendingMachine);
-
-  // Meeting room (x=32..39, y=11..14)
-  stampRoom(map, 32, 11, 8, 4,
-    { id: "meeting-room", label: "회의실", bounds: { x: 32, y: 11, w: 8, h: 4 } },
-    [{ x: 35, y: 11 }]);
-  fillRect(map, 34, 12, 3, 2, TileType.Table);
-  setTile(map, 33, 12, TileType.Chair);
-  setTile(map, 37, 12, TileType.Chair);
-  setTile(map, 33, 13, TileType.Chair);
-  setTile(map, 37, 13, TileType.Chair);
-
-  // ===== ROW 4: QA + FINANCE + OPERATIONS + SUPPORT + SALES (y=16..20) =====
-  // Rooms h=5: same overflow constraint as row 2 — single desk row only.
-
-  // QA (x=0..7, y=16..20) — 1 desk (w=8 → col=0 only)
-  stampRoom(map, 0, 16, 8, 5,
-    { id: "qa", label: "QA", bounds: { x: 0, y: 16, w: 8, h: 5 } },
-    [{ x: 7, y: 18 }], TileType.Carpet);
-  furnishDesks(map, 0, 16, 1, 1);
-
-  // Finance (x=10..16, y=16..20) — 1 desk (w=7 → col=0 only)
-  stampRoom(map, 10, 16, 7, 5,
-    { id: "finance", label: "재무팀", bounds: { x: 10, y: 16, w: 7, h: 5 } },
-    [{ x: 13, y: 20 }], TileType.Carpet);
-  furnishDesks(map, 10, 16, 1, 1);
-
-  // Operations (x=17..23, y=16..20) — 1 desk (w=7 → col=0 only)
-  stampRoom(map, 17, 16, 7, 5,
-    { id: "operations", label: "운영팀", bounds: { x: 17, y: 16, w: 7, h: 5 } },
-    [{ x: 20, y: 20 }], TileType.Carpet);
-  furnishDesks(map, 17, 16, 1, 1);
-
-  // Support (x=24..29, y=16..20) — 1 desk (w=6 → col=0 only)
-  stampRoom(map, 24, 16, 6, 5,
-    { id: "support", label: "고객지원팀", bounds: { x: 24, y: 16, w: 6, h: 5 } },
-    [{ x: 27, y: 20 }], TileType.Carpet);
-  furnishDesks(map, 24, 16, 1, 1);
-
-  // Sales (x=32..39, y=16..20) — 1 desk (w=8 → col=0 only)
-  stampRoom(map, 32, 16, 8, 5,
-    { id: "sales", label: "영업팀", bounds: { x: 32, y: 16, w: 8, h: 5 } },
-    [{ x: 35, y: 20 }], TileType.Carpet);
-  furnishDesks(map, 32, 16, 1, 1);
-
-  // ===== ROW 5: SERVER ROOM + RESTROOM (y=22..24) =====
-  // Rooms h=3: interior row y=23 only.
-
-  // Server room (x=0..7, y=22..24)
-  stampRoom(map, 0, 22, 8, 3,
-    { id: "server-room", label: "서버실", bounds: { x: 0, y: 22, w: 8, h: 3 } },
-    [{ x: 7, y: 23 }]);
-  setTile(map, 2, 23, TileType.Server);
-  setTile(map, 4, 23, TileType.Server);
-
-  // Restroom (x=10..15, y=22..24)
-  stampRoom(map, 10, 22, 6, 3,
-    { id: "restroom", label: "화장실", bounds: { x: 10, y: 22, w: 6, h: 3 } },
-    [{ x: 13, y: 22 }]);
-  setTile(map, 11, 23, TileType.Toilet);
-  setTile(map, 13, 23, TileType.Toilet);
-
-  // ===== BOTTOM CORRIDOR (y=26..29) =====
-  fillRect(map, 0, 26, 40, 4, TileType.Corridor);
+  // ===== DOORS (복도 채운 뒤에 뚫어 corridor fill에 덮이지 않게) =====
+  // 로비 → 아래 복도(문 2칸)
+  setTile(map, 29, LOBBY_H - 1, TileType.Door);
+  setTile(map, 30, LOBBY_H - 1, TileType.Door);
+  // 각 그리드 방 상단 중앙에 문(위쪽 복도로 연결)
+  GRID_SLOTS.forEach((_, index) => {
+    const { x, y } = slotOrigin(index);
+    setTile(map, x + Math.floor(ROOM_W / 2), y, TileType.Door);
+  });
+  // 바닥 밴드(서버실/화장실) 상단 문
+  setTile(map, 12, bandY, TileType.Door);
+  setTile(map, 36, bandY, TileType.Door);
 
   return map;
 }

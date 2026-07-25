@@ -36,6 +36,7 @@ import {
   findPath,
   pickWanderTarget,
   wanderZone,
+  assignLook,
   type CompanyStats,
   type DuckWorkState,
   type TileMap,
@@ -45,6 +46,8 @@ import {
   type GameClock,
   type DepartmentId,
   type NpcTask,
+  type CharacterLook,
+  type CharFacing,
 } from "@ldd/core";
 import { InputManager } from "@/lib/office-input";
 import { OfficeSoundManager } from "@/lib/office-sound";
@@ -52,8 +55,9 @@ import { VirtualDpad } from "@/components/VirtualDpad";
 import { OfficeTalkPanel } from "@/components/OfficeTalkPanel";
 import { OfficeDashboard } from "@/components/OfficeDashboard";
 import { OfficeManagementPanel } from "@/components/OfficeManagementPanel";
-import { drawDuckSprite, drawHumanSprite, drawFurnitureSprite, drawFloorTile, drawFurniture, drawFromTileset, drawMinimap, TILESET_MAP } from "@/lib/office-draw";
+import { drawDuckSprite, drawFurnitureSprite, drawFloorTile, drawFloorMI, drawWallMI, drawFurniture, drawFromTileset, drawMinimap, TILESET_MAP } from "@/lib/office-draw";
 import { loadAllSprites, type SpriteAssets } from "@/lib/sprite-loader";
+import { loadCharacterAssets, drawCharacter, type CharacterAssets } from "@/lib/office-characters";
 
 // ---------------------------------------------------------------------------
 // 상수
@@ -227,21 +231,21 @@ function walkableTilesInZone(map: TileMap, zoneId: string): Vec[] {
   return tiles;
 }
 
-// Chair 타일 위치 반환 — NPC를 책상 앞 의자에 배치하기 위함
+// Desk 타일 위치 반환 — NPC를 책상 자리에 앉힌다(책상을 앞에 겹쳐 그려 "앉은" 모습).
 function deskTilesInZone(map: TileMap, zoneId: string): Vec[] {
   const zone = map.zones.find((z) => z.id === zoneId);
   if (!zone) return [];
-  const chairs: Vec[] = [];
+  const desks: Vec[] = [];
   for (let dy = 1; dy < zone.bounds.h - 1; dy++) {
     for (let dx = 1; dx < zone.bounds.w - 1; dx++) {
       const x = zone.bounds.x + dx;
       const y = zone.bounds.y + dy;
-      if (getTile(map, x, y) === TileType.Chair) {
-        chairs.push({ x, y });
+      if (getTile(map, x, y) === TileType.Desk) {
+        desks.push({ x, y });
       }
     }
   }
-  return chairs.length > 0 ? chairs : walkableTilesInZone(map, zoneId);
+  return desks.length > 0 ? desks : walkableTilesInZone(map, zoneId);
 }
 
 function ceoStartPos(map: TileMap): Vec {
@@ -259,21 +263,6 @@ function ceoStartPos(map: TileMap): Vec {
 type TalkTarget = {
   npc: Npc;
   text: string;
-};
-
-// ---------------------------------------------------------------------------
-// 부서 ID -> 캐릭터 인덱스 (0-2, PixelOfficeAssets row 3 캐릭터)
-// ---------------------------------------------------------------------------
-const DEPT_CHAR_INDEX: Partial<Record<string, number>> = {
-  engineering: 0,
-  marketing:   1,
-  design:      2,
-  hr:          0,
-  finance:     1,
-  sales:       0,
-  support:     1,
-  qa:          2,
-  operations:  0,
 };
 
 // ---------------------------------------------------------------------------
@@ -296,6 +285,12 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const camRef = useRef<Camera | null>(null);
   const spritesRef = useRef<SpriteAssets | null>(null);
   const spritesLoadedRef = useRef(false);
+  // Modern Interiors 캐릭터 에셋 + NPC별 외형(캐릭터/색조) 배분
+  const charsRef = useRef<CharacterAssets | null>(null);
+  const npcLooksRef = useRef<Map<string, CharacterLook>>(new Map());
+  // 부서 카펫 색상(타일 인덱스 -> 색) + CEO 책상 위치(대시보드 근접 판정용)
+  const carpetColorsRef = useRef<Map<number, string>>(new Map());
+  const ceoDeskRef = useRef<Vec>({ x: 4, y: 11 });
 
   const inputRef = useRef<InputManager>(new InputManager());
   const soundRef = useRef<OfficeSoundManager>(new OfficeSoundManager());
@@ -398,11 +393,50 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
     }
 
     npcsRef.current = npcs;
+
+    // NPC별 외형(캐릭터/색조) 결정적 배분 — 부서 내 순번 + 전역 순번 기준으로 겹침 최소화
+    const looks = new Map<string, CharacterLook>();
+    const deptCount: Record<string, number> = {};
+    npcs.forEach((npc, gi) => {
+      const di = deptCount[npc.department] ?? 0;
+      deptCount[npc.department] = di + 1;
+      looks.set(npc.id, assignLook(npc.department, di, gi));
+    });
+    npcLooksRef.current = looks;
+
+    // 부서방 카펫 타일 -> 부서 색상. 렌더 Pass 1에서 부서색으로 카펫을 칠한다.
+    const carpetColors = new Map<number, string>();
+    for (const zone of map.zones) {
+      const dept = DEPT_REGISTRY[zone.id as DepartmentId];
+      if (!dept) continue;
+      for (let yy = zone.bounds.y; yy < zone.bounds.y + zone.bounds.h; yy++) {
+        for (let xx = zone.bounds.x; xx < zone.bounds.x + zone.bounds.w; xx++) {
+          if (getTile(map, xx, yy) === TileType.Carpet) {
+            carpetColors.set(yy * map.cols + xx, dept.color);
+          }
+        }
+      }
+    }
+    carpetColorsRef.current = carpetColors;
+
+    // CEO 책상 위치 = ceo-office 존 내 첫 Desk 타일 (대시보드 근접 판정용)
+    const ceoZone = map.zones.find((z) => z.id === "ceo-office");
+    if (ceoZone) {
+      for (let yy = ceoZone.bounds.y; yy < ceoZone.bounds.y + ceoZone.bounds.h; yy++) {
+        for (let xx = ceoZone.bounds.x; xx < ceoZone.bounds.x + ceoZone.bounds.w; xx++) {
+          if (getTile(map, xx, yy) === TileType.Desk) {
+            ceoDeskRef.current = { x: xx, y: yy };
+            break;
+          }
+        }
+      }
+    }
+
     clockRef.current = kstClock();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- realTasks는 마운트 시 1회만 반영 (의도적 빈 deps)
   }, []);
 
-  // 스프라이트 비동기 로드
+  // 스프라이트 비동기 로드 (타일셋/가구/오리 + Modern Interiors 캐릭터)
   useEffect(() => {
     loadAllSprites()
       .then((assets) => {
@@ -412,6 +446,13 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
       .catch((err) => {
         // 스프라이트 로드 실패 — 폴백 렌더러로 계속 동작
         console.warn("스프라이트 로드 실패, 폴백 렌더러 사용:", err);
+      });
+    loadCharacterAssets()
+      .then((assets) => {
+        charsRef.current = assets;
+      })
+      .catch((err) => {
+        console.warn("캐릭터 스프라이트 로드 실패, 폴백 렌더러 사용:", err);
       });
   }, []);
 
@@ -484,6 +525,53 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
     canvas.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => canvas.removeEventListener("touchend", onTouchEnd);
   }, []);
+
+  // 캔버스 마우스 클릭 — 직원(NPC)을 직접 클릭하면 대화/업무 패널을 연다(데스크톱).
+  // 캐릭터는 전신(높이 2타일: 발=자기 타일, 머리=한 칸 위)이라 두 타일 모두 히트 판정한다.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const onClick = (e: MouseEvent) => {
+      const cam = camRef.current;
+      if (!cam) return;
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const { x: wx, y: wy } = screenToWorld(cam, sx, sy);
+      const tileX = Math.floor(wx / TILE);
+      const tileY = Math.floor(wy / TILE);
+      // 클릭 타일이 NPC의 발(자기 타일) 또는 머리(한 칸 위)에 해당하면 선택
+      const npc = npcsRef.current.find(
+        (n) =>
+          n.tile.x === tileX &&
+          (n.tile.y === tileY || n.tile.y === tileY + 1) &&
+          n.schedulePhase !== "offwork" &&
+          n.schedulePhase !== "commuting" &&
+          n.schedulePhase !== "leaving",
+      );
+      if (npc) {
+        setTalking({ npc, text: buildNpcDescription(npc) });
+        soundRef.current.playInteract();
+      }
+    };
+
+    canvas.addEventListener("click", onClick);
+    return () => canvas.removeEventListener("click", onClick);
+  }, []);
+
+  // 대화 패널이 열려 있는 동안 선택한 직원의 실제 업무 진행률을 실시간 반영(1초 간격).
+  const talkingId = talking?.npc.id ?? null;
+  useEffect(() => {
+    if (!talkingId) return;
+    const iv = setInterval(() => {
+      const live = npcsRef.current.find((n) => n.id === talkingId);
+      if (live) {
+        setTalking((prev) => (prev ? { npc: live, text: buildNpcDescription(live) } : prev));
+      }
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [talkingId]);
 
   // ResizeObserver — 캔버스 크기 + 카메라 뷰포트 갱신
   useEffect(() => {
@@ -666,11 +754,12 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         }
       }
 
-      // CEO 책상 근접 감지: ceo-office 내 책상(3,7) 기준 2타일 이내
+      // CEO 책상 근접 감지: ceo-office 내 책상 기준 2타일 이내
+      const ceoDesk = ceoDeskRef.current;
       const atCeoDesk =
         zoneId === "ceo-office" &&
-        Math.abs(player.x - 3) <= 2 &&
-        Math.abs(player.y - 7) <= 2;
+        Math.abs(player.x - ceoDesk.x) <= 2 &&
+        Math.abs(player.y - ceoDesk.y) <= 2;
 
       // 클럭 표시 갱신 (매 초 단위) — 시간대 레이블 + 아이콘 포함
       {
@@ -804,24 +893,31 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
 
       const sprites = spritesRef.current;
 
-      // --- Pass 1: 바닥 타일 ---
+      // --- Pass 1: 바닥 타일 (Modern Interiors Room_Builder, 없으면 절차적 폴백) ---
       const officeTilesetPass1 = sprites?.officeTileset ?? null;
+      const roomBuilder = sprites?.roomBuilder ?? null;
       for (let row = r0; row < r1; row++) {
         for (let col = c0; col < c1; col++) {
           const tt = getTile(map, col, row);
           if (tt === TileType.Wall) continue;
           const { x: sx, y: sy } = worldToScreen(cam, col * TILE, row * TILE);
-          drawFloorTile(ctx, officeTilesetPass1, sx, sy, tt, TILE, col, row);
+          const carpetColor =
+            tt === TileType.Carpet
+              ? carpetColorsRef.current.get(row * map.cols + col)
+              : undefined;
+          if (roomBuilder) {
+            drawFloorMI(ctx, roomBuilder, sx, sy, tt, TILE, carpetColor);
+          } else {
+            drawFloorTile(ctx, officeTilesetPass1, sx, sy, tt, TILE, col, row, carpetColor);
+          }
         }
       }
 
-      // --- Pass 2: 가구 / 벽 ---
-      for (let row = r0; row < r1; row++) {
-        for (let col = c0; col < c1; col++) {
-          const tt = getTile(map, col, row);
-          if (!isFurnitureTile(tt)) continue;
-          const { x: sx, y: sy } = worldToScreen(cam, col * TILE, row * TILE);
+      // 책상/모니터/테이블은 NPC를 앞에서 가려 "앉은" 모습을 만들기 위해 NPC 뒤에 그린다(front pass).
+      const FRONT_FURNITURE = new Set<number>([TileType.Desk, TileType.Monitor, TileType.Table]);
 
+      // 가구 한 칸을 그리는 헬퍼 (back/front pass 공용)
+      const drawFurnitureTile = (tt: number, sx: number, sy: number) => {
           // 우선순위: 1) PixelOffice 타일셋  2) 개별 가구 스프라이트  3) 폴백 프로시저럴
           const tilesetRect = TILESET_MAP[tt];
           const officeTileset = sprites?.officeTileset ?? null;
@@ -859,58 +955,66 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
               }
             }
           }
+      };
+
+      // --- Pass 2 (back): 벽 + 뒤쪽 가구 (책상/모니터/테이블 제외 — 그건 NPC 뒤 front pass) ---
+      for (let row = r0; row < r1; row++) {
+        for (let col = c0; col < c1; col++) {
+          const tt = getTile(map, col, row);
+          if (!isFurnitureTile(tt)) continue;
+          const { x: sx, y: sy } = worldToScreen(cam, col * TILE, row * TILE);
+          if (tt === TileType.Wall) {
+            if (roomBuilder) drawWallMI(ctx, roomBuilder, sx, sy, TILE);
+            else drawFurnitureTile(tt, sx, sy);
+            continue;
+          }
+          if (FRONT_FURNITURE.has(tt)) continue; // front pass에서 그림
+          drawFurnitureTile(tt, sx, sy);
         }
       }
 
-      // --- Pass 2.5: 부서 구역 입구 NPC 수 배지 ---
-      // 각 구역의 문(Door 타일) 위치를 찾아 "현재인원/총인원" 배지를 그린다.
+      // --- Pass 2.5: 방 간판 + 부서 인원 배지 ---
+      // 각 방의 상단 중앙(문 위)에 방 이름 간판을 그리고, 부서는 "근무/총원"을 함께 표시한다.
       {
         const allNpcs = npcsRef.current;
         for (const zone of map.zones) {
-          // 부서 구역만 (복도·로비·화장실 등 제외)
-          if (!DEPT_CHAR_INDEX[zone.id]) continue;
+          if (zone.id === "lobby") continue; // 로비는 전체라 간판 생략
 
-          // 구역 경계 내 Door 타일 찾기 (첫 번째)
-          let doorCol = -1;
-          let doorRow = -1;
-          outer: for (let dy = 0; dy < zone.bounds.h; dy++) {
-            for (let dx = 0; dx < zone.bounds.w; dx++) {
-              const col = zone.bounds.x + dx;
-              const row = zone.bounds.y + dy;
-              if (getTile(map, col, row) === TileType.Door) {
-                doorCol = col;
-                doorRow = row;
-                break outer;
-              }
-            }
-          }
-          if (doorCol < 0) continue;
+          const dept = DEPT_REGISTRY[zone.id as DepartmentId];
+          // 간판 위치 = 방 상단 중앙(월드 기준). 문 바로 위 벽에 붙는다.
+          const signCol = zone.bounds.x + zone.bounds.w / 2;
+          const signRow = zone.bounds.y;
           // 가시 범위 바깥이면 스킵
-          if (doorCol < c0 || doorCol >= c1 || doorRow < r0 || doorRow >= r1) continue;
+          if (signCol < c0 - 4 || signCol >= c1 + 4 || signRow < r0 - 2 || signRow >= r1 + 2) continue;
 
-          // 구역 NPC 집계
-          const total = allNpcs.filter((n) => n.department === zone.id).length;
-          const working = allNpcs.filter(
-            (n) => n.department === zone.id && n.schedulePhase === "working",
-          ).length;
-
-          const label = `${working}/${total}`;
-          const { x: bx, y: by } = worldToScreen(cam, doorCol * TILE, doorRow * TILE);
-          const badgeX = bx + TILE / 2;
-          const badgeY = by - 4;
+          const { x: bx, y: by } = worldToScreen(cam, signCol * TILE, signRow * TILE);
+          const signX = bx;
+          const signY = by - 3; // 벽 위에 살짝
 
           ctx.save();
-          ctx.font = "bold 8px sans-serif";
           ctx.textAlign = "center";
+
+          // 인원 배지(부서만)
+          let countLabel = "";
+          if (dept) {
+            const total = allNpcs.filter((n) => n.department === zone.id).length;
+            const working = allNpcs.filter(
+              (n) => n.department === zone.id && n.schedulePhase === "working",
+            ).length;
+            countLabel = `  ${working}/${total}`;
+          }
+          const label = `${zone.label}${countLabel}`;
+
+          ctx.font = "bold 9px sans-serif";
           const tw = ctx.measureText(label).width;
-          const bw = tw + 6;
-          const bh = 11;
-          // 배지 둥근 사각형
-          ctx.fillStyle = "rgba(0,0,0,0.72)";
+          const bw = tw + 10;
+          const bh = 14;
+          const rx = signX - bw / 2;
+          const ry = signY - bh;
+          const radius = 4;
+          // 간판 판때기 — 부서색 테두리
+          ctx.fillStyle = "rgba(17,20,26,0.85)";
           ctx.beginPath();
-          const rx = badgeX - bw / 2;
-          const ry = badgeY - bh + 2;
-          const radius = 3;
           ctx.moveTo(rx + radius, ry);
           ctx.lineTo(rx + bw - radius, ry);
           ctx.arcTo(rx + bw, ry, rx + bw, ry + radius, radius);
@@ -922,9 +1026,14 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           ctx.arcTo(rx, ry, rx + radius, ry, radius);
           ctx.closePath();
           ctx.fill();
-          // 텍스트: 근무 인원 수에 따라 색 구분
-          ctx.fillStyle = working > 0 ? "#86efac" : "#9ca3af";
-          ctx.fillText(label, badgeX, badgeY);
+          if (dept) {
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = dept.color;
+            ctx.stroke();
+          }
+          // 텍스트
+          ctx.fillStyle = "#F3F4F6";
+          ctx.fillText(label, signX, ry + 10);
           ctx.restore();
         }
       }
@@ -945,17 +1054,26 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         const wy = npc.tile.y * TILE;
         const { x: sx, y: sy } = worldToScreen(cam, wx, wy);
 
-        // 인간 캐릭터 스프라이트 렌더 (직원은 항상 인간 스프라이트)
-        const officeTileset = sprites?.officeTileset ?? null;
-        const charIdx = DEPT_CHAR_INDEX[npc.department] ?? 0;
-        // 점심/휴식 중이면 idle 처리 (반투명)
+        // Modern Interiors 전신 캐릭터 렌더 — 부서·개인별 캐릭터/색조로 서로 다르게, 잘림 없이.
+        // 점심/휴식 중이면 걷기(run) 애니, 자리에선 idle 애니.
         const isIdle = npc.schedulePhase === "lunch" || npc.schedulePhase === "break";
+        const chars = charsRef.current;
+        const look = npcLooksRef.current.get(npc.id);
+        const facing = npc.facing as CharFacing;
+        // 배회 중이면 빠른 걷기 프레임, 자리에선 느린 idle 프레임
+        const cframe = isIdle ? Math.floor(frame / 3) % 6 : Math.floor(frame / 10) % 6;
 
-        if (officeTileset) {
-          drawHumanSprite(ctx, officeTileset, sx, sy, TILE, charIdx, isIdle);
-        } else {
+        const drew =
+          chars && look
+            ? drawCharacter(
+                ctx, chars, look.character, look.hue,
+                sx, sy, TILE, facing, cframe, isIdle, false,
+              )
+            : false;
+
+        if (!drew) {
           // 폴백: 색 원형
-          ctx.globalAlpha = isIdle ? 0.45 : 1.0;
+          ctx.globalAlpha = isIdle ? 0.6 : 1.0;
           ctx.fillStyle = npc.accessoryColor || "#F6EFDD";
           ctx.beginPath();
           ctx.arc(sx + TILE / 2, sy + TILE / 2, TILE / 3, 0, Math.PI * 2);
@@ -996,12 +1114,22 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           }
         }
 
-        // 상태 아이콘 — idle(점심/휴식)이면 💤 표시
+        // 상태 아이콘 — 머리 위(책상에 가리지 않도록). idle(점심/휴식)이면 💤.
         const stateIcon = isIdle ? "💤" : (STATE_ICON[npc.workState] ?? "❓");
         ctx.font = "10px serif";
-        ctx.fillText(stateIcon, sx + TILE / 2, sy + TILE - 2);
+        ctx.fillText(stateIcon, sx + TILE / 2, sy - TILE - 2);
 
         ctx.restore();
+      }
+
+      // --- Pass 3.5 (front): 책상/모니터/테이블 — 착석 NPC 하반신을 가려 "앉은" 모습 완성 ---
+      for (let row = r0; row < r1; row++) {
+        for (let col = c0; col < c1; col++) {
+          const tt = getTile(map, col, row);
+          if (!FRONT_FURNITURE.has(tt)) continue;
+          const { x: sx, y: sy } = worldToScreen(cam, col * TILE, row * TILE);
+          drawFurnitureTile(tt, sx, sy);
+        }
       }
 
       // --- Pass 4: 플레이어(CEO 오리) ---

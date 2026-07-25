@@ -313,6 +313,57 @@ export function drawFloorTile(
 }
 
 // ---------------------------------------------------------------------------
+// drawFloorMI — Modern Interiors Room_Builder(544x736, 32px 셀) 바닥 타일로 바닥을 그린다.
+// 절차적 체커 대신 실제 픽셀아트 바닥 → 데모 수준의 일관된 룩. 카펫은 바닥 + 부서색 얇은 틴트.
+// 셀 좌표(검증): 크림 타일=(11,7)=(352,224), 회색=(11,11)=(352,352), 헤링본 우드=(11,13)=(352,416).
+// ---------------------------------------------------------------------------
+const RB = 32; // Room_Builder 셀 크기(px)
+// tileType -> 바닥 셀 [col,row]
+function floorCell(tileType: number): { c: number; r: number } {
+  switch (tileType) {
+    case 5:  return { c: 11, r: 11 }; // Corridor -> 회색 타일
+    case 4:  return { c: 11, r: 13 }; // Door -> 헤링본 우드(문턱)
+    case 6:  return { c: 11, r: 7 };  // Carpet -> 크림(위에 부서색 틴트)
+    default: return { c: 11, r: 7 };  // Floor 등 -> 크림 타일
+  }
+}
+
+export function drawFloorMI(
+  ctx: CanvasRenderingContext2D,
+  roomBuilder: HTMLImageElement,
+  x: number,
+  y: number,
+  tileType: number,
+  tileSize: number,
+  carpetColor?: string,
+): void {
+  const { c, r } = floorCell(tileType);
+  ctx.drawImage(roomBuilder, c * RB, r * RB, RB, RB, x, y, tileSize, tileSize);
+  // 카펫: 부서색을 얇게 덧입혀 "부서 카펫"처럼 (텍스처는 유지)
+  if (tileType === 6 && carpetColor) {
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = carpetColor;
+    ctx.fillRect(x, y, tileSize, tileSize);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// drawWallMI — Room_Builder 벽 타일. 상단 캡(흰색) 없이 벽 몸통 셀을 사용.
+// 파란-회색 벽 몸통 = (0,18)=(0,576) 근처. 단순 사용을 위해 한 셀만.
+// ---------------------------------------------------------------------------
+export function drawWallMI(
+  ctx: CanvasRenderingContext2D,
+  roomBuilder: HTMLImageElement,
+  x: number,
+  y: number,
+  tileSize: number,
+): void {
+  // 청회색 벽 몸통 (col 0, row 18)
+  ctx.drawImage(roomBuilder, 0 * RB, 18 * RB, RB, RB, x, y, tileSize, tileSize);
+}
+
+// ---------------------------------------------------------------------------
 // drawFurniture — 16x16 pixel art for each TileType
 // Call AFTER drawFloorTile so furniture sits on top.
 // ---------------------------------------------------------------------------

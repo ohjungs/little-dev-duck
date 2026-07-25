@@ -11,11 +11,11 @@ describe("buildOfficeMap", () => {
     map = buildOfficeMap();
   });
 
-  it("40x30 크기의 유효한 맵을 반환한다", () => {
-    expect(map.cols).toBe(40);
-    expect(map.rows).toBe(30);
+  it("60x48 크기의 유효한 맵을 반환한다", () => {
+    expect(map.cols).toBe(60);
+    expect(map.rows).toBe(48);
     expect(map.tiles).toBeInstanceOf(Uint8Array);
-    expect(map.tiles.length).toBe(40 * 30);
+    expect(map.tiles.length).toBe(60 * 48);
   });
 
   it("타일 배열이 비어 있지 않다 (0이 아닌 타일이 존재한다)", () => {
@@ -23,15 +23,23 @@ describe("buildOfficeMap", () => {
     expect(nonZero).toBe(true);
   });
 
-  it("최소 14개 이상의 존을 가진다", () => {
+  it("최소 14개 이상의 존을 가진다 (9부서 + 사장실 + 로비 + 식당 + 회의실 + 서버실 + 화장실)", () => {
     expect(map.zones.length).toBeGreaterThanOrEqual(14);
   });
 
-  it("CEO 오피스 존이 올바른 좌표에 등록되어 있다", () => {
+  it("9개 부서 존이 모두 등록되어 있다", () => {
+    const deptIds = [
+      "engineering", "marketing", "design", "hr", "finance",
+      "sales", "support", "qa", "operations",
+    ];
+    for (const id of deptIds) {
+      expect(map.zones.find(z => z.id === id)).toBeDefined();
+    }
+  });
+
+  it("CEO 오피스 존이 등록되어 있고 레이블이 '사장실'이다", () => {
     const ceo = map.zones.find(z => z.id === "ceo-office");
     expect(ceo).toBeDefined();
-    expect(ceo!.bounds.x).toBe(0);
-    expect(ceo!.bounds.y).toBe(5);
     expect(ceo!.label).toBe("사장실");
   });
 
@@ -41,11 +49,9 @@ describe("buildOfficeMap", () => {
     expect(lobby!.label).toBe("로비");
   });
 
-  it("수평 복도(y=10)는 Corridor 타일이다 (walkable)", () => {
-    // mid1 corridor: fillRect(map, 0, 10, 40, 1, Corridor) → row 10, several x values
-    for (const x of [1, 5, 15, 25, 35]) {
-      const tile = getTile(map, x, 10);
-      expect(tile).toBe(TileType.Corridor);
+  it("수평 복도(y=6)는 Corridor 타일이다 (walkable)", () => {
+    for (const x of [1, 5, 20, 40, 55]) {
+      expect(getTile(map, x, 6)).toBe(TileType.Corridor);
     }
   });
 
@@ -57,37 +63,59 @@ describe("buildOfficeMap", () => {
     expect(isSolid(TileType.Door)).toBe(false);
   });
 
-  it("로비 도어(19, 4)는 Door 타일이다", () => {
-    expect(getTile(map, 19, 4)).toBe(TileType.Door);
-    expect(getTile(map, 20, 4)).toBe(TileType.Door);
+  it("로비 도어(29/30, y=5)는 Door 타일이다", () => {
+    expect(getTile(map, 29, 5)).toBe(TileType.Door);
+    expect(getTile(map, 30, 5)).toBe(TileType.Door);
   });
 
   it("로비 경계 외벽은 Wall 타일이다", () => {
-    // Top wall of lobby (y=0), left wall (x=0)
     expect(getTile(map, 10, 0)).toBe(TileType.Wall);
     expect(getTile(map, 0, 2)).toBe(TileType.Wall);
-    // Right wall (x=39, i.e. x+w-1 = 0+40-1 = 39)
-    expect(getTile(map, 39, 2)).toBe(TileType.Wall);
+    expect(getTile(map, 59, 2)).toBe(TileType.Wall);
   });
 
   it("로비 내부는 Floor 타일이다", () => {
-    expect(getTile(map, 10, 2)).toBe(TileType.Floor);
-    expect(getTile(map, 25, 2)).toBe(TileType.Floor);
+    expect(getTile(map, 15, 2)).toBe(TileType.Floor);
+    expect(getTile(map, 40, 1)).toBe(TileType.Floor);
+  });
+
+  it("개발팀 방은 정원(6명)만큼 의자를 가진다", () => {
+    const eng = map.zones.find(z => z.id === "engineering")!;
+    let chairs = 0;
+    for (let dy = 0; dy < eng.bounds.h; dy++) {
+      for (let dx = 0; dx < eng.bounds.w; dx++) {
+        if (getTile(map, eng.bounds.x + dx, eng.bounds.y + dy) === TileType.Chair) chairs++;
+      }
+    }
+    expect(chairs).toBe(6);
+  });
+
+  it("부서방 바닥은 Carpet(부서 색상용)이다", () => {
+    const eng = map.zones.find(z => z.id === "engineering")!;
+    // 방 내부 어딘가에 Carpet 타일이 존재한다
+    let carpet = false;
+    for (let dy = 1; dy < eng.bounds.h - 1; dy++) {
+      for (let dx = 1; dx < eng.bounds.w - 1; dx++) {
+        if (getTile(map, eng.bounds.x + dx, eng.bounds.y + dy) === TileType.Carpet) carpet = true;
+      }
+    }
+    expect(carpet).toBe(true);
   });
 
   it("서버실 존이 존재한다", () => {
-    const srv = map.zones.find(z => z.id === "server-room");
-    expect(srv).toBeDefined();
+    expect(map.zones.find(z => z.id === "server-room")).toBeDefined();
   });
 
   it("화장실 존이 존재한다", () => {
-    const wc = map.zones.find(z => z.id === "restroom");
-    expect(wc).toBeDefined();
+    expect(map.zones.find(z => z.id === "restroom")).toBeDefined();
   });
 
   it("식당 존이 존재한다", () => {
-    const cafe = map.zones.find(z => z.id === "cafeteria");
-    expect(cafe).toBeDefined();
+    expect(map.zones.find(z => z.id === "cafeteria")).toBeDefined();
+  });
+
+  it("회의실 존이 존재한다", () => {
+    expect(map.zones.find(z => z.id === "meeting-room")).toBeDefined();
   });
 
   it("Wall 타일은 solid하다", () => {

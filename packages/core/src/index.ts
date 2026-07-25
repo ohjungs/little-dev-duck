@@ -261,6 +261,20 @@ export {
   type Department,
 } from "./domain/office-department";
 export {
+  OFFICE_CHARACTERS,
+  CHAR_FRAME_W,
+  CHAR_FRAME_H,
+  CHAR_FRAMES_PER_DIR,
+  CHAR_DIR_ORDER,
+  charDirSlot,
+  charSourceX,
+  assignLook,
+  type OfficeCharacterId,
+  type CharFacing,
+  type CharAnim,
+  type CharacterLook,
+} from "./domain/office-character";
+export {
   createGameClock,
   gameClockFromHm,
   tickClock,

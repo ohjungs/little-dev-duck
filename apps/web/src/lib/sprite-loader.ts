@@ -14,6 +14,7 @@ export type SpriteAssets = {
   duckBoss: HTMLImageElement;    // ducky_3_spritesheet.png — CEO
   furniture: Map<string, HTMLImageElement>;
   officeTileset: HTMLImageElement | null;  // PixelOfficeAssets.png — 256x160 오피스 타일셋
+  roomBuilder: HTMLImageElement | null;    // Modern Interiors Room_Builder_free_32x32.png — 바닥/벽 타일
 };
 
 // 가구 파일명 목록 — /sprites/furniture/{name}.png 형식
@@ -61,5 +62,13 @@ export async function loadAllSprites(): Promise<SpriteAssets> {
     // 타일셋 없으면 폴백 렌더러 유지
   }
 
-  return { duckYellow, duckBoss, furniture, officeTileset };
+  // 2026-07-25 : Modern Interiors 바닥/벽 타일셋(Room_Builder) — 바닥·카펫 렌더에 사용
+  let roomBuilder: HTMLImageElement | null = null;
+  try {
+    roomBuilder = await loadImage("/sprites/modern-interiors/tiles/Room_Builder_free_32x32.png");
+  } catch {
+    // 없으면 절차적 바닥 폴백
+  }
+
+  return { duckYellow, duckBoss, furniture, officeTileset, roomBuilder };
 }
