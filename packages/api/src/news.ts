@@ -206,6 +206,26 @@ export async function listArticles(
   return (data ?? []).map((r) => articleFromRow(r as ArticleRow));
 }
 
+// 2026-07-26 : 뉴스 - 요약대상 - 창밖은영영안됨
+// 수집 라우트는 최신 100개를 가져와 앱에서 summary가 null인 것을 걸렀다. 수집이 요약(1회 8개)
+// 보다 빠르면 요약 안 된 기사가 그 창 밖으로 밀려나고 **그 뒤로는 영영 요약되지 않는다.**
+// 창을 넓히는 대신 대상만 DB에서 직접 고른다 — 창 개념 자체가 사라진다.
+//
+// 오래된 것부터 처리한다. 최신순으로 하면 밀린 기사가 새 기사에 계속 밀려 영영 차례가 안 온다.
+export async function listUnsummarizedArticles(
+  supabase: SupabaseClient,
+  limit: number,
+): Promise<Article[]> {
+  const { data, error } = await supabase
+    .from("articles")
+    .select("*")
+    .is("summary", null)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => articleFromRow(r as ArticleRow));
+}
+
 // Postgres unique_violation — 같은 기사 재수집은 정상이므로 에러가 아니라 스킵으로 다룬다.
 function isDuplicate(error: { code?: string } | null): boolean {
   return error?.code === "23505";

@@ -139,6 +139,7 @@ export {
   setFeedStatus,
   deleteFeed,
   listArticles,
+  listUnsummarizedArticles,
   collectFeed,
   summarizeArticle,
   setArticleSummary,

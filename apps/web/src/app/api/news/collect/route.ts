@@ -3,7 +3,7 @@ import {
   allowRequest,
   listFeeds,
   collectFeed,
-  listArticles,
+  listUnsummarizedArticles,
   summarizeArticle,
   setArticleSummary,
 } from "@ldd/api";
@@ -48,10 +48,9 @@ export async function POST() {
     }
 
     // 요약: summary=null 기사 최신순 상한개까지. 쿼터 소진 시 중단(부분 성공 반환).
-    const articles = await listArticles(supabase, 100);
-    const pending = articles
-      .filter((a) => a.summary === null)
-      .slice(0, MAX_SUMMARIES_PER_RUN);
+    // 요약 대상만 DB에서 직접 고른다. 예전엔 최신 100개를 가져와 앱에서 걸렀는데, 수집이
+    // 요약보다 빠르면 요약 안 된 기사가 그 창 밖으로 밀려나 **영영 요약되지 않았다.**
+    const pending = await listUnsummarizedArticles(supabase, MAX_SUMMARIES_PER_RUN);
     let summarized = 0;
     for (const a of pending) {
       try {
