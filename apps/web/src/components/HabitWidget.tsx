@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { subscribeTable } from "@/lib/realtime";
 import { emitXpChanged } from "@/lib/xpSignal";
 import { todayIso } from "@/lib/today";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   Card,
   CardContent,
@@ -156,6 +157,15 @@ export function HabitWidget() {
       setActionError("변경하지 못했습니다.");
     }
   };
+
+  // 습관 삭제는 되돌릴 수 없다 — habit_checks가 on delete cascade라 체크 기록이 함께
+  // 사라지고, 같은 id로 습관 행만 되살려도 스트릭은 돌아오지 않는다. 할 일·메모처럼
+  // "지우고 되돌리기"를 붙이면 사용자가 복구된다고 믿고 기록을 잃는다. 그래서 실행 전에 묻는다.
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    name: string;
+    checkCount: number;
+  } | null>(null);
 
   const handleDelete = async (id: string) => {
     const prevHabits = habits;
@@ -352,7 +362,13 @@ export function HabitWidget() {
                   )}
                   <button
                     type="button"
-                    onClick={() => handleDelete(habit.id)}
+                    onClick={() =>
+                      setPendingDelete({
+                        id: habit.id,
+                        name: habit.title,
+                        checkCount: checks.filter((c) => c.habitId === habit.id).length,
+                      })
+                    }
                     aria-label="삭제"
                     className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
                   >
@@ -364,6 +380,22 @@ export function HabitWidget() {
           </ul>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="습관 삭제"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.name}"을(를) 삭제하면 체크 기록 ${pendingDelete.checkCount}건도 함께 사라지고 되돌릴 수 없습니다.`
+            : ""
+        }
+        confirmLabel="삭제"
+        onConfirm={() => {
+          const target = pendingDelete;
+          setPendingDelete(null);
+          if (target) void handleDelete(target.id);
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
       {newHabitToast && (
         <div
           role="status"

@@ -2,7 +2,13 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { Check, Download, Pencil, Pin, Plus, Search, StickyNote, X } from "lucide-react";
-import { createMemo, deleteMemo, listMemos, updateMemo } from "@ldd/api";
+import {
+  createMemo,
+  deleteMemo,
+  listMemos,
+  restoreMemo,
+  updateMemo,
+} from "@ldd/api";
 import type { Memo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
@@ -16,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { WidgetSkeleton } from "@/components/Skeleton";
 import { timeAgo } from "@/lib/timeAgo";
+import { UndoNotice } from "@/components/UndoNotice";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -72,6 +79,8 @@ export function MemoWidget() {
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => getPinnedIds());
   const [state, setState] = useState<LoadState>("loading");
   const [actionError, setActionError] = useState<string | null>(null);
+  // 방금 지운 메모. 되돌리기 안내를 띄우는 동안만 들고 있는다.
+  const [deleted, setDeleted] = useState<Memo | null>(null);
   const [newContent, setNewContent] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -171,13 +180,35 @@ export function MemoWidget() {
     }
   };
 
+  const handleUndoDelete = async (memo: Memo) => {
+    setDeleted(null);
+    setActionError(null);
+    // 같은 id로 되살아나므로 임베딩(sourceId)이 그대로 이어진다.
+    setMemos((prev) => (prev.some((m) => m.id === memo.id) ? prev : [memo, ...prev]));
+    try {
+      await restoreMemo(supabase, memo);
+      void reindexSource({
+        sourceType: "memo",
+        sourceId: memo.id,
+        text: memo.content,
+      });
+    } catch {
+      // 실패를 조용히 넘기면 복구된 줄 알고 넘어간다.
+      setMemos((prev) => prev.filter((m) => m.id !== memo.id));
+      setActionError("되돌리지 못했습니다.");
+    }
+  };
+
   const handleDelete = async (id: string) => {
     const prevMemos = memos;
+    const removed = prevMemos.find((m) => m.id === id) ?? null;
     setMemos((prev) => prev.filter((m) => m.id !== id));
     try {
       await deleteMemo(supabase, id);
       // 빈 텍스트로 재인덱싱 = 서버가 해당 소스 임베딩 삭제.
       void reindexSource({ sourceType: "memo", sourceId: id, text: "" });
+      // 삭제 버튼은 hover로 뜨는 작은 아이콘이라 오클릭이 실제로 일어난다. 되돌릴 창을 준다.
+      if (removed) setDeleted(removed);
     } catch {
       setMemos(prevMemos);
       setActionError("메모를 삭제하지 못했습니다.");
@@ -246,6 +277,15 @@ export function MemoWidget() {
               className="h-8 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
+        )}
+
+        {deleted && (
+          <UndoNotice
+            key={deleted.id}
+            message={`"${deleted.title}" 삭제했습니다.`}
+            onUndo={() => void handleUndoDelete(deleted)}
+            onDismiss={() => setDeleted(null)}
+          />
         )}
 
         {actionError && (

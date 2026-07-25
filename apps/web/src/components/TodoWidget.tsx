@@ -7,6 +7,7 @@ import {
   createTodo,
   deleteTodo,
   listTodos,
+  restoreTodo,
   updateTodo,
 } from "@ldd/api";
 import { describeRecurrence, type Todo } from "@ldd/core";
@@ -33,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WidgetSkeleton } from "@/components/Skeleton";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { UndoNotice } from "@/components/UndoNotice";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -52,6 +54,8 @@ export function TodoWidget() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [actionError, setActionError] = useState<string | null>(null);
+  // 방금 지운 할 일. 되돌리기 안내를 띄우는 동안만 들고 있는다.
+  const [deleted, setDeleted] = useState<Todo | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [onlyToday, setOnlyToday] = useState(false);
   const [hideDone, setHideDone] = useState(false);
@@ -192,12 +196,35 @@ export function TodoWidget() {
     }
   };
 
+  const handleUndoDelete = async (todo: Todo) => {
+    setDeleted(null);
+    setActionError(null);
+    // 같은 id로 되살아나므로 순서(localStorage)와 임베딩이 그대로 이어진다.
+    setTodos((prev) => (prev.some((t) => t.id === todo.id) ? prev : [todo, ...prev]));
+    try {
+      await restoreTodo(supabase, todo);
+      void reindexSource({
+        sourceType: "todo",
+        sourceId: todo.id,
+        text: todoEmbedText(todo.title, todo.isDone),
+      });
+      // 오리 기분 신호는 todos가 바뀔 때 도는 effect가 이미 발행한다(중복 호출 불필요).
+    } catch {
+      // 실패를 조용히 넘기면 복구된 줄 알고 넘어간다.
+      setTodos((prev) => prev.filter((t) => t.id !== todo.id));
+      setActionError("되돌리지 못했습니다.");
+    }
+  };
+
   const handleDelete = async (id: string) => {
     const prevTodos = todos;
+    const removed = prevTodos.find((t) => t.id === id) ?? null;
     setTodos((prev) => prev.filter((t) => t.id !== id));
     try {
       await deleteTodo(supabase, id);
       void reindexSource({ sourceType: "todo", sourceId: id, text: "" });
+      // 삭제 버튼은 hover로 뜨는 작은 아이콘이라 오클릭이 실제로 일어난다. 되돌릴 창을 준다.
+      if (removed) setDeleted(removed);
     } catch {
       setTodos(prevTodos);
       setActionError("삭제하지 못했습니다.");
@@ -372,6 +399,15 @@ export function TodoWidget() {
             <Plus />
           </Button>
         </div>
+
+        {deleted && (
+          <UndoNotice
+            key={deleted.id}
+            message={`"${deleted.title}" 삭제했습니다.`}
+            onUndo={() => void handleUndoDelete(deleted)}
+            onDismiss={() => setDeleted(null)}
+          />
+        )}
 
         {actionError && (
           <p role="alert" className="text-xs text-destructive">
