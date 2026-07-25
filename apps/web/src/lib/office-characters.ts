@@ -104,7 +104,11 @@ export function drawCharacter(
   const src = getTinted(assets, char, anim, hue);
   if (!src) return false;
 
-  const sx = charSourceX(facing, frame);
+  // 스프라이트 시트에 명확한 우향 프레임이 없어(slot3가 정면처럼 보임) 좌향(slot2)을 수평 반전해
+  // 우향으로 그린다 — 항상 올바른 좌우 프로필 보장.
+  const flip = facing === "right";
+  const srcFacing: CharFacing = flip ? "left" : facing;
+  const sx = charSourceX(srcFacing, frame);
   const sw = 16;
   const sh = CHAR_FRAME_H; // 32
 
@@ -115,7 +119,16 @@ export function drawCharacter(
   const dy = y - tileSize; // 머리가 한 타일 위로
 
   if (isIdleDim) ctx.globalAlpha = 0.6;
-  ctx.drawImage(src, sx, 0, sw, sh, dx, dy, destW, destH);
+  if (flip) {
+    // 수평 반전: 목적지 중심 기준으로 뒤집어 그린다.
+    ctx.save();
+    ctx.translate(dx + destW, dy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(src, sx, 0, sw, sh, 0, 0, destW, destH);
+    ctx.restore();
+  } else {
+    ctx.drawImage(src, sx, 0, sw, sh, dx, dy, destW, destH);
+  }
   ctx.globalAlpha = 1;
   return true;
 }
