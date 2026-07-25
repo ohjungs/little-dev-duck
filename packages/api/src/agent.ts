@@ -185,9 +185,15 @@ export async function runAgentTurn(
     const { auto, approval, unknown } = partitionToolCalls(calls, adapter.catalog);
 
     // mutating이 하나라도 있으면 실행하지 않고 승인 대기로 반환한다(파괴적/외부발송 자동 실행 금지).
-    // ponytail: 같은 턴에 섞여 온 auto(readonly)/unknown 호출은 여기서 실행·보고되지 않고 버려진다
-    // (예: "일정 보여주고 회의도 잡아줘"의 조회 절반). 현재 카탈로그가 소규모(어댑터 1개, 도구 2개)라
-    // 실사용 빈도가 낮아 미루지만, 어댑터가 늘면(T5+) auto도 함께 실행해 결과에 포함하도록 확장한다.
+    // 2026-07-26 : 오리 - 혼합턴 - 조회절반유실(미해결)
+    // 같은 턴에 섞여 온 auto(readonly)/unknown 호출은 여기서 실행·보고되지 않고 **버려진다**
+    // (예: "이번 주 마감 알려주고 장보기도 추가해줘"의 조회 절반 — 오리가 그 질문엔 아예 답하지 않는다).
+    //
+    // 원래 주석은 "조회 도구가 없어 실사용 빈도가 낮다"를 근거로 이 처리를 미뤘는데,
+    // **listTodos가 생기면서 그 전제가 깨졌다.** 이제 혼합 턴이 실제로 일어날 수 있다.
+    // 다만 auto 결과를 approval_pending 응답에 실어 보내려면 계약(DuckChatResponse)과 승인 카드
+    // UI가 함께 바뀌어야 해서, 여기서 급히 반쪽으로 고치지 않고 별도 작업으로 남긴다
+    // (docs/loop-eng/manual-verification.md 23번). 지금은 조회만 하는 턴은 정상 동작한다.
     if (approval.length > 0) {
       return { status: "approval_pending", calls: approval };
     }

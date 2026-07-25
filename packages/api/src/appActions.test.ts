@@ -17,7 +17,7 @@ function mockSupabase(insertedRow: Record<string, unknown>): SupabaseClient {
 }
 
 describe("createAppActionsAdapter", () => {
-  it("카탈로그에 생성·완료 도구가 있고 전부 mutating(승인 필요)", () => {
+  it("카탈로그 구성 — 조회는 readonly, 나머지는 전부 mutating(승인 필요)", () => {
     const a = createAppActionsAdapter(mockSupabase({}));
     const names = a.catalog.map((t) => t.name).sort();
     expect(names).toEqual([
@@ -27,8 +27,15 @@ describe("createAppActionsAdapter", () => {
       "createMemo",
       "createPage",
       "createTodo",
+      "listTodos",
     ]);
-    expect(a.catalog.every((t) => t.kind === "mutating")).toBe(true);
+    // 안전 계약: **데이터를 바꾸는 도구는 하나도 빠짐없이 승인 대기여야 한다**(T0-4).
+    // 원래 이 테스트는 "전부 mutating"을 못박고 있었는데, 조회 도구가 생기면서 그 문장은
+    // 더 이상 성립하지 않는다. 지켜야 할 건 개수가 아니라 이 성질이라 그쪽으로 다시 쓴다.
+    for (const tool of a.catalog) {
+      const shouldBeReadonly = tool.name.startsWith("list");
+      expect(tool.kind, tool.name).toBe(shouldBeReadonly ? "readonly" : "mutating");
+    }
   });
 
   it("createTodo 실행 시 할 일을 만들고 결과를 되돌린다", async () => {
@@ -360,5 +367,70 @@ describe("createTodo 마감일·반복 (Phase 23)", () => {
     const props = decl.parameters.properties as Record<string, unknown>;
     expect(Object.keys(props).sort()).toEqual(["dueDate", "recurrence", "title"]);
     expect(decl.parameters.required).toEqual(["title"]);
+  });
+});
+
+// 2026-07-26 : 오리 - 조회도구 - 승인없이자동실행
+// 조회 도구는 승인 카드를 띄우면 안 된다(읽기인데 매번 확인을 받으면 대화가 끊긴다).
+// 동시에 **쓰기 도구가 실수로 readonly로 새면 승인 없이 데이터가 바뀐다** — 위 카탈로그
+// 테스트가 그쪽을 막고, 여기서는 조회가 실제로 값을 돌려주는지 본다.
+function todoListSupabase(rows: Record<string, unknown>[]): SupabaseClient {
+  const chain = {
+    select: () => chain,
+    order: () => chain,
+    limit: () => Promise.resolve({ data: rows, error: null }),
+  };
+  return {
+    auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
+    from: () => chain,
+  } as unknown as SupabaseClient;
+}
+
+const TODO_ROW = (id: string, title: string, due: string | null, done = false) => ({
+  id,
+  user_id: "22222222-2222-4222-8222-222222222222",
+  title,
+  is_done: done,
+  due_date: due,
+  created_at: "2026-07-25T00:00:00+00:00",
+  updated_at: "2026-07-25T00:00:00+00:00",
+});
+
+describe("listTodos 조회 도구", () => {
+  it("승인 없이 바로 실행되고 할 일을 돌려준다", async () => {
+    const a = createAppActionsAdapter(
+      todoListSupabase([
+        TODO_ROW("11111111-1111-4111-8111-111111111111", "장보기", null),
+        TODO_ROW("11111111-1111-4111-8111-111111111112", "보고서", "2026-07-27T00:00:00+00:00"),
+      ]),
+    );
+    const res = await a.execute({ id: "c1", name: "listTodos", args: {} });
+    expect(res.response.error).toBeUndefined();
+    const todos = (res.response as { todos: { title: string; dueDate: string | null }[] }).todos;
+    expect(todos.map((t) => t.title)).toContain("장보기");
+    // 마감일은 오리가 오늘과 비교할 수 있게 날짜만 담는다.
+    expect(todos.find((t) => t.title === "보고서")?.dueDate).toBe("2026-07-27");
+  });
+
+  it("완료 상태로 거를 수 있다", async () => {
+    const a = createAppActionsAdapter(
+      todoListSupabase([
+        TODO_ROW("11111111-1111-4111-8111-111111111111", "끝난일", null, true),
+        TODO_ROW("11111111-1111-4111-8111-111111111112", "남은일", null, false),
+      ]),
+    );
+    const res = await a.execute({ id: "c1", name: "listTodos", args: { status: "notDone" } });
+    const todos = (res.response as { todos: { title: string }[] }).todos;
+    expect(todos.map((t) => t.title)).toEqual(["남은일"]);
+  });
+
+  it("조회 조건이 이상하면 실행하지 않고 오류로 답한다", async () => {
+    const a = createAppActionsAdapter(todoListSupabase([]));
+    const res = await a.execute({
+      id: "c1",
+      name: "listTodos",
+      args: { status: "무엇이든", dueWithinDays: "일주일" },
+    });
+    expect(res.response.error).toBeDefined();
   });
 });

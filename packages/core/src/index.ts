@@ -82,6 +82,11 @@ export {
 } from "./domain/quota";
 export { todoEmbedText, calendarEventEmbedText } from "./domain/embed-text";
 export {
+  selectTodosForDuck,
+  DUCK_TODO_LIMIT,
+  type DuckTodoFilter,
+} from "./domain/todo-query";
+export {
   EMBEDDING_DIM,
   embeddingSourceSchema,
   embeddingChunkSchema,

@@ -5,6 +5,7 @@ import {
   kstDateString,
   parseRecurrence,
   serializeRecurrence,
+  selectTodosForDuck,
   todoEmbedText,
 } from "@ldd/core";
 import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
@@ -134,6 +135,30 @@ const addEventDecl: ToolDeclaration = {
   kind: "mutating",
 };
 
+const listTodosDecl: ToolDeclaration = {
+  name: "listTodos",
+  description:
+    "사용자의 할 일 목록을 조회한다. '이번 주 마감 뭐 있어?', '남은 할 일 뭐야?', '오늘 뭐 해야 해?'처럼 " +
+    "할 일을 묻는 질문에 쓴다. 추측하지 말고 반드시 이 도구로 확인한 뒤 답한다. " +
+    "dueWithinDays를 주면 기한이 지난 것도 함께 준다(가장 급한 항목이므로).",
+  parameters: {
+    type: "object",
+    properties: {
+      status: {
+        type: "string",
+        enum: ["all", "done", "notDone"],
+        description: "완료 상태 필터. 기본은 전체",
+      },
+      dueWithinDays: {
+        type: "number",
+        description: "오늘부터 며칠 이내 마감만 볼지(이번 주=7). 생략하면 마감 무관 전체",
+      },
+    },
+    required: [],
+  },
+  kind: "readonly",
+};
+
 const checkHabitDecl: ToolDeclaration = {
   name: "checkHabit",
   description:
@@ -172,6 +197,11 @@ export function coerceTodoDueDate(raw: string): string | null {
   return d.toISOString().slice(0, 10) === s ? iso : null;
 }
 const habitArgs = z.object({ title: z.string().min(1).max(100) });
+const listTodosArgs = z.object({
+  status: z.enum(["all", "done", "notDone"]).optional(),
+  dueWithinDays: z.number().int().min(-3650).max(3650).optional(),
+});
+
 const completeArgs = z.object({ title: z.string().min(1).max(500) });
 const memoArgs = z.object({ content: z.string().min(1).max(2000) });
 const eventArgs = z.object({ title: z.string().min(1).max(300), startAt: z.string().min(1) });
@@ -235,8 +265,29 @@ export function createAppActionsAdapter(
       createPageDecl,
       addEventDecl,
       checkHabitDecl,
+      listTodosDecl,
     ],
     async execute(call: ToolCall): Promise<ToolResult> {
+      if (call.name === listTodosDecl.name) {
+        const parsed = listTodosArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "조회 조건이 올바르지 않습니다.");
+        // 서버는 UTC로 돌아 new Date()로 "오늘"을 만들면 KST 새벽에 어제가 된다.
+        const today = kstDateString(new Date());
+        const selected = selectTodosForDuck(await listTodos(supabase), parsed.data, today);
+        return {
+          id: call.id,
+          name: call.name,
+          // 오리에게 되돌아가는 값이라 필요한 필드만 담는다(컨텍스트·쿼터 절약).
+          response: {
+            todos: selected.map((t) => ({
+              title: t.title,
+              isDone: t.isDone,
+              dueDate: t.dueDate?.slice(0, 10) ?? null,
+            })),
+          },
+        };
+      }
+
       if (call.name === createTodoDecl.name) {
         const parsed = todoArgs.safeParse(call.args);
         if (!parsed.success) return errorResult(call, "할 일 정보가 올바르지 않습니다.");
