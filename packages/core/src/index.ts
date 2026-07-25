@@ -306,6 +306,11 @@ export {
   connectCorridor,
 } from "./domain/office-map-builder";
 export {
+  deptColor,
+  deptLabel,
+  schedulePhaseLabel,
+} from "./domain/office-label";
+export {
   DEPARTMENTS,
   DEPT_REGISTRY,
   DUCK_NAMES,

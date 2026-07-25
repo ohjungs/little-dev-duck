@@ -10,6 +10,8 @@ import {
   type CompanyStats,
   type Npc,
   type GameClock,
+  deptColor,
+  deptLabel,
 } from "@ldd/core";
 import { formatClockTime } from "@ldd/core";
 
@@ -23,36 +25,6 @@ type Props = {
 // ---------------------------------------------------------------------------
 // 헬퍼
 // ---------------------------------------------------------------------------
-function getDeptColor(dept: string): string {
-  const colors: Record<string, string> = {
-    engineering: "#4A90D9",
-    marketing:   "#E84C3D",
-    design:      "#9B59B6",
-    hr:          "#2ECC71",
-    finance:     "#2C3E50",
-    sales:       "#E67E22",
-    support:     "#1ABC9C",
-    qa:          "#F1C40F",
-    operations:  "#95A5A6",
-  };
-  return colors[dept] ?? "#888";
-}
-
-function getDeptLabel(dept: string): string {
-  const labels: Record<string, string> = {
-    engineering: "개발팀",
-    marketing:   "마케팅팀",
-    design:      "디자인팀",
-    hr:          "인사팀",
-    finance:     "재무팀",
-    sales:       "영업팀",
-    support:     "고객지원팀",
-    qa:          "QA팀",
-    operations:  "운영팀",
-  };
-  return labels[dept] ?? dept;
-}
-
 function satisfactionEmoji(val: number): string {
   if (val >= 80) return "😊";
   if (val >= 50) return "😐";
@@ -187,7 +159,7 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
                 members.reduce((s, n) => s + n.productivity, 0) / members.length,
               );
               const working = members.filter((n) => n.schedulePhase === "working").length;
-              const color = getDeptColor(dept);
+              const color = deptColor(dept);
               const isExpanded = expandedDept === dept;
 
               return (
@@ -204,7 +176,7 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
                       {isExpanded ? "▾" : "▸"}
                     </span>
                     <span className="font-mono text-xs flex-1 text-gray-200">
-                      {getDeptLabel(dept)}
+                      {deptLabel(dept)}
                     </span>
                     <span className="font-mono text-xs text-gray-400">
                       {working}/{members.length}
@@ -277,8 +249,8 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
             {topDeptEntry && (
               <div className="flex justify-between font-mono text-xs">
                 <span className="text-gray-400">최고 생산성</span>
-                <span style={{ color: getDeptColor(topDeptEntry[0]) }}>
-                  {getDeptLabel(topDeptEntry[0])} ({topDeptEntry[1]}%)
+                <span style={{ color: deptColor(topDeptEntry[0]) }}>
+                  {deptLabel(topDeptEntry[0])} ({topDeptEntry[1]}%)
                 </span>
               </div>
             )}

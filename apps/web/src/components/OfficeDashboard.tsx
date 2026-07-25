@@ -2,7 +2,11 @@
 
 // 2026-07-24 : Phase F — 전사 대시보드 (CEO 사장실 책상 앞 오버레이)
 
-import { formatClockTime, type Npc, type GameClock } from "@ldd/core";
+import { formatClockTime, type Npc, type GameClock,
+  deptColor,
+  deptLabel,
+  schedulePhaseLabel,
+} from "@ldd/core";
 
 type Props = {
   npcs: Npc[];
@@ -63,14 +67,14 @@ export function OfficeDashboard({ npcs, clock, onClose }: Props) {
               ? activeTasks.reduce((s, t) => s + t.progress, 0) / activeTasks.length
               : 0;
           const working = deptNpcs.filter((n) => n.schedulePhase === "working").length;
-          const color = getDeptColor(dept);
+          const color = deptColor(dept);
 
           return (
             <div key={dept} className="border border-border rounded-lg p-3">
               {/* 부서 헤더 */}
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                <span className="font-semibold text-sm">{getDeptLabel(dept)}</span>
+                <span className="font-semibold text-sm">{deptLabel(dept)}</span>
                 <span className="text-xs text-muted-foreground ml-auto">
                   {working}/{deptNpcs.length}명 근무
                 </span>
@@ -92,7 +96,7 @@ export function OfficeDashboard({ npcs, clock, onClose }: Props) {
                 {deptNpcs.map((n) => (
                   <div key={n.id} className="text-xs flex justify-between">
                     <span>{n.name}</span>
-                    <span className="text-muted-foreground">{getStatusLabel(n.schedulePhase)}</span>
+                    <span className="text-muted-foreground">{schedulePhaseLabel(n.schedulePhase)}</span>
                   </div>
                 ))}
               </div>
@@ -110,8 +114,8 @@ export function OfficeDashboard({ npcs, clock, onClose }: Props) {
           <div className="space-y-1 max-h-40 overflow-y-auto">
             {activityFeed.map((item, i) => (
               <div key={i} className="text-xs text-muted-foreground">
-                <span style={{ color: getDeptColor(item.npc.department) }}>
-                  [{getDeptLabel(item.npc.department)}]
+                <span style={{ color: deptColor(item.npc.department) }}>
+                  [{deptLabel(item.npc.department)}]
                 </span>{" "}
                 {item.npc.name} — {item.task.title} 완료
               </div>
@@ -126,44 +130,3 @@ export function OfficeDashboard({ npcs, clock, onClose }: Props) {
 // ---------------------------------------------------------------------------
 // 헬퍼 — OfficeTalkPanel과 동일한 인라인 매핑
 // ---------------------------------------------------------------------------
-function getDeptColor(dept: string): string {
-  const colors: Record<string, string> = {
-    engineering: "#4A90D9",
-    marketing:   "#E84C3D",
-    design:      "#9B59B6",
-    hr:          "#2ECC71",
-    finance:     "#2C3E50",
-    sales:       "#E67E22",
-    support:     "#1ABC9C",
-    qa:          "#F1C40F",
-    operations:  "#95A5A6",
-  };
-  return colors[dept] ?? "#888";
-}
-
-function getDeptLabel(dept: string): string {
-  const labels: Record<string, string> = {
-    engineering: "개발팀",
-    marketing:   "마케팅팀",
-    design:      "디자인팀",
-    hr:          "인사팀",
-    finance:     "재무팀",
-    sales:       "영업팀",
-    support:     "고객지원팀",
-    qa:          "QA팀",
-    operations:  "운영팀",
-  };
-  return labels[dept] ?? dept;
-}
-
-function getStatusLabel(phase: string): string {
-  const labels: Record<string, string> = {
-    working:   "업무 중",
-    lunch:     "점심 시간",
-    break:     "휴식 중",
-    commuting: "출근 중",
-    leaving:   "퇴근 중",
-    offwork:   "퇴근",
-  };
-  return labels[phase] ?? phase;
-}

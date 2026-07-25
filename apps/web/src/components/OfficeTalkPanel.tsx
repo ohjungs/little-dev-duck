@@ -3,6 +3,7 @@
 // 2026-07-24 : Phase F — NPC 상세 대화 패널 (React 오버레이, 하단 시트 모바일)
 
 import { useState } from "react";
+import { deptColor, deptLabel, schedulePhaseLabel } from "@ldd/core";
 import type { Npc } from "@ldd/core";
 
 type Props = {
@@ -28,13 +29,13 @@ export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
       {/* 헤더 */}
       <div
         className="p-3 border-b border-border"
-        style={{ borderTopWidth: 3, borderTopStyle: "solid", borderTopColor: getDeptColor(npc.department) }}
+        style={{ borderTopWidth: 3, borderTopStyle: "solid", borderTopColor: deptColor(npc.department) }}
       >
         <div className="flex items-center justify-between">
           <div>
             <span className="font-bold text-sm">{npc.name}</span>
             <span className="text-xs text-muted-foreground ml-2">
-              {getDeptLabel(npc.department)} · {npc.role}
+              {deptLabel(npc.department)} · {npc.role}
             </span>
           </div>
           <button
@@ -47,7 +48,7 @@ export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
           </button>
         </div>
         <div className="text-xs mt-1 text-muted-foreground">
-          {getStatusLabel(npc.schedulePhase)} · {getMoodLabel(npc.mood)}
+          {schedulePhaseLabel(npc.schedulePhase)} · {getMoodLabel(npc.mood)}
         </div>
       </div>
 
@@ -72,7 +73,7 @@ export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
                     {isReal && (
                       <span
                         className="shrink-0 rounded px-1 text-[9px] font-bold text-white"
-                        style={{ backgroundColor: getDeptColor(npc.department) }}
+                        style={{ backgroundColor: deptColor(npc.department) }}
                       >
                         내 업무
                       </span>
@@ -86,7 +87,7 @@ export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
                     className="h-full rounded-full transition-all"
                     style={{
                       width: `${task.progress}%`,
-                      backgroundColor: getDeptColor(npc.department),
+                      backgroundColor: deptColor(npc.department),
                     }}
                   />
                 </div>
@@ -153,48 +154,6 @@ export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
 // ---------------------------------------------------------------------------
 // 헬퍼 — 인라인 매핑 (DEPT_REGISTRY import 불필요, 렌더 경로 단순화)
 // ---------------------------------------------------------------------------
-function getDeptColor(dept: string): string {
-  const colors: Record<string, string> = {
-    engineering: "#4A90D9",
-    marketing:   "#E84C3D",
-    design:      "#9B59B6",
-    hr:          "#2ECC71",
-    finance:     "#2C3E50",
-    sales:       "#E67E22",
-    support:     "#1ABC9C",
-    qa:          "#F1C40F",
-    operations:  "#95A5A6",
-  };
-  return colors[dept] ?? "#888";
-}
-
-function getDeptLabel(dept: string): string {
-  const labels: Record<string, string> = {
-    engineering: "개발팀",
-    marketing:   "마케팅팀",
-    design:      "디자인팀",
-    hr:          "인사팀",
-    finance:     "재무팀",
-    sales:       "영업팀",
-    support:     "고객지원팀",
-    qa:          "QA팀",
-    operations:  "운영팀",
-  };
-  return labels[dept] ?? dept;
-}
-
-function getStatusLabel(phase: string): string {
-  const labels: Record<string, string> = {
-    working:    "업무 중",
-    lunch:      "점심 시간",
-    break:      "휴식 중",
-    commuting:  "출근 중",
-    leaving:    "퇴근 중",
-    offwork:    "퇴근",
-  };
-  return labels[phase] ?? phase;
-}
-
 function getMoodLabel(mood: string): string {
   const labels: Record<string, string> = {
     happy:    "기분 좋음",
