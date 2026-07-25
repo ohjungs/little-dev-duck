@@ -159,4 +159,8 @@ api 6 tests로 잠갔는데, **입구에서 막혀 도구가 한 번도 불리�
 - 교훈: 앱 소스를 건드렸으면 e2e는 **반드시 `pnpm e2e`로** 돌린다. 스펙 파일만 고쳤을 땐
   단독 실행이 유효하다(스펙은 Next 빌드 산출물이 아니다).
 - 최초 발견: 2026-07-26 / 재발견 횟수: 0회
-- 상태: active (`apps/web/e2e/README.md`에 명시)
+- 상태: **가드 있음** — `apps/web/e2e/buildFreshness.ts`(Playwright globalSetup)가 앱 소스
+  (`apps/web/src`, `next.config.ts`, `packages/*/src`)의 최신 수정 시각을 `.next/BUILD_ID`와
+  비교해, 빌드가 더 낡았으면 어느 파일 때문인지 짚고 실행을 중단한다. 스펙·문서만 고쳤을 땐
+  걸리지 않는다(빌드 산출물이 아니므로).
+  L-13을 적어 놓고 이 항목만 README 안내로 두는 건 같은 실수라 검사로 승격했다.

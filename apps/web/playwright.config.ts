@@ -4,6 +4,9 @@ const PORT = 3100;
 
 export default defineConfig({
   testDir: "./e2e",
+  // webServer가 `next start`라 소스를 고쳐도 직전 빌드가 서빙된다 — 낡은 빌드로 도는 걸 막는다.
+  // 상세 사유는 e2e/buildFreshness.ts.
+  globalSetup: "./e2e/buildFreshness.ts",
   fullyParallel: true,
   retries: 0,
   reporter: [["list"]],
