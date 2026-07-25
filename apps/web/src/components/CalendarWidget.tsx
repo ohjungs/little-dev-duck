@@ -10,6 +10,7 @@ import {
 import { daysUntil, type CalendarEvent } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
+import { eventStartAt, isEndBeforeStart } from "@/lib/eventDateTime";
 import { todayIso } from "@/lib/today";
 import {
   Card,
@@ -101,6 +102,8 @@ export function CalendarWidget() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
+  const [newEndTime, setNewEndTime] = useState("");
   // 월 그리드가 보는 연/월(0-11)과 선택된 날짜(YYYY-MM-DD). 초기값은 현재 월(로컬=KST).
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -134,13 +137,29 @@ export function CalendarWidget() {
   const handleAdd = async () => {
     const title = newTitle.trim();
     if (!title || !newDate) return;
-    // 날짜 input(YYYY-MM-DD)을 그 날짜의 ISO(UTC 자정)로. 스키마는 offset 포함 datetime 요구.
-    const startAt = new Date(newDate).toISOString();
+
+    // 로컬 자정 기준으로 만든다. 화면이 getHours()로 시각을 읽어 0시 0분이면 "종일"로 보고
+    // 감추기 때문이다. 예전에는 `new Date(newDate)`로 만들었는데, 날짜만 있는 ISO 문자열은
+    // UTC로 해석돼서 한국에선 9시가 됐다 — 고른 적 없는 "오전 9:00"이 모든 일정에 붙었다.
+    const startAt = eventStartAt(newDate, newTime);
+    if (!startAt) {
+      setActionError("날짜나 시각을 이해하지 못했습니다.");
+      return;
+    }
+    if (newTime !== "" && isEndBeforeStart(newTime, newEndTime)) {
+      setActionError("종료 시각이 시작보다 빠릅니다.");
+      return;
+    }
+    const endAt =
+      newTime !== "" && newEndTime !== "" ? eventStartAt(newDate, newEndTime) : null;
+
     setNewTitle("");
     setNewDate("");
+    setNewTime("");
+    setNewEndTime("");
     setActionError(null);
     try {
-      const created = await createCalendarEvent(supabase, { title, startAt });
+      const created = await createCalendarEvent(supabase, { title, startAt, endAt });
       setEvents((prev) => [...prev, created].sort(byStartAt));
       // RAG 인덱싱(fire-and-forget).
       void reindexSource({ sourceType: "calendar_event", sourceId: created.id, text: title });
@@ -214,6 +233,31 @@ export function CalendarWidget() {
             aria-label="날짜"
             className="w-auto"
           />
+          {/* 시각은 선택이다. 비우면 종전대로 종일 일정(시각 표시 없음) — 날짜만 넣던
+              흐름을 깨지 않는다. 종료는 시작을 넣었을 때만 받는다(시작 없는 종료는 의미가
+              없고, 칸이 셋이면 폼이 무거워진다). */}
+          <Input
+            type="time"
+            value={newTime}
+            onChange={(e) => setNewTime(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+            }}
+            aria-label="시작 시각(선택)"
+            className="w-auto"
+          />
+          {newTime !== "" && (
+            <Input
+              type="time"
+              value={newEndTime}
+              onChange={(e) => setNewEndTime(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd();
+              }}
+              aria-label="종료 시각(선택)"
+              className="w-auto"
+            />
+          )}
           <Button
             type="button"
             size="icon"
