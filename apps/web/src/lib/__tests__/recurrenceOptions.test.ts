@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recurrenceOptions, withCurrentRecurrence } from "./recurrenceOptions";
+import { recurrenceOptions, withCurrentRecurrence } from "../recurrenceOptions";
 
 // 2026-07-26은 일요일, 2026-07-28은 화요일.
 const TODAY = new Date(2026, 6, 26);
