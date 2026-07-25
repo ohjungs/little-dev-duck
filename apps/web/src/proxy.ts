@@ -7,6 +7,10 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 // /p는 공개 페이지 공유(Phase 12 T1) — 비로그인도 링크로 읽기 전용 조회(get_public_page RPC가
 // is_public=true 한 건만 반환, 열거 불가).
 // /welcome은 비로그인 방문자용 공개 랜딩(Phase 13 T4) — 인증 없이 보이고, CTA가 /login으로 잇는다.
+// 2026-07-26 : 공개공유 - OG이미지 - 크롤러접근
+// /opengraph-image는 소셜 크롤러(카톡·슬랙·X)가 세션 없이 가져가는 공유 카드 이미지다. 공개 경로에
+// 없으면 인증 게이트가 303으로 /welcome에 돌려보내 카드가 통째로 안 뜬다(실측으로 발견).
+// 사용자 데이터가 없는 고정 브랜드 이미지라 무인증 노출이 안전하다.
 const PUBLIC_PATHS = [
   "/login",
   "/welcome",
@@ -14,6 +18,7 @@ const PUBLIC_PATHS = [
   "/api/keepalive",
   "/walker",
   "/p",
+  "/opengraph-image",
 ];
 
 // Tauri WebView가 이 배포 URL을 그대로 로드하는 구조(옵션 A)라 Tauri 쪽 CSP 설정은

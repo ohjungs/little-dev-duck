@@ -1,0 +1,13 @@
+## welcome/desktop
+  [12x] Loading the script 'http://localhost:3100/_next/static/chunks/<hash>.js' violates the following Content Security Policy directive: "script-src 'self' 'nonce-<uuid>' 'strict-dynamic'". Note that 'strict-dynamic' is present, so host-based allowlisting is disabled. Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.
+  [11x] Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'nonce-<uuid>' 'strict-dynamic''. Either the 'unsafe-inline' keyword, a hash ('sha256-<hash>'), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.
+
+## public-page/desktop
+  [1x] Error: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY 환경변수가 설정되지 않았습니다.
+
+## welcome/mobile
+  [12x] Loading the script 'http://localhost:3100/_next/static/chunks/<hash>.js' violates the following Content Security Policy directive: "script-src 'self' 'nonce-<uuid>' 'strict-dynamic'". Note that 'strict-dynamic' is present, so host-based allowlisting is disabled. Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.
+  [11x] Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'nonce-<uuid>' 'strict-dynamic''. Either the 'unsafe-inline' keyword, a hash ('sha256-<hash>'), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.
+
+## public-page/mobile
+  [1x] Error: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY 환경변수가 설정되지 않았습니다.

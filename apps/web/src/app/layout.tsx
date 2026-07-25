@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { resolveSiteUrl } from "@ldd/core";
 import { Analytics } from "@vercel/analytics/next";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import "./globals.css";
@@ -15,6 +16,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // og:image·canonical을 절대 URL로 만드는 기준점. 미설정 시 Next가 빌드 시점 localhost를
+  // 정적 페이지에 박아버려 공유 카드 이미지가 깨진다(/welcome에서 실측).
+  metadataBase: new URL(
+    resolveSiteUrl({
+      NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+      VERCEL_PROJECT_PRODUCTION_URL:
+        process.env.VERCEL_PROJECT_PRODUCTION_URL,
+      VERCEL_URL: process.env.VERCEL_URL,
+    }),
+  ),
   title: {
     default: "Little Dev Duck",
     template: "%s — Little Dev Duck",

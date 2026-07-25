@@ -1,5 +1,27 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ⏭ Phase 18 T1 완료 (2026-07-26 `/loop-eng` — 공개 페이지 바이럴 루프)
+> **공유 링크가 카톡·슬랙·X에서 브랜드 카드로 뜨게 하는 OG 이미지 + 메타데이터 정비.** 배지는 이미
+> PublicFooter에 있어(Phase 12 T1) 재구현하지 않음.
+> - core `publicPageMetaCopy`(제목 1줄 정규화·70자/설명 200자 코드포인트 상한·빈 제목 폴백, 8 tests)
+>   + `resolveSiteUrl`(NEXT_PUBLIC_SITE_URL → VERCEL_PROJECT_PRODUCTION_URL → VERCEL_URL → localhost, 8 tests).
+> - web 루트 `opengraph-image.tsx`(1200x630, next/og, 외부 에셋·의존 0 — 절차적 오리 + 워드마크).
+>   정적 프리렌더(`○`)라 런타임 비용 없음. 모든 라우트가 물려받음(/welcome·/p/[slug]).
+> - **화면검증이 잡은 실제 버그 3건 수정**: ① `/opengraph-image`가 proxy PUBLIC_PATHS에 없어 303 —
+>   크롤러가 카드 이미지를 아예 못 받던 상태 ② `metadataBase` 미설정으로 og:image가 `localhost:3000`으로
+>   나감(정적 페이지에 빌드 시점 값이 박힘) ③ `/p/[slug]` title에 브랜드를 직접 붙여 layout template과
+>   중복("… — Little Dev Duck — Little Dev Duck").
+> - **이미지 안 한글 제목은 축소**: satori는 한글 폰트 버퍼가 있어야 하는데 저장소에 한글 폰트가 없어
+>   넣으면 두부(□)로 깨진다. 카톡·슬랙·X 모두 og:title을 텍스트로 따로 렌더하므로 한글 제목은 이미 보인다.
+>   폰트 자산(~1.5MB) 도입 여부는 사용자 결정 — manual-verification.md 9번.
+> - 검증: core 393 tests(+16)·tsc / api 245 · ai 10 · mascot 9 · ui tsc / web tsc · next build · lint 전부 GREEN.
+>   스크린샷 5장 + 매니페스트: `docs/loop-eng/screenshots/2026-07-26/phase18-t1-public-og/`.
+> - **[사용자 확인 필요 · 우선순위 높음]** `/welcome`의 **모든 스크립트가 CSP nonce로 차단**되는 기존 버그
+>   발견(이번 작업과 무관). 정적 프리렌더 HTML엔 요청별 nonce를 넣을 수 없어 하이드레이션·Vercel
+>   `<Analytics/>`가 죽는다 — **랜딩 유입 지표 측정 불가**라 Phase 18 목적과 충돌. 수정안 3가지가 전부
+>   보안 태세 변경이라 자율 미결정. 상세·재현: manual-verification.md 7번.
+> **다음: Phase 18 T2(시작 템플릿 갤러리) 또는 T3(빈 상태 코치).**
+>
 > ## ⏭ 신규 로드맵 발굴됨 (2026-07-25 `/loop-eng` SCOPE — 마케팅팀 주도)
 > **로드맵 소진(Phase 1~17 + 감사 22 + 픽셀오피스 A~I) → 정지 대신 marketing-skills로 신규 로드맵 생성.**
 > **Phase 18 — 공유·성장 루프**(docs/plans/phase_18.md): 노션 패리티가 아니라 제품 고유 강점(공개 페이지

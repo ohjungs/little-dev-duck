@@ -65,3 +65,21 @@ ponytail 재사용 우선, STDD.
 
 각 Task: STDD(core 순수함수 우선 RED→GREEN) + 전 패키지 tsc + 변경 lint + 유닛/통합 GREEN.
 UI가 붙는 T1~T4는 `/loop-eng` 4-1대로 Playwright로 항목별 스크린샷 저장 + 실기 육안 검증은 8-1 보류 후 진행.
+
+## 구현 현황
+
+- [x] **T1 공개 페이지 바이럴 루프 (2026-07-25/26, `/loop-eng` SCOPE + `/next-step` 인계)** — 기능 완료.
+  - core `public-page-meta.ts`(`publicPageMetaCopy`: 소셜카드 제목·설명 파생, 코드포인트 절단으로 이모지 보존,
+    공백 정규화, 상한 70/200). STDD 8 tests(63938e3).
+  - web 루트 `opengraph-image.tsx`(next/og 1200x630, 절차적 오리·외부에셋 0, satori 한글폰트 부재라 이미지
+    텍스트는 영문·한글 제목은 og:title 메타로) + `/p/[slug]` generateMetadata가 publicPageMetaCopy 재사용
+    (브랜드 중복 방지·미공개 noindex) + twitter summary_large_image(01f465d).
+  - **powered-by 배지·본인 숨김**: 배지 자체는 기존 `PublicPageView` 푸터("Little Dev Duck로 만들었어요"
+    → /welcome) + 헤더 브랜드로 **이미 충족**(a98e2b8, Phase 12). "로그인 본인 뷰 숨김"은 **의도적 미구현** —
+    배지가 이미 은근한 푸터 링크라 본인이 봐도 무해한데, 숨기려면 열거방지 RPC(get_public_page)가 일부러
+    빼둔 소유자 식별을 공개 라우트에서 되살려야 함. 작은 편의 대비 보안 표면·복잡도 증가라 ponytail로 컷.
+  - 검증: core 385 tests(+8)·tsc / web tsc·build / 변경 lint GREEN. 배포됨. 실기 육안(실제 SNS 카드 미리보기)은 8-1 보류(사용자).
+- [ ] T2~T5: 미착수.
+
+> **주의(동시성)**: 이 Phase는 두 세션(SCOPE 생성 세션 + `/next-step` 인계 세션)이 같은 워킹 디렉터리에서
+> 겹쳐 진행됨. 9-1/9-4 위반 위험 — 하나의 루프만 운용 권장.
