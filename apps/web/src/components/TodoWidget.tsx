@@ -491,25 +491,41 @@ export function TodoWidget() {
                     </span>
                   </span>
                   {/* 반복 주기. 설정된 항목은 상시 노출(왜 안 사라지는지 알 수 있어야 한다),
-                      안 걸린 항목은 hover/포커스 때만 — 수정·삭제 버튼과 같은 규칙. */}
-                  <select
-                    value={todo.recurrence ?? ""}
-                    onChange={(e) => void handleRecurrenceChange(todo, e.target.value)}
-                    aria-label={`${todo.title} 반복 주기`}
+                      안 걸린 항목은 hover/포커스 때만 — 수정·삭제 버튼과 같은 규칙.
+                      select를 그대로 두면 안 보여도 선택된 옵션 글자만큼 가로 폭을 먹어서
+                      반복이 없는 행까지 제목이 좁아진다. 아이콘 크기로 고정하고 실제 값은
+                      옆 배지가 보여준다. */}
+                  <span
                     className={
-                      "shrink-0 cursor-pointer rounded border-none bg-transparent text-[10px] text-muted-foreground transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 " +
+                      "relative inline-flex size-4 shrink-0 items-center justify-center rounded transition-opacity focus-within:opacity-100 focus-within:ring-2 focus-within:ring-ring group-hover:opacity-100 " +
                       (todo.recurrence ? "opacity-100" : "opacity-0")
                     }
                   >
-                    {withCurrentRecurrence(
-                      recurrenceOptions(todo.dueDate, new Date()),
-                      todo.recurrence,
-                    ).map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    <Repeat
+                      aria-hidden
+                      className={
+                        "size-3.5 " +
+                        (todo.recurrence
+                          ? "text-primary-accent"
+                          : "text-muted-foreground")
+                      }
+                    />
+                    <select
+                      value={todo.recurrence ?? ""}
+                      onChange={(e) => void handleRecurrenceChange(todo, e.target.value)}
+                      aria-label={`${todo.title} 반복 주기`}
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                    >
+                      {withCurrentRecurrence(
+                        recurrenceOptions(todo.dueDate, new Date()),
+                        todo.recurrence,
+                      ).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
                   <button
                     type="button"
                     onClick={() => startEdit(todo)}
