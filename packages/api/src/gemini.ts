@@ -7,9 +7,17 @@ export const GEMINI_EMBED_MODEL = "gemini-embedding-001";
 // 2026-07-22 : AI - Gemini - gemini-2.5-flash가 신규 키에 404(deprecated for new users)라 자동 최신 별칭으로 교체
 export const GEMINI_GEN_MODEL = "gemini-flash-latest";
 
+// 2026-07-26 : AI - 오류본문 - 쿼터판별을위한길이확장
+// 200자였는데, Gemini 429 본문에서 "분당이냐 하루냐"를 가르는 quotaId는 details 배열 안이라
+// 200자 지점에는 아직 안내 문구만 있고 판별 정보는 잘려 나갔다(quota.ts 참조).
+// 이 문자열은 LddError.message로만 쓰이고 사용자 응답에는 절대 들어가지 않는다
+// (ldd-error.ts userMessage가 코드별 고정 문구로 갈아끼우고, 그걸 테스트가 잠그고 있다).
+// 서버 로그에는 남으므로 무한정 늘리지 않고 판별에 필요한 만큼만 둔다.
+const MAX_ERROR_BODY = 1000;
+
 export async function safeBody(res: Response): Promise<string> {
   try {
-    return (await res.text()).slice(0, 200);
+    return (await res.text()).slice(0, MAX_ERROR_BODY);
   } catch {
     return "";
   }

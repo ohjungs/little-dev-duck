@@ -29,6 +29,9 @@ const WATCHED = [
 
 // packages 아래에서 소스만 본다 — dist/node_modules는 파생물이라 보면 오탐이 난다.
 const SKIP_DIRS = new Set(["node_modules", "dist", ".next", ".turbo", "__tests__"]);
+// 테스트 파일은 번들에 들어가지 않으므로 빌드 입력이 아니다. 세면 "테스트만 고쳤는데
+// 빌드가 낡았다"는 헛경보가 나서 불필요한 재빌드를 시킨다.
+const TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/;
 
 type Newest = { file: string; mtimeMs: number } | null;
 
@@ -40,7 +43,10 @@ function newestIn(target: string): Newest {
     return null; // 없는 경로는 조용히 넘긴다(패키지 구성이 바뀌어도 깨지지 않게).
   }
 
-  if (stat.isFile()) return { file: target, mtimeMs: stat.mtimeMs };
+  if (stat.isFile()) {
+    if (TEST_FILE.test(path.basename(target))) return null;
+    return { file: target, mtimeMs: stat.mtimeMs };
+  }
 
   let newest: Newest = null;
   for (const entry of readdirSync(target, { withFileTypes: true })) {

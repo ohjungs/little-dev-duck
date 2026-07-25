@@ -12,7 +12,7 @@ import {
   runDuckTurn,
   type Adapter,
 } from "@ldd/api";
-import { isLddError } from "@ldd/core";
+import { isLddError, userMessage } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 import { requireGeminiKey } from "@/lib/apiHelpers";
 
@@ -105,9 +105,11 @@ export async function POST(request: Request) {
     // (2026-07-23, 실제로는 요청이 다 llm 라우팅됐는데 쿼터 소진으로 매번 캔 답변만 나감). unavailable로
     // 구분해 원인을 알 수 있게 한다.
     if (isLddError(error) && error.code === "quota_exceeded") {
+      // 문구를 여기 박아 두면 "분당 제한"과 "하루 총량 소진"이 같은 말을 하게 된다.
+      // 하루가 소진됐는데 "1분 후"라고 하면 사용자는 종일 재시도한다 — core가 원문을 보고 가른다.
       return NextResponse.json({
         status: "unavailable",
-        message: "지금 요청이 많아서 잠시 답하기 어려워요. 1분 정도 후 다시 시도해주세요.",
+        message: userMessage(error),
       });
     }
     // access_token 만료/취소 시 어댑터가 unauthorized로 표시한다(Google ~1시간 만료, GitHub 연동 해제 등).

@@ -1,3 +1,5 @@
+import { quotaWindow, quotaWindowMessage } from "./quota";
+
 // 앱 전역 통일 에러 타입(Phase 8 게이트 T0-8). code로 분류하고 사용자 표시 메시지 + 원인을 보존한다.
 // AI(Gemini 호출/네트워크/무료 티어 쿼터) 실패 경로가 늘어나는 Phase라 도입 — api·route·ai가 공유한다.
 export type LddErrorCode =
@@ -46,7 +48,13 @@ export function toLddError(value: unknown, fallbackCode: LddErrorCode = "interna
 }
 
 // 사용자에게 보여줄 안전한 메시지. LddError면 code 기본 문구, 아니면 internal 문구.
+// quota_exceeded만 예외로 원문에서 "분당이냐 하루냐"를 읽어 문구를 가른다 — 하루 총량이
+// 소진됐는데 "잠시 후"라고 안내하면 사용자가 하루 종일 재시도하게 된다(quota.ts).
+// 판별 결과만 쓰고 원문은 절대 섞지 않는다.
 export function userMessage(value: unknown): string {
-  if (isLddError(value)) return DEFAULT_USER_MESSAGE[value.code];
-  return DEFAULT_USER_MESSAGE.internal;
+  if (!isLddError(value)) return DEFAULT_USER_MESSAGE.internal;
+  if (value.code === "quota_exceeded") {
+    return quotaWindowMessage(quotaWindow(value.message));
+  }
+  return DEFAULT_USER_MESSAGE[value.code];
 }

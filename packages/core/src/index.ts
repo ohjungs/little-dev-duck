@@ -76,6 +76,11 @@ export {
   type LddErrorCode,
 } from "./domain/ldd-error";
 export {
+  quotaWindow,
+  quotaWindowMessage,
+  type QuotaWindow,
+} from "./domain/quota";
+export {
   EMBEDDING_DIM,
   embeddingSourceSchema,
   embeddingChunkSchema,

@@ -40,4 +40,29 @@ describe("userMessage", () => {
   it("LddError가 아니면 internal 문구", () => {
     expect(userMessage(new Error("leak"))).not.toContain("leak");
   });
+
+  // 쿼터만 예외로 원문을 읽어 문구를 가른다(quota.ts). 하루 총량이 소진됐는데 "잠시 후"라고
+  // 안내하면 사용자는 하루 종일 재시도한다 — 그 구분이 사라지지 않게 잠근다.
+  it("하루 총량 소진이면 오늘 안에는 안 된다고 말한다", () => {
+    const err = new LddError(
+      "quota_exceeded",
+      'gemini 429: {"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}',
+    );
+    expect(userMessage(err)).toContain("오늘");
+    expect(userMessage(err)).not.toContain("429");
+  });
+
+  it("분당 제한이면 잠깐 뒤 다시 시도하라고 말한다", () => {
+    const err = new LddError(
+      "quota_exceeded",
+      'gemini 429: {"quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier"}',
+    );
+    expect(userMessage(err)).toContain("1분");
+  });
+
+  it("판별할 수 없으면 지킬 수 없는 시간 약속을 하지 않는다", () => {
+    const msg = userMessage(new LddError("quota_exceeded", "gemini 429 raw"));
+    expect(msg).not.toContain("1분");
+    expect(msg).not.toContain("오늘");
+  });
 });
