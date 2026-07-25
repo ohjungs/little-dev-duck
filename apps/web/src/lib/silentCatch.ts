@@ -17,6 +17,8 @@
 
 // 사용자에게 무언가를 전달하거나, 처리를 상위로 넘기는 호출들.
 // 새 알림 수단을 만들면 여기 추가한다(추가를 잊으면 검사가 실패하므로 조용히 새지 않는다).
+import { stripComments } from "./stripComments";
+
 const INFORMS =
   /setError|setActionError|setState\(\s*["']error["']\s*\)|showError|setNote|flashMsg|setVersionMsg|setStandupError|console\.(error|warn)|\bthrow\b|\breturn\b/;
 
@@ -29,16 +31,21 @@ export type SilentCatch = { line: number; body: string };
  * 중괄호 깊이로 본문을 잘라낸다 — 정규식으로 자르면 중첩 블록에서 엉뚱한 범위를 잡는다.
  */
 export function findSilentCatches(source: string): SilentCatch[] {
+  // 주석 속 문구("예전엔 } catch { ... } 였다")를 진짜 catch로 오인하지 않으려면 정제본에서
+  // **찾아야** 하지만, 이 규칙의 통과 조건 하나가 "주석으로 사유를 남겼는가"라서 **판정은
+  // 원본으로** 해야 한다. 정제기가 길이를 보존하므로 같은 오프셋으로 원본을 읽을 수 있다.
+  const scan = stripComments(source);
+
   const found: SilentCatch[] = [];
   const re = /\bcatch\s*(\([^)]*\))?\s*\{/g;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(source)) !== null) {
-    const open = source.indexOf("{", m.index);
+  while ((m = re.exec(scan)) !== null) {
+    const open = scan.indexOf("{", m.index);
     let depth = 0;
     let close = -1;
-    for (let i = open; i < source.length; i += 1) {
-      if (source[i] === "{") depth += 1;
-      else if (source[i] === "}") {
+    for (let i = open; i < scan.length; i += 1) {
+      if (scan[i] === "{") depth += 1;
+      else if (scan[i] === "}") {
         depth -= 1;
         if (depth === 0) {
           close = i;

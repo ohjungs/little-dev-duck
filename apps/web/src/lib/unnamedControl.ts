@@ -7,6 +7,8 @@
 // 고치니 4건, 그중 셋은 <label>로 감싼 정상이었고 진짜 결함은 1건이었다.
 // 파싱을 대충 하면 검사가 아니라 소음이 된다.
 
+import { stripComments } from "./stripComments";
+
 export type UnnamedControl = { line: number; snippet: string };
 
 // 이름을 주는 방법들. <label>로 감싸는 경우는 태그 속성만으로 알 수 없어 별도 처리한다.
@@ -45,6 +47,9 @@ function wrappedInLabel(src: string, tagStart: number): boolean {
 
 /** 접근 이름이 없는 폼 컨트롤을 찾는다. */
 export function findUnnamedControls(source: string): UnnamedControl[] {
+  // 주석 속 문구를 코드로 오인하지 않는다(길이 보존이라 줄 번호는 그대로).
+  source = stripComments(source);
+
   const found: UnnamedControl[] = [];
   const re = /<(input|select|textarea)\b/g;
   let m: RegExpExecArray | null;
