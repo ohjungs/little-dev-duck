@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Send, Sparkles, Trash2 } from "lucide-react";
 import { describeCall } from "@/lib/approvalLabel";
+import { DUCK_EXAMPLES } from "@/lib/duckExamples";
 import { useDuckChat } from "@ldd/ai";
-import type { ToolCall } from "@ldd/core";
 import { cn } from "@/lib/utils";
 import {
   Card,
@@ -40,6 +40,7 @@ export function DuckChatPanel() {
   const { messages, pending, error, pendingApproval, send, approve, cancel, clear } =
     useDuckChat();
   const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
   // 최초 1회 자동 백필 인덱싱(버튼 제거 — 사용자가 신경 쓸 필요 없이 알아서 연동).
@@ -96,9 +97,25 @@ export function DuckChatPanel() {
               </span>
               <p className="text-sm text-muted-foreground">
                 메모·할 일을 물어보거나 일을 시켜보세요.
-                <br />
-                예: &quot;이번 주 마감 뭐 있어?&quot; · &quot;내일 오후 3시에 회의 잡아줘&quot;
               </p>
+              {/* 예시를 눌러 입력창에 채운다. **바로 보내지 않는다** — 의도 없이 눌렀을 때
+                  무료 쿼터를 쓰지 않게 하고, 문장을 고쳐 쓸 여지를 남긴다.
+                  예시가 실제로 오리에게 도달하는지는 테스트로 잠갔다(duckExamples.test.ts). */}
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {DUCK_EXAMPLES.map((ex) => (
+                  <button
+                    key={ex.text}
+                    type="button"
+                    onClick={() => {
+                      setInput(ex.text);
+                      inputRef.current?.focus();
+                    }}
+                    className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {ex.text}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {messages.map((m, i) => (
@@ -162,6 +179,7 @@ export function DuckChatPanel() {
 
         <div className="flex gap-2">
           <Input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
