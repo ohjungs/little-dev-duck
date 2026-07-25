@@ -13,19 +13,18 @@ import { pageEmbedText,
   calendarEventEmbedText,
 } from "@ldd/core";
 import type { EmbeddingSource } from "@ldd/core";
+import { planReindex, type ReindexItem } from "@/lib/reindexPlan";
 import { createClient } from "@/lib/supabase/server";
 import { requireGeminiKey } from "@/lib/apiHelpers";
 
 export const dynamic = "force-dynamic";
 
-type ReindexItem = { sourceType: EmbeddingSource; sourceId: string; text: string };
 
 // 무료 티어 보호: 1회 백필로 인덱싱할 최대 항목 수. 순차 처리로 Gemini RPM도 완만하게.
-const MAX_ITEMS = 200;
 
 // 기존 메모·할일을 일괄 인덱싱(백필). 저장 시 인덱싱(/api/ai/embed)은 신규·수정분만 다루므로,
 // 이미 있던 데이터를 검색 가능하게 하려면 사용자가 한 번 이 백필을 실행해야 한다.
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -44,6 +43,15 @@ export async function POST() {
   const keyOrError = requireGeminiKey();
   if (keyOrError instanceof NextResponse) return keyOrError;
   const apiKey = keyOrError;
+
+  // 이어서 처리할 위치. 클라이언트가 지난 실행의 nextOffset을 그대로 돌려보낸다.
+  let offset = 0;
+  try {
+    const body = (await request.json()) as { offset?: unknown };
+    if (typeof body?.offset === "number") offset = body.offset;
+  } catch {
+    // 본문이 없거나 JSON이 아니면 처음부터 — 기존 호출(본문 없음)과 호환된다.
+  }
 
   try {
     const [memos, todos, habits, events, pages] = await Promise.all([
@@ -79,13 +87,10 @@ export async function POST() {
         text: pageEmbedText(p.plainText, p.rowProps),
       })),
     ];
-    const items: ReindexItem[] = [];
-    const maxLen = bySource.reduce((n, s) => Math.max(n, s.length), 0);
-    for (let i = 0; i < maxLen && items.length < MAX_ITEMS; i += 1) {
-      for (const src of bySource) {
-        if (i < src.length && items.length < MAX_ITEMS) items.push(src[i]);
-      }
-    }
+    // offset부터 이어서 처리한다. 예전엔 매번 앞 200개만 잡아 **그 뒤는 영영 색인되지
+    // 않았다**(자동 백필도, 버튼을 여러 번 눌러도). 순서는 실행마다 같아야 offset이 의미를 갖는다.
+    const plan = planReindex(bySource, offset);
+    const items = plan.items;
 
     // 순차 처리: 무료 티어 RPM 보호 + 쿼터 소진 시 여기까지는 인덱싱 유지(indexSource가 던지면 중단).
     let indexed = 0;
@@ -93,7 +98,14 @@ export async function POST() {
       await indexSource(supabase, apiKey, { userId: user.id, ...item });
       indexed += 1;
     }
-    return NextResponse.json({ indexed, total: items.length });
+    // total은 **잘리기 전 전체 개수**다. 예전엔 잘린 개수를 돌려줘 indexed === total이 되어
+    // 늘 "다 됐다"처럼 보였고, 그걸 믿은 클라이언트가 완료 플래그를 남겨 나머지를 버렸다.
+    return NextResponse.json({
+      indexed,
+      total: plan.total,
+      nextOffset: offset + indexed,
+      done: offset + indexed >= plan.total,
+    });
   } catch (error) {
     console.error("AI reindex-all 실패", { userId: user.id, error });
     return NextResponse.json(

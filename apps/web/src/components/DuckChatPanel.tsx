@@ -23,6 +23,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 // 기존 메모·할일 백필 인덱싱: 최초 1회만 자동 실행(버튼 없이). 성공 시 플래그를 남겨 재실행 안 함.
 // 신규 저장분은 CRUD 시점에 이미 인덱싱되므로, 백필은 사전 데이터에 대해 한 번이면 충분하다.
 const REINDEX_DONE_KEY = "ldd-reindex-backfilled";
+// 상한에 걸려 중간까지만 했을 때 이어서 시작할 위치.
+const REINDEX_OFFSET_KEY = "ldd-reindex-offset";
 
 // 상대 시각 표시. createdAt은 ISO 8601 문자열(useDuckChat이 new Date().toISOString()으로 기록).
 // 외부 라이브러리 없이 인라인 계산 — 분 단위까지, 그 이상은 시각 그대로.
@@ -33,14 +35,31 @@ export function DuckChatPanel() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  // 최초 1회 자동 백필 인덱싱(버튼 제거 — 사용자가 신경 쓸 필요 없이 알아서 연동).
+  // 자동 백필 인덱싱(버튼 없이 — 사용자가 신경 쓸 필요 없이 알아서 연동).
   // 실패하면 플래그를 남기지 않아 다음 세션에 자동 재시도한다(멱등 upsert).
+  //
+  // 2026-07-26 : 한 번 200개 상한에 걸리면 **나머지가 영영 색인되지 않던 것**을 고쳤다.
+  // 예전엔 응답이 늘 "다 됐다"처럼 보여(잘린 개수를 total로 줬다) 첫 실행에 완료 플래그를
+  // 남기고 끝냈다. 이제 서버가 진짜 전체 개수와 다음 위치를 주므로, 끝날 때까지 세션마다
+  // 이어서 돈다. 한 세션에 몰아 돌리지 않는 건 무료 티어 쿼터를 아끼기 위해서다.
   useEffect(() => {
     if (localStorage.getItem(REINDEX_DONE_KEY)) return;
     void (async () => {
       try {
-        const res = await fetch("/api/ai/reindex-all", { method: "POST" });
-        if (res.ok) localStorage.setItem(REINDEX_DONE_KEY, "1");
+        const offset = Number(localStorage.getItem(REINDEX_OFFSET_KEY) ?? "0") || 0;
+        const res = await fetch("/api/ai/reindex-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offset }),
+        });
+        if (!res.ok) return; // 다음 세션에 같은 위치부터 재시도
+        const data = (await res.json()) as { nextOffset?: number; done?: boolean };
+        if (data.done) {
+          localStorage.setItem(REINDEX_DONE_KEY, "1");
+          localStorage.removeItem(REINDEX_OFFSET_KEY);
+        } else if (typeof data.nextOffset === "number") {
+          localStorage.setItem(REINDEX_OFFSET_KEY, String(data.nextOffset));
+        }
       } catch {
         // 다음 세션에 재시도
       }
