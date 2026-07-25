@@ -19,9 +19,15 @@ import { requireGeminiKey } from "@/lib/apiHelpers";
 export const dynamic = "force-dynamic";
 
 const MAX_QUESTION_LEN = 1000;
-const NO_CALENDAR_NOTE =
-  "구글 캘린더 도구는 아직 연동되지 않았다. 사용자가 캘린더/일정 관련 작업을 요청하면 실행하려 들지 말고 " +
-  '"설정 페이지에서 Google Calendar 연동을 하면 캘린더 일정을 시킬 수 있어요"라고 안내만 하라.';
+// 2026-07-26 : 오리 - 미연동안내 - 되는기능까지막던문구
+// 원래 문구는 "캘린더/일정 관련 작업을 요청하면 **실행하려 들지 말고** 연동 안내만 하라"였다.
+// 그런데 앱 자체 캘린더 도구(addCalendarEvent·listCalendarEvents)는 연동과 무관하게 **항상 켜져 있다.**
+// 즉 구글을 안 붙인 사용자(기본 상태)가 "내일 3시 회의 잡아줘"라고 하면, 되는 기능을 두고
+// "연동하세요"라고 답하게 만드는 문구였다. 없는 도구만 막고 있는 도구는 쓰게 한다.
+export const NO_CALENDAR_NOTE =
+  "구글 캘린더 연동은 아직 되어 있지 않다. 다만 **앱 자체 캘린더 도구는 쓸 수 있으니** 일정 추가·조회 " +
+  "요청은 그 도구로 처리하라. 사용자가 구글 캘린더를 콕 집어 요구할 때만 " +
+  '"설정 페이지에서 Google Calendar를 연동하면 구글 일정도 다룰 수 있어요"라고 안내하라.';
 const NO_GITHUB_NOTE =
   "GitHub 이슈 도구는 아직 연동되지 않았다. 사용자가 GitHub 이슈 생성/조회를 요청하면 실행하려 들지 말고 " +
   '"설정 페이지에서 GitHub 이슈 연동을 하면 이슈를 만들 수 있어요"라고 안내만 하라.';

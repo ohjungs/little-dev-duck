@@ -27,6 +27,7 @@ describe("createAppActionsAdapter", () => {
       "createMemo",
       "createPage",
       "createTodo",
+      "listCalendarEvents",
       "listTodos",
     ]);
     // 안전 계약: **데이터를 바꾸는 도구는 하나도 빠짐없이 승인 대기여야 한다**(T0-4).
@@ -430,6 +431,78 @@ describe("listTodos 조회 도구", () => {
       id: "c1",
       name: "listTodos",
       args: { status: "무엇이든", dueWithinDays: "일주일" },
+    });
+    expect(res.response.error).toBeDefined();
+  });
+});
+
+// 2026-07-26 : 오리 - 앱캘린더조회
+// 구글 캘린더 어댑터엔 조회 도구가 있었지만 **앱 자체 캘린더엔 없어서**, 연동하지 않은
+// 사용자(기본 상태)의 일정은 오리가 볼 방법이 아예 없었다.
+function eventListSupabase(rows: Record<string, unknown>[]): SupabaseClient {
+  const chain = {
+    select: () => chain,
+    order: () => chain,
+    limit: () => Promise.resolve({ data: rows, error: null }),
+  };
+  return {
+    auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
+    from: () => chain,
+  } as unknown as SupabaseClient;
+}
+
+const EVENT_ROW = (id: string, title: string, startAt: string) => ({
+  id,
+  user_id: "22222222-2222-4222-8222-222222222222",
+  title,
+  start_at: startAt,
+  end_at: null,
+  created_at: "2026-07-25T00:00:00+00:00",
+  updated_at: "2026-07-25T00:00:00+00:00",
+});
+
+describe("listCalendarEvents 조회 도구", () => {
+  it("승인 없이 바로 실행되고 앞으로의 일정을 돌려준다", async () => {
+    // 로컬 자정 규약(Phase 27)에 맞춰 로컬 시각으로 만든다 — UTC로 만들면 KST에서 전날이 된다.
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 1);
+    soon.setHours(15, 0, 0, 0);
+    const a = createAppActionsAdapter(
+      eventListSupabase([
+        EVENT_ROW("11111111-1111-4111-8111-111111111111", "회의", soon.toISOString()),
+      ]),
+    );
+    const res = await a.execute({ id: "c1", name: "listCalendarEvents", args: {} });
+    expect(res.response.error).toBeUndefined();
+    const events = (res.response as { events: { title: string }[] }).events;
+    expect(events.map((e) => e.title)).toEqual(["회의"]);
+  });
+
+  it("지난 일정은 기본으로 빼고, 요청하면 준다", async () => {
+    const past = new Date();
+    past.setDate(past.getDate() - 5);
+    past.setHours(10, 0, 0, 0);
+    const rows = [EVENT_ROW("11111111-1111-4111-8111-111111111112", "지난회의", past.toISOString())];
+
+    const a1 = createAppActionsAdapter(eventListSupabase(rows));
+    const hidden = await a1.execute({ id: "c1", name: "listCalendarEvents", args: {} });
+    expect((hidden.response as { events: unknown[] }).events).toHaveLength(0);
+
+    const a2 = createAppActionsAdapter(eventListSupabase(rows));
+    const shown = await a2.execute({
+      id: "c2",
+      name: "listCalendarEvents",
+      args: { includePast: true },
+    });
+    expect((shown.response as { events: unknown[] }).events).toHaveLength(1);
+  });
+
+  it("조회 조건이 이상하면 실행하지 않고 오류로 답한다", async () => {
+    const a = createAppActionsAdapter(eventListSupabase([]));
+    const res = await a.execute({
+      id: "c1",
+      name: "listCalendarEvents",
+      args: { withinDays: "일주일" },
     });
     expect(res.response.error).toBeDefined();
   });

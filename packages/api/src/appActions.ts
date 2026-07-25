@@ -5,6 +5,7 @@ import {
   kstDateString,
   parseRecurrence,
   serializeRecurrence,
+  selectEventsForDuck,
   selectTodosForDuck,
   todoEmbedText,
 } from "@ldd/core";
@@ -13,7 +14,7 @@ import type { Adapter } from "./agent";
 import { createTodo, listTodos, updateTodo } from "./todos";
 import { createMemo } from "./memos";
 import { createPage } from "./pages";
-import { createCalendarEvent } from "./calendar";
+import { createCalendarEvent, listCalendarEvents } from "./calendar";
 import { checkHabit, listHabits } from "./habits";
 import { indexSource } from "./embeddings";
 
@@ -159,6 +160,29 @@ const listTodosDecl: ToolDeclaration = {
   kind: "readonly",
 };
 
+const listEventsDecl: ToolDeclaration = {
+  name: "listCalendarEvents",
+  description:
+    "앱 자체 캘린더의 일정을 조회한다(Google 캘린더 연동과 별개). '내일 일정 뭐 있어?', " +
+    "'이번 주 일정 알려줘'처럼 일정을 묻는 질문에 쓴다. 추측하지 말고 반드시 이 도구로 확인한 뒤 답한다. " +
+    "기본은 오늘부터 앞으로의 일정이며, 지난 일정을 물으면 includePast를 켠다.",
+  parameters: {
+    type: "object",
+    properties: {
+      withinDays: {
+        type: "number",
+        description: "오늘부터 며칠 이내까지 볼지(이번 주=7). 생략하면 앞으로 전부",
+      },
+      includePast: {
+        type: "boolean",
+        description: "지난 일정도 포함할지. 기본은 제외",
+      },
+    },
+    required: [],
+  },
+  kind: "readonly",
+};
+
 const checkHabitDecl: ToolDeclaration = {
   name: "checkHabit",
   description:
@@ -197,6 +221,11 @@ export function coerceTodoDueDate(raw: string): string | null {
   return d.toISOString().slice(0, 10) === s ? iso : null;
 }
 const habitArgs = z.object({ title: z.string().min(1).max(100) });
+const listEventsArgs = z.object({
+  withinDays: z.number().int().min(0).max(3650).optional(),
+  includePast: z.boolean().optional(),
+});
+
 const listTodosArgs = z.object({
   status: z.enum(["all", "done", "notDone"]).optional(),
   dueWithinDays: z.number().int().min(-3650).max(3650).optional(),
@@ -266,8 +295,32 @@ export function createAppActionsAdapter(
       addEventDecl,
       checkHabitDecl,
       listTodosDecl,
+      listEventsDecl,
     ],
     async execute(call: ToolCall): Promise<ToolResult> {
+      if (call.name === listEventsDecl.name) {
+        const parsed = listEventsArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "조회 조건이 올바르지 않습니다.");
+        const today = kstDateString(new Date());
+        const selected = selectEventsForDuck(
+          await listCalendarEvents(supabase),
+          parsed.data,
+          today,
+        );
+        return {
+          id: call.id,
+          name: call.name,
+          // 오리에게 되돌아가는 값이라 필요한 필드만(컨텍스트·쿼터 절약).
+          response: {
+            events: selected.map((e) => ({
+              title: e.title,
+              startAt: e.startAt,
+              endAt: e.endAt ?? null,
+            })),
+          },
+        };
+      }
+
       if (call.name === listTodosDecl.name) {
         const parsed = listTodosArgs.safeParse(call.args);
         if (!parsed.success) return errorResult(call, "조회 조건이 올바르지 않습니다.");

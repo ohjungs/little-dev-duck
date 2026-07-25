@@ -87,6 +87,11 @@ export {
   type DuckTodoFilter,
 } from "./domain/todo-query";
 export {
+  selectEventsForDuck,
+  DUCK_EVENT_LIMIT,
+  type DuckEventFilter,
+} from "./domain/event-query";
+export {
   EMBEDDING_DIM,
   embeddingSourceSchema,
   embeddingChunkSchema,
