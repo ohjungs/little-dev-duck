@@ -44,6 +44,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
+    // 본문이 JSON이 아니면 아래 스키마 검증이 400으로 답한다 — 여기서 따로 알리지 않는다.
     body = undefined;
   }
   const parsed = bodySchema.safeParse(body);

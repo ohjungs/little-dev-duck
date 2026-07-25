@@ -81,6 +81,7 @@ export function TrashView() {
 
   // 전체 복원: 각 페이지를 순차 복원하고 RAG 재인덱싱. 일부 실패해도 성공한 것은 목록에서 제거한다.
   const handleRestoreAll = async () => {
+    setActionError(null);
     const snapshot = [...pages];
     setPages([]);
     const failed: Page[] = [];
@@ -94,18 +95,22 @@ export function TrashView() {
             text: pageEmbedText(page.plainText, page.rowProps),
           });
         } catch {
+          // 개별로 알리면 N개가 쏟아진다 — 모아서 아래에서 한 번에 알린다.
           failed.push(page);
         }
       }),
     );
     if (failed.length > 0) {
+      // 실패한 것만 목록에 남는데, 그것만으로는 "왜 얘들만 남았는지" 알 수 없다.
       setPages(failed);
+      setActionError(`${failed.length}개를 복원하지 못했습니다. 다시 시도해 주세요.`);
     }
   };
 
   // 전체 영구 삭제: 확인 후 실행. DB cascade로 하위 페이지도 삭제된다.
   const confirmPurgeAll = async () => {
     setPendingPurgeAll(false);
+    setActionError(null);
     const snapshot = [...pages];
     setPages([]);
     const failed: Page[] = [];
@@ -114,12 +119,14 @@ export function TrashView() {
         try {
           await purgePage(supabase, page.id);
         } catch {
+          // 개별로 알리면 N개가 쏟아진다 — 모아서 아래에서 한 번에 알린다.
           failed.push(page);
         }
       }),
     );
     if (failed.length > 0) {
       setPages(failed);
+      setActionError(`${failed.length}개를 영구 삭제하지 못했습니다. 다시 시도해 주세요.`);
     }
   };
 
