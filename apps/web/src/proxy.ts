@@ -11,6 +11,8 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 // /opengraph-image는 소셜 크롤러(카톡·슬랙·X)가 세션 없이 가져가는 공유 카드 이미지다. 공개 경로에
 // 없으면 인증 게이트가 303으로 /welcome에 돌려보내 카드가 통째로 안 뜬다(실측으로 발견).
 // 사용자 데이터가 없는 고정 브랜드 이미지라 무인증 노출이 안전하다.
+// /robots.txt·/sitemap.xml은 크롤러가 세션 없이 가장 먼저 가져가는 파일이다. 공개 경로에 없으면
+// 303으로 /welcome을 돌려받아 크롤러가 robots를 읽지 못한다(실측 — /opengraph-image와 같은 부류).
 const PUBLIC_PATHS = [
   "/login",
   "/welcome",
@@ -19,6 +21,8 @@ const PUBLIC_PATHS = [
   "/walker",
   "/p",
   "/opengraph-image",
+  "/robots.txt",
+  "/sitemap.xml",
 ];
 
 // Tauri WebView가 이 배포 URL을 그대로 로드하는 구조(옵션 A)라 Tauri 쪽 CSP 설정은

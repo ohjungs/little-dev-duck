@@ -116,3 +116,15 @@ UI가 붙는 T1~T4는 `/loop-eng` 4-1대로 Playwright로 항목별 스크린샷
   - [ ] 남음: 지난 주 활동 집계(dashboard.ts 재사용) → 페이지 생성 → 방해금지·일일 상한 통과 시 알림 1건,
     주차 키 localStorage 저장. **기존 스탠드업 생성기(bedd1e5, 일간·LLM)와 별개** — 재사용 지점은
     "활동 집계 → 페이지 본문" 부분이며 주간 집계 함수가 없어 추가 필요.
+
+- [x] **T5 발견성/SEO 표면 (2026-07-26, `/loop-eng`)** — 완료·실서버 검증됨.
+  - `robots.ts`(deny-by-default: `Disallow: /` + /welcome·/p/·/opengraph-image만 allow) + `sitemap.ts`
+    (랜딩만). 둘 다 core `resolveSiteUrl`로 절대 URL. Next metadata API만 사용(의존 0).
+  - **계획서가 남긴 프라이버시 질문 확정**: 사이트맵에 **공개 slug를 싣지 않는다**. Phase 12 T1이
+    열거 방지를 위해 RPC로 한 건씩만 반환하게 설계했는데 사이트맵이 전 slug를 나열하면 그 방어가
+    무의미해진다. 개별 페이지는 공유 링크로 도달·색인되고 목록은 배포하지 않는다.
+  - **검증이 잡은 버그**: `/robots.txt`·`/sitemap.xml`이 PUBLIC_PATHS 누락으로 303 리다이렉트되고
+    있었다(크롤러가 robots를 못 읽는 상태 = SEO 정책 무의미). 공개 경로 추가 → 200 확인.
+  - 정책은 테스트로 잠금(`seoSurface.test.ts` 8 tests — 특히 "사이트맵에 /p/ 없음"은 완화 금지).
+  - 검증: web 140 tests · tsc · lint · next build · 실서버 curl 응답 확인.
+    증거: `docs/loop-eng/screenshots/2026-07-26/phase18-t5-seo/served-output.md`.
