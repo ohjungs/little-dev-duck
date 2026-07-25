@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { listTodos, listMemos, listHabits, listPages } from "@ldd/api";
 import { createClient } from "@/lib/supabase/client";
+import { todayIso } from "@/lib/today";
 import { Button } from "@/components/ui/button";
 
 export function ExportDataButton() {
@@ -41,7 +42,7 @@ export function ExportDataButton() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `little-dev-duck-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `little-dev-duck-export-${todayIso()}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {

@@ -1,5 +1,21 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ⏭ 2026-07-26 `/loop-eng` — 날짜 버그 부류를 린트 규칙으로 차단
+> 하루 동안 같은 부류(`toISOString().slice(0,10)` = UTC 날짜)로 **8건**이 터졌고 그중 2건은
+> 내가 낸 회귀였다. 고치는 것만으로는 또 들어온다 — **규칙으로 막았다.**
+> - `no-restricted-syntax`로 `x.toISOString().slice(...)`를 금지하고, 대안을 오류 메시지에
+>   직접 적었다(클라 `todayIso()`/`toLocalDateString`, 서버 `kstDateString`, 타임스탬프→날짜
+>   `localDateKey`). CI의 `pnpm lint`에 그대로 실린다.
+> - **루트 설정은 next 앱에 자동 적용되지 않는다** — 웹 설정에서 같은 규칙 객체를 import해
+>   쓰게 했다(정의는 루트 한 곳). 웹에 위반을 주입해 실제로 걸리는지 확인하고 복구했다.
+> - **의도된 예외 1건만 남기고 사유를 적었다**: `coerceTodoDueDate`의 왕복 검사는 방금 UTC로
+>   만든 값을 되읽어 대조하는 것이라 UTC가 맞다(달력에 없는 날짜를 걸러내는 게 목적).
+>   여러 줄 주석 뒤에 `eslint-disable-next-line`을 두면 코드 줄에 안 붙는다는 것도 확인했다.
+> - 부수: 내보내기 파일명 2곳(`ExportDataButton`·`MemoWidget`)이 UTC 날짜를 쓰고 있었다 —
+>   KST 새벽에 어제 날짜로 저장되던 것을 `todayIso()`로 고쳤다.
+> - 검증: turbo test·lint·build 18/18 GREEN. 규칙 주입 → 오류, 복구 → 통과 확인.
+
+
 > ## 🔴 2026-07-26 `/loop-eng` — **내가 낸 회귀 수정** (캘린더 날짜가 하루 밀림)
 > 직전 사이클에 캘린더 저장을 UTC 자정 → **로컬 자정**으로 바꿨는데(없는 "오전 9:00"을 없애려고),
 > **같은 컴포넌트에서 날짜를 UTC로 읽던 두 곳을 안 고쳤다.**

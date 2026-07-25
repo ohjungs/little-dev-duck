@@ -12,6 +12,7 @@ import {
 import type { Memo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
+import { todayIso } from "@/lib/today";
 import { subscribeTable } from "@/lib/realtime";
 import {
   Card,
@@ -50,7 +51,7 @@ function exportMemos(memos: Memo[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `memos-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.download = `memos-${todayIso()}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 }

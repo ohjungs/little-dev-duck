@@ -159,6 +159,10 @@ export function coerceTodoDueDate(raw: string): string | null {
   const iso = `${s}T00:00:00.000Z`;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
+  // 여기선 UTC 날짜가 맞다. 방금 UTC로 만든 값(`${s}T00:00:00.000Z`)을 되읽어 입력과 같은지
+  // 대조하는 **왕복 검사**라, 로컬로 바꾸면 검사 자체가 성립하지 않는다(달력에 없는 날짜를
+  // 걸러내는 게 목적이다).
+  // eslint-disable-next-line no-restricted-syntax -- 위 사유(UTC 왕복 검사)
   return d.toISOString().slice(0, 10) === s ? iso : null;
 }
 const habitArgs = z.object({ title: z.string().min(1).max(100) });
