@@ -6,6 +6,8 @@ import {
   type ToolResult,
 } from "@ldd/core";
 import { composeAdapters, executeApprovedCalls, runAgentTurn, type Adapter } from "./agent";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAppActionsAdapter } from "./appActions";
 
 const READONLY: ToolDeclaration = {
   name: "listEvents",
@@ -408,5 +410,68 @@ describe("조회와 변경이 섞인 턴", () => {
     const result = await runAgentTurn("일정 알려주고 회의도 잡아줘", adapter, "key", fetchImpl);
     expect(created).toBe(false);
     expect(result.status).toBe("approval_pending");
+  });
+});
+
+// 2026-07-26 : 오리 - 지시문 - 조회도구와자료지침충돌
+// listTodos를 만들어 놔도 모델이 부르지 않으면 없는 기능이다. 지시문에는 "[사용자 자료]에 없으면
+// 모른다고 답하라"가 강하게 들어 있어, "이번 주 마감 뭐 있어?" 같은 **사실 질문**이 도구 대신
+// 자료 쪽으로 기울 여지가 있었다. 실제 모델 거동은 쿼터 없이 확인할 수 없으므로,
+// 여기서는 **지시문이 그 공백을 덮는지**만 결정적으로 검사한다.
+describe("조회 도구와 자료 지침의 충돌 방지", () => {
+  it("목록 조회는 자료만 보고 단정하지 말고 도구로 확인하라고 지시한다", async () => {
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    await runAgentTurn("이번 주 마감 뭐 있어?", mockAdapter(), "key", fetchImpl);
+    expect(bodies[0]).toContain("그 도구로 확인한 뒤");
+  });
+
+  it("[사용자 자료]가 전체가 아니라 검색된 일부라는 사실을 알려준다", async () => {
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    await runAgentTurn("남은 할 일 뭐야?", mockAdapter(), "key", fetchImpl);
+    // 이 한 문장이 핵심이다 — 상위 k개로 개수를 세면 조용히 틀린 답이 나온다.
+    expect(bodies[0]).toContain("전체 목록이 아니므로");
+  });
+
+  it("도구가 없으면 이 지침도 넣지 않는다(쓸데없는 토큰 낭비 방지)", async () => {
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    const noTools: Adapter = {
+      catalog: [],
+      execute: async (call) => ({ id: call.id, name: call.name, response: {} }),
+    };
+    await runAgentTurn("아무 질문", noTools, "key", fetchImpl);
+    expect(bodies[0]).not.toContain("전체 목록이 아니므로");
+  });
+});
+
+// 2026-07-26 : 오리 - 도구전달 - 선언과전송사이
+// 도구를 선언하고 카탈로그에 넣어도, 요청 본문에 실려 나가지 않으면 오리에겐 없는 기능이다.
+// 그 사이를 검사하는 테스트가 없었다 — 이 세션에서 "만들어 놓고 입구에서 막혀 있던" 부류를
+// 두 번 겪었으므로(짧은 명령 라우팅, 임베딩 날짜) 선언→전송 구간도 잠근다.
+describe("도구 카탈로그가 실제로 오리에게 전달된다", () => {
+  it("카탈로그의 도구 이름이 요청 본문에 실린다", async () => {
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    await runAgentTurn("q", mockAdapter(), "key", fetchImpl);
+    expect(bodies[0]).toContain("listEvents");
+    expect(bodies[0]).toContain("createEvent");
+  });
+
+  it("실제 앱 도구 목록에 조회 도구(listTodos)가 실려 나간다", async () => {
+    const supabase = {
+      auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
+      from: () => ({ select: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }) }),
+    } as unknown as SupabaseClient;
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    await runAgentTurn("이번 주 마감 뭐 있어?", createAppActionsAdapter(supabase), "key", fetchImpl);
+    expect(bodies[0]).toContain("listTodos");
+  });
+
+  it("카탈로그가 비면 tools 자체를 보내지 않는다(빈 목록은 Gemini가 거부)", async () => {
+    const { fetchImpl, bodies } = capturingFetch(ok([{ text: "ok" }]));
+    const noTools: Adapter = {
+      catalog: [],
+      execute: async (call) => ({ id: call.id, name: call.name, response: {} }),
+    };
+    await runAgentTurn("q", noTools, "key", fetchImpl);
+    expect(bodies[0]).not.toContain("functionDeclarations");
   });
 });
