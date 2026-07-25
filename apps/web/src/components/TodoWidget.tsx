@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, CheckCheck, ChevronDown, ChevronUp, ListTodo, Pencil, Plus, X } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, ListTodo, Pencil, Plus, Repeat, X } from "lucide-react";
 import {
   applyXpAward,
   createTodo,
@@ -9,8 +9,12 @@ import {
   listTodos,
   updateTodo,
 } from "@ldd/api";
-import type { Todo } from "@ldd/core";
+import { describeRecurrence, type Todo } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
+import {
+  recurrenceOptions,
+  withCurrentRecurrence,
+} from "@/lib/recurrenceOptions";
 import { todoEmbedText } from "@/lib/embedText";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeTable } from "@/lib/realtime";
@@ -143,12 +147,15 @@ export function TodoWidget() {
       prev.map((t) => (t.id === todo.id ? { ...t, isDone: willBeDone } : t)),
     );
     try {
-      await updateTodo(supabase, todo.id, { isDone: willBeDone });
+      const updated = await updateTodo(supabase, todo.id, { isDone: willBeDone });
+      // 반복 할 일은 서버가 "완료"가 아니라 "다음 회차로 옮긴 상태"를 돌려준다. 낙관적 갱신값을
+      // 그대로 두면 체크된 채로 남아 실제와 어긋나므로 응답으로 맞춘다.
+      setTodos((prev) => prev.map((t) => (t.id === todo.id ? updated : t)));
       // 완료/미완료 토글도 재인덱싱 — 상태를 임베딩에 반영해야 오리가 완료 여부를 답한다.
       void reindexSource({
         sourceType: "todo",
         sourceId: todo.id,
-        text: todoEmbedText(todo.title, willBeDone),
+        text: todoEmbedText(updated.title, updated.isDone),
       });
       if (willBeDone) {
         // 할일 완료 시 오리 XP 적립(원천: 할일 완료). 적립/신호 실패는 완료 자체를 되돌리지 않는다.
@@ -167,6 +174,21 @@ export function TodoWidget() {
     } catch {
       setTodos(prevTodos);
       setActionError("변경하지 못했습니다.");
+    }
+  };
+
+  const handleRecurrenceChange = async (todo: Todo, value: string) => {
+    const recurrence = value === "" ? null : value;
+    const prevTodos = todos;
+    setTodos((prev) =>
+      prev.map((t) => (t.id === todo.id ? { ...t, recurrence } : t)),
+    );
+    setActionError(null);
+    try {
+      await updateTodo(supabase, todo.id, { recurrence });
+    } catch {
+      setTodos(prevTodos);
+      setActionError("반복 설정을 바꾸지 못했습니다.");
     }
   };
 
@@ -458,10 +480,36 @@ export function TodoWidget() {
                     >
                       {todo.title}
                     </span>
-                    <span className="text-[10px] text-muted-foreground/60 leading-none">
+                    <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 leading-none">
                       {timeAgo(todo.createdAt)}
+                      {describeRecurrence(todo.recurrence) && (
+                        <span className="inline-flex items-center gap-0.5 text-primary-accent">
+                          <Repeat className="size-2.5" aria-hidden />
+                          {describeRecurrence(todo.recurrence)}
+                        </span>
+                      )}
                     </span>
                   </span>
+                  {/* 반복 주기. 설정된 항목은 상시 노출(왜 안 사라지는지 알 수 있어야 한다),
+                      안 걸린 항목은 hover/포커스 때만 — 수정·삭제 버튼과 같은 규칙. */}
+                  <select
+                    value={todo.recurrence ?? ""}
+                    onChange={(e) => void handleRecurrenceChange(todo, e.target.value)}
+                    aria-label={`${todo.title} 반복 주기`}
+                    className={
+                      "shrink-0 cursor-pointer rounded border-none bg-transparent text-[10px] text-muted-foreground transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 " +
+                      (todo.recurrence ? "opacity-100" : "opacity-0")
+                    }
+                  >
+                    {withCurrentRecurrence(
+                      recurrenceOptions(todo.dueDate, new Date()),
+                      todo.recurrence,
+                    ).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     onClick={() => startEdit(todo)}

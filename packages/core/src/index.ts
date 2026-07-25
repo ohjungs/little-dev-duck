@@ -36,6 +36,7 @@ export {
   describeRecurrence,
   type RecurrenceRule,
 } from "./domain/recurrence";
+export { rolloverDueDate } from "./domain/recurrence-rollover";
 export { isQuietHour } from "./domain/quiet-hours";
 export { nextDailyCount, type DailyCount } from "./domain/notify-budget";
 export {

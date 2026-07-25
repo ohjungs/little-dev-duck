@@ -16,6 +16,7 @@ function todo(o: Partial<Todo> = {}): Todo {
     title: "할 일",
     isDone: false,
     dueDate: null,
+    recurrence: null,
     createdAt: ISO,
     updatedAt: ISO,
     ...o,
