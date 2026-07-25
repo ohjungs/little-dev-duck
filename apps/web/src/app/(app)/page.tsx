@@ -9,6 +9,7 @@ import { PomodoroWidget } from "@/components/PomodoroWidget";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { DashboardGrid } from "@/components/DashboardGrid";
 import { LastPageLink } from "@/components/LastPageLink";
+import { getGreeting, getTimeEmoji } from "@/lib/greeting";
 
 export const dynamic = "force-dynamic";
 
@@ -22,20 +23,6 @@ function kstHour(): number {
       hourCycle: "h23",
     }).format(new Date()),
   );
-}
-
-function getGreeting(h: number): string {
-  if (h < 6) return "좋은 새벽이에요";
-  if (h < 12) return "좋은 아침이에요";
-  if (h < 18) return "좋은 오후예요";
-  return "좋은 저녁이에요";
-}
-
-function getTimeEmoji(h: number): string {
-  if (h >= 6 && h < 12) return "\u{1F324}\uFE0F"; // 🌤 morning sun
-  if (h >= 12 && h < 18) return "\u2600\uFE0F";   // ☀ afternoon sun
-  if (h >= 18 && h < 22) return "\u{1F307}";      // 🌇 sunset
-  return "\u{1F319}";                              // 🌙 moon (22-5)
 }
 
 // 날짜 기반으로 하루 동안 일관된 동기부여 메시지를 고른다(무작위 아님).
