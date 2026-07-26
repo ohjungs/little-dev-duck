@@ -6,24 +6,44 @@
 
 ---
 
-## 1. DB 변경 3건 적용 — 명령 한 번
+## 1. DB 변경 4건 적용 — 명령 한 번 (**가장 급함**)
 
 ```
 supabase db push
 ```
 
-되돌리기 어려운 작업이라 **자율로 적용하지 않았습니다**(CLAUDE.md 5절). 롤백 스크립트는
-`supabase/rollback/`에 같은 이름 `_down.sql`로 다 있습니다.
+**2026-07-26 갱신: 실서버를 조회해 미적용 4건을 확인했다**(`list_migrations` 결과 29건까지만
+적용됨). 그리고 **자율 적용을 시도했지만 두 경로 모두 권한 게이트에 차단됐다** —
+Supabase MCP `apply_migration`, `supabase db push` 둘 다. **사용자만 실행할 수 있다.**
+
+롤백 스크립트는 `supabase/rollback/`에 같은 이름 `_down.sql`로 전건 있다.
 
 | 순위 | 마이그레이션 | 내용 | 지금 상태의 문제 |
 |---|---|---|---|
-| **높음** | `20260726110000_harden_security_definer` | `award_xp` 권한 결함 수정 | **로그인 없이도 남의 오리 XP·레벨·먹이를 바꿀 수 있음** |
+| **🔴 높음** | `20260726110000_harden_security_definer` | `award_xp` 권한 결함 수정 | **로그인 없이도 남의 오리 XP·레벨·먹이를 바꿀 수 있음 — 지금 열려 있는 구멍** |
 | 중간 | `20260726100000_todo_recurrence` | 할 일 반복 컬럼 | 반복 기능이 동작하지 않음(나머지는 정상) |
+| 중간 | `20260726130000_user_roles_and_layout` | 역할(ADMIN/USER/CUSTOMER)·기능 토글·대시보드 카드 배치 | **2026-07-26 배포한 관리자 기능이 저장되지 않음** — 화면은 뜨지만 바꿔도 남지 않는다 |
 | 낮음 | `20260726120000_rls_initplan_rest` | RLS 성능 + 외래키 인덱스 | 성능만, 동작엔 영향 없음 |
 
-적용 뒤에 Supabase 어드바이저를 다시 돌리면 지적이 사라졌는지 확인됩니다.
-`get_public_page`가 anon에 열린 것은 **의도된 설계**라 남는 게 정상입니다.
-→ 상세: [manual-verification 17번](manual-verification.md), [14번](manual-verification.md)
+### 적용 뒤 한 번 더 — 본인을 관리자로
+
+역할 기본값이 `user`라 **적용 직후에는 관리자 화면의 사용자 관리가 안 보인다.**
+
+```sql
+update public.profiles set role = 'admin' where email = '<내 이메일>';
+```
+
+### 적용 안 해도 앱은 그대로 동작한다
+
+컬럼이 없으면 안전한 기본값(가장 낮은 권한 + 모든 기능 켜짐 = 기존 동작)으로 떨어지도록
+만들고 회귀 테스트로 잠갔다. 이 저장소가 한 번 겪은 사고 —
+"미적용 컬럼을 payload에 무조건 실어 테이블 쓰기가 통째로 죽음" — 를 되풀이하지 않기 위해서다.
+다만 **역할·기능 토글·카드 배치는 저장되지 않는다.**
+
+적용 뒤 Supabase 어드바이저를 다시 돌리면 지적이 사라졌는지 확인된다.
+`get_public_page`가 anon에 열린 것은 **의도된 설계**라 남는 게 정상이다.
+→ 상세: [manual-verification 17번](manual-verification.md), [14번](manual-verification.md),
+[Phase 30 T7](../plans/phase_30.md)
 
 ---
 
@@ -31,10 +51,10 @@ supabase db push
 
 ```
 cd apps/web
-pnpm exec playwright open http://localhost:3100/login --save-storage=e2e/.auth/user.json
+pnpm exec playwright open http://localhost:5100/login --save-storage=e2e/.auth/user.json
 ```
 
-브라우저가 뜨면 실제로 로그인하고 창을 닫으면 됩니다(포트는 **반드시 3100**).
+브라우저가 뜨면 실제로 로그인하고 창을 닫으면 됩니다(포트는 **반드시 5100**).
 → 절차 원문: `apps/web/e2e/README.md`
 
 지금은 로그인 뒤 화면 테스트 **39건이 전부 건너뛰어집니다.** 세션 파일이 생기면 그때부터
