@@ -7,7 +7,7 @@ import {
   listPomodoroSessions,
   startPomodoro,
 } from "@ldd/api";
-import type { PomodoroSession } from "@ldd/core";
+import { findResumablePomodoro, type PomodoroSession } from "@ldd/core";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/timeAgo";
 import { createClient } from "@/lib/supabase/client";
@@ -118,15 +118,28 @@ export function PomodoroWidget() {
       const data = await listPomodoroSessions(supabase);
       setSessions(data);
       setState("ready");
+      return data;
     } catch {
       setState("error");
+      return null;
     }
   };
 
   useEffect(() => {
     // 마운트 시 1회 조회(오늘 완료 집계용). 재시도는 reload가 담당.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
-    fetchSessions();
+    // 2026-07-26: 조회한 김에 **진행 중이던 세션을 이어받는다.** 그 전에는 새로고침 한 번에
+    // 타이머가 사라지고 completed_at이 null인 행만 남았다 — 사용자는 시간도 XP도 잃었다.
+    // 상태 변경은 async 콜백 안에서만 한다(이펙트 본문 동기 setState 회피 — 이 파일의 기존 관례).
+    void (async () => {
+      const data = await fetchSessions();
+      if (!data) return;
+      const resumable = findResumablePomodoro(data, Date.now());
+      if (!resumable) return;
+      setActiveId(resumable.id);
+      setRemaining(resumable.remainingSeconds);
+      setRunning(true);
+      enableFocusMode();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 실행
   }, []);
 

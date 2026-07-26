@@ -443,3 +443,7 @@ export {
   type InitiativeInput,
   type InitiativeState,
 } from "./domain/duck-initiative";
+export {
+  findResumablePomodoro,
+  type ResumablePomodoro,
+} from "./domain/pomodoro-resume";
