@@ -563,6 +563,8 @@ export {
   messageSchema,
   messageBody,
   messageAttachment,
+  isRoomMuted,
+  MUTE_DURATIONS,
   unreadCount,
   sortRooms,
   DELETED_MESSAGE_TEXT,

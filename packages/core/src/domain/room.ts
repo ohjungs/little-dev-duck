@@ -118,3 +118,26 @@ export function sortRooms<T extends { pinnedAt: string | null; lastMessageSeq: n
     return b.lastMessageSeq - a.lastMessageSeq;
   });
 }
+
+/**
+ * 이 방이 지금 음소거 상태인가. **"언제까지"를 저장하고 판정은 지금 시각과 비교**한다 —
+ * 켜짐/꺼짐 불리언으로 두면 "1시간만 끄기"를 표현할 수 없고, 해제할 주체도 없다
+ * (이 프로젝트는 무료 원칙상 서버 스케줄러가 없다).
+ *
+ * 시각을 인자로 받는다. 안에서 `Date.now()`를 부르면 테스트가 시간에 의존한다.
+ * 과거 시각이면 이미 풀린 것이다 — 지난 값이 남아 있어도 알림이 영영 막히지 않는다.
+ */
+export function isRoomMuted(mutedUntil: string | null, now: number): boolean {
+  if (!mutedUntil) return false;
+  const until = Date.parse(mutedUntil);
+  // 해석할 수 없는 값이면 **음소거로 치지 않는다.** 알림을 조용히 잃는 쪽이 더 나쁘다.
+  if (Number.isNaN(until)) return false;
+  return until > now;
+}
+
+/** 자주 쓰는 음소거 기간. 화면마다 다른 값을 쓰면 사용자가 무엇을 고른 건지 헷갈린다. */
+export const MUTE_DURATIONS = [
+  { label: "1시간", ms: 60 * 60 * 1000 },
+  { label: "오늘 하루", ms: 24 * 60 * 60 * 1000 },
+  { label: "직접 풀 때까지", ms: 365 * 24 * 60 * 60 * 1000 },
+] as const;

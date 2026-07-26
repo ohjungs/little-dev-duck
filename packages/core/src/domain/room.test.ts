@@ -4,6 +4,8 @@ import {
   messageBody,
   messageAttachment,
   messageSchema,
+  isRoomMuted,
+  MUTE_DURATIONS,
   roomMemberSchema,
   sortRooms,
   unreadCount,
@@ -149,5 +151,39 @@ describe("메시지 첨부", () => {
 
   it("첨부가 없으면 null", () => {
     expect(messageAttachment({ attachmentPath: null, deletedAt: null })).toBeNull();
+  });
+});
+
+// 2026-07-27 : 메신저 - 방 음소거 (Phase 51 T2)
+describe("방 음소거", () => {
+  const NOW = Date.parse("2026-07-27T12:00:00.000Z");
+
+  it("음소거한 적 없으면 조용하지 않다", () => {
+    expect(isRoomMuted(null, NOW)).toBe(false);
+  });
+
+  it("아직 안 지났으면 음소거다", () => {
+    expect(isRoomMuted("2026-07-27T13:00:00.000Z", NOW)).toBe(true);
+  });
+
+  it("지난 값은 이미 풀린 것이다 (남아 있어도 영영 막히지 않는다)", () => {
+    expect(isRoomMuted("2026-07-27T11:00:00.000Z", NOW)).toBe(false);
+  });
+
+  it("경계에서 풀린다", () => {
+    expect(isRoomMuted("2026-07-27T12:00:00.000Z", NOW)).toBe(false);
+  });
+
+  it("해석할 수 없는 값은 음소거로 치지 않는다", () => {
+    // 알림을 조용히 잃는 쪽이 더 나쁘다.
+    expect(isRoomMuted("이상한 값", NOW)).toBe(false);
+    expect(isRoomMuted("", NOW)).toBe(false);
+  });
+
+  it("기간 선택지에 라벨과 길이가 모두 있다", () => {
+    for (const d of MUTE_DURATIONS) {
+      expect(d.label.length).toBeGreaterThan(0);
+      expect(d.ms).toBeGreaterThan(0);
+    }
   });
 });

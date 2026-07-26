@@ -303,3 +303,57 @@ export async function messageImageUrl(
   if (error || !data) return null;
   return data.signedUrl;
 }
+
+// ---------------------------------------------------------------------------
+// 방 음소거
+// ---------------------------------------------------------------------------
+/**
+ * 이 방에서의 내 멤버 정보(읽음 위치·음소거·고정). 없으면 null —
+ * **멤버가 아니면 null이지 오류가 아니다**(정책이 안 보이게 막으므로 빈 결과가 정상이다).
+ */
+export async function getMyMembership(
+  supabase: SupabaseClient,
+  roomId: string,
+): Promise<{ mutedUntil: string | null; lastReadMessageId: string | null } | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("room_members")
+    .select("muted_until, last_read_message_id")
+    .eq("room_id", roomId)
+    .eq("user_id", user.id)
+    .limit(1);
+
+  if (error || !data) return null;
+  const rows = data as { muted_until: string | null; last_read_message_id: string | null }[];
+  const row = rows[0];
+  if (!row) return null;
+  return { mutedUntil: row.muted_until, lastReadMessageId: row.last_read_message_id };
+}
+
+/**
+ * 음소거를 설정하거나(시각) 푼다(null).
+ * **"언제까지"를 저장한다** — 켜짐/꺼짐으로 두면 "1시간만"을 표현할 수 없고,
+ * 시간이 지났을 때 풀어 줄 주체가 없다(무료 원칙상 서버 스케줄러가 없다).
+ */
+export async function setRoomMute(
+  supabase: SupabaseClient,
+  roomId: string,
+  mutedUntil: string | null,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase
+    .from("room_members")
+    .update({ muted_until: mutedUntil })
+    .eq("room_id", roomId)
+    .eq("user_id", user.id);
+
+  if (error) throw new Error(error.message);
+}

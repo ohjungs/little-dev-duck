@@ -190,5 +190,7 @@ export {
   uploadMessageImage,
   messageImageUrl,
   SIGNED_URL_SECONDS,
+  getMyMembership,
+  setRoomMute,
   type SendMessageInput,
 } from "./rooms";

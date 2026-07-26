@@ -14,8 +14,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   deleteMessage,
   listMessages,
+  getMyMembership,
   markRead,
   messageImageUrl,
+  setRoomMute,
   sendMessage,
   uploadMessageImage,
 } from "@ldd/api";
@@ -28,12 +30,20 @@ import {
   afterSend,
   shouldFlushOnLeave,
   shouldSendRead,
+  isRoomMuted,
+  MUTE_DURATIONS,
   type Message,
   type ReadReceiptState,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeRoomMessages } from "@/lib/realtime";
 import { notifyDuck } from "@/lib/notify";
+
+// "지금부터 ms 뒤"를 ISO로. **컴포넌트 밖에 둔다** — 렌더 중 현재 시각을 읽으면
+// 결과가 다시 그릴 때마다 달라져 예측할 수 없다(React 순수성 규칙, 린트가 잡았다).
+function muteUntilIso(ms: number): string {
+  return new Date(Date.now() + ms).toISOString();
+}
 
 type Props = {
   roomId: string;
@@ -61,6 +71,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 이미 알린 위치. **첫 렌더의 과거 메시지로 알림을 쏘지 않으려고** null로 시작하지 않고
   // 처음 본 순간의 seq로 채운다 — 방에 들어가자마자 지난 대화가 알림으로 쏟아지면 안 된다.
   const notifiedSeqRef = useRef<number | null>(null);
+  // 음소거는 "언제까지"로 저장한다. 화면에서도 그 값을 그대로 들고 판정만 core에 맡긴다.
+  const [mutedUntil, setMutedUntil] = useState<string | null>(null);
+  // 렌더 중에 현재 시각을 읽지 않는다. 대신 상태로 두고 **만료되면 스스로 풀리게** 한다 —
+  // 타이머가 없으면 화면을 새로 열기 전까지 "꺼짐"으로 남아 있다.
+  const [muted, setMuted] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -132,6 +147,31 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     };
   }, [messages, imageUrls]);
 
+  useEffect(() => {
+    const now = Date.now();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 현재 시각은 렌더 중에 읽을 수 없다(순수성). mutedUntil이 바뀔 때만 1회 동기화
+    setMuted(isRoomMuted(mutedUntil, now));
+    if (!mutedUntil) return;
+    const remain = Date.parse(mutedUntil) - now;
+    if (Number.isNaN(remain) || remain <= 0) return;
+    // 아주 먼 미래("직접 풀 때까지")면 타이머를 걸지 않는다 — setTimeout 상한을 넘으면
+    // 즉시 발화해 방금 끈 알림이 바로 켜진다.
+    if (remain > 2 ** 31 - 1) return;
+    const id = setTimeout(() => setMuted(false), remain);
+    return () => clearTimeout(id);
+  }, [mutedUntil]);
+
+  // 내 멤버 정보(음소거)를 한 번 읽는다. 실패해도 대화는 열려야 하므로 조용히 넘긴다.
+  useEffect(() => {
+    let alive = true;
+    void getMyMembership(createClient(), roomId).then((m) => {
+      if (alive && m) setMutedUntil(m.mutedUntil);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [roomId]);
+
   // 새 메시지 알림. **재구현하지 않는다** — `notifyDuck`이 권한·방해금지·집중 모드·
   // 하루 상한을 이미 다 본다(계획 T2: 두 벌로 만들면 한쪽만 방해금지를 지킨다).
   //
@@ -150,9 +190,10 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
 
     if (last.senderUserId === myUserId) return; // 내가 쓴 걸 나에게 알리지 않는다
     if (typeof document !== "undefined" && !document.hidden) return;
+    if (muted) return; // 이 방만 조용히
 
     notifyDuck("새 메시지", messageBody(last));
-  }, [messages, myUserId]);
+  }, [messages, myUserId, muted]);
 
   // 읽음 위치를 보낸다. **판정은 core가 하고 여기서는 실행만** 한다 —
   // 조건을 화면에 흩어 두면 어디선가 한 곳이 빠져 실시간 예산을 태운다.
@@ -205,6 +246,20 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     );
     if (!blob) throw new Error("이미지를 줄이지 못했어요.");
     return blob;
+  }
+
+  async function handleMute(ms: number | null) {
+    // null이면 해제. 그 외엔 "지금부터 ms 뒤까지".
+    const until = ms === null ? null : muteUntilIso(ms);
+    const prev = mutedUntil;
+    setMutedUntil(until); // 낙관적으로 먼저 바꾼다 — 버튼이 즉시 반응해야 눌린 게 보인다
+    try {
+      await setRoomMute(createClient(), roomId, until);
+    } catch (err) {
+      setMutedUntil(prev); // 실패하면 되돌린다. 껐다고 생각했는데 알림이 오면 더 나쁘다
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    }
   }
 
   async function handlePickImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -275,6 +330,37 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
 
   return (
     <div className="flex h-[60vh] flex-col rounded-lg border border-border">
+      {/* 2026-07-27 (Phase 51 T2): 방별 음소거. **"언제까지"를 고르게 한다** —
+          켜짐/꺼짐만 두면 "1시간만 조용히"를 표현할 수 없다. */}
+      <div className="flex flex-wrap items-center gap-1 border-b border-border p-2 text-xs">
+        {muted ? (
+          <>
+            <span className="text-muted-foreground">이 방 알림이 꺼져 있어요</span>
+            <button
+              type="button"
+              onClick={() => handleMute(null)}
+              className="rounded border border-border px-2 py-0.5 hover:bg-accent"
+            >
+              알림 켜기
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-muted-foreground">알림 끄기</span>
+            {MUTE_DURATIONS.map((d) => (
+              <button
+                key={d.label}
+                type="button"
+                onClick={() => handleMute(d.ms)}
+                className="rounded border border-border px-2 py-0.5 hover:bg-accent"
+              >
+                {d.label}
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+
       <ul className="flex-1 space-y-2 overflow-y-auto p-3" aria-label="대화 내용">
         {messages.length === 0 ? (
           <li className="text-sm text-muted-foreground">아직 주고받은 말이 없어요.</li>
