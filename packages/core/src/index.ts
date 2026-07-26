@@ -151,6 +151,13 @@ export {
 } from "./domain/weekly-digest";
 export { rowsToCsv } from "./domain/db-export";
 export {
+  buildBarChart,
+  describeBarChart,
+  type BarPoint,
+  type BarLayout,
+  type ChartScale,
+} from "./domain/bar-chart";
+export {
   deltaE,
   hexToLab,
   lightness,

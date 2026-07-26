@@ -41,6 +41,7 @@ import {
   DATE_RANGE_LABELS,
   type DateRangePreset,
 } from "@ldd/core";
+import { BarChart } from "@/components/BarChart";
 import { HabitHeatmap } from "./HabitHeatmap";
 import { createClient } from "@/lib/supabase/client";
 import { ActivityLogView } from "@/components/ActivityLogView";
@@ -497,6 +498,16 @@ export function InsightsView() {
         <p className="text-xs text-muted-foreground">
           {rangeFrom} ~ {rangeTo} ({rangeDays}일) · 체크 {rangeCheckCount}회
         </p>
+        {/* 2026-07-27 (2차 피드백 3-1, Phase 46 T1): 막대 그래프. **라이브러리 0개** —
+            SVG로 직접 그린다(계획이 ponytail 사다리로 내린 결론). 잔디는 "언제 했나"를,
+            막대는 "얼마나 했나"를 보여 준다 — 같은 데이터의 다른 질문이라 둘 다 남긴다. */}
+        <BarChart
+          points={rangeHeatmap.map((d) => ({
+            label: d.date.slice(5),
+            value: d.count,
+          }))}
+          ariaLabel={`${DATE_RANGE_LABELS[preset]} 습관 체크 추이`}
+        />
         <HabitHeatmap data={rangeHeatmap} />
       </section>
     )}
