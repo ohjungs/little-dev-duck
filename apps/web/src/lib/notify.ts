@@ -2,6 +2,7 @@
 // 방해금지 시간대(T2)와 하루 총량 상한을 준수한다. 프로필/서버 없이 localStorage로 상태 관리(ponytail).
 import { isQuietHour, nextDailyCount, type DailyCount } from "@ldd/core";
 import { readQuietHours } from "./quietHours";
+import { isFocusMode } from "./focusMode";
 
 const CAP_KEY = "ldd:notifyCount";
 const DAILY_CAP = 10;
@@ -40,6 +41,10 @@ function consumeDailyBudget(today: string): boolean {
 // 오리 알림 발송. 권한·방해금지·일일 상한을 모두 통과할 때만 브라우저 알림을 띄운다.
 export function notifyDuck(title: string, body: string): void {
   if (notifyPermission() !== "granted") return;
+  // 2026-07-27 (Phase 51 T2): 집중 모드 억제를 **여기서** 한다.
+  // 호출부마다 확인하게 두면 새 알림이 생길 때마다 한 곳씩 빠지고,
+  // 실제로 그래서 집중 모드가 아무것도 막지 못하는 상태였다(읽는 곳 0곳).
+  if (isFocusMode()) return;
   const now = new Date();
   const q = readQuietHours();
   if (q && isQuietHour(now.getHours(), q.start, q.end)) return; // 밤엔 조용

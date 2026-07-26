@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { disableFocusMode, enableFocusMode } from "@/lib/focusMode";
 import { Play, Square, Timer } from "lucide-react";
 import {
   completePomodoro,
@@ -90,19 +91,9 @@ function isMuted(): boolean {
   return window.localStorage.getItem(MUTE_KEY) === "1";
 }
 
-// 집중 모드 플래그. DuckWidget 등 다른 컴포넌트가 이 이벤트를 수신해 알림을 억제한다.
-const FOCUS_MODE_KEY = "ldd-focus-mode";
-const FOCUS_CHANGED_EVENT = "ldd:focus-changed";
-
-function enableFocusMode(): void {
-  localStorage.setItem(FOCUS_MODE_KEY, "true");
-  window.dispatchEvent(new Event(FOCUS_CHANGED_EVENT));
-}
-
-function disableFocusMode(): void {
-  localStorage.removeItem(FOCUS_MODE_KEY);
-  window.dispatchEvent(new Event(FOCUS_CHANGED_EVENT));
-}
+// 2026-07-27 (Phase 51 T2): 집중 모드 플래그를 lib/focusMode로 옮겼다.
+// 여기 있던 주석은 "다른 컴포넌트가 이 이벤트를 수신해 알림을 억제한다"고 적혀 있었는데
+// **읽는 곳이 0곳이었다** — 켜도 알림이 그대로 떴다. 이제 notifyDuck이 직접 본다.
 
 type LoadState = "loading" | "error" | "ready";
 

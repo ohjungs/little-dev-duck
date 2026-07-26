@@ -38,3 +38,42 @@ describe("notifyPermission", () => {
     expect(notifyPermission()).toBe("granted");
   });
 });
+
+// 2026-07-27 : 알림 - 집중 모드 억제 (Phase 51 T2)
+// **고치기 전 상태: 집중 모드는 아무것도 막지 않았다.** PomodoroWidget이 키를 쓰고
+// "다른 컴포넌트가 억제한다"고 주석을 달아 뒀는데 **읽는 곳이 0곳**이었다(실측).
+// 켜도 알림이 그대로 떴다. 억제를 notifyDuck 안으로 옮겼으니 그 성질을 여기서 잠근다.
+describe("집중 모드 억제", () => {
+  function stubWindow(focusOn: boolean, onNotify: () => void) {
+    class FakeNotification {
+      static permission = "granted";
+      constructor() {
+        onNotify();
+      }
+    }
+    vi.stubGlobal("window", {
+      Notification: FakeNotification,
+      localStorage: {
+        getItem: (k: string) => (k === "ldd-focus-mode" && focusOn ? "true" : null),
+        setItem: () => {},
+      },
+    });
+    vi.stubGlobal("Notification", FakeNotification);
+  }
+
+  it("집중 모드가 켜져 있으면 알림을 띄우지 않는다", async () => {
+    let fired = 0;
+    stubWindow(true, () => { fired += 1; });
+    const { notifyDuck } = await import("../notify");
+    notifyDuck("제목", "내용");
+    expect(fired).toBe(0);
+  });
+
+  it("꺼져 있으면 평소대로 띄운다 (억제가 과하면 알림이 영영 안 온다)", async () => {
+    let fired = 0;
+    stubWindow(false, () => { fired += 1; });
+    const { notifyDuck } = await import("../notify");
+    notifyDuck("제목", "내용");
+    expect(fired).toBe(1);
+  });
+});
