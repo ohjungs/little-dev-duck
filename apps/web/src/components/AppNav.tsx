@@ -90,8 +90,12 @@ function isActive(pathname: string, href: string): boolean {
 function Brand() {
   return (
     <Link href="/" className="flex items-center gap-2.5 px-2">
-      <span className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
-        <AnimatedDuckLogo size={24} />
+      {/* 2026-07-27 (2차 피드백 1-1): 로고가 너무 작다 → 32px / 40px 그릇.
+          **재인코딩하지 않았다.** 원본이 이미 96×96이라 32px은 여전히 3배 축소다
+          (계획은 "24px용으로 인코딩한 걸 키우면 뭉개진다"고 봤지만 실측하니 아니었다).
+          접힌 사이드바(w-16=64px)에도 40px이 들어간다. 아래 접힘 쪽과 **두 자리 모두** 바꿨다. */}
+      <span className="flex size-10 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
+        <AnimatedDuckLogo size={32} />
       </span>
       <span className="text-sm font-semibold tracking-tight">
         Little Dev Duck
@@ -123,9 +127,10 @@ export function AppSidebar({
       )}
     >
       <div className={cn("py-2", collapsed && "flex justify-center")}>
+        {/* 접힌 사이드바의 로고는 위 Brand와 같은 크기여야 접었다 폈을 때 튀지 않는다. */}
         {collapsed ? (
-          <Link href="/" className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
-            <AnimatedDuckLogo size={24} />
+          <Link href="/" className="flex size-10 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
+            <AnimatedDuckLogo size={32} />
           </Link>
         ) : (
           <Brand />

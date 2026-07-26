@@ -491,3 +491,21 @@
   - T4 공개 랜딩 `/welcome`(편집형 히어로+베이토+CTA) + 미들웨어 비로그인 리다이렉트 대상 변경.
   - T5 Sentry·T6 i18n은 인프라·범위로 이월. 검증 core 126 / api 198 tests + web tsc·build GREEN.
   - db push 3건 대기(pages_db_view·pages_public_share·delete_all_my_data)는 사용자 몫(DDL 안전 규칙).
+
+- 2026-07-27 : Phase 41 T3(비밀번호 재설정) + **Phase 42 완료**(원인 확정 버그 7건) — `/loop` 5분 러너 세션.
+  - **Phase 41 T3**: 이메일 로그인이 만든 "잊으면 영구 잠김" 구멍을 닫았다. 메일 링크는 `next=/auth/reset`을
+    달아 **이미 OAuth가 쓰는 `/auth/callback`**으로 들어온다(교환 라우트·open redirect 방어 재사용).
+    세션 없이 폼이 렌더되지 않는 것을 인증 게이트 + 페이지 판정 **두 겹**으로 잠갔다(e2e가 303을 못박음).
+    만료 판정을 로그인 규칙표에 **섞지 않았다** — 섞었다면 로그인 실패에 "재설정 링크 만료"라는 거짓말이 떴다.
+    곁다리로 `/login?error=auth`의 침묵(빈 폼만 다시 뜸)을 없앴다. SMTP 상한 조사해
+    `CONSTRAINTS_FREE_TIER.md`에 추가(가입 확인 메일과 재설정 메일이 **같은 시간당 통**을 쓴다).
+  - **Phase 42 T1~T7**: 도구 모음·사이드바 `flex-wrap` · 인사말이 무시하던 프로필 이름(core
+    `resolveDisplayName` 한 벌) · 뉴스 "수집된 기사 없음"이라던 **거짓 문구**(이유를 값으로 반환) ·
+    velog 홈 거부 → **전체 피드 등록** · 습관 잔디 대비를 **CIE ΔE로 잠금**(globals.css 실물 파싱) ·
+    로고 24 → 32px.
+  - **계획의 전제가 세 번 틀렸고 세 번 다 착수 전 실측이 잡았다**: T2 원인①(`publishedAt` 없으면 버림 —
+    `createdAt` 폴백이 있어 성립 안 함) · T3("velog에 전체 피드 없음" — **있었다**, 실측 200/20건) ·
+    T5("재인코딩 필요" — 원본이 이미 96×96이라 불필요). → lessons-learned **L-17** 신설.
+  - 검증: turbo test·lint·build 18/18 GREEN / core 947 / web 신규 16 / e2e 19 통과·46 스킵.
+    **화면 검증은 Phase 42 7건 중 0건** — 전부 로그인 뒤 화면이라 스크린샷 불가(Phase 41 T5 의존).
+    사용자 확인 항목은 `docs/loop-eng/manual-verification.md` 41·42번에 절차로 남겼다.
