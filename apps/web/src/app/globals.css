@@ -175,7 +175,30 @@
   }
 }
 
+/* 2026-07-26 : 문서 - 인쇄 레이아웃 (피드백 2-6 워드 단계)
+   "페이지 기능안에 ... 워드 기능도" 중 블록 에디터가 아직 못 하던 것 = 인쇄용 지면.
+   BlockNote가 제목·목록·표·코드블록을 이미 하므로, 빠진 건 **종이로 나갈 때의 규칙**이었다. */
 @media print {
+  /* 다크 모드로 인쇄하면 흰 종이에 밝은 회색 글씨가 찍힌다(브라우저는 배경을 기본적으로
+     인쇄하지 않는다). 팔레트 전체를 복사하지 않고 **읽는 데 필요한 변수만** 밝은 값으로 되돌린다. */
+  .dark {
+    --background: #ffffff;
+    --foreground: #171717;
+    --card: #ffffff;
+    --card-foreground: #171717;
+    --muted: #f5f5f5;
+    --muted-foreground: #525252;
+    --border: #d4d4d4;
+    --input: #d4d4d4;
+    --accent: #f5f5f5;
+    --accent-foreground: #171717;
+  }
+
+  /* 용지 여백. 브라우저 기본값은 지면마다 달라 결과를 예측할 수 없다. */
+  @page {
+    margin: 18mm 16mm;
+  }
+
   nav,
   aside,
   .no-print {
@@ -184,6 +207,54 @@
   main {
     margin: 0;
     padding: 0;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  /* 제목이 지면 끝에 혼자 남고 본문이 다음 장으로 넘어가는 것을 막는다. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    break-after: avoid-page;
+    break-inside: avoid;
+  }
+
+  /* 표·코드블록·인용은 중간에서 잘리면 읽기 어렵다. 통째로 다음 장으로 넘긴다. */
+  table,
+  pre,
+  blockquote,
+  figure {
+    break-inside: avoid;
+  }
+
+  /* 한 줄만 남거나 한 줄만 넘어가는 것(외톨이 줄)을 막는다. */
+  p,
+  li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* 코드블록 배경은 인쇄에서 보통 빠지므로 테두리로 경계를 남긴다 — 배경을 강제로 찍으면
+     잉크를 많이 쓰고 종이에서 오히려 읽기 나쁘다. */
+  pre {
+    border: 1px solid #d4d4d4;
+    white-space: pre-wrap; /* 지면 밖으로 넘어가 잘리지 않게 */
+    word-break: break-word;
+  }
+
+  /* 편집기는 화면 폭에 맞춰 좌우 여백을 두는데, 종이에서는 @page 여백과 겹쳐 본문이 좁아진다. */
+  .bn-container .bn-editor {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  img {
+    max-width: 100% !important;
+    break-inside: avoid;
   }
 }
 

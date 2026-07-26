@@ -23,6 +23,7 @@ import {
   Table2,
   Upload,
   X,
+  Printer,
 } from "lucide-react";
 import type { Block } from "@blocknote/core";
 import {
@@ -365,6 +366,22 @@ export function PageEditor({
     URL.revokeObjectURL(url);
   };
 
+  // 2026-07-26 (피드백 2-6): 인쇄·PDF. 브라우저 인쇄 대화상자가 "PDF로 저장"을 포함하므로
+  // PDF 라이브러리를 새로 들이지 않는다 — 지면 규칙(여백·페이지 나눔·다크 모드 보정)은
+  // globals.css의 @media print가 담당한다.
+  //
+  // 저장이 끝나기 전에 인쇄하면 방금 친 글이 빠진 채 나간다. 먼저 저장을 밀어낸다.
+  const handlePrint = () => {
+    // 대기 중인 디바운스 저장이 없으면 null이라 바로 인쇄한다.
+    const pending = flushPendingSave();
+    if (!pending) {
+      window.print();
+      return;
+    }
+    // 저장이 실패해도 인쇄는 막지 않는다 — 화면에 보이는 내용은 그대로 찍힌다.
+    void pending.finally(() => window.print());
+  };
+
   // 2026-07-26 (피드백 2-2): 이 페이지를 **템플릿 파일**로 내려받는다.
   // 템플릿 저장소를 새로 만들지 않고 파일로 주고받는다 — 받은 사람은 새 페이지 메뉴에서 가져온다.
   // 제목·본문·아이콘·데이터베이스 설정만 담는다(내용은 남의 것이 될 수 있어 그대로 옮긴다).
@@ -448,7 +465,7 @@ export function PageEditor({
 
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 px-2 py-10">
-      <div className="flex items-center justify-end gap-1 px-4">
+      <div className="no-print flex items-center justify-end gap-1 px-4">
         {versionMsg && (
           <span className="mr-auto text-xs text-muted-foreground" role="status">
             {versionMsg}
@@ -509,6 +526,15 @@ export function PageEditor({
           className="text-muted-foreground"
         >
           <Download className="size-3.5" /> 템플릿으로 저장
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handlePrint}
+          className="text-muted-foreground"
+        >
+          <Printer className="size-3.5" /> 인쇄 · PDF
         </Button>
         <Button
           type="button"
