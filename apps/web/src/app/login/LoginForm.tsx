@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { allowRequest } from "@ldd/api";
 import { authErrorMessage } from "@ldd/core";
 import { DuckVideo } from "@/components/DuckVideo";
 import { createClient } from "@/lib/supabase/client";
@@ -48,6 +49,10 @@ function GoogleMark() {
     </svg>
   );
 }
+
+// 5분에 5번. 오타로 몇 번 틀리는 건 통과하고, 연타는 걸린다.
+const LOGIN_ATTEMPT_LIMIT = 5;
+const LOGIN_ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
 
 export function LoginForm({ initialError = "" }: { initialError?: string }) {
   const [mode, setMode] = useState<Mode>("signin");
@@ -103,6 +108,19 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
     const supabase = createClient();
     try {
       if (mode === "signin") {
+        // 2026-07-27 : 로그인 - 시도 상한 (Phase 41 T2)
+        // **공용 `allowRequest`를 쓴다.** 자체 Map으로 다시 만들면 인벤토리 위반이고,
+        // 이 저장소가 Phase 36에서 정확히 그걸로 데였다(교훈 L-16).
+        //
+        // **[한계 · 이건 보안 통제가 아니다]** 이 상한은 **이 탭의 메모리**에 산다.
+        // 새로고침하거나 다른 브라우저로 오면 초기화된다. 즉 작정한 공격자는 그냥 지나간다.
+        // **실제 방어선은 Supabase Auth 자체의 상한**이고, 이건 그 앞의 완충이다 —
+        // 오타로 연달아 실패하는 사람에게 "잠시 뒤에"라고 알려 주는 쪽이 목적이다.
+        // 이 한계를 여기 적어 두지 않으면 다음 사람이 이걸 방어선이라고 믿는다.
+        if (!allowRequest(`login:${email.trim().toLowerCase()}`, LOGIN_ATTEMPT_LIMIT, LOGIN_ATTEMPT_WINDOW_MS)) {
+          setError("로그인 시도가 많았어요. 잠시 뒤에 다시 시도해 주세요.");
+          return;
+        }
         const { error: err } = await supabase.auth.signInWithPassword({
           email,
           password,
