@@ -28,14 +28,10 @@ import {
   timeOverlay,
   timeOfDayLabel,
   timeOfDayIcon,
-  createCompany,
-  tickCompany,
-  formatMoney,
   findPath,
   pickWanderTarget,
   wanderZone,
   assignLook,
-  type CompanyStats,
   type DuckWorkState,
   type TileMap,
   type Camera,
@@ -80,7 +76,6 @@ function kstClock(): GameClock {
 const TILE = 32;          // 오리 스프라이트 프레임 32x32와 맞춤
 const FRAME_MS = 60;      // ~16fps (깜빡임 방지)
 const ZONE_HUD_MS = 2000;
-const CLOCK_START_HOUR = 8;
 const MINIMAP_SCALE = 2;  // 타일당 2px
 const MINIMAP_MARGIN = 6; // 우상단 여백
 
@@ -289,10 +284,11 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
 
   const clockRef = useRef<GameClock>(kstClock());
   const lastTickRef = useRef<number>(0);
+  // 2026-07-26 (피드백 5-5): 퇴근 상태. 렌더 루프(ref)와 버튼(state) 양쪽이 봐야 해서 둘 다 둔다.
+  const [offwork, setOffwork] = useState(false);
+  const offworkRef = useRef(false);
   // 회사 재정 상태
-  const companyRef = useRef<CompanyStats>(createCompany());
   // 마지막으로 시간당 회사 틱을 실행한 게임 hour
-  const lastCompanyHourRef = useRef<number>(CLOCK_START_HOUR);
 
   // NPC 배회 경로 추적 (Npc 타입 미수정, 외부 Map 사용)
   // nextMoveAt: 다음 타일 이동을 실행할 timestamp(ms). idleUntil: 목적지 도착 후 대기 종료 timestamp.
@@ -307,7 +303,6 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const [dashboardNpcs, setDashboardNpcs] = useState<Npc[]>([]);
   // management panel용 스냅샷 (React 렌더 트리거용)
   const [managementSnapshot, setManagementSnapshot] = useState<{
-    company: CompanyStats;
     npcs: Npc[];
     clock: GameClock;
   } | null>(null);
@@ -316,7 +311,6 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const [showMinimap, setShowMinimap] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
   const [clockDisplay, setClockDisplay] = useState("08:00 ☀️ 오전");
-  const [hudMoney, setHudMoney] = useState(0);
   const [hudNpcCount, setHudNpcCount] = useState(0);
 
   const pausedRef = useRef(false);
@@ -607,6 +601,12 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
       if (!pausedRef.current) {
         const clock = clockRef.current;
         npcsRef.current = npcsRef.current.map((npc) => {
+          // 2026-07-26 (피드백 5-5): 퇴근시키면 **실제로 일을 그만둔다**. 시각·업무와 무관하게
+          // offwork로 고정되고, 아래 렌더가 offwork NPC를 그리지 않으므로 사무실이 실제로 빈다.
+          // 다시 출근시킬 때까지 유지된다 — 눌러도 곧 원상복구되면 누른 의미가 없다.
+          if (offworkRef.current) {
+            return { ...npc, schedulePhase: "offwork" as const, workState: "offwork" as const };
+          }
           const realPhase = schedulePhase(clock.hour);
           // AI 에이전트는 사람과 달리 시간 무관 상주한다 — 출퇴근/퇴근 단계는 working으로 대체해
           // 밤(실시간)에도 오피스가 비지 않게 한다(낮의 점심·휴식 배회는 그대로 유지).
@@ -747,14 +747,8 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         setClockDisplay(
           `${formatClockTime(clock)} ${timeOfDayIcon(tod)} ${timeOfDayLabel(tod)}`,
         );
-        setHudMoney(companyRef.current.money);
         setHudNpcCount(npcsRef.current.length);
 
-        // 게임 hour 변경 시 회사 재정 틱
-        if (clock.hour !== lastCompanyHourRef.current) {
-          lastCompanyHourRef.current = clock.hour;
-          companyRef.current = tickCompany(companyRef.current, npcsRef.current.length);
-        }
       }
 
       // 프레임 게이트
@@ -831,7 +825,6 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           if (!prev) {
             // 패널 열 때 스냅샷 갱신
             setManagementSnapshot({
-              company: { ...companyRef.current },
               npcs: [...npcsRef.current],
               clock: { ...clockRef.current },
             });
@@ -1242,9 +1235,11 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           <div className="rounded bg-black/60 px-2 py-0.5 font-mono text-xs font-bold text-white">
             {clockDisplay}
           </div>
+          {/* 2026-07-26 (피드백 5-5): 자금(₩) 표시 제거 — 어떤 실제 값과도 연결돼 있지 않았다. */}
           <div className="rounded bg-black/60 px-2 py-0.5 font-mono text-[10px] text-gray-200 flex gap-2">
-            <span className="text-green-400">₩{formatMoney(hudMoney)}</span>
-            <span className="text-gray-400">{hudNpcCount}명</span>
+            <span className="text-gray-400">
+              {offwork ? "퇴근함" : `${hudNpcCount}명`}
+            </span>
           </div>
         </div>
 
@@ -1255,8 +1250,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
             setShowManagement((prev) => {
               if (!prev) {
                 setManagementSnapshot({
-                  company: { ...companyRef.current },
-                  npcs: [...npcsRef.current],
+                      npcs: [...npcsRef.current],
                   clock: { ...clockRef.current },
                 });
               }
@@ -1269,6 +1263,24 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
                      hover:bg-black/80 hover:text-white transition-colors z-10"
         >
           경영 [TAB]
+        </button>
+
+        {/* 퇴근/출근 토글 (피드백 5-5: "퇴근시키기 만들어놓고 실제로 누르면 일 그만하게")
+            누르면 전 직원이 offwork가 되어 렌더에서 빠진다 — 사무실이 실제로 빈다. */}
+        <button
+          type="button"
+          onClick={() => {
+            const next = !offworkRef.current;
+            offworkRef.current = next;
+            setOffwork(next);
+          }}
+          aria-pressed={offwork}
+          aria-label={offwork ? "직원 다시 출근시키기" : "직원 퇴근시키기"}
+          className="absolute left-[4.5rem] top-2 rounded bg-black/60 border border-gray-600
+                     px-2 py-0.5 font-mono text-[10px] text-gray-200
+                     hover:bg-black/80 hover:text-white transition-colors z-10"
+        >
+          {offwork ? "출근시키기" : "퇴근시키기"}
         </button>
 
         {/* NPC 대화 패널 — canvas 위에 절대 오버레이 */}

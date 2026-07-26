@@ -1021,6 +1021,17 @@ export function drawDuckSprite(
 // drawFurnitureSprite — 개별 가구 이미지를 타일에 맞춰 그린다
 // 이미지 원본이 16px 이하면 1타일, 32px 이하면 2타일, 그 이상은 그대로 확대.
 // ---------------------------------------------------------------------------
+// 2026-07-26 : 오피스 - 가구렌더 - 벽침범 (피드백 5-2)
+// "사물들 에셋이 벽을 넘어가는등 UI가 이상해"의 원인이 여기 있었다.
+// 규칙이 `32px 이하 → 2타일`이라 **32x32 자산 20개가 64x64로** 그려졌다(자산 43개를 직접 재서
+// 확인). 타일은 32px인데 두 타일 크기를 그리니 시작점 기준 오른쪽·아래로 삐져나가고, 그 자리가
+// 벽이면 가구가 벽 위에 얹혔다. 가구끼리도 겹쳤다.
+// 이 규칙은 타일이 16px이던 시절 것으로 보인다 — 그땐 32px 자산이 정말 2타일이었다.
+//
+// 불변식을 되돌린다: **맵의 한 타일 = 그려지는 한 타일.**
+// 절충(명시): 큰 자산(32px)은 16px 자산과 달리 확대되지 않아 상대적으로 작게 보인다.
+// 진짜 2x2 가구를 그리려면 맵이 2x2를 예약해야 하는데 그건 맵 데이터 변경이라 여기서 하지 않았다.
+// 겹쳐 보이는 것보다 작게 보이는 쪽이 낫다 — 전자는 버그고 후자는 취향이다.
 export function drawFurnitureSprite(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -1028,10 +1039,5 @@ export function drawFurnitureSprite(
   y: number,
   tileSize: number,
 ): void {
-  // naturalWidth 기준으로 표시 크기 결정 (16px -> 1타일, 32px -> 2타일)
-  const naturalW = img.naturalWidth || img.width;
-  const tiles = naturalW <= 16 ? 1 : naturalW <= 32 ? 2 : Math.ceil(naturalW / 16);
-  const drawW = tileSize * tiles;
-  const drawH = tileSize * tiles;
-  ctx.drawImage(img, x, y, drawW, drawH);
+  ctx.drawImage(img, x, y, tileSize, tileSize);
 }
