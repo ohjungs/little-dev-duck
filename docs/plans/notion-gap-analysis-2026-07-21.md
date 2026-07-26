@@ -267,6 +267,25 @@ postgres_changes 구독 → invalidate-and-refetch. 세밀한 patch/presence/bro
 
 ## 7. 기술 부채 상환표
 
+> ## ✅ 2026-07-26 대조 — **P1 항목이 전부 상환됐다.** 아래 표는 이력이다.
+>
+> CLAUDE.md 8절이 이 문서를 "개발 지시서"로 가리키고 있어, 낡은 채로 두면 **이미 끝낸 일을
+> 다시 하거나 없는 문제를 쫓게 된다**(같은 날 `feedback-2026-07-26.md` 상태 표에서 겪은 부류).
+> 그래서 코드로 하나씩 대조했다 — 아래는 추측이 아니라 확인 결과다.
+>
+> | 항목 | 지금 상태 | 확인한 근거 |
+> |---|---|---|
+> | SEC-04 auth callback `next` 검증 | **완료** | `auth/callback/route.ts:8-13` — `/` 시작 + `//`·`/\` 배제까지 |
+> | 동기화 실패 무알림 | **완료** | `DesktopCollectorSync.tsx:54,85` — `setError` + Toast |
+> | `upsertActivityDaily` zod 검증 | **완료** | `api/activity.ts:36,52,74` — `activityDailyEntrySchema.parse` |
+> | 커버리지 측정 · vitest.config 부재 | **완료** | `apps/web/vitest.config.ts` · 루트 `coverage` 스크립트 + `@vitest/coverage-v8` |
+> | 에러 계약(LddError) | **완료** | `core/domain/ldd-error.ts` |
+> | keepalive 워크플로 | **완료** | `.github/workflows/ci.yml` + `/api/keepalive`(호출 상한까지) |
+> | style-src `unsafe-inline` (P2) | **유지가 맞음** | `proxy.ts:43` — 인라인 style 관례를 버릴 때만 의미가 있다(원 문서 판단 그대로) |
+>
+> **남은 P0 둘은 여전히 사용자 몫이다**(로그인 필요 검증 · 마이그레이션 적용) —
+> [`../loop-eng/PENDING.md`](../loop-eng/PENDING.md)에 모아 뒀다.
+
 | 등급 | 항목 | 파일/근거 | 상환 시점 |
 |---|---|---|---|
 | P0 | CLAUDE.md 불일치 2건 (static export, Tauri Release) | CLAUDE.md 2절 | **이 지시서와 함께 적용됨** |

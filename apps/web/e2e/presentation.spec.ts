@@ -22,17 +22,14 @@ test.describe("발표 모드 (Phase 34)", () => {
 
   // 새 페이지를 만들고 그 편집 화면에 도착한다. 발표 버튼은 페이지 편집 화면에만 있다.
   //
-  // **"새 페이지"라는 이름의 버튼이 둘이다**(2026-07-26 확인):
-  //  · 사이드바의 아이콘 버튼 — aria-label만 있고 글자가 없다. 누르면 **메뉴가 열릴 뿐** 안 만든다.
-  //  · 오른쪽 빈 화면의 버튼 — 글자가 있고 누르면 **바로 만든다**.
-  // 이름이 같아 first()로 잡으면 엉뚱한 쪽(메뉴)을 누른다. 글자 유무로 가른다.
-  // (스크린리더에는 둘 다 "새 페이지 버튼"으로 읽힌다 — 별개 개선거리로 적어 뒀다.)
+  // **이 셀렉터가 이름 충돌의 회귀 잠금이다.** 한때 "새 페이지"라는 이름의 버튼이 둘이었다 —
+  // 사이드바 아이콘(메뉴를 열 뿐)과 빈 화면 버튼(즉시 생성). 스크린리더에 구분되지 않았고
+  // 이 테스트도 엉뚱한 쪽을 누를 뻔했다. 사이드바 쪽 이름을 "새 페이지 메뉴"로 고쳤다.
+  //
+  // exact를 켜 두면 이름이 다시 겹치는 순간 **"resolved to 2 elements"로 여기서 먼저 깨진다.**
   async function openNewPage(page: import("@playwright/test").Page) {
     await page.goto("/pages");
-    await page
-      .getByRole("button", { name: "새 페이지" })
-      .filter({ hasText: "새 페이지" })
-      .click();
+    await page.getByRole("button", { name: "새 페이지", exact: true }).click();
     // 페이지가 만들어지면 /pages/<id>로 이동한다.
     await page.waitForURL(/\/pages\/[0-9a-f-]{36}/);
     await expect(page.getByLabel("페이지 제목")).toBeVisible();

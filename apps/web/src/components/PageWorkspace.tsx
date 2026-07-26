@@ -423,7 +423,11 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
             variant="ghost"
             size="icon-sm"
             onClick={() => setNewMenuOpen((v) => !v)}
-            aria-label="새 페이지"
+            // 2026-07-26 : 접근성 - 이름충돌 - 새페이지
+            // 빈 화면의 "새 페이지" 버튼은 **즉시 만들고** 이 버튼은 **메뉴를 열 뿐**인데
+            // 이름이 같아 스크린리더에는 둘이 구분되지 않았다(e2e를 쓰다 발견 — 셀렉터도 갈렸다).
+            // aria-label은 화면에 보이지 않으므로 이 수정으로 눈에 보이는 것은 바뀌지 않는다.
+            aria-label="새 페이지 메뉴"
             aria-expanded={newMenuOpen}
           >
             <Plus className="size-4" />
