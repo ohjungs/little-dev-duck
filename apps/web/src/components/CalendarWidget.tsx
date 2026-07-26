@@ -41,6 +41,9 @@ function formatEventTime(startAt: string): string | null {
   return `${period} ${h12}:${String(m).padStart(2, "0")}`;
 }
 
+// 지난 일정 표시 여부(기기별 취향이라 서버가 아니라 localStorage에 둔다).
+const SHOW_PAST_KEY = "ldd-calendar-show-past";
+
 // D-day 라벨: 0=오늘, 양수=D-N(다가옴), 음수=D+N(지남).
 function ddayLabel(startAt: string): string {
   // startAt은 타임스탬프다. daysUntil은 문자열 앞 10자리(=UTC 날짜)를 쓰므로 로컬 자정
@@ -111,7 +114,29 @@ export function CalendarWidget() {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // 2026-07-27 (2차 피드백 1-7 "아무것도 안골르면 당장 오늘로하고"): 기본 선택을 오늘로.
+  // **날짜 계산을 새로 쓰지 않는다** — `todayIso`가 로컬 기준으로 이미 있다(이 저장소는
+  // 하루 밀림을 여러 번 겪어 eslint 규칙까지 만들었다).
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => todayIso());
+
+  // 2026-07-27 (2차 피드백 1-7 "지난거는 볼건지안볼건지도 중요하고"): 지난 일정 표시 토글.
+  // **기본값은 숨김이다** — 사용자가 "볼지 말지"를 물었다는 것 자체가 지금 보이는 게
+  // 방해된다는 뜻이다. 선택은 기기별 취향이라 localStorage에 남긴다(이 저장소의 다른
+  // 화면 설정과 같은 방식 — 서버 설정은 마이그레이션 대기 중이라 여기에 얹지 않는다).
+  const [showPast, setShowPast] = useState(false);
+  useEffect(() => {
+    // 초기값을 useState 초기화 함수에서 읽지 않는 이유: 서버 렌더에는 localStorage가 없어
+    // 하이드레이션이 어긋난다. 이 파일이 일정 조회에 쓰는 것과 같은 예외다(마운트 후 1회 동기화).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
+    setShowPast(window.localStorage.getItem(SHOW_PAST_KEY) === "1");
+  }, []);
+  const toggleShowPast = () => {
+    setShowPast((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(SHOW_PAST_KEY, next ? "1" : "0");
+      return next;
+    });
+  };
 
   const supabase = createClient();
 
@@ -206,9 +231,20 @@ export function CalendarWidget() {
     setViewMonth(d.getMonth());
     setSelectedDate(null);
   };
-  const visibleEvents = selectedDate
+  // 날짜를 고르면 그날 것만, 안 고르면 전체. 그 위에 "지난 일정 숨김"을 얹는다.
+  // **날짜를 직접 고른 경우에는 숨기지 않는다** — 사용자가 과거 날짜를 눌렀는데 빈 화면이
+  // 나오면 고장으로 보인다(고르는 행위 자체가 "그날을 보겠다"는 뜻이다).
+  const byDate = selectedDate
     ? events.filter((e) => localDateKey(e.startAt) === selectedDate)
     : events;
+  const visibleEvents =
+    showPast || selectedDate !== null
+      ? byDate
+      : byDate.filter((e) => localDateKey(e.startAt) >= todayKey);
+  const hiddenPastCount =
+    showPast || selectedDate !== null
+      ? 0
+      : byDate.length - visibleEvents.length;
 
   return (
     <Card data-testid="calendar-widget" className="h-full">
@@ -370,9 +406,33 @@ export function CalendarWidget() {
             </Button>
           </div>
         )}
+        {/* 2026-07-27 (2차 피드백 1-7): 지난 일정 보기 토글. 날짜를 직접 고른 상태에서는
+            숨기지 않으므로 토글도 감춘다 — 눌러도 아무 일이 없으면 고장으로 보인다. */}
+        {state === "ready" && selectedDate === null && (
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <button
+              type="button"
+              onClick={toggleShowPast}
+              aria-pressed={showPast}
+              className="rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              {showPast ? "지난 일정 숨기기" : "지난 일정 보기"}
+            </button>
+            {/* 숨긴 건수를 말한다 — 말 없이 사라지면 "일정이 없어졌다"가 된다. */}
+            {hiddenPastCount > 0 && (
+              <span className="text-muted-foreground">
+                지난 일정 {hiddenPastCount}건 숨김
+              </span>
+            )}
+          </div>
+        )}
         {state === "ready" && visibleEvents.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            {selectedDate ? "이 날은 일정이 없어요" : "아직 일정이 없어요"}
+            {selectedDate
+              ? "이 날은 일정이 없어요"
+              : hiddenPastCount > 0
+                ? `앞으로의 일정이 없어요. 지난 일정 ${hiddenPastCount}건은 숨겨져 있어요.`
+                : "아직 일정이 없어요"}
           </p>
         )}
         {state === "ready" && visibleEvents.length > 0 && (
