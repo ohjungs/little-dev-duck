@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAppActionsAdapter, coerceEventStart, findTodoByTitle } from "./appActions";
+// 목에 넣는 db_schema는 **앱이 실제로 만드는 값**이어야 한다. 대충 만든 객체는 `fromRow`의
+// zod 검증에 걸려 조용히 null이 되고, 그러면 "이미 데이터베이스" 검사가 헛돈다(실제로 겪었다).
+import { createDefaultDbSchema } from "@ldd/core";
 
 // createTodo/createMemo는 supabase.auth.getUser + from().insert().select().single() 체인을 쓴다.
 // 최소 목으로 성공/검증 경로를 확인한다(외부 호출 0).
@@ -24,6 +27,8 @@ describe("createAppActionsAdapter", () => {
       "addCalendarEvent",
       "checkHabit",
       "completeTodo",
+      // 2026-07-27 (2차 피드백 2-3): 페이지를 표로. 되돌릴 수 없어 mutating이다.
+      "convertPageToDatabase",
       "createMemo",
       "createPage",
       "createTodo",
@@ -818,5 +823,130 @@ describe("뽀모도로 도구", () => {
     const r = await a.execute(exec("stopPomodoro"));
     expect(sink.updated).toBe(true);
     expect(r.response.stopped).toMatchObject({ id: running.id });
+  });
+});
+
+// 2026-07-27 : 오리도구 - 페이지를 표로 (2차 피드백 2-3, Phase 43 T2)
+// 사용자 요청: "데이터베이스로 전환은 왜 필요한지 모르겠고 **오리한테 시켜서** 할 수 있거나…".
+// 도구 모음에서 버튼을 빼는 대신 오리에게 옮긴다 — **지우면 표를 만들 길이 사라진다**
+// (DatabaseView 638줄과 Phase 33의 열 집계가 전부 그 입구에 매달려 있다).
+//
+// **이 변환은 화면에서 되돌릴 수 없다**(실측: `dbSchema`를 null로 되돌리는 자리가 코드에 없다).
+// 그래서 `kind: "mutating"` — 승인 카드 없이는 실행되지 않는다. 그 성질을 여기서 잠근다.
+// `fromRow`가 `pageSchema.parse`를 거치므로 목도 **실제 행 모양**이어야 한다
+// (uuid·타임스탬프까지). 대충 만든 목은 통과해도 실제와 다른 걸 검사하게 된다.
+function pageRow(n: number, title: string, dbSchema?: unknown) {
+  const id = `00000000-0000-4000-8000-00000000000${n}`;
+  return {
+    id,
+    user_id: "00000000-0000-4000-8000-0000000000ff",
+    parent_id: null,
+    title,
+    content: null,
+    plain_text: "",
+    icon: null,
+    is_trashed: false,
+    trashed_at: null,
+    created_at: "2026-07-27T00:00:00.000Z",
+    updated_at: "2026-07-27T00:00:00.000Z",
+    db_schema: dbSchema ?? null,
+    row_props: {},
+    is_public: false,
+    public_slug: null,
+    cover_url: null,
+  };
+}
+
+function mockPagesSupabase(pages: ReturnType<typeof pageRow>[]) {
+  const updated: { id?: string; patch?: Record<string, unknown> } = {};
+  const chain = {
+    select: () => chain,
+    eq: () => chain,
+    is: () => chain,
+    order: () => chain,
+    // 실제 listPages는 order 뒤에 limit로 끝난다 — 목이 체인을 빠뜨리면 검사가 헛돈다.
+    limit: () => Promise.resolve({ data: pages, error: null }),
+    update: (patch: Record<string, unknown>) => {
+      updated.patch = patch;
+      return {
+        eq: (_col: string, id: string) => {
+          updated.id = id;
+          return {
+            select: () => ({
+              single: () =>
+                Promise.resolve({
+                  data: { ...pages.find((p) => p.id === id), ...patch },
+                  error: null,
+                }),
+            }),
+          };
+        },
+      };
+    },
+  };
+  const client = {
+    auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
+    from: () => chain,
+  } as unknown as SupabaseClient;
+  return { client, updated };
+}
+
+describe("convertPageToDatabase 액션", () => {
+  const call = (title: string) => ({
+    id: "c1",
+    name: "convertPageToDatabase",
+    args: { title },
+  });
+
+  it("되돌릴 수 없는 변환이라 승인이 필요한 도구다", () => {
+    const a = createAppActionsAdapter(mockPagesSupabase([]).client);
+    const decl = a.catalog.find((t) => t.name === "convertPageToDatabase");
+    expect(decl, "도구가 카탈로그에 없다").toBeDefined();
+    expect(decl!.kind).toBe("mutating");
+    // 되돌릴 수 없다는 사실이 설명에 있어야 승인 카드를 보는 사용자가 판단할 수 있다.
+    expect(decl!.description).toContain("되돌");
+  });
+
+  it("제목으로 찾아 데이터베이스로 바꾼다", async () => {
+    const { client, updated } = mockPagesSupabase([
+      pageRow(1, "회의록"),
+      pageRow(2, "일기"),
+    ]);
+    const a = createAppActionsAdapter(client);
+    const res = await a.execute(call("회의록"));
+    // 오류는 `response.error`에 담긴다(errorResult) — 성공이면 그 자리가 비어 있다.
+    expect(res.response?.error).toBeUndefined();
+    expect(updated.id).toBe(pageRow(1, "회의록").id);
+    // 기본 스키마로 만든다 — 전환 로직을 새로 짜지 않고 core의 것을 그대로 쓴다.
+    expect(updated.patch?.db_schema).toBeTruthy();
+  });
+
+  it("이미 데이터베이스인 페이지는 다시 바꾸지 않는다", async () => {
+    // 다시 바꾸면 사용자가 만든 열·뷰가 기본값으로 덮여 사라진다.
+    const { client, updated } = mockPagesSupabase([
+      pageRow(1, "트래커", createDefaultDbSchema()),
+    ]);
+    const a = createAppActionsAdapter(client);
+    const res = await a.execute(call("트래커"));
+    expect(res.response?.error).toBeTruthy();
+    expect(updated.id, "쓰기가 일어나면 안 된다").toBeUndefined();
+  });
+
+  it("여러 개가 걸리면 실행하지 않고 되묻는다", async () => {
+    const { client, updated } = mockPagesSupabase([
+      pageRow(1, "회의록 7월"),
+      pageRow(2, "회의록 8월"),
+    ]);
+    const a = createAppActionsAdapter(client);
+    const res = await a.execute(call("회의록"));
+    expect(String(res.response?.error)).toContain("여러");
+    expect(updated.id).toBeUndefined();
+  });
+
+  it("못 찾으면 조용히 성공하지 않는다", async () => {
+    const { client } = mockPagesSupabase([pageRow(1, "일기")]);
+    const a = createAppActionsAdapter(client);
+    const res = await a.execute(call("없는 페이지"));
+    expect(res.response?.error).toBeTruthy();
   });
 });

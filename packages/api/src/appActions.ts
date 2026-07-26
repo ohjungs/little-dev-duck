@@ -11,13 +11,13 @@ import {
   todoEmbedText,
   DUCK_HABIT_RANGE_DAYS,
   findResumablePomodoro,
-} from "@ldd/core";
+  createDefaultDbSchema,} from "@ldd/core";
 import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
 import { createTodo, deleteTodo, listTodos, updateTodo } from "./todos";
 import { listEventsForDuck, listTodosForDuck } from "./duckQueries";
 import { createMemo, deleteMemo, listMemos, updateMemo } from "./memos";
-import { createPage } from "./pages";
+import { createPage, listPages, updatePage } from "./pages";
 import { createCalendarEvent } from "./calendar";
 import { checkHabit, listHabits, listHabitChecksInRange } from "./habits";
 import { indexSource } from "./embeddings";
@@ -106,6 +106,26 @@ const createPageDecl: ToolDeclaration = {
     properties: {
       title: { type: "string", description: "페이지 제목" },
       body: { type: "string", description: "페이지 본문(선택 — 없으면 빈 페이지)" },
+    },
+    required: ["title"],
+  },
+  kind: "mutating",
+};
+
+// 2026-07-27 : 오리도구 - 페이지를 표로 (2차 피드백 2-3, Phase 43 T2)
+// "데이터베이스로 전환은 왜 필요한지 모르겠고 **오리한테 시켜서** 할 수 있거나…"가 원문이다.
+// 도구 모음에서 버튼만 빼면 표를 만들 길이 사라진다 — 입구를 오리로 옮긴다.
+//
+// **되돌릴 수 없다**(실측: `dbSchema`를 null로 되돌리는 자리가 코드 어디에도 없다).
+// 그래서 `mutating`이고, 승인 카드에 그 사실이 보이도록 설명 첫머리에 적는다.
+const convertPageToDbDecl: ToolDeclaration = {
+  name: "convertPageToDatabase",
+  description:
+    "이미 있는 페이지를 데이터베이스(표·보드)로 바꾼다. 되돌릴 수 없다 — 한 번 바꾸면 문서로 되돌리는 기능이 없다. 사용자가 '~ 페이지 표로 바꿔줘', '데이터베이스로 만들어줘'라고 할 때 사용.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "바꿀 페이지의 제목(또는 일부)" },
     },
     required: ["title"],
   },
@@ -387,6 +407,7 @@ const pageArgs = z.object({
   title: z.string().min(1).max(200),
   body: z.string().max(5000).optional(),
 });
+const convertPageArgs = z.object({ title: z.string().min(1) });
 
 // 본문 텍스트를 BlockNote 단락 블록으로 감싼다(서버가 plain_text 파생 → 검색·RAG 자동 편입).
 function bodyToContent(body: string | undefined): unknown {
@@ -447,6 +468,7 @@ export function createAppActionsAdapter(
       editMemoDecl,
       deleteMemoDecl,
       createPageDecl,
+      convertPageToDbDecl,
       addEventDecl,
       checkHabitDecl,
       listTodosDecl,
@@ -731,6 +753,30 @@ export function createAppActionsAdapter(
           id: call.id,
           name: call.name,
           response: { created: { id: page.id, title: page.title } },
+        };
+      }
+
+      if (call.name === convertPageToDbDecl.name) {
+        const parsed = convertPageArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "페이지 정보가 올바르지 않습니다.");
+        // 제목 매칭은 할 일과 같은 규칙을 쓴다(정확 일치 우선 → 부분 일치 1건).
+        // 여러 개가 걸리면 **실행하지 않고 되묻는다** — 되돌릴 수 없는 변환이라 추측이 위험하다.
+        const found = findTodoByTitle(await listPages(supabase), parsed.data.title);
+        if (found === "ambiguous") {
+          return errorResult(call, "그 이름의 페이지가 여러 개 있어요. 더 정확한 제목으로 알려주세요.");
+        }
+        if (!found) return errorResult(call, "그 이름의 페이지를 찾지 못했어요.");
+        // 이미 데이터베이스면 다시 바꾸지 않는다 — 기본 스키마가 사용자가 만든 열·뷰를 덮어쓴다.
+        if (found.dbSchema) {
+          return errorResult(call, "그 페이지는 이미 데이터베이스예요.");
+        }
+        const updated = await updatePage(supabase, found.id, {
+          dbSchema: createDefaultDbSchema(),
+        });
+        return {
+          id: call.id,
+          name: call.name,
+          response: { converted: { id: updated.id, title: updated.title } },
         };
       }
 
