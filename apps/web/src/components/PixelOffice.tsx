@@ -1348,6 +1348,12 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
             npcs={managementSnapshot.npcs}
             clock={managementSnapshot.clock}
             onClose={() => setShowManagement(false)}
+            // 목록에서 고르면 상세를 연다 — 지도에서 그 직원을 찾아다니지 않아도 되게.
+            // 관리 패널은 닫는다. 둘이 겹쳐 뜨면 상세가 가려진다.
+            onSelectNpc={(npc) => {
+              setShowManagement(false);
+              setTalking({ npc, text: buildNpcDescription(npc) });
+            }}
           />
         )}
 

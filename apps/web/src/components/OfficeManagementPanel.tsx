@@ -16,6 +16,8 @@ import { formatClockTime } from "@ldd/core";
 
 type Props = {
   npcs: Npc[];
+  // 직원을 고르면 상세를 연다. 없으면 목록은 읽기 전용으로 남는다(선택 필드인 이유).
+  onSelectNpc?: (npc: Npc) => void;
   clock: GameClock;
   onClose: () => void;
 };
@@ -38,7 +40,7 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 // ---------------------------------------------------------------------------
 // 메인 컴포넌트
 // ---------------------------------------------------------------------------
-export function OfficeManagementPanel({ npcs, clock, onClose }: Props) {
+export function OfficeManagementPanel({ npcs, clock, onClose, onSelectNpc }: Props) {
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
 
   // 부서별 그룹핑
@@ -163,10 +165,18 @@ export function OfficeManagementPanel({ npcs, clock, onClose }: Props) {
                         <span className="w-12 text-right">업무</span>
                       </div>
                       {members.map((npc) => (
-                        <div
+                        // 2026-07-27 : 오피스 - 목록에서 상세 열기 (2차 피드백 5-2·5-5, Phase 48 T4)
+                        // 전에는 상세를 보려면 **지도에서 그 직원을 찾아 클릭**해야 했다.
+                        // 20명이 돌아다니는 화면에서 특정 직원을 찾는 건 그 자체가 일이다.
+                        // 여기서 바로 열 수 있게 한다 — 새 데이터도, 새 화면도 만들지 않는다.
+                        // button으로 두어 키보드 Tab·Enter로도 열린다(캔버스는 접근성이 잘 빠진다).
+                        <button
+                          type="button"
                           key={npc.id}
-                          className="px-2 py-0.5 flex font-mono text-[10px] text-gray-300
-                                     hover:bg-gray-700/50 transition-colors"
+                          onClick={() => onSelectNpc?.(npc)}
+                          aria-label={`${npc.name} 상세 보기`}
+                          className="w-full px-2 py-0.5 flex font-mono text-[10px] text-gray-300
+                                     hover:bg-gray-700/50 focus-visible:bg-gray-700/50 transition-colors"
                         >
                           {/* 2026-07-26 (피드백 5-5): 급여·만족도 제거. 급여는 게임 재화이고
                               만족도는 난수로 흔들리던 값이라 둘 다 근거가 없었다.
@@ -178,7 +188,7 @@ export function OfficeManagementPanel({ npcs, clock, onClose }: Props) {
                           <span className="w-12 text-right text-gray-400">
                             {npc.tasks.filter((t) => t.status === "active").length}건
                           </span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
