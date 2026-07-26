@@ -2,7 +2,9 @@
 
 // 2026-07-24 : Phase F — NPC 상세 대화 패널 (React 오버레이, 하단 시트 모바일)
 
-import { deptColor, deptLabel, hasActiveWork, npcStatusLabel } from "@ldd/core";
+import Link from "next/link";
+
+import { deptColor, deptLabel, describeTaskSource, hasActiveWork, npcStatusLabel } from "@ldd/core";
 import type { Npc } from "@ldd/core";
 
 type Props = {
@@ -61,21 +63,35 @@ export function OfficeTalkPanel({ npc, onClose }: Props) {
           </p>
         ) : (
           activeTasks.map((task) => {
-            // id가 "real-"로 시작하면 사용자의 실제 데이터(투두/페이지/습관/일정)에서 온 업무다.
-            const isReal = task.id.startsWith("real-");
+            // 2026-07-27 : 오피스 - 원천 표시 (2차 피드백 5-2, Phase 48 T2)
+            // 전에는 **id가 "real-"로 시작하는지**로 실제 업무를 추측하고 "내 업무"라고만 적었다.
+            // 그건 문자열 규칙에 기댄 추측이고, **어디서 온 일인지는 여전히 못 밝혔다.**
+            // 이제 업무가 `source`를 직접 들고 오므로 그 값을 그대로 쓴다 — 이게 계획이 말한
+            // "원천을 밝히는 것"이다. 근거 없이 "일하는 중"이라고만 하면 1차 5-7과 같아진다.
+            //
+            // 원본으로 데려가는 링크는 **개별 주소가 실제로 있는 것에만** 건다(지금은 문서뿐).
+            // 나머지를 홈으로 보내면 "원본으로 이동"이 아니라 그냥 홈이다 — 가짜 링크는 안 만든다.
+            const sourceHref =
+              task.source === "page" && task.sourceId ? `/pages/${task.sourceId}` : null;
             return (
               <div key={task.id} className="mb-2 last:mb-0">
                 <div className="flex justify-between text-xs">
                   <span className="truncate mr-2 flex items-center gap-1">
-                    {isReal && (
+                    {task.source && (
                       <span
                         className="shrink-0 rounded px-1 text-[9px] font-bold text-white"
                         style={{ backgroundColor: deptColor(npc.department) }}
                       >
-                        내 업무
+                        {describeTaskSource(task.source)}
                       </span>
                     )}
-                    <span className="truncate">{task.title}</span>
+                    {sourceHref ? (
+                      <Link href={sourceHref} className="truncate underline hover:no-underline">
+                        {task.title}
+                      </Link>
+                    ) : (
+                      <span className="truncate">{task.title}</span>
+                    )}
                   </span>
                   <span className="text-muted-foreground shrink-0">{Math.round(task.progress)}%</span>
                 </div>
