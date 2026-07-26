@@ -39,6 +39,10 @@ export type UseDuckChatOptions = {
   rulePhrase?: () => string; // rule 분기 시 오리 룰 대사(Phase 6 pickIdlePhrase 등) 주입
   fetchImpl?: typeof fetch;
   now?: () => string; // 타임스탬프 주입(테스트용)
+  // 2026-07-26 (피드백 1-4): 승인 실행이 **성공한 뒤** 한 번 부른다. 같은 탭의 위젯이 바뀐 데이터를
+  // 다시 읽게 하려는 것 — 이 훅은 무엇을 갱신할지 모르므로 결과만 넘기고 판단은 호출부가 한다
+  // (packages/ai가 앱 화면 사정을 알면 계층이 뒤집힌다).
+  onExecuted?: (results: ToolResult[]) => void;
 };
 
 export type UseDuckChatResult = {
@@ -96,6 +100,7 @@ export function useDuckChat(options: UseDuckChatOptions = {}): UseDuckChatResult
     rulePhrase,
     fetchImpl = fetch,
     now = () => new Date().toISOString(),
+    onExecuted,
   } = options;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -167,13 +172,14 @@ export function useDuckChat(options: UseDuckChatOptions = {}): UseDuckChatResult
       if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as { results: ToolResult[] };
       addDuckMessage(summarizeResults(data.results));
+      onExecuted?.(data.results);
     } catch {
       setError("실행 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.");
       addDuckMessage("꽥... 작업을 완료하지 못했어요.");
     } finally {
       setPending(false);
     }
-  }, [pendingApproval, pending, fetchImpl, approveEndpoint, addDuckMessage]);
+  }, [pendingApproval, pending, fetchImpl, approveEndpoint, addDuckMessage, onExecuted]);
 
   const cancel = useCallback(() => {
     setPendingApproval(null);

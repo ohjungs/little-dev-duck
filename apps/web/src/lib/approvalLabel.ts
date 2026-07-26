@@ -19,6 +19,8 @@ export const TOOL_LABELS: Record<string, string> = {
   createMemo: "메모 작성",
   // 2026-07-26 (피드백 1-4): 수정·삭제. 삭제는 되돌리기 UI가 없는 경로라 **이 카드가 마지막
   // 방어선**이다 — 무엇이 지워지는지 제목으로 분명히 보여준다.
+  startPomodoro: "집중 타이머 시작",
+  stopPomodoro: "집중 타이머 중지",
   editTodo: "할 일 수정",
   deleteTodo: "할 일 삭제",
   editMemo: "메모 수정",

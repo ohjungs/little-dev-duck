@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/timeAgo";
 import { createClient } from "@/lib/supabase/client";
 import { emitXpChanged } from "@/lib/xpSignal";
+import { onAppAction } from "@/lib/appActionSignal";
 import { todayIso } from "@/lib/today";
 import {
   Card,
@@ -141,6 +142,31 @@ export function PomodoroWidget() {
       enableFocusMode();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 실행
+  }, []);
+
+  // 2026-07-26 (피드백 1-4): 오리가 승인 실행으로 타이머를 시작·중지했을 때 이 화면이 따라간다.
+  // 같은 탭이라 서버를 한 바퀴 돌 필요가 없다(pomodoro_sessions는 realtime 대상도 아니다).
+  useEffect(() => {
+    return onAppAction(["startPomodoro", "stopPomodoro"], () => {
+      void (async () => {
+        const data = await fetchSessions();
+        if (!data) return;
+        const resumable = findResumablePomodoro(data, Date.now());
+        if (resumable) {
+          setActiveId(resumable.id);
+          setRemaining(resumable.remainingSeconds);
+          setRunning(true);
+          enableFocusMode();
+          return;
+        }
+        // 오리가 끝냈다 — 화면도 멈춘다. 집중 모드 플래그가 남으면 다른 화면이 계속 숨는다.
+        setRunning(false);
+        setActiveId(null);
+        setRemaining(0);
+        disableFocusMode();
+      })();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 구독은 마운트 시 1회
   }, []);
 
   // 카운트다운: running일 때만 인터벌을 돌리고, 정지/언마운트 시 정리한다.

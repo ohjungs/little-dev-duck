@@ -35,6 +35,9 @@ describe("createAppActionsAdapter", () => {
       "listCalendarEvents",
       "listHabits",
       "listTodos",
+      // 2026-07-26 (피드백 1-4): 집중 타이머. 타이머 자체는 화면이 돌리고 도구는 세션 행만 다룬다.
+      "startPomodoro",
+      "stopPomodoro",
     ]);
     // 안전 계약: **데이터를 바꾸는 도구는 하나도 빠짐없이 승인 대기여야 한다**(T0-4).
     // 원래 이 테스트는 "전부 mutating"을 못박고 있었는데, 조회 도구가 생기면서 그 문장은
@@ -713,5 +716,107 @@ describe("수정·삭제 도구", () => {
     const r = await a.execute(call("deleteMemo", { title: "회" }));
     expect(String(r.response.error)).toContain("여러 개");
     expect(sink.deleted).toBeUndefined();
+  });
+});
+
+// 2026-07-26 : 오리 뽀모도로 (피드백 1-4)
+// 타이머 자체는 화면이 돌린다. 도구가 지켜야 할 건 **세션이 둘 이상 동시에 열리지 않는 것**과
+// **없는 걸 끝냈다고 하지 않는 것**이다.
+describe("뽀모도로 도구", () => {
+  const NOW = Date.now();
+  const running = {
+    id: "66666666-6666-4666-8666-666666666666",
+    user_id: "22222222-2222-4222-8222-222222222222",
+    duration_minutes: 25,
+    tag: null,
+    started_at: new Date(NOW - 60_000).toISOString(),
+    completed_at: null,
+    created_at: new Date(NOW - 60_000).toISOString(),
+  };
+
+  function pomodoroSupabase(sessions: Record<string, unknown>[], sink: { inserted?: Record<string, unknown>; updated?: boolean } = {}) {
+    const chain: Record<string, unknown> = {};
+    Object.assign(chain, {
+      select: () => chain,
+      order: () => chain,
+      eq: () => chain,
+      is: () => chain,
+      limit: () => Promise.resolve({ data: sessions, error: null }),
+      maybeSingle: () => {
+        sink.updated = true;
+        return Promise.resolve({ data: { ...running, completed_at: new Date().toISOString() }, error: null });
+      },
+      // 삽입 payload를 반환 행에 통째로 섞지 않는다 — 목의 user_id는 uuid가 아니라 검증에 걸린다.
+      // 실제 서버는 저장된 행을 다시 돌려주므로 여기서도 그걸 흉내 낸다.
+      single: () =>
+        Promise.resolve({
+          data: {
+            ...running,
+            duration_minutes:
+              (sink.inserted?.duration_minutes as number | undefined) ?? running.duration_minutes,
+            completed_at: null,
+          },
+          error: null,
+        }),
+      insert: (payload: Record<string, unknown>) => {
+        sink.inserted = payload;
+        return chain;
+      },
+      update: () => chain,
+    });
+    return {
+      auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
+      rpc: () => Promise.resolve({ data: null, error: null }),
+      from: () => chain,
+    } as unknown as SupabaseClient;
+  }
+
+  const exec = (name: string, args: Record<string, unknown> = {}) => ({ id: "c1", name, args });
+
+  it("이미 돌고 있으면 새로 시작하지 않는다", async () => {
+    // 두 세션이 동시에 열리면 어느 쪽이 끝날지 알 수 없다.
+    const sink: { inserted?: Record<string, unknown> } = {};
+    const a = createAppActionsAdapter(pomodoroSupabase([running], sink));
+    const r = await a.execute(exec("startPomodoro", { durationMinutes: 25 }));
+    expect(String(r.response.error)).toContain("이미");
+    expect(sink.inserted).toBeUndefined();
+  });
+
+  it("분을 말하지 않으면 25분으로 시작한다", async () => {
+    const sink: { inserted?: Record<string, unknown> } = {};
+    const a = createAppActionsAdapter(pomodoroSupabase([], sink));
+    await a.execute(exec("startPomodoro"));
+    expect(sink.inserted?.duration_minutes).toBe(25);
+  });
+
+  it("범위를 벗어난 시간은 저장 전에 막는다", async () => {
+    // DB CHECK(1~180)에 걸리면 사용자는 이유 없는 실패를 본다.
+    const a = createAppActionsAdapter(pomodoroSupabase([]));
+    for (const bad of [0, -5, 999]) {
+      const r = await a.execute(exec("startPomodoro", { durationMinutes: bad }));
+      expect(String(r.response.error), String(bad)).toContain("1~180");
+    }
+  });
+
+  it("모델이 문자열로 줘도 숫자로 받는다", async () => {
+    const sink: { inserted?: Record<string, unknown> } = {};
+    const a = createAppActionsAdapter(pomodoroSupabase([], sink));
+    await a.execute(exec("startPomodoro", { durationMinutes: "30" }));
+    expect(sink.inserted?.duration_minutes).toBe(30);
+  });
+
+  it("돌고 있지 않은데 중지하면 그렇게 말한다", async () => {
+    // 아무것도 안 끝냈는데 "끝냈다"고 하면 사용자는 된 줄 안다.
+    const a = createAppActionsAdapter(pomodoroSupabase([]));
+    const r = await a.execute(exec("stopPomodoro"));
+    expect(String(r.response.error)).toContain("없어요");
+  });
+
+  it("돌고 있으면 그 세션을 끝낸다", async () => {
+    const sink: { updated?: boolean } = {};
+    const a = createAppActionsAdapter(pomodoroSupabase([running], sink));
+    const r = await a.execute(exec("stopPomodoro"));
+    expect(sink.updated).toBe(true);
+    expect(r.response.stopped).toMatchObject({ id: running.id });
   });
 });

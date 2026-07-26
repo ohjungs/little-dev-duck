@@ -171,3 +171,12 @@ describe("routeUtterance — 수정·삭제 발화", () => {
     }
   });
 });
+
+// 2026-07-26 (피드백 1-4): 뽀모도로 도구를 추가하면서 입구도 함께 넓혔다.
+describe("routeUtterance — 집중 타이머 발화", () => {
+  it("타이머 발화가 도구까지 간다", () => {
+    for (const t of ["25분 집중 시작해줘", "뽀모도로 시작", "집중 그만", "타이머 중지"]) {
+      expect(routeUtterance(t), t).toBe("llm");
+    }
+  });
+});

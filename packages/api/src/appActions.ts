@@ -10,6 +10,7 @@ import {
   summarizeHabitsForDuck,
   todoEmbedText,
   DUCK_HABIT_RANGE_DAYS,
+  findResumablePomodoro,
 } from "@ldd/core";
 import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
@@ -20,6 +21,7 @@ import { createPage } from "./pages";
 import { createCalendarEvent } from "./calendar";
 import { checkHabit, listHabits, listHabitChecksInRange } from "./habits";
 import { indexSource } from "./embeddings";
+import { completePomodoro, listPomodoroSessions, startPomodoro } from "./pomodoro";
 
 // LLM이 준 날짜/시각 문자열을 offset 포함 ISO(내부 캘린더 스키마 요구)로 보정한다. 순수함수 — 테스트 대상.
 // 지원: 완전 ISO(offset/Z 포함) 그대로, 'YYYY-MM-DD'→KST 자정, offset 없는 'YYYY-MM-DDTHH:mm(:ss)'→KST.
@@ -292,6 +294,44 @@ const deleteMemoDecl: ToolDeclaration = {
   kind: "mutating",
 };
 
+// 2026-07-26 : 오리 - 뽀모도로 (피드백 1-4)
+// **타이머 자체는 화면이 돌린다.** 서버 도구가 하는 일은 세션 행을 만들고 끝내는 것뿐이고,
+// 카운트다운·집중 모드·완료음은 위젯의 몫이다(도구가 브라우저 타이머를 만들 수는 없다).
+// 화면이 바로 알아채도록 승인 실행 뒤 같은 탭 이벤트로 알린다(web lib/appActionSignal).
+const startPomodoroDecl: ToolDeclaration = {
+  name: "startPomodoro",
+  description:
+    "집중 타이머(뽀모도로)를 시작한다. 사용자가 '25분 집중 시작해줘', '뽀모도로 시작'처럼 말할 때 사용. " +
+    "분을 말하지 않으면 25분으로 한다.",
+  parameters: {
+    type: "object",
+    properties: {
+      durationMinutes: { type: "number", description: "집중할 분(1~180). 생략하면 25" },
+      tag: { type: "string", description: "무엇에 집중하는지(선택)" },
+    },
+    required: [],
+  },
+  kind: "mutating",
+};
+
+const stopPomodoroDecl: ToolDeclaration = {
+  name: "stopPomodoro",
+  description:
+    "진행 중인 집중 타이머를 지금 끝낸다. 사용자가 '집중 그만', '타이머 중지'라고 할 때 사용.",
+  parameters: { type: "object", properties: {}, required: [] },
+  kind: "mutating",
+};
+
+// 위젯의 기본값과 같은 25분. 위젯 상수를 가져오면 api가 화면에 의존하므로 값만 맞춘다.
+const DEFAULT_POMODORO_MINUTES = 25;
+
+const startPomodoroArgs = z.object({
+  // 모델이 문자열로 줄 때가 있어 강제 변환한다. DB CHECK(1~180)와 같은 범위를 여기서도 건다 —
+  // 범위를 넘기면 insert가 통째로 거부돼 사용자는 이유 없는 실패를 본다.
+  durationMinutes: z.coerce.number().int().min(1).max(180).optional(),
+  tag: z.string().max(50).optional(),
+});
+
 const editTodoArgs = z.object({
   title: z.string().min(1).max(500),
   newTitle: z.string().min(1).max(200).optional(),
@@ -399,6 +439,8 @@ export function createAppActionsAdapter(
     catalog: [
       createTodoDecl,
       completeTodoDecl,
+      startPomodoroDecl,
+      stopPomodoroDecl,
       editTodoDecl,
       deleteTodoDecl,
       createMemoDecl,
@@ -537,6 +579,42 @@ export function createAppActionsAdapter(
           id: call.id,
           name: call.name,
           response: { completed: { id: updated.id, title: updated.title } },
+        };
+      }
+
+      if (call.name === startPomodoroDecl.name) {
+        const parsed = startPomodoroArgs.safeParse(call.args);
+        if (!parsed.success) {
+          return errorResult(call, "집중 시간은 1~180분 사이 숫자로 알려주세요.");
+        }
+        // 이미 돌고 있는데 또 시작하면 두 세션이 동시에 열려 어느 쪽이 끝날지 알 수 없다.
+        const running = findResumablePomodoro(await listPomodoroSessions(supabase), Date.now());
+        if (running) {
+          return errorResult(call, "이미 집중 타이머가 돌고 있어요. 먼저 끝내고 시작할까요?");
+        }
+        const session = await startPomodoro(supabase, {
+          durationMinutes: parsed.data.durationMinutes ?? DEFAULT_POMODORO_MINUTES,
+          tag: parsed.data.tag ?? null,
+        });
+        return {
+          id: call.id,
+          name: call.name,
+          response: {
+            started: { id: session.id, durationMinutes: session.durationMinutes },
+          },
+        };
+      }
+
+      if (call.name === stopPomodoroDecl.name) {
+        const running = findResumablePomodoro(await listPomodoroSessions(supabase), Date.now());
+        // 돌고 있지 않은데 "끝냈다"고 하면 사용자는 뭔가 된 줄 안다.
+        if (!running) return errorResult(call, "지금 돌고 있는 집중 타이머가 없어요.");
+        // completePomodoro는 completed_at이 null일 때만 갱신하므로 중복 호출이 안전하다(XP 이중지급 없음).
+        const done = await completePomodoro(supabase, running.id);
+        return {
+          id: call.id,
+          name: call.name,
+          response: { stopped: { id: done.id, durationMinutes: done.durationMinutes } },
         };
       }
 

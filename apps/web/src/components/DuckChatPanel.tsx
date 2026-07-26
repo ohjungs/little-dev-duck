@@ -6,6 +6,7 @@ import { describeCall } from "@/lib/approvalLabel";
 import { timeAgo } from "@/lib/timeAgo";
 import { DUCK_EXAMPLES } from "@/lib/duckExamples";
 import { useDuckChat } from "@ldd/ai";
+import { emitAppAction } from "@/lib/appActionSignal";
 import { cn } from "@/lib/utils";
 import {
   Card,
@@ -24,7 +25,11 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 // 외부 라이브러리 없이 인라인 계산 — 분 단위까지, 그 이상은 시각 그대로.
 export function DuckChatPanel() {
   const { messages, pending, error, pendingApproval, send, approve, cancel, clear } =
-    useDuckChat();
+    useDuckChat({
+      // 승인 실행이 끝나면 같은 탭의 위젯이 바뀐 데이터를 다시 읽게 한다.
+      // 오리가 뽀모도로를 시작했는데 화면은 그대로면 사용자는 아무 일도 안 일어났다고 본다.
+      onExecuted: (results) => emitAppAction(results.map((r) => r.name)),
+    });
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [confirmClear, setConfirmClear] = useState(false);
