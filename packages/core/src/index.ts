@@ -451,6 +451,7 @@ export {
   accountDeletionEnabled,
   type AccountDeleteStep,
 } from "./domain/account-deletion";
+export { pendingMigrationMessage } from "./domain/pending-migration";
 export { untrustedTextRule } from "./domain/untrusted-text";
 export { buildArticleSummaryPrompt } from "./domain/news-summary-prompt";
 export { parseBackup, type BackupParseResult } from "./domain/backup-parse";

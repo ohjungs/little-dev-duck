@@ -11,6 +11,7 @@ import {
 import { FEATURES, ROLES, canAdminister, roleLabel, type Role } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { friendlyError } from "@/lib/friendlyError";
 
 // 2026-07-26 : 관리자 - 사용자 관리 (피드백 6-2·6-3)
 // "사용자별 컨트롤할수있어야해 … 관리자 페이지에서 권한도 줘야지 모든것을 쓸수있게 하는게
@@ -55,7 +56,7 @@ export function AdminUserPanel({ myRole }: { myRole: Role }) {
       await setUserRole(createClient(), p.id, role);
       await load();
     } catch (err) {
-      setNote(err instanceof Error ? err.message : "역할을 바꾸지 못했어요.");
+      setNote(friendlyError(err, "역할을 바꾸지 못했어요."));
     } finally {
       setBusyId(null);
     }
@@ -71,7 +72,7 @@ export function AdminUserPanel({ myRole }: { myRole: Role }) {
       await setUserDisabledFeatures(createClient(), p.id, next);
       await load();
     } catch (err) {
-      setNote(err instanceof Error ? err.message : "기능 설정을 바꾸지 못했어요.");
+      setNote(friendlyError(err, "기능 설정을 바꾸지 못했어요."));
     } finally {
       setBusyId(null);
     }

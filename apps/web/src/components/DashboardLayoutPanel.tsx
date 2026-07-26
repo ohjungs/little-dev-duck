@@ -13,6 +13,7 @@ import {
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { DASHBOARD_WIDGETS } from "@/lib/dashboardWidgets";
+import { friendlyError } from "@/lib/friendlyError";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -60,11 +61,11 @@ export function DashboardLayoutPanel() {
       await saveMyDashboardLayout(createClient(), next);
     } catch (err) {
       setLayout(previous);
-      setNote(
-        err instanceof Error
-          ? `저장하지 못했어요: ${err.message}`
-          : "저장하지 못했어요.",
-      );
+      // 2026-07-26 : 오류 - 미적용마이그레이션 - 사람말로 (Phase 37)
+      // `dashboard_layout` 컬럼을 더하는 마이그레이션이 적용 대기라 지금은 실제로 저장이 안 된다.
+      // 그대로 두면 사용자는 **영문 DB 오류**를 보고 자기가 뭘 잘못했는지 의심한다 —
+      // 알려진 대기 상태이므로 그렇게 말해 준다. 모르는 오류는 원문을 그대로 보여준다.
+      setNote(friendlyError(err, "저장하지 못했어요."));
     } finally {
       setSaving(false);
     }
