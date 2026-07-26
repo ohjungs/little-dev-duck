@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import { deleteAllMyData } from "@ldd/api";
-import { ACCOUNT_DELETE_PHRASE, CONTENT_DELETE_PHRASE } from "@ldd/core";
+import { CONTENT_DELETE_PHRASE } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 

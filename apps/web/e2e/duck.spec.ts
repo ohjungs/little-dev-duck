@@ -1,18 +1,11 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { AUTH_STATE } from "./authState";
 
-// Duck 위젯도 로그인 뒤에 있다 - widgets.spec.ts와 동일한 세션 스킵 가드.
-const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
-const hasAuthState = existsSync(AUTH_STATE_PATH);
+// Duck 위젯도 로그인 뒤에 있다 - 세션 스킵 가드는 authState.ts 한 곳에 있다.
 
 test.describe("오리 마스코트 (Phase 3 플레이스홀더)", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("홈 화면에 오리 캔버스가 렌더링되고 클릭하면 말풍선이 뜬다", async ({
     page,

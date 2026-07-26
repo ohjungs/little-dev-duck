@@ -1,24 +1,17 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { AUTH_STATE } from "./authState";
 
 // 2026-07-26 : 페이지 - 발표 - e2e (Phase 34 후속)
-// 페이지 화면은 로그인 뒤에 있다 — widgets.spec.ts와 동일한 세션 스킵 가드.
+// 페이지 화면은 로그인 뒤에 있다 — 세션 스킵 가드는 authState.ts 한 곳에 있다.
 //
 // **여기서 검사하는 것은 배선이다**: 버튼 → 오버레이 → 키보드 조작 → 닫힘.
 // 장 나누기 규칙(h1 경계·표지·상한)은 core `slides.test.ts` 18건이 이미 순수하게 잠갔다 —
 // BlockNote에 실제로 타이핑해 제목을 만드는 건 에디터 입력 방식에 의존해 잘 깨진다.
 // 그 부분까지 e2e로 끌고 오면 **테스트가 기능이 아니라 에디터를 검사**하게 된다.
-const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
-const hasAuthState = existsSync(AUTH_STATE_PATH);
 
 test.describe("발표 모드 (Phase 34)", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   // 새 페이지를 만들고 그 편집 화면에 도착한다. 발표 버튼은 페이지 편집 화면에만 있다.
   //
@@ -35,7 +28,9 @@ test.describe("발표 모드 (Phase 34)", () => {
     await expect(page.getByLabel("페이지 제목")).toBeVisible();
   }
 
-  test("발표 버튼을 누르면 발표 화면이 열리고 Esc로 닫힌다", async ({ page }) => {
+  test("발표 버튼을 누르면 발표 화면이 열리고 Esc로 닫힌다", async ({
+    page,
+  }) => {
     await openNewPage(page);
 
     await page.getByRole("button", { name: "발표" }).click();
@@ -66,7 +61,9 @@ test.describe("발표 모드 (Phase 34)", () => {
 
     const stage = page.getByRole("dialog", { name: "발표 모드" });
     await expect(stage.getByRole("button", { name: "이전 장" })).toBeDisabled();
-    await expect(stage.getByRole("button", { name: "발표 끝내기" })).toBeEnabled();
+    await expect(
+      stage.getByRole("button", { name: "발표 끝내기" }),
+    ).toBeEnabled();
   });
 
   test("닫기 버튼으로도 끝난다", async ({ page }) => {

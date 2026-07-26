@@ -1,12 +1,8 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { AUTH_STATE } from "./authState";
 
 // 반복 할 일(Phase 20)은 로그인 뒤 대시보드 위젯이라 저장된 세션이 있어야 돈다.
 // 세션 생성 방법은 e2e/README.md 참고. 없으면 스킵된다(실패 아님).
-const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
-const hasAuthState = existsSync(AUTH_STATE_PATH);
 
 const TODO_ID = "00000000-0000-4000-8000-00000000e2e0";
 const PLAIN_ID = "00000000-0000-4000-8000-00000000e2e1";
@@ -38,11 +34,8 @@ const rows = [
 ];
 
 test.describe("반복 할 일 (Phase 20)", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test.beforeEach(async ({ page }) => {
     await page.route("**/rest/v1/todos*", async (route) => {
@@ -94,7 +87,9 @@ test.describe("반복 할 일 (Phase 20)", () => {
     expect(labels).toContain("매주 화");
   });
 
-  test("완료해도 목록에서 사라지지 않고 다음 회차로 옮겨간다", async ({ page }) => {
+  test("완료해도 목록에서 사라지지 않고 다음 회차로 옮겨간다", async ({
+    page,
+  }) => {
     // 서버는 완료가 아니라 "다음 회차로 옮긴 상태"를 돌려준다 — 화면이 그 응답을 따라야 한다.
     await page.route("**/rest/v1/todos*", async (route) => {
       const method = route.request().method();
@@ -136,7 +131,9 @@ test.describe("반복 할 일 (Phase 20)", () => {
     await page.goto("/");
     await expect(page.getByTestId(`todo-${TODO_ID}`)).toBeVisible();
     const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
     );
     expect(overflow).toBe(false);
   });
@@ -146,11 +143,8 @@ test.describe("반복 할 일 (Phase 20)", () => {
 // 마감일 (Phase 26) — "오늘 마감" 필터가 실제로 쓸 수 있게 됐는지
 // ---------------------------------------------------------------------------
 test.describe("할 일 마감일 (Phase 26)", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test.beforeEach(async ({ page }) => {
     await page.route("**/rest/v1/todos*", async (route) => {
@@ -179,7 +173,9 @@ test.describe("할 일 마감일 (Phase 26)", () => {
     await expect(item.locator('input[type="date"]')).toHaveValue("");
   });
 
-  test("마감일 입력은 아이콘 크기를 넘지 않는다 (제목 공간 잠식 금지)", async ({ page }) => {
+  test("마감일 입력은 아이콘 크기를 넘지 않는다 (제목 공간 잠식 금지)", async ({
+    page,
+  }) => {
     // input[type=date]는 기본 폭이 넓다 — 안 보여도 모든 행의 제목을 좁힌다.
     await page.goto("/");
     const box = await page
@@ -190,7 +186,9 @@ test.describe("할 일 마감일 (Phase 26)", () => {
     expect(box!.width).toBeLessThanOrEqual(24);
   });
 
-  test("마감일 입력값이 저장된 날짜와 일치한다 (하루 밀림 금지)", async ({ page }) => {
+  test("마감일 입력값이 저장된 날짜와 일치한다 (하루 밀림 금지)", async ({
+    page,
+  }) => {
     // UTC 자정 저장값을 로컬 변환에 태우면 시간대에 따라 하루가 밀린다.
     await page.goto("/");
     await expect(

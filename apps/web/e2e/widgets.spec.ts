@@ -1,20 +1,13 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { AUTH_STATE } from "./authState";
 
 // 위젯은 로그인(OAuth) 뒤에 있다. Google/GitHub 로그인을 Playwright로 직접 통과할 수
 // 없으므로, 미리 저장해 둔 세션(storageState)이 있을 때만 이 스펙을 실행한다.
 // 세션 생성 방법: e2e/README.md 참고.
-const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
-const hasAuthState = existsSync(AUTH_STATE_PATH);
 
 test.describe("투두/메모 위젯 CRUD", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("투두를 추가하고 수정하고 완료 토글 후 삭제한다", async ({ page }) => {
     await page.goto("/");
@@ -70,11 +63,8 @@ test.describe("투두/메모 위젯 CRUD", () => {
 });
 
 test.describe("투두 위젯 빈 상태", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("목록이 비어 있으면 안내 문구를 보여준다", async ({ page }) => {
     // 실제 테스트 계정은 이미 데이터가 있을 수 있어 진짜 빈 상태를 재현하기 어렵다.
@@ -99,11 +89,8 @@ test.describe("투두 위젯 빈 상태", () => {
 });
 
 test.describe("투두/메모 위젯 에러 상태", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("투두 목록 조회가 실패하면 에러 문구와 재시도 버튼을 보여준다", async ({
     page,
@@ -158,11 +145,8 @@ test.describe("투두/메모 위젯 에러 상태", () => {
 });
 
 test.describe("투두 제목 유효성 검증", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("공백만 입력한 제목은 추가되지 않는다", async ({ page }) => {
     await page.goto("/");
@@ -179,20 +163,15 @@ test.describe("투두 제목 유효성 검증", () => {
     await widget.getByRole("button", { name: "추가" }).click();
 
     // 조기 반환이므로 입력값(newTitle)도 지워지지 않고 그대로 남아 있어야 한다.
-    await expect(widget.getByPlaceholder("할 일 추가")).toHaveValue(
-      blankTitle,
-    );
+    await expect(widget.getByPlaceholder("할 일 추가")).toHaveValue(blankTitle);
     await expect(widget.locator("li")).toHaveCount(initialCount);
     await expect(widget.getByRole("alert")).toHaveCount(0);
   });
 });
 
 test.describe("여러 항목 리스트 정합성", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("여러 투두를 추가해도 각각 독립적으로 수정/삭제된다", async ({
     page,

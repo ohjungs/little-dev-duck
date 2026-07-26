@@ -1,6 +1,5 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { AUTH_STATE } from "./authState";
 
 // web/testing.md 규칙이 지정한 4개 breakpoint. 그 사이 크기는 CSS가 fluid하게
 // 보간한다고 보고, 레이아웃 붕괴 여부는 이 4개 지점에서만 확인한다.
@@ -59,17 +58,11 @@ test.describe("로그인 페이지 반응형 (인증 불필요)", () => {
   }
 });
 
-// 홈 화면 위젯은 로그인 뒤에 있다. widgets.spec.ts와 동일한 세션 스킵 가드.
-const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
-const hasAuthState = existsSync(AUTH_STATE_PATH);
+// 홈 화면 위젯은 로그인 뒤에 있다. 세션 스킵 가드는 authState.ts 한 곳에 있다.
 
 test.describe("홈 화면 반응형 (인증 필요)", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   for (const { width, height } of VIEWPORTS) {
     // 무겁게 만들지 않기 위해 뷰포트당 overflow와 핵심 위젯(투두/메모/오리/GitHub)

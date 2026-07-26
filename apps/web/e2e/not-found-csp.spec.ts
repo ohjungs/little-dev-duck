@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { AUTH_STATE } from "./authState";
 
 // 2026-07-26 : 보안 - CSP - 404페이지 정적프리렌더 (Phase 38)
 // `lessons-learned.md`의 **재발견 1회짜리** 교훈: "nonce 기반 CSP는 정적 프리렌더링 페이지에서
@@ -16,9 +16,6 @@ import { expect, test } from "@playwright/test";
 //
 // 교훈이 못박은 검증 방법 그대로다: **"curl의 응답 헤더 값만으로는 이 버그를 못 잡는다"** —
 // nonce가 매번 달라지는 것 자체는 정상으로 보인다. 실제 브라우저 콘솔을 봐야 한다.
-const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
-const hasAuthState = existsSync(AUTH_STATE_PATH);
 
 const OUT = path.join(
   __dirname,
@@ -33,11 +30,8 @@ const OUT = path.join(
 );
 
 test.describe("404 페이지 (로그인 필요 — 비로그인은 /welcome으로 돌려보내진다)", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("스크립트가 CSP에 막히지 않는다", async ({ page }) => {
     const consoleErrors: string[] = [];

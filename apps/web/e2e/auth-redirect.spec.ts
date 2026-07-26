@@ -1,6 +1,5 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { AUTH_STATE } from "./authState";
 
 // Phase 13 T4: 비로그인 접근은 마케팅 랜딩(/welcome)으로 보낸다(로그인 폼은 랜딩 CTA로 도달).
 test("비로그인 사용자가 /에 접근하면 /welcome(랜딩)으로 리다이렉트된다", async ({
@@ -31,7 +30,9 @@ test("/login에 Google/GitHub 로그인 버튼이 보인다", async ({ page }) =
 // 구분하지 못하므로 이 파일에서는 정확한 303 값을 확인한다.
 
 test.describe("미인증 리다이렉트 상태 코드 (proxy.ts)", () => {
-  test("GET / 요청은 303으로 /welcome에 리다이렉트된다", async ({ request }) => {
+  test("GET / 요청은 303으로 /welcome에 리다이렉트된다", async ({
+    request,
+  }) => {
     // maxRedirects: 0으로 리다이렉트를 따라가지 않아야 응답 자체의 status code를 볼 수
     // 있다. 따라가면 최종 목적지(/welcome, 200)만 보여 307/303 차이가 가려진다.
     const response = await request.get("/", { maxRedirects: 0 });
@@ -51,16 +52,10 @@ test.describe("미인증 리다이렉트 상태 코드 (proxy.ts)", () => {
 
 // 로그아웃은 세션 쿠키가 있어야 실제 auth.signOut() 경로를 타므로, 다른 인증 필요 스펙과
 // 동일한 스킵가드 패턴을 쓴다. 세션 생성 방법: e2e/README.md 참고.
-const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
-const hasAuthState = existsSync(AUTH_STATE_PATH);
 
 test.describe("로그아웃 라우트 리다이렉트 상태 코드", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("POST /auth/logout은 303으로 /login에 리다이렉트된다", async ({
     request,

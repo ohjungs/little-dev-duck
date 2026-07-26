@@ -1,19 +1,12 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { AUTH_STATE } from "./authState";
 
 // 삭제 되돌리기(Phase 21)는 로그인 뒤 대시보드 위젯이라 저장된 세션이 있어야 돈다.
 // 세션 생성 방법은 e2e/README.md 참고. 없으면 스킵된다(실패 아님).
-const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
-const hasAuthState = existsSync(AUTH_STATE_PATH);
 
 test.describe("삭제 되돌리기 (Phase 21)", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("지운 할 일을 되돌리면 같은 항목이 돌아온다", async ({ page }) => {
     await page.goto("/");
@@ -27,7 +20,10 @@ test.describe("삭제 되돌리기 (Phase 21)", () => {
     await expect(row).toBeVisible();
     const testId = await row.getAttribute("data-testid");
 
-    await widget.getByTestId(testId!).getByRole("button", { name: "삭제" }).click();
+    await widget
+      .getByTestId(testId!)
+      .getByRole("button", { name: "삭제" })
+      .click();
     await expect(widget.getByTestId(testId!)).toHaveCount(0);
 
     const notice = widget.getByTestId("undo-notice");
@@ -42,7 +38,10 @@ test.describe("삭제 되돌리기 (Phase 21)", () => {
     await expect(notice).toHaveCount(0);
 
     // 뒷정리
-    await widget.getByTestId(testId!).getByRole("button", { name: "삭제" }).click();
+    await widget
+      .getByTestId(testId!)
+      .getByRole("button", { name: "삭제" })
+      .click();
     await expect(widget.getByTestId(testId!)).toHaveCount(0);
   });
 
@@ -55,7 +54,10 @@ test.describe("삭제 되돌리기 (Phase 21)", () => {
     await widget.getByRole("button", { name: "추가" }).click();
     const row = widget.locator("li", { hasText: title });
     const testId = await row.getAttribute("data-testid");
-    await widget.getByTestId(testId!).getByRole("button", { name: "삭제" }).click();
+    await widget
+      .getByTestId(testId!)
+      .getByRole("button", { name: "삭제" })
+      .click();
 
     await expect(widget.getByRole("status")).toContainText("되돌리기");
   });
@@ -76,7 +78,10 @@ test.describe("삭제 되돌리기 (Phase 21)", () => {
       const id = await widget
         .locator("li", { hasText: title })
         .getAttribute("data-testid");
-      await widget.getByTestId(id!).getByRole("button", { name: "삭제" }).click();
+      await widget
+        .getByTestId(id!)
+        .getByRole("button", { name: "삭제" })
+        .click();
       await expect(widget.getByTestId(id!)).toHaveCount(0);
     }
 
@@ -98,7 +103,10 @@ test.describe("삭제 되돌리기 (Phase 21)", () => {
     await expect(note).toBeVisible();
     const testId = await note.getAttribute("data-testid");
 
-    await widget.getByTestId(testId!).getByRole("button", { name: "삭제" }).click();
+    await widget
+      .getByTestId(testId!)
+      .getByRole("button", { name: "삭제" })
+      .click();
     await expect(widget.getByTestId(testId!)).toHaveCount(0);
 
     await widget
@@ -107,6 +115,9 @@ test.describe("삭제 되돌리기 (Phase 21)", () => {
       .click();
     await expect(widget.getByTestId(testId!)).toBeVisible();
 
-    await widget.getByTestId(testId!).getByRole("button", { name: "삭제" }).click();
+    await widget
+      .getByTestId(testId!)
+      .getByRole("button", { name: "삭제" })
+      .click();
   });
 });

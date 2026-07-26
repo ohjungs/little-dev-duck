@@ -1,18 +1,11 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { AUTH_STATE } from "./authState";
 
-// GitHub 잔디 위젯도 로그인 뒤에 있다 - widgets.spec.ts와 동일한 세션 스킵 가드.
-const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
-const hasAuthState = existsSync(AUTH_STATE_PATH);
+// GitHub 잔디 위젯도 로그인 뒤에 있다 - 세션 스킵 가드는 authState.ts 한 곳에 있다.
 
 test.describe("GitHub 잔디 위젯", () => {
-  test.skip(
-    !hasAuthState,
-    `인증 세션 파일이 없어 스킵합니다 (${AUTH_STATE_PATH}). e2e/README.md 참고.`,
-  );
-  test.use({ storageState: hasAuthState ? AUTH_STATE_PATH : undefined });
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
 
   test("로딩이 끝나면 잔디 그리드/미연동 안내/에러 상태 중 하나로 정착한다", async ({
     page,
@@ -113,14 +106,18 @@ test.describe("GitHub 잔디 위젯", () => {
         await route.fulfill({
           status: 500,
           contentType: "application/json",
-          body: JSON.stringify({ error: "GITHUB_TOKEN 환경변수가 설정되지 않았습니다." }),
+          body: JSON.stringify({
+            error: "GITHUB_TOKEN 환경변수가 설정되지 않았습니다.",
+          }),
         });
       });
 
       await page.goto("/");
       const widget = page.getByTestId("github-contribution-widget");
       await expect(widget).toBeVisible();
-      await expect(widget.getByText("잔디를 불러오지 못했습니다.")).toBeVisible();
+      await expect(
+        widget.getByText("잔디를 불러오지 못했습니다."),
+      ).toBeVisible();
       await expect(
         widget.getByRole("button", { name: "다시 시도" }),
       ).toBeVisible();
@@ -139,7 +136,9 @@ test.describe("GitHub 잔디 위젯", () => {
       await page.goto("/");
       const widget = page.getByTestId("github-contribution-widget");
       await expect(widget).toBeVisible();
-      await expect(widget.getByText("잔디를 불러오지 못했습니다.")).toBeVisible();
+      await expect(
+        widget.getByText("잔디를 불러오지 못했습니다."),
+      ).toBeVisible();
       await expect(
         widget.getByRole("button", { name: "다시 시도" }),
       ).toBeVisible();
