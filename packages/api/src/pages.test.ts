@@ -342,6 +342,7 @@ describe("Phase 11 DB 뷰", () => {
           sort: null,
           filters: [],
           hiddenPropIds: [],
+          aggregations: {},
         },
       ],
     };

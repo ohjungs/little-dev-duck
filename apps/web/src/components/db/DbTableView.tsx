@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { Plus, SquareArrowOutUpRight, Trash2 } from "lucide-react";
-import type { Page, PropertyDef, RowPropValue } from "@ldd/core";
+import {
+  AGGREGATIONS,
+  computeAggregation,
+  formatAggregation,
+  type AggregationKind,
+  type Page,
+  type PropertyDef,
+  type RowPropValue,
+} from "@ldd/core";
 import { dbEmptyMessage } from "@/lib/dbEmptyState";
 import { PropertyCell } from "./PropertyCell";
 import { DbPropertyMenu } from "./DbPropertyMenu";
@@ -75,6 +83,8 @@ export function DbTableView({
   onEditProperty,
   totalRows,
   hasFilters,
+  aggregations,
+  onAggregationChange,
 }: {
   // rows는 필터·정렬을 거친 표시 행이다. 빈 상태 문구를 정확히 쓰려면 원본 개수도 필요하다.
   rows: Page[];
@@ -87,8 +97,25 @@ export function DbTableView({
   onAddRow: () => void;
   onDeleteRow: (rowId: string) => void;
   onEditProperty: (propId: string, next: PropertyDef | null) => void;
+  // 열 id -> 집계 종류. 저장된 스키마가 구버전이면 키 자체가 없다(하위호환 기본값 {}).
+  aggregations: Record<string, string>;
+  onAggregationChange: (propId: string, kind: AggregationKind) => void;
 }) {
   const [menuPropId, setMenuPropId] = useState<string | null>(null);
+
+  // 저장된 값이 우리가 아는 집계인지 확인한다. 모르는 값(미래 버전이 만든 종류)은 none으로 떨어뜨린다 —
+  // 표 전체가 안 열리는 것보다 낫다(스키마가 값을 문자열로 받는 이유).
+  const kindOf = (propId: string): AggregationKind => {
+    const raw = aggregations?.[propId];
+    return (AGGREGATIONS as readonly string[]).includes(raw ?? "")
+      ? (raw as AggregationKind)
+      : "none";
+  };
+
+  // 집계 대상은 **지금 화면에 보이는 행**이다(필터를 걸었으면 걸린 것만). 필터를 걸어 놓고
+  // 전체 합을 보여주면 화면과 숫자가 어긋나 사용자가 어느 쪽을 믿을지 알 수 없다.
+  const aggRows = rows.map((r) => ({ title: r.title, props: r.rowProps ?? {} }));
+  const hasAnyAggregation = properties.some((p) => kindOf(p.id) !== "none");
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full border-collapse text-sm">
@@ -116,6 +143,8 @@ export function DbTableView({
                     prop={p}
                     onEdit={(next) => onEditProperty(p.id, next)}
                     onClose={() => setMenuPropId(null)}
+                    aggregation={kindOf(p.id)}
+                    onAggregationChange={(kind) => onAggregationChange(p.id, kind)}
                   />
                 )}
               </th>
@@ -158,6 +187,24 @@ export function DbTableView({
             </tr>
           )}
         </tbody>
+        {/* 2026-07-26 : 데이터베이스 - 집계 - 결과 줄 (Phase 33 T2)
+            아무 열도 계산하지 않으면 줄 자체를 그리지 않는다 — 모든 표에 갑자기 빈 줄이 생기면 안 된다.
+            tfoot에 두는 이유: 인쇄할 때 표와 함께 나가고, 스크린리더가 요약 행으로 읽는다. */}
+        {hasAnyAggregation && rows.length > 0 && (
+          <tfoot>
+            <tr className="border-t border-border bg-muted/20 text-xs text-muted-foreground">
+              <td className="px-3 py-1.5">계산</td>
+              {properties.map((p) => {
+                const kind = kindOf(p.id);
+                return (
+                  <td key={p.id} className="px-2 py-1.5 tabular-nums">
+                    {formatAggregation(kind, computeAggregation(aggRows, p.id, kind))}
+                  </td>
+                );
+              })}
+            </tr>
+          </tfoot>
+        )}
       </table>
       <div className="flex items-center justify-between border-t border-border/60">
         <button

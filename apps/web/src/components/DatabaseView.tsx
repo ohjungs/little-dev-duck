@@ -239,6 +239,7 @@ export function DatabaseView({
           sort: null,
           filters: [],
           hiddenPropIds: [],
+          aggregations: {},
         },
       ],
     });
@@ -276,6 +277,21 @@ export function DatabaseView({
       ),
     });
   };
+  // 2026-07-26 : 데이터베이스 - 집계 - 저장 (Phase 33 T2)
+  // 집계는 **뷰의 설정**이다 — 같은 열을 표 뷰마다 다르게 계산할 수 있다.
+  // none이면 키를 지운다(안 지우면 db_schema에 안 쓰는 키가 계속 쌓인다).
+  const handleAggregationChange = (propId: string, kind: string) => {
+    const next = { ...(view.aggregations ?? {}) };
+    if (kind === "none") delete next[propId];
+    else next[propId] = kind;
+    onSchemaChange({
+      ...dbSchema,
+      views: dbSchema.views.map((v) =>
+        v.id === view.id ? { ...v, aggregations: next } : v,
+      ),
+    });
+  };
+
   // 표 뷰에 실제로 렌더할 속성(숨김 제외). board는 열 개념이 없어 hiddenPropIds 무시.
   const visibleProperties = dbSchema.properties.filter(
     (p) => !(view.hiddenPropIds ?? []).includes(p.id),
@@ -508,6 +524,8 @@ export function DatabaseView({
           onAddRow={() => handleAddRow()}
           onDeleteRow={handleDeleteRow}
           onEditProperty={handleEditProperty}
+          aggregations={view.aggregations ?? {}}
+          onAggregationChange={handleAggregationChange}
         />
       )}
     </div>

@@ -115,6 +115,17 @@ export const viewDefSchema = z.object({
   filters: z.array(filterSpecSchema).max(MAX_FILTERS).default([]),
   // 표 뷰에서 숨길 속성 id 목록(열 표시/숨김). 하위호환 기본값 []. board 뷰는 무시.
   hiddenPropIds: z.array(z.string().max(64)).max(MAX_PROPERTIES).default([]),
+  // 2026-07-26 : 데이터베이스 - 집계 - 뷰설정 (Phase 33 T1)
+  // 열 id -> 집계 종류. **하위호환 기본값 {}** — 기존 db_schema에는 이 키가 없고,
+  // 없으면 아무 열도 집계하지 않는다(모든 표에 갑자기 숫자가 생기면 안 된다).
+  // 값은 문자열로 받아 UI가 알 수 없는 값을 "none"으로 폴백한다 — select 색상이 쓰는 것과 같은
+  // 전방호환 관례다(미래 버전이 만든 집계 종류를 만나도 파일 전체가 거부되지 않는다).
+  aggregations: z
+    .record(z.string().max(64), z.string().max(32))
+    .refine((o) => Object.keys(o).length <= MAX_PROPERTIES, {
+      message: `집계 설정은 최대 ${MAX_PROPERTIES}개까지입니다.`,
+    })
+    .default({}),
 });
 export type ViewDef = z.infer<typeof viewDefSchema>;
 
@@ -159,6 +170,8 @@ export function createDefaultDbSchema(): DbSchema {
         sort: null,
         filters: [],
         hiddenPropIds: [],
+        // 새 표는 아무 열도 계산하지 않는다 — 만들자마자 숫자가 붙어 있으면 놀란다.
+        aggregations: {},
       },
       {
         id: "board",
@@ -168,6 +181,8 @@ export function createDefaultDbSchema(): DbSchema {
         sort: null,
         filters: [],
         hiddenPropIds: [],
+        // 새 표는 아무 열도 계산하지 않는다 — 만들자마자 숫자가 붙어 있으면 놀란다.
+        aggregations: {},
       },
     ],
   };

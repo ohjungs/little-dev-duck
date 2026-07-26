@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import {
   SELECT_COLORS,
+  aggregationLabel,
+  aggregationsForType,
+  type AggregationKind,
   type PropertyDef,
   type PropertyType,
   type SelectOption,
@@ -25,10 +28,16 @@ export function DbPropertyMenu({
   prop,
   onEdit,
   onClose,
+  aggregation,
+  onAggregationChange,
 }: {
   prop: PropertyDef;
   onEdit: (next: PropertyDef | null) => void;
   onClose: () => void;
+  // 집계는 **속성이 아니라 뷰의 설정**이다(같은 열을 다른 뷰에서 다르게 계산할 수 있다).
+  // 그래서 onEdit(PropertyDef)에 섞지 않고 따로 올린다.
+  aggregation: AggregationKind;
+  onAggregationChange: (kind: AggregationKind) => void;
 }) {
   const [name, setName] = useState(prop.name);
   const [type, setType] = useState<PropertyType>(prop.type);
@@ -85,6 +94,22 @@ export function DbPropertyMenu({
           {TYPE_LABELS.map((t) => (
             <option key={t.type} value={t.type}>
               {t.label}
+            </option>
+          ))}
+        </select>
+
+        {/* 2026-07-26 : 데이터베이스 - 집계 - 고르는 자리 (Phase 33 T2)
+            타입이 바뀌면 고를 수 있는 집계도 달라진다 — 저장된 type이 아니라 편집 중인 type을 본다.
+            타입에 안 맞는 집계가 걸려 있으면(예: 숫자→텍스트로 바꿈) 목록에 없으므로 none으로 보인다. */}
+        <select
+          value={aggregationsForType(type).includes(aggregation) ? aggregation : "none"}
+          onChange={(e) => onAggregationChange(e.target.value as AggregationKind)}
+          aria-label={`${prop.name} 열 계산`}
+          className="rounded border border-border bg-transparent px-2 py-1 text-sm outline-none"
+        >
+          {aggregationsForType(type).map((k) => (
+            <option key={k} value={k}>
+              {k === "none" ? "계산 없음" : aggregationLabel(k)}
             </option>
           ))}
         </select>

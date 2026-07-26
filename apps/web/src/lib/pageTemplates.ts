@@ -58,6 +58,7 @@ function tableAndBoard(groupByPropId: string): DbSchema["views"] {
       sort: null,
       filters: [],
       hiddenPropIds: [],
+          aggregations: {},
     },
     {
       id: "board",
@@ -67,6 +68,7 @@ function tableAndBoard(groupByPropId: string): DbSchema["views"] {
       sort: null,
       filters: [],
       hiddenPropIds: [],
+          aggregations: {},
     },
   ];
 }
