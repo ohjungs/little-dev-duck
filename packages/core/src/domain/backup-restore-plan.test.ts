@@ -10,6 +10,8 @@ const bundle = (over: Partial<Backup>): Backup => ({
   formatVersion: 1,
   exportedAt: "t",
   truncated: [],
+  // 브라우저 설정은 복원 계획(DB 쓰기)의 대상이 아니다 — 여기서는 늘 비어 있어도 된다.
+  localPrefs: {},
   todos: [],
   memos: [],
   habits: [],

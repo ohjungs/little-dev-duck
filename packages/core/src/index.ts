@@ -430,6 +430,17 @@ export {
 } from "./domain/backup";
 export { parseBackup, type BackupParseResult } from "./domain/backup-parse";
 export {
+  LOCAL_PREF_SPECS,
+  LOCAL_PREF_LIST_CAP,
+  collectLocalPrefs,
+  parseLocalPrefs,
+  planLocalPrefsRestore,
+  type LocalPrefs,
+  type LocalPrefValue,
+  type LocalPrefSpec,
+  type QuietHoursPref,
+} from "./domain/local-prefs";
+export {
   planRestore,
   orderPagesParentsFirst,
   type RestorePlan,

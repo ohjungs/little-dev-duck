@@ -5,13 +5,18 @@
 //
 // 순수함수다. 조회는 api가, 파일 다운로드는 UI가 맡는다(db-export.ts의 CSV와 같은 분업).
 
+import type { LocalPrefs } from "./local-prefs";
+
 // 형식이 바뀌었을 때 옛 파일을 거부할지 변환할지 정하려면 파일 자신이 버전을 알아야 한다.
 // 가져오기(복원)를 붙일 때 이 값이 판정 기준이 된다.
 //
 // v2(2026-07-26): feeds·duckState 추가. **버전을 올린 건 구분용이지 차단용이 아니다** —
 // v1 파일에는 두 컬렉션이 없을 뿐이고 나머지는 그대로 복원된다(parseBackup이 선택으로 받는다).
 // v3(2026-07-26): pomodoroSessions·activityDaily 추가. v1·v2도 계속 읽는다(선택 키).
-export const BACKUP_FORMAT_VERSION = 3;
+// v4(2026-07-26): localPrefs 추가 — 브라우저에만 있던 값(할 일 순서·즐겨찾기·방해금지 등).
+// 컬렉션이 아니라 **키→값 맵**이라 BackupCollections에 넣지 않는다(상한·복원계획 로직이 전부
+// 배열 전제다). v1~v3 파일에는 없을 뿐이고 나머지는 그대로 복원된다.
+export const BACKUP_FORMAT_VERSION = 4;
 
 export type BackupCollections = {
   todos: unknown[];
@@ -38,6 +43,8 @@ export type Backup = BackupCollections & {
   exportedAt: string;
   // 조회 상한에 닿아 뒤가 잘렸을 수 있는 컬렉션. 비어 있으면 전부 온전하다.
   truncated: BackupCollectionKey[];
+  // v4 추가. 브라우저(localStorage)에만 있던 설정. DB 조회가 아니므로 truncated 판정 대상이 아니다.
+  localPrefs: LocalPrefs;
 };
 
 const KEYS: BackupCollectionKey[] = [
@@ -60,6 +67,8 @@ export function buildBackup(
   collections: BackupCollections,
   exportedAt: string,
   caps: Partial<Record<BackupCollectionKey, number>>,
+  // 브라우저에서만 읽을 수 있는 값이라 호출부가 넣어 준다. 서버·테스트에서는 없는 게 정상이다.
+  localPrefs: LocalPrefs = {},
 ): Backup {
   const truncated = KEYS.filter((key) => {
     const cap = caps[key];
@@ -72,6 +81,7 @@ export function buildBackup(
     formatVersion: BACKUP_FORMAT_VERSION,
     exportedAt,
     truncated,
+    localPrefs: { ...localPrefs },
     todos: [...collections.todos],
     memos: [...collections.memos],
     habits: [...collections.habits],

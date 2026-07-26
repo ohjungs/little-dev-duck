@@ -102,7 +102,8 @@ describe("collectBackup", () => {
 
   it("컬렉션과 버전을 담는다", async () => {
     const backup = await collectBackup(fakeClient);
-    expect(backup.formatVersion).toBe(3);
+    // 값을 못박아 둔다 — 형식을 바꾸면 이 테스트가 먼저 울어 "무엇이 늘었는지" 적게 만든다.
+    expect(backup.formatVersion).toBe(4);
     for (const key of [
       "todos",
       "memos",
@@ -116,6 +117,12 @@ describe("collectBackup", () => {
     ] as const) {
       expect(backup[key], key).toEqual([]);
     }
+  });
+
+  it("window가 없는 환경에서도 로컬 설정 자리를 비워 둘 뿐 실패하지 않는다", async () => {
+    // 내보내기 조립은 브라우저에서 돌지만 이 테스트는 node다. 여기서 터지면 백업이 통째로 실패한다.
+    const backup = await collectBackup(fakeClient);
+    expect(backup.localPrefs).toEqual({});
   });
 
   it("상한에 닿은 컬렉션을 알린다", async () => {

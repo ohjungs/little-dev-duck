@@ -12,6 +12,7 @@ import {
   restoreActivityDaily,
 } from "@ldd/api";
 import { parseBackup, planRestore, type Backup } from "@ldd/core";
+import { restoreLocalPrefs } from "./localPrefs";
 
 // 2026-07-26 : 백업 - 가져오기 - 실행
 // 판단(무엇을 어떤 순서로)은 core가, 쓰기는 api가 한다. 여기는 둘을 잇는 자리다 —
@@ -28,6 +29,9 @@ export type RestoreOutcome = {
   failed: number;
   // 처음 몇 건의 실패 사유. 전부 모으면 화면이 길어지고, 없으면 원인을 알 수 없다.
   errors: string[];
+  // 브라우저에 복원한 설정 수(할 일 순서·즐겨찾기 등). DB 항목과 세는 대상이 달라 따로 둔다 —
+  // restored에 섞으면 미리보기에서 보여준 개수와 맞지 않아 사용자가 무엇이 들어갔는지 알 수 없다.
+  localPrefs: number;
 };
 
 const MAX_REPORTED_ERRORS = 5;
@@ -52,6 +56,9 @@ export async function restoreBackup(
     invalid: plan.invalid,
     failed: 0,
     errors: [],
+    // 브라우저 설정은 네트워크를 타지 않아 실패할 일이 사실상 없다. DB 쓰기가 하나라도 실패해도
+    // 이건 되도록 먼저 넣는다 — 순서 의존이 없고, 뒤로 미루면 중간 실패 때 통째로 빠진다.
+    localPrefs: restoreLocalPrefs(backup.localPrefs),
   };
 
   // 한 건이 실패해도 나머지를 계속 넣는다. 중간에 멈추면 사용자는 "얼마나 들어갔는지"

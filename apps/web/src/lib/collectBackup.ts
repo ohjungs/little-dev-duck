@@ -15,6 +15,7 @@ import {
   PAGE_EXPORT_LIMIT,
 } from "@ldd/api";
 import { buildBackup, type Backup, type BackupCollectionKey } from "@ldd/core";
+import { readLocalPrefs } from "./localPrefs";
 
 // 2026-07-26 : 백업 - 내보내기 - 조합지점
 // 조립은 순수함수(core buildBackup)로, 조회는 api로 각각 테스트돼 있었는데 **정작 둘을 잇는
@@ -90,5 +91,8 @@ export async function collectBackup(supabase: SupabaseClient): Promise<Backup> {
     },
     new Date().toISOString(),
     QUERY_CAPS,
+    // 브라우저에만 있던 값(할 일 순서·즐겨찾기·방해금지 등). DB 조회가 아니라 상한 판정 대상이
+    // 아니고, 서버·테스트 환경에는 window가 없어 빈 객체가 된다.
+    readLocalPrefs(),
   );
 }

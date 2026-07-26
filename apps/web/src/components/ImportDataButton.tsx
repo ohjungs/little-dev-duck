@@ -70,6 +70,10 @@ export function ImportDataButton() {
         pending.backup.truncated.length > 0
           ? "이 백업은 내보낼 때 일부가 잘렸을 수 있습니다."
           : "",
+        // 이 브라우저에 이미 설정이 있으면 그대로 두므로 "가져온다"가 아니라 조건을 밝힌다.
+        Object.keys(pending.backup.localPrefs).length > 0
+          ? "할 일 순서·즐겨찾기 같은 브라우저 설정은 이 브라우저에 아직 없는 것만 채웁니다."
+          : "",
       ]
         .filter(Boolean)
         .join(" ")
@@ -107,6 +111,10 @@ export function ImportDataButton() {
           {outcome.invalid > 0 && ` 모양이 맞지 않아 건너뛴 항목 ${outcome.invalid}개.`}
           {outcome.failed > 0 &&
             ` 실패 ${outcome.failed}개 — ${outcome.errors.join(" / ")}`}
+          {/* 화면은 마운트할 때 이 값들을 읽었으므로 지금 화면에는 반영돼 있지 않다.
+              "됐다"고만 하고 왜 안 보이는지 말하지 않으면 안 된 줄 안다. */}
+          {outcome.localPrefs > 0 &&
+            ` 브라우저 설정 ${outcome.localPrefs}개도 복원했습니다 — 새로고침하면 반영됩니다.`}
         </p>
       )}
 

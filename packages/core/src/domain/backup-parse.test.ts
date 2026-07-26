@@ -161,3 +161,84 @@ describe("parseBackup — v1 하위호환", () => {
     expect(parseBackup({ ...validFile(), duckState: [null] }).ok).toBe(false);
   });
 });
+
+// 조립(buildBackup)과 검사(parseLocalPrefs)는 각각 잠겨 있다. 이 저장소가 반복해서 결함을 낸 건
+// **둘을 잇는 지점**이라(내보내기가 목록용 조회를 쓴 Phase 29) 조합을 따로 잠근다.
+describe("parseBackup - 브라우저 로컬 설정(v4)", () => {
+  it("v3 이하 파일에는 없으므로 빈 객체가 된다", () => {
+    const old: Record<string, unknown> = { ...validFile(), formatVersion: 3 };
+    delete old.localPrefs;
+    const r = parseBackup(old);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.backup.localPrefs).toEqual({});
+  });
+
+  it("담긴 설정을 그대로 살린다", () => {
+    const r = parseBackup({
+      ...validFile(),
+      localPrefs: { "ldd-todo-order": ["a", "b"], "ldd:quietHours": { start: 22, end: 7 } },
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.backup.localPrefs).toEqual({
+        "ldd-todo-order": ["a", "b"],
+        "ldd:quietHours": { start: 22, end: 7 },
+      });
+    }
+  });
+
+  it("등록되지 않은 키가 든 파일도 거부하지 않고 그 키만 버린다", () => {
+    // **보안 성질**: 백업 파일은 외부에서 온다. 낯선 키를 그대로 쓰면 남이 만든 파일이
+    // 브라우저의 아무 키나 덮어쓸 수 있다. 다만 그것 때문에 파일 전체를 거부하면
+    // 사용자는 멀쩡한 할 일·페이지까지 복원하지 못한다.
+    const r = parseBackup({
+      ...validFile(),
+      localPrefs: { "ldd-todo-order": ["a"], "ldd-theme": "dark", "evil-key": ["x"] },
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(Object.keys(r.backup.localPrefs)).toEqual(["ldd-todo-order"]);
+  });
+
+  it("localPrefs가 깨져 있어도 나머지 복원을 막지 않는다", () => {
+    // 컬렉션과 달리 이건 부가 설정이다. 이것 하나로 데이터 복원을 통째로 막을 이유가 없다.
+    const r = parseBackup({ ...validFile(), localPrefs: "문자열" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.backup.localPrefs).toEqual({});
+      expect(r.backup.todos).toHaveLength(1);
+    }
+  });
+
+  it("내보낸 파일이 그대로 다시 열린다(라운드트립)", () => {
+    const exported = JSON.parse(
+      JSON.stringify(
+        buildBackup(
+          {
+            todos: [],
+            memos: [],
+            habits: [],
+            habitChecks: [],
+            calendarEvents: [],
+            pages: [],
+            feeds: [],
+            duckState: [],
+            pomodoroSessions: [],
+            activityDaily: [],
+          },
+          "2026-07-26T00:00:00.000Z",
+          {},
+          { "ldd:favorites": ["p1"], "ldd-pomodoro-tags": ["공부"] },
+        ),
+      ),
+    ) as Record<string, unknown>;
+    expect(exported.formatVersion).toBe(BACKUP_FORMAT_VERSION);
+    const r = parseBackup(exported);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.backup.localPrefs).toEqual({
+        "ldd:favorites": ["p1"],
+        "ldd-pomodoro-tags": ["공부"],
+      });
+    }
+  });
+});

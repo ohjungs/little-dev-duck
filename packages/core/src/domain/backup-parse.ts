@@ -3,6 +3,7 @@ import {
   type Backup,
   type BackupCollectionKey,
 } from "./backup";
+import { parseLocalPrefs } from "./local-prefs";
 
 // 2026-07-26 : 백업 - 가져오기 - 파일검증
 // 사용자가 고른 파일이 실제로 우리 백업인지 판정하는 입구. 복원은 데이터를 쓰는 일이라
@@ -99,6 +100,9 @@ export function parseBackup(raw: unknown): BackupParseResult {
               typeof k === "string" && (KEYS as string[]).includes(k),
           ))
         : [],
+      // v4 이전 파일에는 없다. parseLocalPrefs가 허용 목록으로 걸러내므로 **낯선 키는 들어오지
+      // 못한다** — 백업 파일은 외부에서 오고, 그대로 믿으면 브라우저의 아무 키나 덮어쓸 수 있다.
+      localPrefs: parseLocalPrefs(raw.localPrefs),
       todos: collections.get("todos") ?? [],
       memos: collections.get("memos") ?? [],
       habits: collections.get("habits") ?? [],
