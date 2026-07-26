@@ -324,6 +324,9 @@ export {
 } from "./domain/standup";
 export {
   createCamera,
+  nextZoom,
+  OFFICE_ZOOM_LEVELS,
+  type OfficeZoom,
   followTarget,
   worldToScreen,
   screenToWorld,

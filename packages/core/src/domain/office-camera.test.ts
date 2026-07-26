@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  OFFICE_ZOOM_LEVELS,
+  nextZoom,
   createCamera,
   followTarget,
   worldToScreen,
@@ -104,5 +106,35 @@ describe("visibleTileRange", () => {
     expect(range.minRow).toBe(0);
     expect(range.maxCol).toBe(10);
     expect(range.maxRow).toBe(8); // ceil(240/32) = 8 (240/32=7.5→8)
+  });
+});
+
+// 2026-07-27 : 오피스 - 줌 (2차 피드백 5-5, Phase 48 T4)
+describe("오피스 줌 배율", () => {
+  it("전부 정수 배율이다 (소수는 픽셀 아트를 뭉갠다)", () => {
+    for (const z of OFFICE_ZOOM_LEVELS) expect(Number.isInteger(z)).toBe(true);
+  });
+
+  it("1배부터 시작한다 (기본이 확대 상태면 처음 본 사람이 방을 못 찾는다)", () => {
+    expect(OFFICE_ZOOM_LEVELS[0]).toBe(1);
+  });
+
+  it("순환한다 — 마지막 다음은 처음", () => {
+    expect(nextZoom(1)).toBe(2);
+    expect(nextZoom(2)).toBe(3);
+    expect(nextZoom(3)).toBe(1);
+  });
+
+  it("범위 밖 값(저장된 옛 설정·조작된 값)은 1배로 되돌린다", () => {
+    for (const bad of [0, -1, 1.5, 99, Number.NaN]) {
+      expect(OFFICE_ZOOM_LEVELS).toContain(nextZoom(bad));
+    }
+  });
+
+  it("확대하면 보이는 타일 수가 줄어든다 (뷰포트를 논리 크기로 줄이는 방식)", () => {
+    // 배율을 렌더 코드에 뿌리지 않고 카메라 뷰포트만 줄인다 — 1차 5-2의 스케일 버그 방지.
+    const wide = visibleTileRange(createCamera(600, 360), 32);
+    const zoomed = visibleTileRange(createCamera(600 / 2, 360 / 2), 32);
+    expect(zoomed.maxCol - zoomed.minCol).toBeLessThan(wide.maxCol - wide.minCol);
   });
 });

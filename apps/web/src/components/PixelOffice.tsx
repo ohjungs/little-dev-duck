@@ -33,6 +33,8 @@ import {
   wanderZone,
   assignLook,
   bubbleText,
+  nextZoom,
+  type OfficeZoom,
   type DuckWorkState,
   type TileMap,
   type Camera,
@@ -280,6 +282,10 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   const npcsRef = useRef<Npc[]>([]);
   const playerRef = useRef<Vec>({ x: 40, y: 17 });
   const nearbyNpcRef = useRef<Npc | null>(null);
+  // 2026-07-27 : 오피스 - 줌 (2차 피드백 5-5, Phase 48 T4)
+  // 렌더 루프와 클릭 핸들러는 마운트 시 1회만 붙으므로 ref로도 최신 배율을 읽는다.
+  const [zoom, setZoom] = useState<OfficeZoom>(1);
+  const zoomRef = useRef<OfficeZoom>(1);
   const playerFacingRef = useRef<"up" | "down" | "left" | "right">("down");
   const playerMovingRef = useRef(false);
 
@@ -512,8 +518,10 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
       const cam = camRef.current;
       if (!cam) return;
       const rect = canvas.getBoundingClientRect();
-      const sx = e.clientX - rect.left;
-      const sy = e.clientY - rect.top;
+      // 컨텍스트에 배율을 걸었으므로 클릭 좌표도 같은 배율로 나눠야 같은 타일을 가리킨다.
+      const z = zoomRef.current;
+      const sx = (e.clientX - rect.left) / z;
+      const sy = (e.clientY - rect.top) / z;
       const { x: wx, y: wy } = screenToWorld(cam, sx, sy);
       const tileX = Math.floor(wx / TILE);
       const tileY = Math.floor(wy / TILE);
@@ -558,17 +566,25 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
     const applySize = (w: number) => {
       const h = Math.round(w * (9 / 15));
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // 2026-07-27 : 오피스 - 줌 (2차 피드백 5-5, Phase 48 T4)
+      // **배율을 렌더 코드에 뿌리지 않는다.** 1차 5-2에서 32×32 자산을 64×64로 그려
+      // 벽을 넘어간 버그가 바로 그 방식이었다. 배율은 여기 컨텍스트에 **한 번만** 걸고,
+      // 카메라에는 "논리 뷰포트 크기"(w/z)를 준다 — 렌더 코드는 한 줄도 바뀌지 않는다.
+      // canvas.width 대입이 변환 행렬을 초기화하므로 scale이 누적되지 않는다.
+      const z = zoomRef.current;
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.scale(dpr, dpr);
+        ctx.scale(dpr * z, dpr * z);
         ctx.imageSmoothingEnabled = false;
       }
+      const viewW = w / z;
+      const viewH = h / z;
       if (!camRef.current) {
-        camRef.current = createCamera(w, h);
+        camRef.current = createCamera(viewW, viewH);
       } else {
-        camRef.current = { ...camRef.current, viewW: w, viewH: h };
+        camRef.current = { ...camRef.current, viewW, viewH };
       }
     };
 
@@ -579,7 +595,7 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
     ro.observe(container);
     applySize(container.getBoundingClientRect().width || 480);
     return () => ro.disconnect();
-  }, []);
+  }, [zoom]);
 
   // 메인 게임 루프
   useEffect(() => {
@@ -1414,6 +1430,20 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
             className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
           >
             {paused ? "시뮬 재개" : "시뮬 정지"}
+          </button>
+          {/* 2026-07-27 (2차 피드백 5-5): 화면이 작다 → 정수 배율 확대.
+              현재 배율을 글자로 보여 준다 — 아이콘만 있으면 지금 몇 배인지 알 수 없다. */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = nextZoom(zoomRef.current);
+              zoomRef.current = next;
+              setZoom(next);
+            }}
+            aria-label={`화면 배율 ${zoom}배, 누르면 다음 배율로`}
+            className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            확대 {zoom}배
           </button>
         </div>
       </div>
