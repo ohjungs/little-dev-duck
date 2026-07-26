@@ -6,6 +6,7 @@ import {
   Download,
   Info,
   Keyboard,
+  LayoutDashboard,
   Link2,
   LogOut,
   Mail,
@@ -35,6 +36,8 @@ import { GitHubMark } from "@/components/ui/github-mark";
 import { GmailLink } from "@/components/GmailLink";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 import { DangerZone } from "@/components/DangerZone";
+import { DashboardLayoutPanel } from "@/components/DashboardLayoutPanel";
+import { ProfileSettings } from "@/components/ProfileSettings";
 import { ExportDataButton } from "@/components/ExportDataButton";
 import { ImportDataButton } from "@/components/ImportDataButton";
 import { LocalResetButton } from "@/components/LocalResetButton";
@@ -50,12 +53,8 @@ export default async function SettingsPage() {
   const githubLinked = user ? !!(await getGithubTokens(supabase, user.id)) : false;
   const gmailLinked = user ? !!(await getGmailTokens(supabase, user.id)) : false;
 
-  const displayName =
-    (user?.user_metadata.full_name as string | undefined) ??
-    (user?.user_metadata.name as string | undefined) ??
-    user?.email ??
-    "사용자";
-  const email = user?.email ?? "";
+  // 이름·이메일은 더 이상 서버에서 내려주지 않는다 — 프로필 카드가 편집 가능해지면서
+  // ProfileSettings가 직접 읽는다(같은 값을 두 곳에서 가져오면 저장 후 한쪽만 낡는다).
   const provider = user?.app_metadata.provider ?? "이메일";
 
   return (
@@ -67,8 +66,11 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      {/* 좁은 단일 컬럼 → 다단(masonry)으로 좌우를 꽉 채운다. 카드는 열 사이에서 잘리지 않게 break-inside-avoid. */}
-      <div className="columns-1 gap-4 md:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid">
+      {/* 이름 없는 section은 스크린리더에 landmark로 노출되지 않는다 — 제목과 묶어 건너뛸 수 있게 한다. */}
+      <section className="mb-2" aria-labelledby="settings-personal">
+        <h2 id="settings-personal" className="mb-3 mt-2 text-sm font-semibold tracking-tight text-muted-foreground">개인화</h2>
+        {/* 다단(masonry)은 묶음마다 따로 잡는다 — 하나로 묶으면 제목이 열 사이를 가로지른다. */}
+        <div className="columns-1 gap-4 md:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid">
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
@@ -81,7 +83,6 @@ export default async function SettingsPage() {
             <AppearanceSetting />
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
@@ -96,7 +97,6 @@ export default async function SettingsPage() {
             <QuietHoursSetting />
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
@@ -111,16 +111,39 @@ export default async function SettingsPage() {
             <NotifySetting />
           </CardContent>
         </Card>
-
+        {/* 2026-07-26 (피드백 6-1·1-2·1-5): 대시보드 구성도 "내 것"이라 설정에 둔다.
+            관리자 화면에 있었는데, 경계 규칙은 **설정 = 내 것(개인화) · 관리자 = 남의 것(권한 부여)**이다. */}
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <LayoutDashboard className="size-4 text-primary-accent" />
+              대시보드 구성
+            </CardTitle>
+            <CardDescription>
+              대시보드 카드의 순서를 바꾸고, 쓰지 않는 카드는 숨깁니다. 내 계정에만
+              적용됩니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DashboardLayoutPanel />
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
               <User className="size-4 text-primary-accent" />
               프로필
             </CardTitle>
-            <CardDescription>{provider} 계정으로 로그인됨.</CardDescription>
+            <CardDescription>
+              {provider} 계정으로 로그인됨. 이름을 바꾸면 사이드바와 오리 인사말에 함께
+              반영됩니다.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="flex items-center gap-3">
+          {/* 2026-07-26 (피드백 6-1): 여기는 읽기 전용 카드였고, 편집 기능은 관리자 화면에
+              있었다. 사용자는 "왼쪽아래 계정정보"를 고치려고 **설정**을 연다 — 기능은 만들어
+              두고 도달 경로가 어긋나 있었다. 새 카드를 만들지 않고 이 카드를 편집 가능하게 바꾼다
+              (같은 것이 두 곳에 생기면 어느 쪽이 진짜인지 알 수 없다). */}
+          <CardContent className="flex items-start gap-3">
             <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary ring-1 ring-border">
               <Image
                 src="/duck-logo.png"
@@ -130,13 +153,49 @@ export default async function SettingsPage() {
                 className="size-12 object-cover"
               />
             </span>
-            <div className="min-w-0">
-              <p className="truncate font-medium">{displayName}</p>
-              <p className="truncate text-sm text-muted-foreground">{email}</p>
+            <div className="min-w-0 flex-1">
+              <ProfileSettings />
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Keyboard className="size-4 text-primary-accent" />
+              키보드 단축키
+            </CardTitle>
+            <CardDescription>자주 쓰는 단축키 목록입니다.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              {[
+                { label: "명령 팔레트", key: "Ctrl+K" },
+                { label: "할 일 추가", key: "Ctrl+Shift+T" },
+                { label: "오피스 이동", key: "방향키 / WASD" },
+                { label: "오피스 상호작용", key: "E" },
+                { label: "오피스 경영 패널", key: "Tab" },
+                { label: "오피스 미니맵", key: "M" },
+                { label: "오피스 사운드", key: "N" },
+                { label: "오피스 도움말", key: "?" },
+              ].map(({ label, key }) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{label}</span>
+                  <kbd className="inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground shadow-[0_1px_0_0] shadow-border">
+                    {key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        </div>
+      </section>
 
+      {/* 이름 없는 section은 스크린리더에 landmark로 노출되지 않는다 — 제목과 묶어 건너뛸 수 있게 한다. */}
+      <section className="mb-2" aria-labelledby="settings-integrations">
+        <h2 id="settings-integrations" className="mb-3 mt-2 text-sm font-semibold tracking-tight text-muted-foreground">연동</h2>
+        {/* 다단(masonry)은 묶음마다 따로 잡는다 — 하나로 묶으면 제목이 열 사이를 가로지른다. */}
+        <div className="columns-1 gap-4 md:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid">
         {/* 외부 연동을 한 카드로 통합 — 서비스별로 흩어진 카드를 한곳에서 바로바로 연동. */}
         <Card>
           <CardHeader className="flex-col items-start gap-1">
@@ -181,7 +240,6 @@ export default async function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-
         {/* GitHub 잔디(기여 캘린더) — 대시보드에서 설정으로 이동. GitHub 로그인 시 표시. */}
         <Card>
           <CardHeader className="flex-col items-start gap-1">
@@ -197,22 +255,53 @@ export default async function SettingsPage() {
             <GithubContributionWidget />
           </CardContent>
         </Card>
+        </div>
+      </section>
 
+      {/* 이름 없는 section은 스크린리더에 landmark로 노출되지 않는다 — 제목과 묶어 건너뛸 수 있게 한다. */}
+      <section className="mb-2" aria-labelledby="settings-data">
+        <h2 id="settings-data" className="mb-3 mt-2 text-sm font-semibold tracking-tight text-muted-foreground">데이터</h2>
+        {/* 다단(masonry)은 묶음마다 따로 잡는다 — 하나로 묶으면 제목이 열 사이를 가로지른다. */}
+        <div className="columns-1 gap-4 md:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid">
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
-              <Activity className="size-4 text-primary-accent" />
-              서비스 상태
+              <Download className="size-4 text-primary-accent" />
+              데이터 내보내기·가져오기
             </CardTitle>
             <CardDescription>
-              연결된 서비스가 정상인지 확인합니다.
+              할 일·메모·습관·습관 체크 기록·캘린더 일정·페이지(본문 포함)를 JSON 파일로
+              내보냅니다. 가져오기는 지금 데이터를 지우거나 바꾸지 않고, 이미 있는 항목은
+              건너뜁니다. 연동 계정 토큰은 안전을 위해 파일에 담지 않습니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <ExportDataButton />
+            <ImportDataButton />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <RotateCcw className="size-4 text-primary-accent" />
+              로컬 데이터 초기화
+            </CardTitle>
+            <CardDescription>
+              브라우저에 저장된 테마·즐겨찾기·최근 페이지 등 로컬 설정을 초기화합니다.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <HealthStatus />
+            <LocalResetButton />
           </CardContent>
         </Card>
+        </div>
+      </section>
 
+      {/* 이름 없는 section은 스크린리더에 landmark로 노출되지 않는다 — 제목과 묶어 건너뛸 수 있게 한다. */}
+      <section className="mb-2" aria-labelledby="settings-account">
+        <h2 id="settings-account" className="mb-3 mt-2 text-sm font-semibold tracking-tight text-muted-foreground">계정과 상태</h2>
+        {/* 다단(masonry)은 묶음마다 따로 잡는다 — 하나로 묶으면 제목이 열 사이를 가로지른다. */}
+        <div className="columns-1 gap-4 md:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid">
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
@@ -232,87 +321,20 @@ export default async function SettingsPage() {
             </form>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
-              <Keyboard className="size-4 text-primary-accent" />
-              키보드 단축키
-            </CardTitle>
-            <CardDescription>자주 쓰는 단축키 목록입니다.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              {[
-                { label: "명령 팔레트", key: "Ctrl+K" },
-                { label: "할 일 추가", key: "Ctrl+Shift+T" },
-                { label: "오피스 이동", key: "방향키 / WASD" },
-                { label: "오피스 상호작용", key: "E" },
-                { label: "오피스 경영 패널", key: "Tab" },
-                { label: "오피스 미니맵", key: "M" },
-                { label: "오피스 사운드", key: "N" },
-                { label: "오피스 도움말", key: "?" },
-              ].map(({ label, key }) => (
-                <div key={label} className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{label}</span>
-                  <kbd className="inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground shadow-[0_1px_0_0] shadow-border">
-                    {key}
-                  </kbd>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex-col items-start gap-1">
-            <CardTitle>
-              <Download className="size-4 text-primary-accent" />
-              데이터 내보내기·가져오기
+              <Activity className="size-4 text-primary-accent" />
+              서비스 상태
             </CardTitle>
             <CardDescription>
-              할 일·메모·습관·습관 체크 기록·캘린더 일정·페이지(본문 포함)를 JSON 파일로
-              내보냅니다. 가져오기는 지금 데이터를 지우거나 바꾸지 않고, 이미 있는 항목은
-              건너뜁니다. 연동 계정 토큰은 안전을 위해 파일에 담지 않습니다.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <ExportDataButton />
-            <ImportDataButton />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex-col items-start gap-1">
-            <CardTitle>
-              <RotateCcw className="size-4 text-primary-accent" />
-              로컬 데이터 초기화
-            </CardTitle>
-            <CardDescription>
-              브라우저에 저장된 테마·즐겨찾기·최근 페이지 등 로컬 설정을 초기화합니다.
+              연결된 서비스가 정상인지 확인합니다.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LocalResetButton />
+            <HealthStatus />
           </CardContent>
         </Card>
-
-        {user && (
-          <Card className="border-destructive/30">
-            <CardHeader className="flex-col items-start gap-1">
-              <CardTitle>
-                <Trash2 className="size-4 text-destructive" />
-                위험 구역
-              </CardTitle>
-              <CardDescription>
-                내 모든 콘텐츠를 영구 삭제합니다. 되돌릴 수 없어요.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DangerZone userId={user.id} />
-            </CardContent>
-          </Card>
-        )}
         <Card>
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
@@ -339,7 +361,33 @@ export default async function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </section>
+
+      {/* 이름 없는 section은 스크린리더에 landmark로 노출되지 않는다 — 제목과 묶어 건너뛸 수 있게 한다. */}
+      <section className="mb-2" aria-labelledby="settings-danger">
+        <h2 id="settings-danger" className="mb-3 mt-2 text-sm font-semibold tracking-tight text-muted-foreground">위험</h2>
+        {/* 다단(masonry)은 묶음마다 따로 잡는다 — 하나로 묶으면 제목이 열 사이를 가로지른다. */}
+        <div className="columns-1 gap-4 md:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid">
+        {user && (
+          <Card className="border-destructive/30">
+            <CardHeader className="flex-col items-start gap-1">
+              <CardTitle>
+                <Trash2 className="size-4 text-destructive" />
+                위험 구역
+              </CardTitle>
+              <CardDescription>
+                내 모든 콘텐츠를 영구 삭제합니다. 되돌릴 수 없어요.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DangerZone userId={user.id} />
+            </CardContent>
+          </Card>
+        )}
+        </div>
+      </section>
+
 
       <p className="mt-8 text-xs text-muted-foreground">Little Dev Duck v1.0.0</p>
     </div>
