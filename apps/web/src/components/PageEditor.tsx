@@ -21,9 +21,10 @@ import {
   Smile,
   Star,
   Table2,
+  Play,
+  Printer,
   Upload,
   X,
-  Printer,
 } from "lucide-react";
 import type { Block } from "@blocknote/core";
 import {
@@ -51,6 +52,7 @@ import { Button } from "@/components/ui/button";
 import { VersionHistory } from "@/components/VersionHistory";
 import { DatabaseView } from "@/components/DatabaseView";
 import { AiWriteAssistant } from "@/components/AiWriteAssistant";
+import { PresentationMode } from "@/components/PresentationMode";
 import {
   isFavorite,
   subscribeFavorites,
@@ -382,6 +384,24 @@ export function PageEditor({
     void pending.finally(() => window.print());
   };
 
+  // 2026-07-26 (피드백 2-6): 발표 모드. 본문의 큰 제목(h1)마다 한 장으로 보여준다.
+  // 인쇄와 같은 이유로 **대기 중인 저장을 먼저 밀어낸다** — 방금 친 글이 빠진 채 발표되면 안 된다.
+  // 저장이 실패해도 발표는 막지 않는다(화면에 보이는 내용은 그대로 보여줄 수 있다).
+  //
+  // 본문 스냅샷을 **누른 시점에** 잡아 상태로 둔다. 렌더 중에 latest.current를 읽으면
+  // 린트의 "Cannot access refs during render"에 걸리고, 실제로도 발표 중 편집이 반영돼
+  // 화면이 흔들릴 수 있다. 발표는 누른 순간의 내용을 보여주는 게 맞다.
+  const [presentContent, setPresentContent] = useState<unknown | null>(null);
+  const handlePresent = () => {
+    const pending = flushPendingSave();
+    const start = () => setPresentContent(latest.current.content);
+    if (!pending) {
+      start();
+      return;
+    }
+    void pending.finally(start);
+  };
+
   // 2026-07-26 (피드백 2-2): 이 페이지를 **템플릿 파일**로 내려받는다.
   // 템플릿 저장소를 새로 만들지 않고 파일로 주고받는다 — 받은 사람은 새 페이지 메뉴에서 가져온다.
   // 제목·본문·아이콘·데이터베이스 설정만 담는다(내용은 남의 것이 될 수 있어 그대로 옮긴다).
@@ -535,6 +555,15 @@ export function PageEditor({
           className="text-muted-foreground"
         >
           <Printer className="size-3.5" /> 인쇄 · PDF
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handlePresent}
+          className="text-muted-foreground"
+        >
+          <Play className="size-3.5" /> 발표
         </Button>
         <Button
           type="button"
@@ -767,6 +796,14 @@ export function PageEditor({
         onExportReady={handleExportReady}
         onImportReady={handleImportReady}
       />
+      {/* 발표는 **누른 시점의 내용**을 보여준다 — page.content는 처음 불러온 값이라
+          방금 친 글이 빠진다(스냅샷은 handlePresent가 잡는다). */}
+      {presentContent !== null && (
+        <PresentationMode
+          content={presentContent}
+          onClose={() => setPresentContent(null)}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-x-3 px-4 text-xs text-muted-foreground">
         <span role="status" aria-live="polite" className="flex items-center gap-1">
           {saveState === "saving" && (

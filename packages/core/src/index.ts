@@ -438,6 +438,12 @@ export {
   type AggregationKind,
   type AggregationRow,
 } from "./domain/database-aggregation";
+export {
+  MAX_SLIDES,
+  splitIntoSlides,
+  slideTitle,
+  type Slide,
+} from "./domain/slides";
 export { untrustedTextRule } from "./domain/untrusted-text";
 export { buildArticleSummaryPrompt } from "./domain/news-summary-prompt";
 export { parseBackup, type BackupParseResult } from "./domain/backup-parse";
