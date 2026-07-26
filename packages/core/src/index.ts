@@ -310,6 +310,8 @@ export {
   movePlayer,
   isAdjacent,
   describeActivity,
+  bubbleText,
+  BUBBLE_MAX_CHARS,
   deskSlots,
   type Vec,
   type Dir,

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { movePlayer, isAdjacent, describeActivity, deskSlots } from "./office-play";
+import { movePlayer, isAdjacent, describeActivity, deskSlots,
+  bubbleText,
+  BUBBLE_MAX_CHARS,
+} from "./office-play";
 
 const noBlock = () => false;
 
@@ -76,5 +79,44 @@ describe("deskSlots", () => {
     expect(slots).toHaveLength(4);
     // 4번째는 두번째 줄 → y가 첫 줄과 다르다.
     expect(slots[3].y).not.toBe(slots[0].y);
+  });
+});
+
+// 2026-07-27 : 오피스 - 상시 말풍선 (2차 피드백 5-4, Phase 48 T3)
+// 요청은 "계속 말하게"였지만, **말풍선을 채우려고 문장을 생성하면 그게 1차 5-7의 "일하는 척"**이다.
+// 여기서 잠그는 성질: 실제 업무가 있을 때만 그 업무를 말한다. 없으면 지어내지 않는다.
+describe("상시 말풍선 문구", () => {
+  it("업무가 있으면 그 업무를 말한다", () => {
+    expect(bubbleText({ state: "typing", label: "로그인 고치기" })).toBe("로그인 고치기");
+  });
+
+  it("쉬는 중이면 쉬는 중이라고 한다 (없는 일을 만들지 않는다)", () => {
+    expect(bubbleText({ state: "idle", label: "무엇이든" })).toBe("쉬는 중");
+  });
+
+  it("퇴근했으면 말풍선을 띄우지 않는다", () => {
+    // 퇴근한 오리 위에 말풍선이 뜨면 이상하다 — null이면 호출부가 안 그린다.
+    expect(bubbleText({ state: "offwork", label: "일" })).toBeNull();
+  });
+
+  it("업무명이 비면 지어내지 않고 쉬는 중으로 본다", () => {
+    expect(bubbleText({ state: "typing", label: "   " })).toBe("쉬는 중");
+  });
+
+  it("긴 업무명은 잘라서 말줄임을 붙인다 (말풍선이 겹치면 못 읽는다)", () => {
+    const out = bubbleText({ state: "typing", label: "아주아주아주아주아주아주 긴 업무 이름" })!;
+    expect([...out].length).toBeLessThanOrEqual(BUBBLE_MAX_CHARS);
+    expect(out.endsWith("…")).toBe(true);
+  });
+
+  it("이모지가 섞여도 글자가 깨지지 않는다", () => {
+    // slice로 자르면 이모지 중간이 끊겨 깨진 글자가 나온다.
+    const out = bubbleText({ state: "typing", label: "🦆".repeat(20) })!;
+    expect([...out].every((ch) => ch === "🦆" || ch === "…")).toBe(true);
+  });
+
+  it("상한과 정확히 같은 길이는 자르지 않는다", () => {
+    const exact = "가".repeat(BUBBLE_MAX_CHARS);
+    expect(bubbleText({ state: "typing", label: exact })).toBe(exact);
   });
 });
