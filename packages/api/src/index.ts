@@ -25,7 +25,7 @@ export {
   type UpsertActivityDailyInput,
 } from "./activity";
 
-export { getDuckState, applyXpAward } from "./duckState";
+export { getDuckState, applyXpAward, restoreDuckState } from "./duckState";
 
 export {
   listCalendarEvents,
@@ -143,6 +143,7 @@ export { deleteAllMyData } from "./account";
 export {
   addFeed,
   listFeeds,
+  restoreFeed,
   setFeedStatus,
   deleteFeed,
   listArticles,

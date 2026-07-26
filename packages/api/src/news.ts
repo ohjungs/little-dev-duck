@@ -409,3 +409,26 @@ export async function setArticleSummary(
     .eq("id", articleId);
   if (error) throw new Error(error.message);
 }
+
+// 2026-07-26 : 백업 - 가져오기 - 피드복원
+// restoreTodo와 같은 계약: 같은 id로 넣고, 인자의 userId는 무시하고 로그인 사용자로 채우며,
+// 이미 있으면 멱등 성공. (user_id, url) 유일 제약이 있어 같은 주소를 다시 넣어도 안전하다.
+// fail_count는 복원하지 않는다 — 실패 횟수는 지금 이 계정에서 다시 세는 값이지 백업 대상이 아니다.
+export async function restoreFeed(
+  supabase: SupabaseClient,
+  feed: Feed,
+): Promise<void> {
+  const userId = await requireUserId(supabase);
+  const { error } = await supabase.from("feeds").insert({
+    id: feed.id,
+    user_id: userId,
+    url: feed.url,
+    title: feed.title,
+    folder: feed.folder,
+    status: feed.status,
+    created_at: feed.createdAt,
+  });
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}

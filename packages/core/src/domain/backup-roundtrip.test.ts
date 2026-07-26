@@ -108,6 +108,21 @@ const FULL: BackupCollections = {
       coverUrl: null,
     },
   ],
+  feeds: [
+    {
+      id: U(8),
+      userId: uid,
+      url: "https://example.com/rss.xml",
+      title: "예시 피드",
+      folder: "개발",
+      status: "active",
+      failCount: 0,
+      createdAt: ts,
+    },
+  ],
+  duckState: [
+    { userId: uid, xp: 1234, level: 7, feed: 80, costume: "default", updatedAt: ts },
+  ],
 };
 
 // 내보내기 → 파일 → 가져오기 판정 → 복원 계획. 실제 사용자 경로 그대로.
@@ -124,7 +139,7 @@ describe("백업 라운드트립", () => {
   it("우리가 내보낸 파일은 우리가 다시 읽을 수 있다", () => {
     const plan = roundTrip(FULL);
     expect(plan.invalid).toBe(0);
-    expect(plan.total).toBe(7);
+    expect(plan.total).toBe(9);
   });
 
   it("할 일이 필드 하나 없이 그대로 돌아온다", () => {
@@ -174,6 +189,8 @@ describe("백업 라운드트립", () => {
       ["habitChecks", FULL.habitChecks[0], plan.habitChecks[0]],
       ["calendarEvents", FULL.calendarEvents[0], plan.calendarEvents[0]],
       ["pages", FULL.pages[0], plan.pages.find((p) => p.id === U(6))],
+      ["feeds", FULL.feeds[0], plan.feeds[0]],
+      ["duckState", FULL.duckState[0], plan.duckState[0]],
     ];
     for (const [name, before, after] of pairs) {
       expect(keysOf(after), `${name}의 필드가 라운드트립에서 바뀌었다`).toEqual(keysOf(before));
@@ -189,6 +206,8 @@ describe("백업 라운드트립", () => {
       habitChecks: once.habitChecks,
       calendarEvents: once.calendarEvents,
       pages: once.pages,
+      feeds: once.feeds,
+      duckState: once.duckState,
     });
     expect(twice.pages).toEqual(once.pages);
     expect(twice.todos).toEqual(once.todos);
@@ -203,6 +222,8 @@ describe("백업 라운드트립", () => {
       habitChecks: [],
       calendarEvents: [],
       pages: [],
+      feeds: [],
+      duckState: [],
     });
     expect(plan.total).toBe(0);
     expect(plan.invalid).toBe(0);

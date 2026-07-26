@@ -6,6 +6,8 @@ import {
   listHabitChecks,
   listCalendarEvents,
   listPagesForExport,
+  listFeeds,
+  getDuckState,
   HABIT_CHECK_EXPORT_LIMIT,
   PAGE_EXPORT_LIMIT,
 } from "@ldd/api";
@@ -34,10 +36,12 @@ export const BACKUP_LABELS: Record<BackupCollectionKey, string> = {
   habitChecks: "습관 체크 기록",
   calendarEvents: "캘린더 일정",
   pages: "페이지",
+  feeds: "뉴스 피드",
+  duckState: "오리 상태",
 };
 
 export async function collectBackup(supabase: SupabaseClient): Promise<Backup> {
-  const [todos, memos, habits, habitChecks, calendarEvents, pages] =
+  const [todos, memos, habits, habitChecks, calendarEvents, pages, feeds, duckState] =
     await Promise.all([
       listTodos(supabase),
       listMemos(supabase),
@@ -46,10 +50,14 @@ export async function collectBackup(supabase: SupabaseClient): Promise<Backup> {
       listCalendarEvents(supabase),
       // 목록용 listPages는 content를 빼므로 백업에 쓰면 제목만 남는다.
       listPagesForExport(supabase),
+      listFeeds(supabase),
+      // 행이 하나뿐이라 배열로 감싼다. getDuckState는 행이 없으면 기본값 행을 만드는데,
+      // 앱을 열면 어차피 만들어지는 행이라 내보내기가 그걸 앞당기는 것뿐이다.
+      getDuckState(supabase).then((s) => [s]),
     ]);
 
   return buildBackup(
-    { todos, memos, habits, habitChecks, calendarEvents, pages },
+    { todos, memos, habits, habitChecks, calendarEvents, pages, feeds, duckState },
     new Date().toISOString(),
     QUERY_CAPS,
   );

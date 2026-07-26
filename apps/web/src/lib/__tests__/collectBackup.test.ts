@@ -12,6 +12,8 @@ const listHabitChecks = vi.fn();
 const listCalendarEvents = vi.fn();
 const listPagesForExport = vi.fn();
 const listPages = vi.fn();
+const listFeeds = vi.fn();
+const getDuckState = vi.fn();
 
 vi.mock("@ldd/api", () => ({
   listTodos: (...a: unknown[]) => listTodos(...a),
@@ -21,6 +23,8 @@ vi.mock("@ldd/api", () => ({
   listCalendarEvents: (...a: unknown[]) => listCalendarEvents(...a),
   listPagesForExport: (...a: unknown[]) => listPagesForExport(...a),
   listPages: (...a: unknown[]) => listPages(...a),
+  listFeeds: (...a: unknown[]) => listFeeds(...a),
+  getDuckState: (...a: unknown[]) => getDuckState(...a),
   PAGE_EXPORT_LIMIT: 500,
   HABIT_CHECK_EXPORT_LIMIT: 5000,
 }));
@@ -39,6 +43,8 @@ beforeEach(() => {
   listCalendarEvents.mockResolvedValue([]);
   listPagesForExport.mockResolvedValue([]);
   listPages.mockResolvedValue([]);
+  listFeeds.mockResolvedValue([]);
+  getDuckState.mockResolvedValue({ userId: "u", xp: 0, level: 1, feed: 100, costume: "default", updatedAt: "t" });
 });
 
 describe("collectBackup", () => {
@@ -55,6 +61,19 @@ describe("collectBackup", () => {
     expect(listHabitChecks).toHaveBeenCalledTimes(1);
   });
 
+  // v2: 등록한 피드와 오리 진행도. 둘 다 잃으면 손으로 되돌리기 어렵다.
+  it("등록한 피드와 오리 상태도 부른다", async () => {
+    await collectBackup(fakeClient);
+    expect(listFeeds).toHaveBeenCalledTimes(1);
+    expect(getDuckState).toHaveBeenCalledTimes(1);
+  });
+
+  it("오리 상태는 행이 하나뿐이라 배열로 감싼다", async () => {
+    const backup = await collectBackup(fakeClient);
+    expect(backup.duckState).toHaveLength(1);
+    expect((backup.duckState[0] as { level: number }).level).toBe(1);
+  });
+
   it("습관 체크는 상한을 명시해 부른다 (조용한 잘림 방지)", async () => {
     await collectBackup(fakeClient);
     expect(listHabitChecks).toHaveBeenCalledWith(fakeClient, 5000);
@@ -67,9 +86,9 @@ describe("collectBackup", () => {
     expect((backup.pages[0] as { content: unknown }).content).toEqual(content);
   });
 
-  it("여섯 컬렉션과 버전을 담는다", async () => {
+  it("컬렉션과 버전을 담는다", async () => {
     const backup = await collectBackup(fakeClient);
-    expect(backup.formatVersion).toBe(1);
+    expect(backup.formatVersion).toBe(2);
     for (const key of [
       "todos",
       "memos",
@@ -77,6 +96,7 @@ describe("collectBackup", () => {
       "habitChecks",
       "calendarEvents",
       "pages",
+      "feeds",
     ] as const) {
       expect(backup[key], key).toEqual([]);
     }

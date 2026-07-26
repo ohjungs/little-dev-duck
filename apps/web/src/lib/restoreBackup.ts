@@ -6,6 +6,8 @@ import {
   restoreHabitCheck,
   restoreCalendarEvent,
   restorePageFromBackup,
+  restoreFeed,
+  restoreDuckState,
 } from "@ldd/api";
 import { parseBackup, planRestore, type Backup } from "@ldd/core";
 
@@ -77,6 +79,11 @@ export async function restoreBackup(
   }
   for (const page of plan.pages) {
     await run("페이지", () => restorePageFromBackup(supabase, page));
+  }
+  for (const feed of plan.feeds) await run("뉴스 피드", () => restoreFeed(supabase, feed));
+  // 오리 상태는 이미 있으면 건드리지 않는다(덮어쓰면 지금 레벨이 백업 시점으로 후퇴한다).
+  for (const state of plan.duckState) {
+    await run("오리 상태", () => restoreDuckState(supabase, state));
   }
 
   return outcome;

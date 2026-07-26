@@ -74,3 +74,31 @@ export async function applyXpAward(
   });
   if (error) throw new Error(error.message);
 }
+
+// 2026-07-26 : 백업 - 가져오기 - 오리상태복원
+// **이미 있으면 건드리지 않는다.** duck_state는 user_id가 기본키라 행이 하나뿐이고, 덮어쓰면
+// 지금 레벨이 백업 시점으로 **후퇴한다** — 가져오기의 "지금 데이터를 바꾸지 않는다" 계약 위반이다.
+// 그래서 insert만 하고 23505(이미 있음)는 성공으로 본다. 계정을 갈아탄 뒤 처음 복원할 때만
+// 실제로 값이 들어간다.
+export async function restoreDuckState(
+  supabase: SupabaseClient,
+  state: DuckState,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase.from("duck_state").insert({
+    // 인자의 userId는 쓰지 않는다(남의 행을 만들 수 없어야 한다).
+    user_id: user.id,
+    xp: state.xp,
+    level: state.level,
+    feed: state.feed,
+    costume: state.costume,
+    updated_at: state.updatedAt,
+  });
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}

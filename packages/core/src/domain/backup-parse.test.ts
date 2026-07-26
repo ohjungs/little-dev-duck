@@ -13,6 +13,8 @@ const validFile = () =>
           habitChecks: [],
           calendarEvents: [],
           pages: [],
+          feeds: [],
+          duckState: [],
         },
         "2026-07-26T00:00:00.000Z",
         {},
@@ -80,7 +82,7 @@ describe("parseBackup", () => {
 
   it("빈 백업도 유효하다 (아무것도 없는 계정)", () => {
     const empty = buildBackup(
-      { todos: [], memos: [], habits: [], habitChecks: [], calendarEvents: [], pages: [] },
+      { todos: [], memos: [], habits: [], habitChecks: [], calendarEvents: [], pages: [], feeds: [], duckState: [] },
       "t",
       {},
     );
@@ -111,5 +113,49 @@ describe("parseBackup", () => {
     const r = parseBackup(file);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.backup.exportedAt).toBe("");
+  });
+});
+
+// 2026-07-26 v2: feeds·duckState 추가. **옛 백업(v1)을 우리 손으로 거부하면 안 된다.**
+describe("parseBackup — v1 하위호환", () => {
+  const v1File = () => {
+    const f = validFile();
+    delete f.feeds;
+    delete f.duckState;
+    f.formatVersion = 1;
+    return f;
+  };
+
+  it("v1 파일(feeds·duckState 없음)을 그대로 받아들인다", () => {
+    const r = parseBackup(v1File());
+    expect(r.ok).toBe(true);
+  });
+
+  it("v1 파일의 빠진 컬렉션은 빈 배열로 채운다", () => {
+    const r = parseBackup(v1File());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.backup.feeds).toEqual([]);
+      expect(r.backup.duckState).toEqual([]);
+    }
+  });
+
+  it("v1 파일의 기존 데이터는 그대로 살린다", () => {
+    const r = parseBackup(v1File());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.backup.todos).toHaveLength(1);
+  });
+
+  it("v1이라고 적혀 있어도 formatVersion은 파일의 값을 보존한다", () => {
+    const r = parseBackup(v1File());
+    expect(r.ok).toBe(true);
+    // 읽은 파일이 어떤 형식이었는지 호출부가 알 수 있어야 한다(무엇이 없는지 판단 근거).
+    if (r.ok) expect(r.backup.formatVersion).toBe(1);
+  });
+
+  it("선택 컬렉션이 '없음'이 아니라 '깨짐'이면 거부한다", () => {
+    // 없는 것과 깨진 것은 다르다. 깨진 걸 조용히 버리면 넣었다고 믿은 것을 잃는다.
+    expect(parseBackup({ ...validFile(), feeds: "문자열" }).ok).toBe(false);
+    expect(parseBackup({ ...validFile(), duckState: [null] }).ok).toBe(false);
   });
 });

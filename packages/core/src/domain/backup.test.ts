@@ -12,6 +12,8 @@ const empty: BackupCollections = {
   habitChecks: [],
   calendarEvents: [],
   pages: [],
+  feeds: [],
+  duckState: [],
 };
 
 const fill = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `${i}` }));
@@ -24,7 +26,7 @@ describe("buildBackup", () => {
   });
 
   // 백업의 존재 이유. 여기서 컬렉션이 하나라도 빠지면 사용자는 없는 백업을 믿게 된다.
-  it("여섯 컬렉션을 모두 담는다", () => {
+  it("여덟 컬렉션을 모두 담는다", () => {
     const b = buildBackup(
       {
         todos: fill(1),
@@ -33,6 +35,8 @@ describe("buildBackup", () => {
         habitChecks: fill(4),
         calendarEvents: fill(5),
         pages: fill(6),
+        feeds: fill(7),
+        duckState: fill(1),
       },
       "2026-07-26T00:00:00.000Z",
       {},
@@ -43,6 +47,8 @@ describe("buildBackup", () => {
     expect(b.habitChecks).toHaveLength(4);
     expect(b.calendarEvents).toHaveLength(5);
     expect(b.pages).toHaveLength(6);
+    expect(b.feeds).toHaveLength(7);
+    expect(b.duckState).toHaveLength(1);
   });
 
   it("페이지 본문을 그대로 보존한다 (백업의 핵심)", () => {

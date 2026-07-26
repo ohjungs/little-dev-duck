@@ -3,6 +3,8 @@ import { memoSchema, type Memo } from "./memo";
 import { habitSchema, habitCheckSchema, type Habit, type HabitCheck } from "./habit";
 import { calendarEventSchema, type CalendarEvent } from "./calendar-event";
 import { pageSchema, type Page } from "./page";
+import { feedSchema, type Feed } from "./news";
+import { duckStateSchema, type DuckState } from "./duck-state";
 import type { Backup, BackupCollectionKey } from "./backup";
 
 // 2026-07-26 : 백업 - 가져오기 - 복원계획
@@ -19,6 +21,8 @@ const RESTORE_ORDER: BackupCollectionKey[] = [
   "habitChecks",
   "calendarEvents",
   "pages",
+  "feeds",
+  "duckState",
 ];
 
 export type RestorePlan = {
@@ -28,6 +32,8 @@ export type RestorePlan = {
   habitChecks: HabitCheck[];
   calendarEvents: CalendarEvent[];
   pages: Page[];
+  feeds: Feed[];
+  duckState: DuckState[];
   order: BackupCollectionKey[];
   // 모양이 깨져 복원할 수 없는 항목 수. 한 줄 때문에 백업 전체를 버리지 않되,
   // 몇 개를 못 넣었는지는 사용자에게 반드시 알린다.
@@ -99,6 +105,12 @@ export function planRestore(backup: Backup): RestorePlan {
     counter,
   );
   const pages = keepValid<Page>(backup.pages, (v) => pageSchema.safeParse(v), counter);
+  const feeds = keepValid<Feed>(backup.feeds, (v) => feedSchema.safeParse(v), counter);
+  const duckState = keepValid<DuckState>(
+    backup.duckState,
+    (v) => duckStateSchema.safeParse(v),
+    counter,
+  );
 
   return {
     todos,
@@ -107,6 +119,8 @@ export function planRestore(backup: Backup): RestorePlan {
     habitChecks,
     calendarEvents,
     pages: orderPagesParentsFirst(pages),
+    feeds,
+    duckState,
     order: RESTORE_ORDER,
     invalid: counter.invalid,
     total:
@@ -115,6 +129,8 @@ export function planRestore(backup: Backup): RestorePlan {
       habits.length +
       habitChecks.length +
       calendarEvents.length +
-      pages.length,
+      pages.length +
+      feeds.length +
+      duckState.length,
   };
 }

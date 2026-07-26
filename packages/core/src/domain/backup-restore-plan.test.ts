@@ -16,6 +16,8 @@ const bundle = (over: Partial<Backup>): Backup => ({
   habitChecks: [],
   calendarEvents: [],
   pages: [],
+  feeds: [],
+  duckState: [],
   ...over,
 });
 

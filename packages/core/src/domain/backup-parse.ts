@@ -16,7 +16,8 @@ export type BackupParseResult =
   | { ok: true; backup: Backup }
   | { ok: false; reason: string };
 
-const KEYS: BackupCollectionKey[] = [
+// v1부터 있던 컬렉션 — 없으면 백업 파일이 아니라고 본다.
+const REQUIRED_KEYS: BackupCollectionKey[] = [
   "todos",
   "memos",
   "habits",
@@ -24,6 +25,13 @@ const KEYS: BackupCollectionKey[] = [
   "calendarEvents",
   "pages",
 ];
+
+// v2에서 늘어난 컬렉션 — **없으면 빈 배열**로 받는다.
+// 필수로 두면 Phase 29가 내보낸 v1 파일을 우리 손으로 거부하게 된다. 버전을 올린 이유는
+// "이 파일에 무엇이 들어 있는지" 구분하기 위해서지 옛 파일을 막기 위해서가 아니다.
+const OPTIONAL_KEYS: BackupCollectionKey[] = ["feeds", "duckState"];
+
+const KEYS: BackupCollectionKey[] = [...REQUIRED_KEYS, ...OPTIONAL_KEYS];
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -49,22 +57,28 @@ export function parseBackup(raw: unknown): BackupParseResult {
     };
   }
 
-  const missing = KEYS.filter((k) => raw[k] === undefined);
+  const missing = REQUIRED_KEYS.filter((k) => raw[k] === undefined);
   if (missing.length > 0) {
     return { ok: false, reason: `백업에 ${missing.join(", ")}이(가) 없습니다.` };
   }
 
-  const notArray = KEYS.filter((k) => !Array.isArray(raw[k]));
-  if (notArray.length > 0) {
-    return { ok: false, reason: `${notArray.join(", ")}이(가) 목록 형태가 아닙니다.` };
-  }
-
-  // 항목이 객체가 아니면 복원 단계에서 정체 모를 실패가 난다. 입구에서 막는다.
+  // 선택 컬렉션은 없으면 빈 배열로 채운다(옛 백업 하위호환). 있는데 모양이 틀리면 그건 거부한다 —
+  // "없음"과 "깨짐"은 다르고, 깨진 걸 조용히 버리면 사용자는 넣었다고 믿은 것을 잃는다.
+  const collections = new Map<BackupCollectionKey, unknown[]>();
   for (const key of KEYS) {
-    const items = raw[key] as unknown[];
-    if (items.some((item) => !isRecord(item))) {
+    const value = raw[key];
+    if (value === undefined && OPTIONAL_KEYS.includes(key)) {
+      collections.set(key, []);
+      continue;
+    }
+    if (!Array.isArray(value)) {
+      return { ok: false, reason: `${key}이(가) 목록 형태가 아닙니다.` };
+    }
+    // 항목이 객체가 아니면 복원 단계에서 정체 모를 실패가 난다. 입구에서 막는다.
+    if (value.some((item) => !isRecord(item))) {
       return { ok: false, reason: `${key}에 항목이 아닌 값이 섞여 있습니다.` };
     }
+    collections.set(key, value);
   }
 
   return {
@@ -80,12 +94,14 @@ export function parseBackup(raw: unknown): BackupParseResult {
               typeof k === "string" && (KEYS as string[]).includes(k),
           ))
         : [],
-      todos: raw.todos as unknown[],
-      memos: raw.memos as unknown[],
-      habits: raw.habits as unknown[],
-      habitChecks: raw.habitChecks as unknown[],
-      calendarEvents: raw.calendarEvents as unknown[],
-      pages: raw.pages as unknown[],
+      todos: collections.get("todos") ?? [],
+      memos: collections.get("memos") ?? [],
+      habits: collections.get("habits") ?? [],
+      habitChecks: collections.get("habitChecks") ?? [],
+      calendarEvents: collections.get("calendarEvents") ?? [],
+      pages: collections.get("pages") ?? [],
+      feeds: collections.get("feeds") ?? [],
+      duckState: collections.get("duckState") ?? [],
     },
   };
 }

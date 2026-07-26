@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { XP_REWARDS } from "@ldd/core";
-import { applyXpAward, getDuckState } from "./duckState";
+import { applyXpAward, getDuckState, restoreDuckState } from "./duckState";
 
 // 유효한 v4 UUID (버전 니블 4, 변형 니블 8). duckStateSchema.userId 통과용.
 const USER_ID = "33333333-3333-4333-8333-333333333333";
@@ -128,5 +128,77 @@ describe("applyXpAward", () => {
     await expect(
       applyXpAward(supabase, USER_ID, "commit"),
     ).rejects.toThrow("rpc failed");
+  });
+});
+
+// 2026-07-26 : 백업 v2 — 오리 진행도를 백업에 담기 시작했다.
+// **복원이 덮어쓰면 지금 레벨이 백업 시점으로 후퇴한다.** 가져오기의 "지금 데이터를 바꾸지
+// 않는다" 계약을 여기서 잠근다 — upsert로 바뀌는 순간 이 테스트가 실패해야 한다.
+describe("restoreDuckState", () => {
+  function captureInsert(insertResult: { error: unknown } = { error: null }) {
+    const captured: { payload?: Record<string, unknown>; upsertCalled?: boolean } = {};
+    const supabase = {
+      auth: { getUser: async () => ({ data: { user: { id: "me" } } }) },
+      from: () => ({
+        insert: async (payload: Record<string, unknown>) => {
+          captured.payload = payload;
+          return insertResult;
+        },
+        upsert: async () => {
+          captured.upsertCalled = true;
+          return { error: null };
+        },
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    return { captured, supabase };
+  }
+
+  const state = {
+    userId: "someone-else",
+    xp: 1234,
+    level: 7,
+    feed: 80,
+    costume: "default",
+    updatedAt: "2026-07-20T00:00:00.000Z",
+  };
+
+  it("insert만 한다 (upsert면 지금 레벨이 백업 시점으로 후퇴한다)", async () => {
+    const { captured, supabase } = captureInsert();
+    await restoreDuckState(supabase, state);
+    expect(captured.payload).toBeDefined();
+    expect(captured.upsertCalled).toBeUndefined();
+  });
+
+  it("파일의 userId를 믿지 않고 로그인 사용자로 채운다", async () => {
+    const { captured, supabase } = captureInsert();
+    await restoreDuckState(supabase, state);
+    expect(captured.payload?.user_id).toBe("me");
+  });
+
+  it("진행도 값을 그대로 담는다", async () => {
+    const { captured, supabase } = captureInsert();
+    await restoreDuckState(supabase, state);
+    expect(captured.payload?.xp).toBe(1234);
+    expect(captured.payload?.level).toBe(7);
+    expect(captured.payload?.feed).toBe(80);
+  });
+
+  it("이미 있으면 성공으로 본다 (건드리지 않는다)", async () => {
+    const { supabase } = captureInsert({ error: { code: "23505", message: "duplicate" } });
+    await expect(restoreDuckState(supabase, state)).resolves.toBeUndefined();
+  });
+
+  it("다른 DB 오류는 삼키지 않는다", async () => {
+    const { supabase } = captureInsert({ error: { code: "42501", message: "denied" } });
+    await expect(restoreDuckState(supabase, state)).rejects.toThrow("denied");
+  });
+
+  it("로그인하지 않으면 아무것도 쓰지 않는다", async () => {
+    const supabase = {
+      auth: { getUser: async () => ({ data: { user: null } }) },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    await expect(restoreDuckState(supabase, state)).rejects.toThrow("로그인이 필요합니다.");
   });
 });

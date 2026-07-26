@@ -7,7 +7,10 @@
 
 // 형식이 바뀌었을 때 옛 파일을 거부할지 변환할지 정하려면 파일 자신이 버전을 알아야 한다.
 // 가져오기(복원)를 붙일 때 이 값이 판정 기준이 된다.
-export const BACKUP_FORMAT_VERSION = 1;
+//
+// v2(2026-07-26): feeds·duckState 추가. **버전을 올린 건 구분용이지 차단용이 아니다** —
+// v1 파일에는 두 컬렉션이 없을 뿐이고 나머지는 그대로 복원된다(parseBackup이 선택으로 받는다).
+export const BACKUP_FORMAT_VERSION = 2;
 
 export type BackupCollections = {
   todos: unknown[];
@@ -16,6 +19,11 @@ export type BackupCollections = {
   habitChecks: unknown[];
   calendarEvents: unknown[];
   pages: unknown[];
+  // v2 추가. 사용자가 직접 등록한 RSS 피드 — 잃으면 하나씩 다시 넣어야 한다.
+  feeds: unknown[];
+  // v2 추가. 오리 진행도(xp·레벨·먹이·코스튬). user_id가 기본키라 **행이 최대 1개**지만,
+  // 다른 컬렉션과 모양을 맞춰 배열로 둔다(없으면 빈 배열 = 특수 분기가 필요 없다).
+  duckState: unknown[];
 };
 
 export type BackupCollectionKey = keyof BackupCollections;
@@ -29,6 +37,8 @@ export type Backup = BackupCollections & {
 
 const KEYS: BackupCollectionKey[] = [
   "calendarEvents",
+  "duckState",
+  "feeds",
   "habitChecks",
   "habits",
   "memos",
@@ -61,5 +71,7 @@ export function buildBackup(
     habitChecks: [...collections.habitChecks],
     calendarEvents: [...collections.calendarEvents],
     pages: [...collections.pages],
+    feeds: [...collections.feeds],
+    duckState: [...collections.duckState],
   };
 }

@@ -11,6 +11,8 @@ const restoreHabit = vi.fn();
 const restoreHabitCheck = vi.fn();
 const restoreCalendarEvent = vi.fn();
 const restorePageFromBackup = vi.fn();
+const restoreFeed = vi.fn();
+const restoreDuckState = vi.fn();
 
 vi.mock("@ldd/api", () => ({
   restoreTodo: (...a: unknown[]) => restoreTodo(...a),
@@ -19,6 +21,8 @@ vi.mock("@ldd/api", () => ({
   restoreHabitCheck: (...a: unknown[]) => restoreHabitCheck(...a),
   restoreCalendarEvent: (...a: unknown[]) => restoreCalendarEvent(...a),
   restorePageFromBackup: (...a: unknown[]) => restorePageFromBackup(...a),
+  restoreFeed: (...a: unknown[]) => restoreFeed(...a),
+  restoreDuckState: (...a: unknown[]) => restoreDuckState(...a),
   // 복원이 기존 데이터를 지우거나 바꾸는 함수를 부르지 않는지 감시한다.
   deleteTodo: vi.fn(),
   deleteMemo: vi.fn(),
@@ -79,6 +83,8 @@ const bundle = (over: Partial<Backup>): Backup =>
       habitChecks: [],
       calendarEvents: [],
       pages: [],
+      feeds: [],
+      duckState: [],
       ...over,
     },
     ts,
@@ -97,6 +103,8 @@ beforeEach(() => {
     restoreHabitCheck,
     restoreCalendarEvent,
     restorePageFromBackup,
+    restoreFeed,
+    restoreDuckState,
   ]) {
     fn.mockResolvedValue(undefined);
   }
