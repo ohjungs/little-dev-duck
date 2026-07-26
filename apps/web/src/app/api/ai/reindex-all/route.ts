@@ -13,7 +13,6 @@ import { pageEmbedText,
   todoEmbedText,
   calendarEventEmbedText,
 } from "@ldd/core";
-import type { EmbeddingSource } from "@ldd/core";
 import { excludeIndexed, indexedKey, planReindex, type ReindexItem } from "@/lib/reindexPlan";
 import { createClient } from "@/lib/supabase/server";
 import { requireGeminiKey } from "@/lib/apiHelpers";

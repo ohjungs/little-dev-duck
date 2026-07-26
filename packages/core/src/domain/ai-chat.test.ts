@@ -65,9 +65,37 @@ describe("routeUtterance", () => {
     expect(routeUtterance("내일 3시 회의 등록")).toBe("llm");
   });
 
+  // 2026-07-26 2차 실측: 위 수정 뒤 **9종 도구 전체**의 트리거 문장을 다시 통과시켜 보니
+  // 같은 부류가 더 남아 있었다. 한 번 고친 자리를 다시 재는 이유다.
+  it("완료·체크의 다른 어미도 LLM으로 간다", () => {
+    // "했어"만 넣고 같은 어간의 다른 어미를 빠뜨렸다 — 습관 체크·할 일 완료가 그대로 막혀 있었다.
+    expect(routeUtterance("운동 했다")).toBe("llm");
+    expect(routeUtterance("물마시기 했음")).toBe("llm");
+    expect(routeUtterance("청소 다함")).toBe("llm");
+  });
+
+  it("도구가 다루는 명사만으로도 LLM으로 간다", () => {
+    // 조회 도구(listCalendarEvents·listHabits)가 있는데 그 도메인 명사가 힌트에 없어
+    // 명사구 발화가 전부 rule로 샜다.
+    expect(routeUtterance("오늘 스케줄")).toBe("llm");
+    expect(routeUtterance("다음주 캘린더")).toBe("llm");
+    expect(routeUtterance("습관 현황")).toBe("llm");
+    expect(routeUtterance("내 루틴 어때")).toBe("llm");
+    expect(routeUtterance("회의록 문서 하나")).toBe("llm");
+    expect(routeUtterance("내 투두 보여줘")).toBe("llm");
+  });
+
   it("사회적 발화는 여전히 룰이다 (쿼터 낭비 금지 — 회귀 금지)", () => {
     // 명령 힌트를 넓히면서 인사까지 LLM으로 새면 무료 쿼터가 인사에 소모된다.
     for (const t of ["안녕", "하이", "고마워", "잘가", "귀엽다", "좋아", "ㅋㅋㅋ", "ㅇㅇ"]) {
+      expect(routeUtterance(t), t).toBe("rule");
+    }
+  });
+
+  it("일상 잡담은 넓힌 뒤에도 룰이다 (2차 실측 기준선 보존)", () => {
+    // 완료 어미·도메인 명사를 넣으면서 평범한 잡담까지 새지 않는지 실제로 쟀다.
+    // "먹었다"·"잤음"은 어간이 달라 "했다"·"했음"에 걸리지 않는다.
+    for (const t of ["밥 먹었다", "잘 잤음", "피곤해", "배고파", "오늘 덥다", "아 짜증나", "그렇구나", "응"]) {
       expect(routeUtterance(t), t).toBe("rule");
     }
   });
