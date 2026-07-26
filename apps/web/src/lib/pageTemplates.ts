@@ -88,6 +88,18 @@ function bullet(t: string): TemplateBlock {
 function check(t: string): TemplateBlock {
   return { type: "checkListItem", props: { checked: false }, content: text(t) };
 }
+function quote(t: string): TemplateBlock {
+  return { type: "quote", content: text(t) };
+}
+
+// 2026-07-27 : 템플릿 - 안내 문구 (2차 피드백 2-4, Phase 43 T3)
+// **사용자가 "빈페이지말고 실제 노션에서 쓰는 회의록처럼"이라고 한 이유를 코드에서 찾았다.**
+// 구조(h1 + h2 섹션)는 있었는데 **모든 칸이 빈 문자열**이었다 — 템플릿을 골라도 제목만 늘어선
+// 뼈대가 나온다. 노션 템플릿이 다른 점은 목록이 아니라 **각 칸에 뭘 쓰면 되는지 적혀 있다**는 것이다.
+//
+// 그래서 빈 칸을 전부 안내 문구로 채운다. 지우고 쓰면 되고, 지우지 않아도 문서가 성립한다.
+// **h1은 템플릿마다 하나뿐이어야 한다** — 발표 모드(Phase 34)가 h1을 장 경계로 삼아서,
+// 여러 개면 회의록 하나가 여러 장으로 흩어진다. 테스트로 잠갔다.
 
 export const PAGE_TEMPLATES: PageTemplate[] = [
   {
@@ -106,14 +118,19 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     title: "회의록",
     content: [
       heading("회의록", 1),
+      // 메타 줄. 회의록에서 가장 먼저 찾는 정보이고, 나중에 검색할 때도 이 줄이 걸린다.
+      quote("날짜 · 시간 · 장소를 적어 주세요"),
       heading("참석자", 2),
-      para(),
+      bullet("이름 (역할)"),
       heading("안건", 2),
-      bullet(""),
+      bullet("무엇을 정하려고 모였는지 한 줄로"),
+      heading("논의", 2),
+      para("오간 이야기를 적습니다. 결론은 아래 결정사항으로 옮겨 주세요."),
       heading("결정사항", 2),
-      bullet(""),
+      bullet("정해진 것 — 정하지 못한 것은 여기 쓰지 않습니다"),
       heading("액션 아이템", 2),
-      check(""),
+      // 담당자·기한이 없는 액션 아이템은 아무도 하지 않는다 — 자리를 미리 만들어 둔다.
+      check("할 일 — 담당: 이름 / 기한: 월-일"),
     ],
   },
   {
@@ -126,9 +143,10 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     content: [
       heading("오늘", 1),
       heading("할 일", 2),
-      check(""),
+      check("오늘 꼭 끝낼 것 하나"),
+      check("할 수 있으면 좋은 것"),
       heading("메모", 2),
-      para(),
+      para("생각나는 대로 적어 두는 자리. 정리는 나중에."),
     ],
   },
   {
@@ -137,7 +155,12 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     description: "체크리스트만 빠르게",
     icon: "✅",
     title: "할 일",
-    content: [heading("할 일", 1), check(""), check(""), check("")],
+    content: [
+      heading("할 일", 1),
+      check("가장 먼저 할 것"),
+      check("그다음"),
+      check("여유가 되면"),
+    ],
   },
   {
     key: "weekly-retro",
@@ -149,13 +172,13 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     content: [
       heading("주간 회고", 1),
       heading("이번 주 한 일", 2),
-      bullet(""),
+      bullet("끝낸 것 — 진행 중인 것과 나눠 적으면 다음 주 계획이 쉬워집니다"),
       heading("잘된 점 / 배운 점", 2),
-      bullet(""),
+      bullet("다음에도 그대로 할 것"),
       heading("아쉬운 점 / 개선", 2),
-      bullet(""),
+      bullet("무엇이 왜 아쉬웠는지 — 사람이 아니라 방식으로 적습니다"),
       heading("다음 주 계획", 2),
-      check(""),
+      check("가장 중요한 하나"),
     ],
   },
   {
@@ -167,13 +190,15 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     content: [
       heading("프로젝트", 1),
       heading("목표", 2),
-      para(),
+      para("무엇이 되면 성공인지 한 문장으로. 측정할 수 있으면 더 좋습니다."),
       heading("범위", 2),
-      bullet(""),
+      bullet("할 것"),
+      // 범위에서 뺀 것을 안 적으면 나중에 "왜 안 했냐"가 된다.
+      bullet("하지 않을 것 — 적어 두면 나중에 다투지 않습니다"),
       heading("마일스톤", 2),
-      check(""),
+      check("첫 번째 확인 지점 — 언제까지"),
       heading("리스크", 2),
-      bullet(""),
+      bullet("막힐 수 있는 것 / 막히면 어떻게 할지"),
     ],
   },
   {
@@ -185,13 +210,13 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     content: [
       heading("개발 노트", 1),
       heading("오늘 작업", 2),
-      check(""),
+      check("무엇을 건드렸는지 — 파일·기능 단위로"),
       heading("막힌 점 / 해결", 2),
-      bullet(""),
+      bullet("증상 → 원인 → 고친 방법. 원인을 적어야 다음에 안 밟습니다"),
       heading("배운 점", 2),
-      bullet(""),
+      bullet("다음의 나에게 남기는 한 줄"),
       heading("다음에 할 일", 2),
-      check(""),
+      check("이어서 할 것 — 지금 맥락이 있을 때 적어 두면 내일 빨리 붙습니다"),
     ],
   },
   // 2026-07-26 : 활성화 - 템플릿 - 일기·포트폴리오·회고록 (피드백 2-3)
@@ -207,13 +232,13 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     content: [
       heading("일기", 1),
       heading("오늘 있었던 일", 2),
-      para(),
+      para("있었던 일을 순서대로. 잘 쓰려고 하지 않아도 됩니다."),
       heading("기억에 남는 순간", 2),
-      para(),
+      para("장면 하나만 자세히 적어도 나중에 그날이 통째로 떠오릅니다."),
       heading("지금 드는 생각", 2),
-      para(),
+      para("감정을 그대로. 정리하지 않아도 괜찮습니다."),
       heading("내일의 나에게", 2),
-      para(),
+      para("한 줄이면 충분합니다."),
     ],
   },
   {
@@ -226,18 +251,18 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
       heading("프로젝트 이름", 1),
       para("한 줄 소개 — 무엇을 만들었고 누구를 위한 것인지."),
       heading("맡은 역할", 2),
-      bullet(""),
+      bullet("내가 한 것 — 팀이 한 것과 구분해서 적습니다"),
       heading("문제와 배경", 2),
-      para(),
+      para("왜 이걸 만들었는지. 문제가 선명할수록 결과가 커 보입니다."),
       heading("해결 방법", 2),
-      bullet(""),
+      bullet("어떻게 풀었는지 — 고른 이유까지"),
       heading("결과", 2),
       // 숫자를 적을 자리를 미리 만들어 둔다 — 포트폴리오에서 가장 자주 빠지는 부분이다.
       bullet("수치로 말할 수 있는 것 (예: 응답 시간 2.1s → 0.4s)"),
       heading("사용 기술", 2),
-      bullet(""),
+      bullet("쓴 것 — 왜 그것을 골랐는지 한 줄씩"),
       heading("배운 점 / 아쉬운 점", 2),
-      bullet(""),
+      bullet("다시 한다면 다르게 할 것"),
       heading("링크", 2),
       bullet("저장소 / 데모 / 발표 자료"),
     ],
@@ -251,15 +276,15 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     content: [
       heading("회고록", 1),
       heading("무엇을 했나", 2),
-      para(),
+      para("기간과 한 일을 사실만. 평가는 아래에서 합니다."),
       heading("잘된 것 (Keep)", 2),
-      bullet(""),
+      bullet("계속할 것 — 왜 잘됐는지까지 적습니다"),
       heading("문제가 된 것 (Problem)", 2),
-      bullet(""),
+      bullet("무엇이 어려웠는지 — 사람이 아니라 구조로"),
       heading("다음에 바꿀 것 (Try)", 2),
-      check(""),
+      check("당장 바꿀 수 있는 것 하나"),
       heading("다시 한다면", 2),
-      para(),
+      para("처음으로 돌아간다면 어디서부터 다르게 할지."),
     ],
   },
   {
