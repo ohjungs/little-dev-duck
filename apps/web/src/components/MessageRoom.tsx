@@ -11,14 +11,25 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { deleteMessage, listMessages, messageImageUrl, sendMessage, uploadMessageImage } from "@ldd/api";
+import {
+  deleteMessage,
+  listMessages,
+  markRead,
+  messageImageUrl,
+  sendMessage,
+  uploadMessageImage,
+} from "@ldd/api";
 import {
   checkMessageImage,
   messageAttachment,
   messageBody,
   pendingMigrationMessage,
   resizeTarget,
+  afterSend,
+  shouldFlushOnLeave,
+  shouldSendRead,
   type Message,
+  type ReadReceiptState,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeRoomMessages } from "@/lib/realtime";
@@ -42,6 +53,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 서명 URL은 만료된다(1시간). 그래서 **저장하지 않고 화면에 있는 동안만** 들고 있는다.
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
+  // 2026-07-27 : 메신저 - 읽음 보내기 (Phase 51 T1)
+  // 보낸 위치를 ref로 든다 — 상태로 두면 갱신할 때마다 다시 그려지고, 이 값은 화면에 안 쓰인다.
+  const readRef = useRef<ReadReceiptState>({ sentSeq: null, sentAt: null });
 
   const reload = useCallback(async () => {
     try {
@@ -112,6 +126,32 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
       alive = false;
     };
   }, [messages, imageUrls]);
+
+  // 읽음 위치를 보낸다. **판정은 core가 하고 여기서는 실행만** 한다 —
+  // 조건을 화면에 흩어 두면 어디선가 한 곳이 빠져 실시간 예산을 태운다.
+  // 마지막 메시지가 내 것이면 보낼 이유가 없다(내가 쓴 걸 읽었다고 알릴 필요는 없다).
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.senderUserId === myUserId) return;
+
+    const send = async () => {
+      if (!shouldSendRead(readRef.current, last.seq, Date.now())) return;
+      readRef.current = afterSend(last.seq, Date.now());
+      try {
+        await markRead(createClient(), roomId, last.id);
+      } catch {
+        // 읽음 기록 실패로 대화를 막지 않는다. 다음 판정 때 다시 시도된다.
+      }
+    };
+    void send();
+
+    // 떠날 때 한 번 더 — 놓치면 다음에 들어왔을 때 "분명히 읽었는데 뱃지가 그대로"가 된다.
+    return () => {
+      if (!shouldFlushOnLeave(readRef.current, last.seq)) return;
+      readRef.current = afterSend(last.seq, Date.now());
+      void markRead(createClient(), roomId, last.id).catch(() => {});
+    };
+  }, [messages, myUserId, roomId]);
 
   // 새 메시지가 오면 아래로. 사용자가 위를 읽는 중일 수도 있어 부드럽게만 민다.
   useEffect(() => {

@@ -582,3 +582,12 @@ export {
   messageAttachmentPath,
   type AttachmentCheck,
 } from "./domain/attachment-rules";
+
+// 2026-07-27 : 메신저 - 읽음 보내기 판정 (Phase 51 T1)
+export {
+  READ_RECEIPT_MIN_INTERVAL_MS,
+  shouldSendRead,
+  shouldFlushOnLeave,
+  afterSend,
+  type ReadReceiptState,
+} from "./domain/read-receipt";
