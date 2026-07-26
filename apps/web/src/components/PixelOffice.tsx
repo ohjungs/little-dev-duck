@@ -32,6 +32,7 @@ import {
   pickWanderTarget,
   wanderZone,
   assignLook,
+  bubbleText,
   type DuckWorkState,
   type TileMap,
   type Camera,
@@ -1016,6 +1017,10 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         (n) => n.schedulePhase !== "offwork" && n.schedulePhase !== "commuting" && n.schedulePhase !== "leaving",
       );
       const sortedNpcs = [...visibleNpcs].sort((a, b) => a.tile.y - b.tile.y);
+      // 2026-07-27 : 오피스 - 말풍선 - 겹침회피 (2차 피드백 5-2, Phase 48 T3)
+      // 이미 그린 말풍선의 사각형을 모아 둔다. 옆자리 오리끼리 겹치면 **둘 다 못 읽는다** —
+      // 겹치면 뒤에 그릴 쪽을 생략한다(Y순 정렬이라 앞줄이 우선권을 갖는다).
+      const bubbleRects: { x: number; y: number; w: number; h: number }[] = [];
       for (const npc of sortedNpcs) {
         if (
           npc.tile.x < c0 || npc.tile.x >= c1 ||
@@ -1070,19 +1075,37 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         ctx.fillStyle = "#FFFFFF";
         ctx.fillText(nameLabel, nameX, nameY);
 
-        // 현재 태스크 표시 (인접할 때 + 작업 중)
-        if (isNearby && npc.workState === "typing") {
-          const activeTask = npc.tasks.find((tk) => tk.status === "active");
-          if (activeTask) {
-            const taskLabel = `${activeTask.title} ${Math.floor(activeTask.progress)}%`;
-            ctx.font = "9px sans-serif";
-            const tw = ctx.measureText(taskLabel).width + 6;
-            const tx = sx + TILE / 2;
-            const ty = sy - 8;
+        // 2026-07-27 : 오피스 - 말풍선 - 상시표시 (2차 피드백 5-2, Phase 48 T3)
+        // 전에는 **가까이 갔을 때 + 타이핑 중일 때만** 떴다. 사용자는 "직원들은 말풍선으로
+        // 계속 말하게"를 요청했는데, 대부분의 오리는 조건에 걸려 아무 말도 하지 않았다.
+        //
+        // 이제 항상 띄우되 **없는 업무를 지어내지 않는다** — 실제 태스크가 없으면 "쉬는 중"이고,
+        // 퇴근했으면 아무것도 안 띄운다(core `bubbleText`가 그 계약을 갖는다).
+        // 가까이 가면 진행률까지 붙은 **긴 라벨**로 바뀐다(같은 자리라 둘이 겹치지 않는다).
+        const activeTask = npc.tasks.find((tk) => tk.status === "active");
+        const detailed = isNearby && npc.workState === "typing" && activeTask;
+        const label = detailed
+          ? `${activeTask.title} ${Math.floor(activeTask.progress)}%`
+          : bubbleText({ state: npc.workState, label: activeTask?.title ?? "" });
+        if (label) {
+          ctx.font = "9px sans-serif";
+          const tw = ctx.measureText(label).width + 6;
+          const tx = sx + TILE / 2;
+          const ty = sy - 8;
+          const rect = { x: tx - tw / 2, y: ty - 10, w: tw, h: 12 };
+          // 이미 그린 말풍선과 겹치면 생략 — 겹쳐 그리면 둘 다 읽을 수 없다.
+          const overlaps = bubbleRects.some(
+            (r) =>
+              rect.x < r.x + r.w && r.x < rect.x + rect.w &&
+              rect.y < r.y + r.h && r.y < rect.y + rect.h,
+          );
+          if (!overlaps) {
+            bubbleRects.push(rect);
             ctx.fillStyle = "rgba(0,0,0,0.7)";
-            ctx.fillRect(tx - tw / 2, ty - 10, tw, 12);
-            ctx.fillStyle = "#AAFFAA";
-            ctx.fillText(taskLabel, tx, ty);
+            ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+            // 실제 업무는 초록, "쉬는 중"은 회색 — 색만 봐도 일하는지 아닌지 구분된다.
+            ctx.fillStyle = label === "쉬는 중" ? "#B8B8B8" : "#AAFFAA";
+            ctx.fillText(label, tx, ty);
           }
         }
 
