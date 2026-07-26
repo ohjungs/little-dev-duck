@@ -570,3 +570,14 @@ export {
   type RoomMember,
   type Message,
 } from "./domain/room";
+
+// 2026-07-27 : 메신저 - 이미지 첨부 규칙 (Phase 50 T4)
+export {
+  MESSAGE_IMAGE_TYPES,
+  MESSAGE_IMAGE_MAX_BYTES,
+  MESSAGE_IMAGE_MAX_EDGE,
+  checkMessageImage,
+  resizeTarget,
+  messageAttachmentPath,
+  type AttachmentCheck,
+} from "./domain/attachment-rules";
