@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Newspaper } from "lucide-react";
 import { listArticles } from "@ldd/api";
-import { topArticles, type Article, type RankedArticle } from "@ldd/core";
+import {
+  topArticles,
+  type Article,
+  type RankedArticle,
+  type TopArticlesResult,
+} from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { timeAgo } from "@/lib/timeAgo";
 import { markArticleRead } from "@/lib/readArticles";
@@ -23,7 +28,7 @@ function safeHref(url: string): string {
 }
 
 export function NewsTopWidget() {
-  const [top, setTop] = useState<RankedArticle<Article>[]>([]);
+  const [result, setResult] = useState<TopArticlesResult<Article> | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
@@ -33,7 +38,7 @@ export function NewsTopWidget() {
         const articles = await listArticles(createClient(), FETCH_LIMIT);
         if (!alive) return;
         // 기준 시각은 렌더 시점. 서버가 아니라 클라이언트에서 계산하므로 사용자의 실제 '지금'이다.
-        setTop(topArticles(articles, { now: new Date().toISOString() }));
+        setResult(topArticles(articles, { now: new Date().toISOString() }));
         setState("ready");
       } catch {
         if (alive) setState("error");
@@ -43,6 +48,11 @@ export function NewsTopWidget() {
       alive = false;
     };
   }, []);
+
+  const top: RankedArticle<Article>[] = result?.items ?? [];
+  // 창 길이를 여기서 "3일"이라고 다시 쓰지 않는다 — core가 실제로 적용한 값에서 만든다.
+  // 상수를 두 벌로 두면 창을 바꾸는 날 화면 문구만 거짓으로 남는다.
+  const windowDays = result ? Math.round(result.windowHours / 24) : 0;
 
   return (
     <section className="flex flex-col gap-3 p-5" aria-labelledby="news-top-heading">
@@ -68,11 +78,24 @@ export function NewsTopWidget() {
       {state === "error" && (
         <p className="text-sm text-muted-foreground">뉴스를 불러오지 못했어요.</p>
       )}
-      {state === "ready" && top.length === 0 && (
+      {/* 2026-07-27 (2차 피드백 1-8): 전에는 어느 경우든 "최근 3일 안에 수집된 기사가
+          없어요"였다. **기사를 방금 수집한 사용자에게 그건 거짓말이다** — 걸린 건 수집이
+          아니라 발행일이었다. 이제 core가 이유를 함께 돌려주므로 사실대로 나눠 말한다.
+          판정은 core에 있고 여기서는 문구만 고른다(조건을 다시 쓰면 두 벌이 된다). */}
+      {state === "ready" && top.length === 0 && result?.reason === "no-articles" && (
         <p className="text-sm text-muted-foreground">
-          최근 3일 안에 수집된 기사가 없어요.{" "}
+          아직 수집된 기사가 없어요.{" "}
           <Link href="/news" className="text-primary-accent hover:underline">
             뉴스에서 수집하기
+          </Link>
+        </p>
+      )}
+      {state === "ready" && top.length === 0 && result?.reason === "none-recent" && (
+        <p className="text-sm text-muted-foreground">
+          최근 기사가 없어요. 수집된 기사 {result.totalConsidered}건은 발행일이{" "}
+          {windowDays}일보다 오래됐어요.{" "}
+          <Link href="/news" className="text-primary-accent hover:underline">
+            전체 보기
           </Link>
         </p>
       )}

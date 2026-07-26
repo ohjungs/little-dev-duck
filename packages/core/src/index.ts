@@ -259,6 +259,8 @@ export {
 } from "./domain/news-cluster";
 export {
   topArticles,
+  type TopArticlesResult,
+  type TopArticlesEmptyReason,
   type RankableArticle,
   type RankedArticle,
   type TopArticlesOptions,

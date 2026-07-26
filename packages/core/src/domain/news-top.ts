@@ -24,6 +24,32 @@ export interface RankedArticle<T> {
   feedCount: number;
 }
 
+// 2026-07-27 : 뉴스 - TOP3 - 왜 비었는지 (Phase 42 T2, 2차 피드백 1-8)
+// 사용자가 뉴스 화면에서 기사를 보고 왔는데 대시보드는 "최근 3일 안에 수집된 기사가 없어요"라고
+// 했다. **그 문구가 사실이 아니었다** — 기사는 방금 수집됐고, 걸린 건 **발행일**이다.
+// RSS가 2주 전에 발행한 글을 오늘 수집하면 창 밖이라 여기서 빠지는데, 화면은 "수집이 안 됐다"고
+// 말한다. 사용자가 그걸 오류로 인식한 것은 **맞는 인식**이었다.
+//
+// 창을 넓히지 않는다 — "오늘의 뉴스"가 2주 전 기사를 보여주면 위젯 이름이 거짓이 된다.
+// 대신 **왜 비었는지를 값으로 돌려준다.** 위젯에서 조건을 다시 쓰면 두 벌이 되고 한쪽만 고쳐진다.
+export type TopArticlesEmptyReason =
+  // 애초에 기사가 하나도 없다(수집 전).
+  | "no-articles"
+  // 기사는 있는데 전부 창 밖이다(오래된 발행일 / 오래 전에 수집됨).
+  | "none-recent";
+
+export interface TopArticlesResult<T> {
+  items: RankedArticle<T>[];
+  // 판정에 넣은 기사 수. 화면이 "N건은 오래됐어요"라고 숫자로 말할 수 있게 한다.
+  totalConsidered: number;
+  // 창 밖이거나 시각을 알 수 없어 빠진 수.
+  excluded: number;
+  // 실제로 적용된 창 길이. 화면 문구가 이 값과 어긋나지 않게 함께 돌려준다.
+  windowHours: number;
+  // items가 비었을 때만 채운다. 비어 있지 않으면 null이다.
+  reason: TopArticlesEmptyReason | null;
+}
+
 export interface TopArticlesOptions {
   // 기준 시각(ISO). 호출부가 주입해 테스트가 실행 시각과 무관하게 성립하게 한다.
   now: string;
@@ -50,11 +76,24 @@ function timeOf(a: RankableArticle): number | null {
 export function topArticles<T extends RankableArticle>(
   articles: readonly T[],
   options: TopArticlesOptions,
-): RankedArticle<T>[] {
+): TopArticlesResult<T> {
   const limit = options.limit ?? DEFAULT_LIMIT;
-  const windowMs = (options.windowHours ?? DEFAULT_WINDOW_HOURS) * 60 * 60 * 1000;
+  const windowHours = options.windowHours ?? DEFAULT_WINDOW_HOURS;
+  const windowMs = windowHours * 60 * 60 * 1000;
+  const totalConsidered = articles.length;
+  const empty = (reason: TopArticlesEmptyReason): TopArticlesResult<T> => ({
+    items: [],
+    totalConsidered,
+    excluded: totalConsidered,
+    windowHours,
+    reason,
+  });
+
   const nowMs = new Date(options.now).getTime();
-  if (Number.isNaN(nowMs)) return [];
+  // 기준 시각을 해석할 수 없으면 아무것도 판정할 수 없다. 기사가 없는 것과 같게 취급한다
+  // (없는 사실을 지어내 "오래됐어요"라고 말하지 않는다).
+  if (Number.isNaN(nowMs)) return empty("no-articles");
+  if (totalConsidered === 0) return empty("no-articles");
 
   // 시각을 알 수 없거나 창 밖인 기사는 뺀다. 시각은 한 번만 계산해 정렬에서 재사용한다.
   const dated: { item: T; at: number }[] = [];
@@ -64,7 +103,7 @@ export function topArticles<T extends RankableArticle>(
     if (nowMs - at > windowMs) continue;
     dated.push({ item: a, at });
   }
-  if (dated.length === 0) return [];
+  if (dated.length === 0) return empty("none-recent");
 
   const byId = new Map(dated.map((d) => [d.item.id, d]));
   const clusters = clusterArticles(dated.map((d) => d.item));
@@ -91,5 +130,12 @@ export function topArticles<T extends RankableArticle>(
     return x.entry.article.id.localeCompare(y.entry.article.id);
   });
 
-  return ranked.slice(0, limit).map((r) => r.entry);
+  return {
+    items: ranked.slice(0, limit).map((r) => r.entry),
+    totalConsidered,
+    excluded: totalConsidered - dated.length,
+    windowHours,
+    // 여기까지 왔으면 창 안에 기사가 있으므로 items는 비지 않는다.
+    reason: null,
+  };
 }
