@@ -1,62 +1,33 @@
-# 2026-07-26 — 공개 화면 스크린샷 (로그인 불필요 표면)
+# 공개 화면 스크린샷 — 2026-07-26
 
-생성: `apps/web/e2e/public-visual.spec.ts` (Playwright, 로컬 dev 서버 :3100)
-
-## 커버한 항목
+/ 로그인 없이 볼 수 있는 화면만. 로그인 뒤 화면은 세션 파일이 없어 찍을 수 없다(PENDING 2번).
 
 | 파일 | 화면 | 상태 | 뷰포트 |
-| --- | --- | --- | --- |
-| `welcome__default__desktop.png` | /welcome (랜딩) | default | 1440x900 |
-| `welcome__default__mobile.png` | /welcome (랜딩) | default | 390x844 |
-| `login__default__desktop.png` | /login | default | 1440x900 |
-| `login__default__mobile.png` | /login | default | 390x844 |
+|---|---|---|---|
+| `welcome__default__desktop.png` | 랜딩(/welcome) | default | desktop |
+| `welcome__default__mobile.png` | 랜딩(/welcome) | default | mobile |
+| `login__default__desktop.png` | 로그인(/login) | default | desktop |
+| `login__default__mobile.png` | 로그인(/login) | default | mobile |
 
-## 커버하지 못한 것 (정직하게)
+## 2026-07-26 마지막 실행 (Phase 30~34 배포 뒤 회귀 확인)
 
-- **로그인 뒤 화면 전부** — 대시보드 위젯, 오리 대화창, 캘린더, 인사이트, 뉴스.
-  OAuth 세션 파일(`apps/web/e2e/.auth/user.json`)이 있어야 접근 가능하다.
-  만드는 방법은 `apps/web/e2e/README.md`. 이게 없어 이번에도 못 찍었다.
-- **loading / empty / error 상태** — 공개 화면 두 곳은 상태 분기가 없다(정적 랜딩·로그인 버튼).
-  상태별 촬영은 로그인 뒤 화면에서만 의미가 있어 위 블로커에 함께 걸려 있다.
+`npx next build && npx playwright test public-visual.spec.ts` → **6/6 통과**.
+콘솔 오류 0건 · 공개 페이지가 참조하는 정적 자원 전부 인증 없이 수신됨.
 
-## 발견한 이슈
+**왜 돌렸나**: 이 세션에서 core 인덱스·`PageEditor`·`globals.css`처럼 여러 화면이 공유하는
+파일을 다섯 번 고쳤다. 로그인 뒤 화면은 못 보지만 **공개 화면 회귀는 실제로 확인할 수 있다** —
+"검증 못 했다"로 넘기지 않고 볼 수 있는 만큼은 실행으로 확인한다.
 
-### 1. 프로덕션 Web Analytics가 꺼져 있다 — 방문자 데이터 수집 0건 [확인됨]
+## 이번 회차에 바뀐 것
 
-이번 촬영에서 네 화면 모두 `404 /_vercel/insights/script.js`가 찍혀 추적한 결과다.
+Phase 30~34는 **로그인 뒤 화면만** 건드렸다(설정·페이지·표·발표). 공개 화면은 코드 변경이
+없고, 위 이미지의 픽셀 차이는 재렌더링에서 오는 것이지 의도된 디자인 변경이 아니다.
 
-- `apps/web/src/app/layout.tsx:69`에 `<Analytics />`가 모든 페이지에 붙어 있다.
-- 프로덕션(`https://web-sepia-one-88.vercel.app`)에서 그 스크립트가 **404**.
-- Vercel API 응답: `web_analytics_not_enabled` — "Web Analytics is not enabled for this project".
-- 같은 프로젝트에서 `/_vercel/speed-insights/script.js`는 **200** — 인프라 문제가 아니라
-  Web Analytics만 꺼져 있다는 뜻이다.
+## 발견한 것 (REFINE로 넘김)
 
-영향: 랜딩 유입·페이지뷰가 **한 건도 쌓이지 않았다.** 덤으로 모든 방문자의 브라우저 콘솔에
-404가 하나씩 남는다. `apps/web/src/app/welcome/page.tsx:12`의 주석은 이전 사이클이
-"Analytics 사망 = 랜딩 유입 지표 측정 불가"를 이미 문제로 인식했음을 보여주는데,
-그때 고친 원인(미들웨어 차단)과 별개로 **설정이 애초에 꺼져 있었다.**
-
-조치: Vercel 대시보드 토글이라 코드로 못 고친다 → `docs/loop-eng/PENDING.md`.
-
-### 2. 랜딩 제목에 브랜드가 두 번 나왔다 [확인됨·수정함]
-
-프로덕션 실측:
-
-```
-<title>Little Dev Duck — 오리가 사는 개인 워크스페이스 — Little Dev Duck</title>
-```
-
-root layout이 `title.template: "%s — Little Dev Duck"`으로 브랜드를 자동으로 붙이는데
-`welcome/page.tsx`가 title에 브랜드를 또 넣고 있었다. 검색 결과·브라우저 탭·북마크에
-그대로 노출되는 값이고, 랜딩은 유일한 공개 진입점이다.
-
-같은 규칙이 `p/[slug]/page.tsx:19`에는 **주석으로 이미 적혀 있었다** — 규칙은 알고 있었는데
-강제하는 장치가 없어 다른 페이지가 어겼다. 그래서 소스 파싱이 아니라 **브라우저가 실제로
-받는 `<title>` 값**으로 검사하도록 `public-visual.spec.ts`에 가드를 넣었다.
-
-수정 후: `오리가 사는 개인 워크스페이스 — Little Dev Duck`.
-
-### 3. 레이아웃 — 이상 없음
-
-데스크톱·모바일 네 조합 모두 가로 overflow 없음. `/_vercel/*` 외 실패 요청 없음,
-콘솔 오류 없음.
+- **[a11y] 같은 이름의 버튼 둘** — 사이드바 아이콘 버튼과 빈 화면 버튼이 **둘 다 접근성 이름이
+  "새 페이지"**인데 동작이 다르다(하나는 메뉴 열기, 하나는 즉시 생성). 스크린리더에는 구분되지
+  않는다. e2e를 쓰다 발견했고 `presentation.spec.ts`에 주석으로 남겼다.
+  → 고치려면 이름을 나눠야 한다(예: 사이드바 쪽을 "새 페이지 메뉴"). **UI 문구 변경이라
+  임의로 하지 않았다.**
+- Vercel Web Analytics는 여전히 꺼져 있다(PENDING 5번) — 코드 쪽은 손댈 게 없다.
