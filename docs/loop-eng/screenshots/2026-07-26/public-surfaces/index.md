@@ -9,6 +9,16 @@
 | `login__default__desktop.png` | 로그인(/login) | default | desktop |
 | `login__default__mobile.png` | 로그인(/login) | default | mobile |
 
+## 2026-07-26 재실행 — Next.js 16.2.10 → 16.2.11 보안 패치 뒤 회귀 확인
+
+`playwright test public-visual.spec.ts` → **6/6 통과**. 콘솔 오류 0건.
+정적 프리렌더 가드(Phase 38)도 통과 — 프레임워크를 올려도 정적으로 구워진 HTML 페이지가 새로
+생기지 않았다.
+
+**왜 돌렸나**: 프레임워크 패치는 우리 코드를 한 줄도 안 고치지만 **렌더링·라우팅 계층 전체가
+바뀐다.** 그래서 "테스트가 통과했다"만으로는 부족하고, 실제로 화면이 뜨는지 봐야 한다.
+UI 코드 변경은 0이므로 위 이미지의 픽셀 차이는 재렌더링에서 오는 것이다.
+
 ## 2026-07-26 마지막 실행 (Phase 30~34 배포 뒤 회귀 확인)
 
 `npx next build && npx playwright test public-visual.spec.ts` → **6/6 통과**.
