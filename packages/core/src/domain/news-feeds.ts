@@ -74,12 +74,29 @@ export type FeedResolution =
   // 규칙 대상이 아니다 — 입력을 그대로 쓴다(자동 발견·관용 경로가 뒤를 받는다).
   | { kind: "asis"; url: string }
   // 규칙 대상인데 이 입력으로는 피드를 만들 수 없다. 조용히 등록하면 안 되는 경우.
+  //
+  // 2026-07-27 (Phase 42 T3): **이 갈래를 기본값으로 쓰지 않는다.** velog가 그렇게 처리돼
+  // 있었는데, 거부는 해결이 아니라서 사용자가 같은 항목을 다시 올렸다. 게다가 "전체 피드가
+  // 없다"는 거부 사유 자체가 **틀린 실측**이었다(아래 velog 주석). 새 사이트 규칙을 더할 때는
+  // **먼저 `rewritten`으로 데려갈 길이 정말 없는지 실측**하고, 그때만 이 갈래를 쓴다.
+  // 지금 이 갈래를 쓰는 규칙은 하나도 없다(전수 확인).
   | { kind: "unresolvable"; reason: string };
 
 // velog: 홈에 RSS 링크가 없고(실측), velog.io/rss/@아이디는 404이며, 진짜 피드는
-// v2.velog.io/rss/@아이디 다(실측 200 / 20건). 전체 피드는 제공하지 않아 사용자 지정이 필수다.
+// v2.velog.io/rss/@아이디 다(실측 200 / 20건).
+//
+// 2026-07-27 정정 (2차 피드백 4-1, Phase 42 T3): **"전체 피드는 제공하지 않는다"고 적어 뒀던
+// 것이 틀렸다.** `https://v2.velog.io/rss/`가 실제로 200에 RSS를 준다 — 실측: 20건, 전부
+// title·link·pubDate를 갖고 있고 발행 시각도 당일이었다. 1차 조사는 홈 HTML의
+// `<link rel=alternate>`만 봤고, **없다는 것을 확인한 게 아니라 못 찾은 것**이었다.
+//
+// 그래서 홈 주소를 **거부하지 않는다.** 거부는 해결이 아니다 — 안내만 띄우고 "고쳤다"고
+// 적었더니 사용자가 같은 항목을 2차 피드백에 다시 올렸다. 이제 전체 피드로 등록하고,
+// 특정 사용자만 보는 방법을 note로 알려 준다(다음 단계로 데려간다).
 const VELOG_USER = /^(?:https?:\/\/)?(?:www\.)?velog\.io\/@([^/?#]+)/i;
 const VELOG_HOME = /^(?:https?:\/\/)?(?:www\.)?velog\.io\/?(?:[?#]|$)/i;
+// 끝의 슬래시를 뺀 `https://v2.velog.io/rss`는 확인하지 않았다 — 실측한 주소만 쓴다.
+const VELOG_ALL_FEED = "https://v2.velog.io/rss/";
 
 // core는 플랫폼 중립이라 URL 타입이 없다(news.ts 42행 주석) — 문자열 수준으로만 다룬다.
 export function resolveFeedUrl(raw: string): FeedResolution {
@@ -95,9 +112,9 @@ export function resolveFeedUrl(raw: string): FeedResolution {
   }
   if (VELOG_HOME.test(url)) {
     return {
-      kind: "unresolvable",
-      reason:
-        "velog는 사이트 전체 피드를 제공하지 않아요. velog.io/@아이디 처럼 사용자 주소로 등록해 주세요.",
+      kind: "rewritten",
+      url: VELOG_ALL_FEED,
+      note: "velog 전체 글 피드로 등록했어요. 특정 사용자의 글만 받으려면 velog.io/@아이디 로 등록하세요.",
     };
   }
 

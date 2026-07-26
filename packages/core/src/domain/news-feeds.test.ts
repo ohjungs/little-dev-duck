@@ -114,12 +114,29 @@ describe("resolveFeedUrl", () => {
     }
   });
 
-  it("사용자 아이디 없는 velog.io는 '못 만든다'고 이유와 함께 답한다", () => {
-    // 조용히 등록해 두면 사용자는 수집이 될 줄 알고 기다린다. velog에는 전체 피드가 없다.
-    const r = resolveFeedUrl("https://velog.io");
-    expect(r.kind).toBe("unresolvable");
-    if (r.kind === "unresolvable") {
-      expect(r.reason).toContain("@");
+  // 2026-07-27 정정 (2차 피드백 4-1, Phase 42 T3)
+  // 전에는 이 자리가 "velog에는 전체 피드가 없다"는 전제로 **등록을 거부**했다.
+  // **그 전제가 틀렸다** — `https://v2.velog.io/rss/`가 실측 200에 20건(전부 title·link·pubDate,
+  // 당일 발행)이다. 1차 조사는 홈 HTML의 `<link rel=alternate>`만 봐서 **없다는 것을 확인한 게
+  // 아니라 못 찾은 것**이었다. 거부는 해결이 아니다 — 사용자가 같은 항목을 다시 올렸다.
+  it("사용자 아이디 없는 velog.io는 전체 글 피드로 등록한다", () => {
+    for (const raw of ["https://velog.io", "velog.io/", "http://www.velog.io"]) {
+      const r = resolveFeedUrl(raw);
+      expect(r.kind).toBe("rewritten");
+      if (r.kind === "rewritten") {
+        expect(r.url).toBe("https://v2.velog.io/rss/");
+        // 다음 단계(사용자별 피드)를 안내해야 "전체만 되는구나"에서 멈추지 않는다.
+        expect(r.note).toContain("@아이디");
+      }
+    }
+  });
+
+  it("전체 피드로 바꾼 뒤에도 사용자 지정 주소가 우선한다", () => {
+    // velog.io/@아이디가 홈 규칙에 삼켜지면 개인 피드를 등록할 수 없게 된다(순서 회귀 방지).
+    const r = resolveFeedUrl("https://velog.io/@velopert");
+    expect(r.kind).toBe("rewritten");
+    if (r.kind === "rewritten") {
+      expect(r.url).toBe("https://v2.velog.io/rss/@velopert");
     }
   });
 

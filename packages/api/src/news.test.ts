@@ -266,13 +266,15 @@ describe("addFeed", () => {
     expect(captured.url).toBe("https://v2.velog.io/rss/@velopert");
   });
 
-  it("아이디 없는 velog 주소는 저장하지 않고 방법을 알려준다", async () => {
+  // 2026-07-27 정정 (2차 피드백 4-1, Phase 42 T3)
+  // 이 검사는 전에 **"아이디 없는 velog는 저장하지 않고 거부한다"**를 잠그고 있었다.
+  // 그 근거였던 "velog에 전체 피드가 없다"가 **틀린 실측**이었다 — `https://v2.velog.io/rss/`가
+  // 실제로 200에 20건을 준다(2026-07-27 재실측). 거부는 해결이 아니었고, 사용자가 같은 항목을
+  // 2차 피드백에 다시 올렸다. 이제 전체 피드로 **저장된다.**
+  it("아이디 없는 velog 주소는 전체 글 피드로 바꿔 저장한다", async () => {
     const captured: { url?: string } = {};
-    await expect(
-      addFeed(addFeedSupabase(captured), { url: "https://velog.io" }),
-    ).rejects.toThrow("velog.io/@아이디");
-    // 저장까지 갔다가 실패한 게 아니라, 아예 insert를 하지 않았음을 확인한다.
-    expect(captured.url).toBeUndefined();
+    await addFeed(addFeedSupabase(captured), { url: "https://velog.io" });
+    expect(captured.url).toBe("https://v2.velog.io/rss/");
   });
 });
 
