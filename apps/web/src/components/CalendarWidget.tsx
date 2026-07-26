@@ -44,6 +44,23 @@ function formatEventTime(startAt: string): string | null {
 // 지난 일정 표시 여부(기기별 취향이라 서버가 아니라 localStorage에 둔다).
 const SHOW_PAST_KEY = "ldd-calendar-show-past";
 
+// 2026-07-27 : 캘린더 - 크기 (2차 피드백 1-7 "너무 뭉개지고 … 사이징도 변경가능하게")
+// **"작게"에서는 월 그리드를 아예 그리지 않는다.** 뭉개짐의 직접 원인이 좁은 카드에 7열을
+// 억지로 쥐어짜는 것이라, 칸을 더 줄이는 대신 **목록으로 바꾼다**(계획이 정한 방향).
+// 자유 리사이즈는 하지 않는다 — 그리드 안에서 임의 크기는 다른 카드를 밀어내고,
+// 그 상태를 저장·복원하는 비용이 크다.
+const SIZE_KEY = "ldd-calendar-size";
+const SIZES = [
+  { key: "sm", label: "작게" },
+  { key: "md", label: "보통" },
+  { key: "lg", label: "크게" },
+] as const;
+type CalendarSize = (typeof SIZES)[number]["key"];
+
+function isCalendarSize(v: string | null): v is CalendarSize {
+  return v === "sm" || v === "md" || v === "lg";
+}
+
 // D-day 라벨: 0=오늘, 양수=D-N(다가옴), 음수=D+N(지남).
 function ddayLabel(startAt: string): string {
   // startAt은 타임스탬프다. daysUntil은 문자열 앞 10자리(=UTC 날짜)를 쓰므로 로컬 자정
@@ -130,6 +147,18 @@ export function CalendarWidget() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
     setShowPast(window.localStorage.getItem(SHOW_PAST_KEY) === "1");
   }, []);
+  // 크기. 기본은 "보통"(지금까지의 모습)이라 아무것도 안 고른 사용자에게는 화면이 그대로다.
+  const [size, setSize] = useState<CalendarSize>("md");
+  useEffect(() => {
+    const saved = window.localStorage.getItem(SIZE_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
+    if (isCalendarSize(saved)) setSize(saved);
+  }, []);
+  const changeSize = (next: CalendarSize) => {
+    setSize(next);
+    window.localStorage.setItem(SIZE_KEY, next);
+  };
+
   const toggleShowPast = () => {
     setShowPast((prev) => {
       const next = !prev;
@@ -317,7 +346,29 @@ export function CalendarWidget() {
           </p>
         )}
 
-        {/* 월 그리드 달력 */}
+        {/* 2026-07-27 (2차 피드백 1-7): 크기 3단계. 자유 리사이즈 대신 정해진 세 단계다 —
+            그리드 안에서 임의 크기는 다른 카드를 밀어내고 그 상태를 저장·복원하는 비용이 크다. */}
+        <div className="flex items-center justify-end gap-1" role="group" aria-label="캘린더 크기">
+          {SIZES.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => changeSize(s.key)}
+              aria-pressed={size === s.key}
+              className={`rounded-md px-2 py-1 text-xs transition-colors ${
+                size === s.key
+                  ? "bg-muted font-medium text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 월 그리드 달력. **"작게"에서는 그리지 않는다** — 좁은 카드에 7열을 쥐어짜는 것이
+            "뭉개진다"의 직접 원인이라, 칸을 더 줄이는 대신 아래 목록만 남긴다. */}
+        {size !== "sm" && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <button
@@ -340,7 +391,9 @@ export function CalendarWidget() {
               ›
             </button>
           </div>
-          <div className="grid grid-cols-7 gap-0.5 text-center">
+          <div
+            className={`grid grid-cols-7 gap-0.5 text-center ${size === "lg" ? "text-sm" : "text-xs"}`}
+          >
             {WEEKDAYS.map((w, i) => (
               <span
                 key={w}
@@ -366,7 +419,9 @@ export function CalendarWidget() {
                   }}
                   aria-label={`${viewMonth + 1}월 ${day}일${count > 0 ? `, 일정 ${count}개` : ""}`}
                   aria-pressed={isSelected}
-                  className={`relative flex aspect-square flex-col items-center justify-center rounded-md text-xs tabular-nums transition-colors ${
+                  className={`relative flex aspect-square flex-col items-center justify-center rounded-md tabular-nums transition-colors ${
+                    size === "lg" ? "min-h-11 text-sm" : "min-h-8 text-xs"
+                  } ${
                     isSelected
                       ? "bg-primary text-primary-foreground"
                       : isToday
@@ -394,6 +449,19 @@ export function CalendarWidget() {
             </button>
           )}
         </div>
+        )}
+
+        {/* "작게"에서는 달력이 없으므로 날짜 선택을 풀 수단이 사라진다 — 여기서 대신 제공한다.
+            (그렇지 않으면 오늘 자동 선택된 상태에서 다른 날 일정을 영영 볼 수 없다.) */}
+        {size === "sm" && selectedDate && (
+          <button
+            type="button"
+            onClick={() => setSelectedDate(null)}
+            className="self-end text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            전체 일정 보기
+          </button>
+        )}
 
         {state === "loading" && <WidgetSkeleton />}
         {state === "error" && (
