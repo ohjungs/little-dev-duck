@@ -29,6 +29,7 @@ function messageRow(o: Partial<{ id: string; seq: number; body: string; client_m
     body: o.body ?? "안녕",
     client_msg_id: o.client_msg_id ?? "c1",
     seq: o.seq ?? 1,
+    attachment_path: null,
     deleted_at: null,
     created_at: "2026-07-27T00:00:00.000Z",
   };

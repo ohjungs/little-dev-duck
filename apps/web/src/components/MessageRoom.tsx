@@ -11,8 +11,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { deleteMessage, listMessages, sendMessage } from "@ldd/api";
-import { messageBody, pendingMigrationMessage, type Message } from "@ldd/core";
+import { deleteMessage, listMessages, messageImageUrl, sendMessage, uploadMessageImage } from "@ldd/api";
+import {
+  checkMessageImage,
+  messageAttachment,
+  messageBody,
+  pendingMigrationMessage,
+  resizeTarget,
+  type Message,
+} from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeRoomMessages } from "@/lib/realtime";
 
@@ -32,6 +39,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 열린 메뉴의 메시지 id. **우클릭만으로 여는 메뉴는 키보드 사용자에게 없는 기능**이라
   // 눈에 보이는 버튼을 함께 둔다(계획이 "접근성이 가장 잘 빠지는 자리"라고 짚었다).
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  // 서명 URL은 만료된다(1시간). 그래서 **저장하지 않고 화면에 있는 동안만** 들고 있는다.
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -77,10 +87,97 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     }
   }
 
+  // 첨부가 있는 메시지의 서명 URL을 채운다. **이미 받은 것은 다시 요청하지 않는다** —
+  // 메시지가 올 때마다 전부 다시 만들면 요청이 목록 길이만큼 반복된다.
+  useEffect(() => {
+    const missing = messages
+      .map((m) => messageAttachment(m))
+      .filter((p): p is string => p !== null && !(p in imageUrls));
+    if (missing.length === 0) return;
+
+    let alive = true;
+    void (async () => {
+      const client = createClient();
+      const pairs = await Promise.all(
+        missing.map(async (path) => [path, await messageImageUrl(client, path)] as const),
+      );
+      if (!alive) return;
+      setImageUrls((prev) => {
+        const next = { ...prev };
+        for (const [path, url] of pairs) if (url) next[path] = url;
+        return next;
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [messages, imageUrls]);
+
   // 새 메시지가 오면 아래로. 사용자가 위를 읽는 중일 수도 있어 부드럽게만 민다.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length]);
+
+  /**
+   * 보내기 전에 브라우저에서 줄인다. **스토리지가 1GB뿐이라 리사이즈는 생존 조건**이라고
+   * 계획이 못박았다. 원본을 그대로 올리면 사진 몇백 장에 가득 찬다.
+   * 줄이지 못하면(캔버스 실패 등) **원본으로 올리지 않고 멈춘다** — 상한을 조용히 넘기지 않는다.
+   */
+  async function shrink(file: File): Promise<Blob> {
+    const bitmap = await createImageBitmap(file);
+    const { width, height } = resizeTarget(bitmap.width, bitmap.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("이미지를 줄이지 못했어요.");
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/webp", 0.85),
+    );
+    if (!blob) throw new Error("이미지를 줄이지 못했어요.");
+    return blob;
+  }
+
+  async function handlePickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // 같은 파일을 다시 고를 수 있게 값을 비운다(안 비우면 change가 안 온다).
+    e.target.value = "";
+    if (!file) return;
+
+    const check = checkMessageImage({ type: file.type, size: file.size });
+    if (!check.ok) {
+      setError(check.reason);
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+    try {
+      const shrunk = await shrink(file);
+      const client = createClient();
+      const path = await uploadMessageImage(
+        client,
+        roomId,
+        Object.assign(shrunk, { type: "image/webp", size: shrunk.size }),
+        crypto.randomUUID(),
+      );
+      // 본문이 비면 목록 미리보기와 알림이 빈칸이 된다 — 무엇이 왔는지 한 줄은 남긴다.
+      const saved = await sendMessage(client, {
+        roomId,
+        body: "사진",
+        clientMsgId: crypto.randomUUID(),
+        attachmentPath: path,
+      });
+      setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -132,6 +229,26 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                   {/* 평문 렌더 — HTML로 그리지 않는다(에이전트 응답이 섞인다). */}
                   {messageBody(m)}
                 </span>
+
+                {(() => {
+                  const path = messageAttachment(m);
+                  if (!path) return null;
+                  const url = imageUrls[path];
+                  // 주소를 아직 못 받았거나 못 만들었으면 자리만 남긴다 —
+                  // 사진 한 장 때문에 대화가 안 보이면 안 된다.
+                  return url ? (
+                    <div className="mt-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- 서명 URL은 만료되는 임시 주소라 next/image 최적화 대상이 아니다(Phase 39의 sharp 면제 전제도 지킨다). */}
+                      <img
+                        src={url}
+                        alt="첨부 이미지"
+                        className="inline-block max-h-60 max-w-[80%] rounded-lg border border-border"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-xs text-muted-foreground">사진을 불러오는 중</div>
+                  );
+                })()}
 
                 {!m.deletedAt && (
                   <button
@@ -197,6 +314,16 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
           maxLength={4000}
           className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm"
         />
+        <label className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-sm">
+          {uploading ? "올리는 중" : "사진"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={handlePickImage}
+            disabled={uploading}
+            className="sr-only"
+          />
+        </label>
         <button
           type="submit"
           disabled={sending || draft.trim() === ""}

@@ -187,5 +187,8 @@ export {
   deleteMessage,
   markRead,
   MESSAGE_PAGE_SIZE,
+  uploadMessageImage,
+  messageImageUrl,
+  SIGNED_URL_SECONDS,
   type SendMessageInput,
 } from "./rooms";

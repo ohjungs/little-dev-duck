@@ -562,6 +562,7 @@ export {
   roomMemberSchema,
   messageSchema,
   messageBody,
+  messageAttachment,
   unreadCount,
   sortRooms,
   DELETED_MESSAGE_TEXT,

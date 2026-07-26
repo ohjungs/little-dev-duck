@@ -10,6 +10,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  checkMessageImage,
+  messageAttachmentPath,
   messageSchema,
   roomSchema,
   type Message,
@@ -35,6 +37,7 @@ type MessageRow = {
   body: string;
   client_msg_id: string;
   seq: number;
+  attachment_path: string | null;
   deleted_at: string | null;
   created_at: string;
 };
@@ -60,6 +63,7 @@ function messageFromRow(row: MessageRow): Message {
     body: row.body,
     clientMsgId: row.client_msg_id,
     seq: Number(row.seq),
+    attachmentPath: row.attachment_path,
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
   });
@@ -105,6 +109,8 @@ export type SendMessageInput = {
   body: string;
   /** 낙관적 UI가 만든 식별자. 재시도해도 같은 값을 보내야 중복이 걸러진다. */
   clientMsgId: string;
+  /** 첨부 이미지의 스토리지 경로. 먼저 올린 뒤 그 경로를 넘긴다. */
+  attachmentPath?: string | null;
 };
 
 // Postgres 유니크 위반. PostgREST가 그대로 흘려 준다.
@@ -137,6 +143,7 @@ export async function sendMessage(
       type: "text",
       body,
       client_msg_id: input.clientMsgId,
+      attachment_path: input.attachmentPath ?? null,
     })
     .select()
     .single();
@@ -247,4 +254,52 @@ async function seqOf(supabase: SupabaseClient, messageId: string): Promise<numbe
   if (error || !data) return null;
   const rows = data as { seq: number }[];
   return rows[0] ? Number(rows[0].seq) : null;
+}
+
+// ---------------------------------------------------------------------------
+// 이미지 첨부
+// ---------------------------------------------------------------------------
+const BUCKET = "message-attachments";
+
+/**
+ * 이미지를 올리고 **경로**를 돌려준다. URL이 아니다 —
+ * 버킷이 비공개라 URL엔 서명이 붙고 만료된다. 만료된 URL을 저장하면 나중에 안 열린다.
+ *
+ * 경로 첫 칸이 방 id여야 버킷 정책이 멤버를 판정할 수 있다(`messageAttachmentPath`).
+ */
+export async function uploadMessageImage(
+  supabase: SupabaseClient,
+  roomId: string,
+  file: Blob & { type: string; size: number },
+  fileId: string,
+): Promise<string> {
+  const check = checkMessageImage({ type: file.type, size: file.size });
+  // 화면에서 이미 걸렀더라도 여기서 한 번 더 본다 — 이 함수를 다른 곳에서 부를 수 있다.
+  if (!check.ok) throw new Error(check.reason);
+
+  const ext = file.type.split("/")[1] ?? "png";
+  const path = messageAttachmentPath(roomId, fileId, ext);
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    contentType: file.type,
+    // 덮어쓰기를 막는다. 버킷 정책도 update를 열지 않았다 —
+    // 덮어쓸 수 있으면 남이 이미 본 이미지가 뒤바뀐다.
+    upsert: false,
+  });
+  if (error) throw new Error(error.message);
+  return path;
+}
+
+/** 이미지를 볼 수 있는 임시 주소. 기본 1시간 — 대화를 보는 동안 충분하고, 새면 곧 만료된다. */
+export const SIGNED_URL_SECONDS = 3600;
+
+export async function messageImageUrl(
+  supabase: SupabaseClient,
+  path: string,
+): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, SIGNED_URL_SECONDS);
+  // 주소를 못 만들어도 대화는 계속 보여야 한다 — 사진 한 장 때문에 화면을 죽이지 않는다.
+  if (error || !data) return null;
+  return data.signedUrl;
 }

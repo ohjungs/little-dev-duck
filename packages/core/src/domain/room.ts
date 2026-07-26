@@ -50,6 +50,10 @@ export const messageSchema = z
     body: z.string().min(1).max(4000),
     clientMsgId: z.string().min(1).max(64),
     seq: z.number().int().nonnegative(),
+    // 첨부 이미지의 스토리지 경로('<room_id>/<uuid>.<ext>'). 없으면 null.
+    // **URL이 아니라 경로다** — 버킷이 비공개라 URL은 서명이 붙어 만료된다.
+    // 만료된 URL을 저장해 두면 나중에 열리지 않는다.
+    attachmentPath: z.string().max(300).nullable(),
     deletedAt: z.string().datetime({ offset: true }).nullable(),
     createdAt: z.string().datetime({ offset: true }),
   })
@@ -67,6 +71,16 @@ export const DELETED_MESSAGE_TEXT = "삭제된 메시지입니다";
 
 export function messageBody(message: Pick<Message, "body" | "deletedAt">): string {
   return message.deletedAt ? DELETED_MESSAGE_TEXT : message.body;
+}
+
+/**
+ * 지운 메시지의 이미지는 보여 주지 않는다. 본문만 가리고 사진이 남으면
+ * **지웠다고 생각한 사람에게 지워지지 않은 것**이 된다.
+ */
+export function messageAttachment(
+  message: Pick<Message, "attachmentPath" | "deletedAt">,
+): string | null {
+  return message.deletedAt ? null : message.attachmentPath;
 }
 
 /**

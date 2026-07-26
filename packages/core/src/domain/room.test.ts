@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DELETED_MESSAGE_TEXT,
   messageBody,
+  messageAttachment,
   messageSchema,
   roomMemberSchema,
   sortRooms,
@@ -25,7 +26,7 @@ describe("메시지 계약", () => {
   it("사람이 보낸 메시지는 보낸 사람이 있어야 한다", () => {
     const base = {
       id: U1, roomId: U2, senderType: "user" as const, type: "text" as const,
-      body: "안녕", clientMsgId: "c1", seq: 1, deletedAt: null, createdAt: ISO,
+      body: "안녕", clientMsgId: "c1", seq: 1, attachmentPath: null, deletedAt: null, createdAt: ISO,
     };
     expect(messageSchema.safeParse({ ...base, senderUserId: U1 }).success).toBe(true);
     // 보낸 사람 없이 "사람이 보냈다"고 하면 화면이 누가 썼는지 못 그린다.
@@ -35,7 +36,7 @@ describe("메시지 계약", () => {
   it("에이전트 메시지는 보낸 사람이 없어야 한다", () => {
     const base = {
       id: U1, roomId: U2, senderType: "agent" as const, type: "text" as const,
-      body: "꽥", clientMsgId: "c2", seq: 2, deletedAt: null, createdAt: ISO,
+      body: "꽥", clientMsgId: "c2", seq: 2, attachmentPath: null, deletedAt: null, createdAt: ISO,
     };
     expect(messageSchema.safeParse({ ...base, senderUserId: null }).success).toBe(true);
     expect(messageSchema.safeParse({ ...base, senderUserId: U1 }).success).toBe(false);
@@ -44,7 +45,7 @@ describe("메시지 계약", () => {
   it("빈 본문과 4000자 초과는 거부한다", () => {
     const base = {
       id: U1, roomId: U2, senderUserId: null, senderType: "agent" as const,
-      type: "text" as const, clientMsgId: "c3", seq: 3, deletedAt: null, createdAt: ISO,
+      type: "text" as const, clientMsgId: "c3", seq: 3, attachmentPath: null, deletedAt: null, createdAt: ISO,
     };
     expect(messageSchema.safeParse({ ...base, body: "" }).success).toBe(false);
     expect(messageSchema.safeParse({ ...base, body: "x".repeat(4001) }).success).toBe(false);
@@ -132,5 +133,21 @@ describe("방 목록 정렬", () => {
 
   it("빈 목록에도 던지지 않는다", () => {
     expect(sortRooms([])).toEqual([]);
+  });
+});
+
+// 2026-07-27 : 메신저 - 첨부 (Phase 50 T4)
+describe("메시지 첨부", () => {
+  it("지운 메시지의 이미지는 보여 주지 않는다", () => {
+    // 본문만 가리고 사진이 남으면 지웠다고 생각한 사람에게 지워지지 않은 것이 된다.
+    expect(messageAttachment({ attachmentPath: "room/a.png", deletedAt: ISO })).toBeNull();
+  });
+
+  it("안 지운 메시지는 경로를 그대로 준다", () => {
+    expect(messageAttachment({ attachmentPath: "room/a.png", deletedAt: null })).toBe("room/a.png");
+  });
+
+  it("첨부가 없으면 null", () => {
+    expect(messageAttachment({ attachmentPath: null, deletedAt: null })).toBeNull();
   });
 });
