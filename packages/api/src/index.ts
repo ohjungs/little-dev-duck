@@ -178,3 +178,14 @@ export {
   type AccessProfile,
 } from "./access";
 export { listActionLog, recordEvent, ACTION_LOG_PAGE_MAX } from "./actionLog";
+
+// 2026-07-27 : 메신저 - 방·메시지 접근 (Phase 50 T2·T3)
+export {
+  listRooms,
+  listMessages,
+  sendMessage,
+  deleteMessage,
+  markRead,
+  MESSAGE_PAGE_SIZE,
+  type SendMessageInput,
+} from "./rooms";
