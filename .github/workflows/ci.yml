@@ -19,6 +19,21 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # 2026-07-26 : 보안 - 의존성감사 - 게이트 (Phase 39)
+      # 2026-07-26에 Next.js 고위험 9건을 고쳤는데, 그 9건은 하루 전 세션이 이미 세어 놓고
+      # 결정 없이 남겨 둔 것이었다 — 문제는 발견이 아니라 아무 장치도 다시 들어 올리지
+      # 않았다는 것이다. `pnpm audit`은 아무도 부르지 않으면 아무 말도 하지 않는다.
+      #
+      #  --prod                    런타임(dependencies + optionalDependencies)만. devDependencies
+      #                            (eslint·tailwind 계열)까지 막으면 사람이 검사를 끈다.
+      #  --audit-level high        high·critical만 게이트. moderate까지 막으면 배포가 상시로 선다.
+      #  --ignore-registry-errors  남의 장애로 우리 배포가 서지 않게. 한계: 그때는 감사가 통과로
+      #                            나오고 로그에만 사유가 남는다.
+      # 면제 목록과 그 사유는 pnpm-workspace.yaml의 auditConfig.ignoreGhsas에 있고,
+      # 사유 누락·근거 만료는 dependencyAuditIgnores.test.ts가 잡는다.
+      - run: pnpm audit --prod --audit-level high --ignore-registry-errors
+
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm test
