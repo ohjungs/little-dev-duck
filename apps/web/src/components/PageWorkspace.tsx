@@ -22,8 +22,9 @@ import {
   softDeletePage,
 } from "@ldd/api";
 import { reindexSource } from "@ldd/ai";
-import type { Page } from "@ldd/core";
+import { parseTemplateFile, type Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
+import { decodeTextBytes } from "@/lib/decodeTextFile";
 import { subscribeTable } from "@/lib/realtime";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -295,6 +296,39 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
     }
   };
 
+  // 2026-07-26 (피드백 2-2): 템플릿 **파일**로 새 페이지를 만든다.
+  // 템플릿 목록을 쌓아 두지 않는다 — 사용자의 목적은 템플릿을 쓰는 것이지 라이브러리 운영이 아니다.
+  // 파일 내용은 남이 만든 것일 수 있어 **core parseTemplateFile이 블록 타입까지 검사**한 뒤에만 쓴다.
+  const handleImportTemplate = async (file: File) => {
+    setActionError(null);
+    try {
+      // File.text()는 무조건 UTF-8로 읽어 CP949 파일이 깨진다(이 저장소가 겪은 부류).
+      const { text } = decodeTextBytes(await file.arrayBuffer());
+      let raw: unknown;
+      try {
+        raw = JSON.parse(text);
+      } catch {
+        setActionError("JSON 파일이 아닙니다. 템플릿으로 저장한 .json 파일을 골라주세요.");
+        return;
+      }
+      const parsed = parseTemplateFile(raw);
+      if (!parsed.ok) {
+        setActionError(parsed.reason);
+        return;
+      }
+      const created = await createPage(supabase, {
+        title: parsed.template.title,
+        content: parsed.template.content,
+        icon: parsed.template.icon,
+        dbSchema: parsed.template.dbSchema ?? undefined,
+      });
+      setPages((prev) => [...prev, created]);
+      router.push(`/pages/${created.id}`);
+    } catch {
+      setActionError("템플릿을 가져오지 못했습니다. 다시 시도해 주세요.");
+    }
+  };
+
   // 페이지 복제: 제목/본문/아이콘/부모/DB 스키마를 복사해 새 페이지 생성 후 이동.
   // 2026-07-26 : 페이지 - 복제 - 스키마보존
   // 예전엔 createPage가 dbSchema를 못 받아 데이터베이스 페이지가 열 없는 일반 페이지로 복제됐다.
@@ -421,6 +455,22 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
                     </button>
                   ))}
                 </div>
+                <label className="mt-2 flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent">
+                  파일에서 템플릿 가져오기
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    aria-label="템플릿 파일 선택"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      // 같은 파일을 연달아 고를 수 있게 비운다(안 비우면 onChange가 안 뜬다).
+                      e.target.value = "";
+                      setNewMenuOpen(false);
+                      if (file) void handleImportTemplate(file);
+                    }}
+                  />
+                </label>
               </div>
             </>
           )}

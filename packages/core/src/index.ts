@@ -447,3 +447,11 @@ export {
   findResumablePomodoro,
   type ResumablePomodoro,
 } from "./domain/pomodoro-resume";
+export {
+  TEMPLATE_FILE_VERSION,
+  IMPORTABLE_BLOCK_TYPES,
+  buildTemplateFile,
+  parseTemplateFile,
+  type TemplateFile,
+  type TemplateParseResult,
+} from "./domain/template-file";

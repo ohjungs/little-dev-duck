@@ -32,6 +32,7 @@ import {
   pageStats,
   type DbSchema,
   type Page,
+  buildTemplateFile,
 } from "@ldd/core";
 import {
   createPage,
@@ -364,6 +365,27 @@ export function PageEditor({
     URL.revokeObjectURL(url);
   };
 
+  // 2026-07-26 (피드백 2-2): 이 페이지를 **템플릿 파일**로 내려받는다.
+  // 템플릿 저장소를 새로 만들지 않고 파일로 주고받는다 — 받은 사람은 새 페이지 메뉴에서 가져온다.
+  // 제목·본문·아이콘·데이터베이스 설정만 담는다(내용은 남의 것이 될 수 있어 그대로 옮긴다).
+  const handleExportTemplate = () => {
+    const file = buildTemplateFile({
+      title: latest.current.title.trim() || "제목 없음",
+      icon: page.icon,
+      content: Array.isArray(latest.current.content) ? latest.current.content : [],
+      dbSchema: page.dbSchema,
+    });
+    const blob = new Blob([JSON.stringify(file, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeFileName(latest.current.title)}.template.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // 현재 페이지를 복제해 새 페이지로 이동(제목/본문/아이콘/부모 복사). db_schema는 계약상 미포함.
   const handleDuplicate = async () => {
     try {
@@ -478,6 +500,15 @@ export function PageEditor({
           className="text-muted-foreground"
         >
           <Download className="size-3.5" /> Markdown 내보내기
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleExportTemplate}
+          className="text-muted-foreground"
+        >
+          <Download className="size-3.5" /> 템플릿으로 저장
         </Button>
         <Button
           type="button"
