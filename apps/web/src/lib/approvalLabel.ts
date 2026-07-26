@@ -17,6 +17,12 @@ export const TOOL_LABELS: Record<string, string> = {
   createTodo: "할 일 추가",
   completeTodo: "할 일 완료",
   createMemo: "메모 작성",
+  // 2026-07-26 (피드백 1-4): 수정·삭제. 삭제는 되돌리기 UI가 없는 경로라 **이 카드가 마지막
+  // 방어선**이다 — 무엇이 지워지는지 제목으로 분명히 보여준다.
+  editTodo: "할 일 수정",
+  deleteTodo: "할 일 삭제",
+  editMemo: "메모 수정",
+  deleteMemo: "메모 삭제",
   createPage: "페이지 만들기",
   addCalendarEvent: "앱 캘린더에 일정 추가",
   checkHabit: "습관 체크",
@@ -57,6 +63,19 @@ export function describeCall(call: {
   const repo = typeof call.args.repo === "string" ? call.args.repo : null;
   const when = start && end ? `${start} ~ ${end}` : start ? start : null;
 
+  // 수정 도구는 "무엇을"뿐 아니라 "무엇으로" 바꾸는지 보여야 판단할 수 있다.
+  // 새 제목이 없으면 마감일만 바꾸는 것이고, 그건 아래 due가 드러낸다.
+  const newTitle = typeof call.args.newTitle === "string" ? call.args.newTitle : null;
+  // title과 content가 **둘 다** 있으면 title은 대상, content는 새 본문이다(editMemo).
+  // 위 title 폴백이 content를 가려버려서, 새 본문이 카드에 아예 안 보이던 것을 고친다 —
+  // 사용자는 무엇으로 바뀌는지 모른 채 승인하게 된다. 길면 자른다(카드가 화면을 덮으면 못 읽는다).
+  const newBody =
+    typeof call.args.title === "string" && typeof call.args.content === "string"
+      ? call.args.content.length > 60
+        ? `${call.args.content.slice(0, 60)}…`
+        : call.args.content
+      : null;
+
   const due = formatDueDate(call.args.dueDate);
   // 반복은 한국어로 풀어 보여준다. FREQ=WEEKLY;BYDAY=TU를 그대로 띄우면 승인 판단에 도움이 안 된다.
   // 풀이가 안 되는 값이면 원문을 보여준다 — 모델이 이상한 규칙을 냈다는 사실 자체가 판단 근거다.
@@ -69,8 +88,11 @@ export function describeCall(call: {
   const parts = [
     owner && repo ? `${owner}/${repo}` : null,
     title ? `"${title}"` : null,
+    newTitle ? `→ "${newTitle}"` : null,
+    newBody ? `→ "${newBody}"` : null,
     when,
-    due ? `마감 ${due}` : null,
+    // 빈 문자열은 "마감일 제거"라는 뜻이라 그렇게 말해준다(빈 값으로 보여주면 뭘 하는지 모른다).
+    call.args.dueDate === "" ? "마감 없앰" : due ? `마감 ${due}` : null,
     recurrence ? `반복 ${recurrence}` : null,
   ].filter(Boolean);
   return parts.length > 0 ? `${label}: ${parts.join(", ")}` : label;

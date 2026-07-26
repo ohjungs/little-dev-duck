@@ -27,6 +27,11 @@ describe("createAppActionsAdapter", () => {
       "createMemo",
       "createPage",
       "createTodo",
+      // 2026-07-26 (피드백 1-4): 수정·삭제. 파괴적이라 아래 mutating 검사가 특히 중요하다.
+      "deleteMemo",
+      "deleteTodo",
+      "editMemo",
+      "editTodo",
       "listCalendarEvents",
       "listHabits",
       "listTodos",
@@ -597,5 +602,116 @@ describe("listHabits 조회 도구", () => {
     const a = createAppActionsAdapter(habitSummarySupabase([], []));
     const res = await a.execute({ id: "c1", name: "listHabits", args: { rangeDays: "일주일" } });
     expect(res.response.error).toBeDefined();
+  });
+});
+
+// 2026-07-26 : 오리 수정·삭제 도구 (피드백 1-4)
+// 삭제는 되돌리기 UI가 없는 경로다. **애매하면 아무것도 하지 않는다**가 이 도구의 핵심 계약이고,
+// 그게 무너지면 사용자가 말하지 않은 항목이 사라진다. 여기서 못박는다.
+describe("수정·삭제 도구", () => {
+  const rows = [
+    { id: "00000001-0000-4000-8000-000000000000", user_id: "00000009-0000-4000-8000-000000000000", title: "장보기", is_done: false, due_date: null, created_at: "2026-07-20T00:00:00.000Z", updated_at: "2026-07-20T00:00:00.000Z" },
+    { id: "00000002-0000-4000-8000-000000000000", user_id: "00000009-0000-4000-8000-000000000000", title: "장보기 목록 정리", is_done: false, due_date: null, created_at: "2026-07-20T00:00:00.000Z", updated_at: "2026-07-20T00:00:00.000Z" },
+  ];
+
+  /** list는 rows를, update/delete는 호출을 기록만 한다. */
+  function listSupabase(list: Record<string, unknown>[], sink: { deleted?: string; updated?: Record<string, unknown> } = {}) {
+    const chain: Record<string, unknown> = {};
+    Object.assign(chain, {
+      select: () => chain,
+      order: () => chain,
+      limit: () => Promise.resolve({ data: list, error: null }),
+      eq: (_c: string, v: string) => {
+        sink.deleted = v;
+        return { ...chain, then: (r: (x: { error: null }) => void) => r({ error: null }) };
+      },
+      update: (payload: Record<string, unknown>) => {
+        sink.updated = payload;
+        return {
+          eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: { ...list[0], ...payload }, error: null }) }) }),
+        };
+      },
+      delete: () => ({ eq: (_c: string, v: string) => { sink.deleted = v; return Promise.resolve({ error: null }); } }),
+    });
+    return {
+      auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } } }) },
+      from: () => chain,
+    } as unknown as SupabaseClient;
+  }
+
+  const call = (name: string, args: Record<string, unknown>) => ({ id: "c1", name, args });
+
+  it("지울 대상이 여러 개면 아무것도 지우지 않는다", async () => {
+    const sink: { deleted?: string } = {};
+    const a = createAppActionsAdapter(listSupabase(rows, sink));
+    // "장보"는 두 행에 부분 일치한다 — "아마 이거겠지"는 지우는 일에서 위험하다.
+    const r = await a.execute(call("deleteTodo", { title: "장보" }));
+    expect(String(r.response.error)).toContain("여러 개");
+    expect(sink.deleted).toBeUndefined();
+  });
+
+  it("못 찾으면 아무것도 지우지 않는다", async () => {
+    const sink: { deleted?: string } = {};
+    const a = createAppActionsAdapter(listSupabase(rows, sink));
+    const r = await a.execute(call("deleteTodo", { title: "없는할일" }));
+    expect(String(r.response.error)).toContain("찾지 못");
+    expect(sink.deleted).toBeUndefined();
+  });
+
+  it("정확히 일치하는 제목이 있으면 부분 일치보다 그것을 고른다", async () => {
+    // "장보기"는 한 행의 제목과 정확히 같고 다른 행에도 부분 일치한다.
+    // 정확 일치를 우선하지 않으면 "여러 개"로 막혀 사용자가 지울 방법이 없어진다.
+    const sink: { deleted?: string } = {};
+    const a = createAppActionsAdapter(listSupabase(rows, sink));
+    const r = await a.execute(call("deleteTodo", { title: "장보기" }));
+    expect(r.response.deleted).toEqual({ id: rows[0].id, title: "장보기" });
+  });
+
+  it("하나로 좁혀지면 그 항목만 지운다", async () => {
+    const sink: { deleted?: string } = {};
+    const a = createAppActionsAdapter(listSupabase(rows, sink));
+    const r = await a.execute(call("deleteTodo", { title: "목록 정리" }));
+    expect(sink.deleted).toBe("00000002-0000-4000-8000-000000000000");
+    expect(r.response.deleted).toEqual({ id: "00000002-0000-4000-8000-000000000000", title: "장보기 목록 정리" });
+  });
+
+  it("바꿀 내용을 안 주면 조용히 성공시키지 않는다", async () => {
+    // 아무것도 안 바뀌었는데 성공이라고 하면 사용자는 된 줄 안다.
+    const a = createAppActionsAdapter(listSupabase(rows));
+    const r = await a.execute(call("editTodo", { title: "목록 정리" }));
+    expect(String(r.response.error)).toContain("무엇을 바꿀지");
+  });
+
+  it("마감일 형식이 틀리면 조용히 버리지 않고 알린다", async () => {
+    const a = createAppActionsAdapter(listSupabase(rows));
+    const r = await a.execute(call("editTodo", { title: "목록 정리", dueDate: "내일쯤" }));
+    expect(String(r.response.error)).toContain("형식");
+  });
+
+  it("빈 마감일은 '마감 없앰'으로 처리한다", async () => {
+    const sink: { updated?: Record<string, unknown> } = {};
+    const a = createAppActionsAdapter(listSupabase(rows, sink));
+    await a.execute(call("editTodo", { title: "목록 정리", dueDate: "" }));
+    expect(sink.updated).toHaveProperty("due_date", null);
+  });
+
+  it("제목만 바꾸면 마감일 키를 건드리지 않는다", async () => {
+    const sink: { updated?: Record<string, unknown> } = {};
+    const a = createAppActionsAdapter(listSupabase(rows, sink));
+    await a.execute(call("editTodo", { title: "목록 정리", newTitle: "새 제목" }));
+    expect(sink.updated).toHaveProperty("title", "새 제목");
+    expect(sink.updated).not.toHaveProperty("due_date");
+  });
+
+  it("메모 삭제도 애매하면 멈춘다", async () => {
+    const memos = [
+      { id: "00000003-0000-4000-8000-000000000000", user_id: "00000009-0000-4000-8000-000000000000", title: "회의", content: "회의 메모", created_at: "2026-07-20T00:00:00.000Z", updated_at: "2026-07-20T00:00:00.000Z" },
+      { id: "00000004-0000-4000-8000-000000000000", user_id: "00000009-0000-4000-8000-000000000000", title: "회의록", content: "회의록", created_at: "2026-07-20T00:00:00.000Z", updated_at: "2026-07-20T00:00:00.000Z" },
+    ];
+    const sink: { deleted?: string } = {};
+    const a = createAppActionsAdapter(listSupabase(memos, sink));
+    const r = await a.execute(call("deleteMemo", { title: "회" }));
+    expect(String(r.response.error)).toContain("여러 개");
+    expect(sink.deleted).toBeUndefined();
   });
 });

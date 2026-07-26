@@ -149,3 +149,25 @@ describe("chatMessageSchema", () => {
     ).toBe(false);
   });
 });
+
+// 2026-07-26 (피드백 1-4): 수정·삭제 도구를 추가하면서 입구도 함께 넓혔다.
+// **도구만 만들고 라우터를 안 고치면 그 기능은 없는 것과 같다** — 이 저장소가 실제로 겪었다.
+describe("routeUtterance — 수정·삭제 발화", () => {
+  it("삭제 발화가 도구까지 간다", () => {
+    for (const t of ["장보기 삭제해", "장보기 지워줘", "메모 지우기", "그거 삭제"]) {
+      expect(routeUtterance(t), t).toBe("llm");
+    }
+  });
+
+  it("수정 발화가 도구까지 간다", () => {
+    for (const t of ["제목 바꿔줘", "마감 변경", "장보기 수정", "메모 고쳐"]) {
+      expect(routeUtterance(t), t).toBe("llm");
+    }
+  });
+
+  it("사회적 발화·잡담은 여전히 룰이다 (회귀 금지)", () => {
+    for (const t of ["안녕", "고마워", "ㅋㅋㅋ", "배고파", "그렇구나", "응"]) {
+      expect(routeUtterance(t), t).toBe("rule");
+    }
+  });
+});

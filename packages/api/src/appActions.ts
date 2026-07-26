@@ -13,9 +13,9 @@ import {
 } from "@ldd/core";
 import type { EmbeddingSource, ToolCall, ToolDeclaration, ToolResult } from "@ldd/core";
 import type { Adapter } from "./agent";
-import { createTodo, listTodos, updateTodo } from "./todos";
+import { createTodo, deleteTodo, listTodos, updateTodo } from "./todos";
 import { listEventsForDuck, listTodosForDuck } from "./duckQueries";
-import { createMemo } from "./memos";
+import { createMemo, deleteMemo, listMemos, updateMemo } from "./memos";
 import { createPage } from "./pages";
 import { createCalendarEvent } from "./calendar";
 import { checkHabit, listHabits, listHabitChecksInRange } from "./habits";
@@ -220,6 +220,89 @@ const checkHabitDecl: ToolDeclaration = {
   kind: "mutating",
 };
 
+// 2026-07-26 : 오리 - 수정·삭제 도구 (피드백 1-4)
+// "기존에 있는 모든 기능을 오리랑 대화하며 자연스럽게 ... 사용가능했으면".
+// 지금까지 오리는 **만들고 완료만** 할 수 있었다 — 고치거나 지우지 못했다.
+//
+// **삭제 도구를 내는 근거**: Phase 19에서 "오삭제 위험"으로 삭제를 의도적으로 뺐다. 그 판단은
+// 지금도 유효하지만 조건이 달라졌다 — 이 경로는 **승인 카드가 실행 전에 무엇이 지워지는지
+// 보여준다.** 위젯의 hover 아이콘 삭제(Phase 21이 고친 것)와 달리 사용자가 대상을 확인하고
+// 누른다. 게다가 할 일·메모는 restoreTodo/restoreMemo로 같은 id 복구가 가능하다.
+//
+// **습관·페이지 삭제 도구는 만들지 않는다.** 습관은 habit_checks가 cascade라 되살려도 기록이
+// 빈 채로 오고(Phase 21에서 확인), 페이지는 이번 요구 범위 밖이다. 되돌릴 수 없는 것에는
+// 대화 삭제를 붙이지 않는다.
+const editTodoDecl: ToolDeclaration = {
+  name: "editTodo",
+  description:
+    "이미 있는 할 일의 제목이나 마감일을 고친다. 사용자가 '~를 ~로 바꿔줘', '~ 마감 내일로' 등으로 " +
+    "요청할 때 사용. 새 할 일 추가가 아니다.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "고칠 할 일의 지금 제목(또는 일부)" },
+      newTitle: { type: "string", description: "새 제목. 제목을 안 바꾸면 비운다" },
+      dueDate: {
+        type: "string",
+        description: "새 마감 날짜(YYYY-MM-DD). 마감일을 없애려면 빈 문자열을 준다",
+      },
+    },
+    required: ["title"],
+  },
+  kind: "mutating",
+};
+
+const deleteTodoDecl: ToolDeclaration = {
+  name: "deleteTodo",
+  description:
+    "이미 있는 할 일을 지운다. 사용자가 '~ 지워줘', '~ 삭제해'라고 할 때 그 할 일을 제목으로 찾아 삭제. " +
+    "완료 처리가 아니다(완료는 completeTodo).",
+  parameters: {
+    type: "object",
+    properties: { title: { type: "string", description: "지울 할 일의 제목(또는 일부)" } },
+    required: ["title"],
+  },
+  kind: "mutating",
+};
+
+const editMemoDecl: ToolDeclaration = {
+  name: "editMemo",
+  description:
+    "이미 있는 메모의 내용을 고쳐 쓴다. 사용자가 '~ 메모 이렇게 바꿔줘'라고 할 때 사용. " +
+    "새 메모 작성이 아니다. 내용은 **통째로 대체**된다.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "고칠 메모의 제목(첫 줄, 또는 일부)" },
+      content: { type: "string", description: "새 본문 전체" },
+    },
+    required: ["title", "content"],
+  },
+  kind: "mutating",
+};
+
+const deleteMemoDecl: ToolDeclaration = {
+  name: "deleteMemo",
+  description: "이미 있는 메모를 지운다. 제목(첫 줄, 또는 일부)으로 찾아 삭제.",
+  parameters: {
+    type: "object",
+    properties: { title: { type: "string", description: "지울 메모의 제목(또는 일부)" } },
+    required: ["title"],
+  },
+  kind: "mutating",
+};
+
+const editTodoArgs = z.object({
+  title: z.string().min(1).max(500),
+  newTitle: z.string().min(1).max(200).optional(),
+  dueDate: z.string().optional(),
+});
+const byTitleArgs = z.object({ title: z.string().min(1).max(500) });
+const editMemoArgs = z.object({
+  title: z.string().min(1).max(500),
+  content: z.string().min(1).max(10000),
+});
+
 const todoArgs = z.object({
   title: z.string().min(1).max(500),
   dueDate: z.string().optional(),
@@ -316,7 +399,11 @@ export function createAppActionsAdapter(
     catalog: [
       createTodoDecl,
       completeTodoDecl,
+      editTodoDecl,
+      deleteTodoDecl,
       createMemoDecl,
+      editMemoDecl,
+      deleteMemoDecl,
       createPageDecl,
       addEventDecl,
       checkHabitDecl,
@@ -450,6 +537,95 @@ export function createAppActionsAdapter(
           id: call.id,
           name: call.name,
           response: { completed: { id: updated.id, title: updated.title } },
+        };
+      }
+
+      if (call.name === editTodoDecl.name) {
+        const parsed = editTodoArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "할 일 정보가 올바르지 않습니다.");
+        const { newTitle, dueDate } = parsed.data;
+        // 바꿀 게 없는데 실행하면 사용자는 뭔가 된 줄 안다. 조용히 성공시키지 않는다.
+        if (newTitle === undefined && dueDate === undefined) {
+          return errorResult(call, "무엇을 바꿀지 알려주세요(제목 또는 마감일).");
+        }
+        const found = findTodoByTitle(await listTodos(supabase), parsed.data.title);
+        if (found === "ambiguous") {
+          return errorResult(call, "고칠 할 일이 여러 개 일치해요. 더 정확한 제목으로 알려주세요.");
+        }
+        if (!found) return errorResult(call, "고칠 할 일을 찾지 못했어요.");
+        // 빈 문자열 = 마감일 제거. 값이 있으면 형식을 검사하고, 어긋나면 **조용히 버리지 않는다**
+        // (버리면 사용자는 마감일이 걸린 줄 안다 — Phase 23에서 정한 규칙).
+        let due: string | null | undefined;
+        if (dueDate !== undefined) {
+          if (dueDate.trim() === "") due = null;
+          else {
+            const coerced = coerceTodoDueDate(dueDate);
+            if (!coerced) return errorResult(call, "마감 날짜 형식이 올바르지 않아요(YYYY-MM-DD).");
+            due = coerced;
+          }
+        }
+        const updated = await updateTodo(supabase, found.id, {
+          ...(newTitle !== undefined ? { title: newTitle } : {}),
+          ...(due !== undefined ? { dueDate: due } : {}),
+        });
+        await reindex("todo", updated.id, todoEmbedText(updated.title, updated.isDone, updated.dueDate));
+        return {
+          id: call.id,
+          name: call.name,
+          response: { updated: { id: updated.id, title: updated.title } },
+        };
+      }
+
+      if (call.name === deleteTodoDecl.name) {
+        const parsed = byTitleArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "할 일 정보가 올바르지 않습니다.");
+        const found = findTodoByTitle(await listTodos(supabase), parsed.data.title);
+        if (found === "ambiguous") {
+          // 지우는 일에서 "아마 이거겠지"는 위험하다. 애매하면 아무것도 하지 않는다.
+          return errorResult(call, "지울 할 일이 여러 개 일치해요. 더 정확한 제목으로 알려주세요.");
+        }
+        if (!found) return errorResult(call, "지울 할 일을 찾지 못했어요.");
+        await deleteTodo(supabase, found.id);
+        // 지운 항목은 검색·RAG에서도 빠져야 한다. 빈 텍스트로 색인을 비운다(위젯 삭제와 같은 방식).
+        await reindex("todo", found.id, "");
+        return {
+          id: call.id,
+          name: call.name,
+          response: { deleted: { id: found.id, title: found.title } },
+        };
+      }
+
+      if (call.name === editMemoDecl.name) {
+        const parsed = editMemoArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "메모 정보가 올바르지 않습니다.");
+        const found = findTodoByTitle(await listMemos(supabase), parsed.data.title);
+        if (found === "ambiguous") {
+          return errorResult(call, "고칠 메모가 여러 개 일치해요. 더 정확한 제목으로 알려주세요.");
+        }
+        if (!found) return errorResult(call, "고칠 메모를 찾지 못했어요.");
+        const updated = await updateMemo(supabase, found.id, { content: parsed.data.content });
+        await reindex("memo", updated.id, parsed.data.content);
+        return {
+          id: call.id,
+          name: call.name,
+          response: { updated: { id: updated.id, title: updated.title } },
+        };
+      }
+
+      if (call.name === deleteMemoDecl.name) {
+        const parsed = byTitleArgs.safeParse(call.args);
+        if (!parsed.success) return errorResult(call, "메모 정보가 올바르지 않습니다.");
+        const found = findTodoByTitle(await listMemos(supabase), parsed.data.title);
+        if (found === "ambiguous") {
+          return errorResult(call, "지울 메모가 여러 개 일치해요. 더 정확한 제목으로 알려주세요.");
+        }
+        if (!found) return errorResult(call, "지울 메모를 찾지 못했어요.");
+        await deleteMemo(supabase, found.id);
+        await reindex("memo", found.id, "");
+        return {
+          id: call.id,
+          name: call.name,
+          response: { deleted: { id: found.id, title: found.title } },
         };
       }
 

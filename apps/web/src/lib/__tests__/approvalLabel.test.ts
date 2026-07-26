@@ -87,3 +87,38 @@ describe("formatWhen", () => {
     expect(formatWhen("내일쯤")).toBe("내일쯤");
   });
 });
+
+// 2026-07-26 (피드백 1-4): 수정·삭제. 삭제는 되돌리기 UI가 없는 경로라
+// **이 카드가 마지막 방어선**이다 — 무엇이 지워지는지, 무엇으로 바뀌는지 보여야 한다.
+describe("수정·삭제 승인 카드", () => {
+  it("삭제 대상을 제목으로 분명히 보여준다", () => {
+    expect(describeCall({ name: "deleteTodo", args: { title: "장보기" } })).toBe(
+      '할 일 삭제: "장보기"',
+    );
+  });
+
+  it("수정은 무엇을 무엇으로 바꾸는지 함께 보여준다", () => {
+    // 새 제목이 안 보이면 사용자는 무엇에 동의하는지 모른 채 누른다.
+    expect(
+      describeCall({ name: "editTodo", args: { title: "장보기", newTitle: "장 보러 가기" } }),
+    ).toContain('→ "장 보러 가기"');
+  });
+
+  it("마감일을 없애는 경우를 빈칸으로 두지 않는다", () => {
+    expect(describeCall({ name: "editTodo", args: { title: "장보기", dueDate: "" } })).toContain(
+      "마감 없앰",
+    );
+  });
+
+  it("메모 수정은 새 본문을 보여준다", () => {
+    expect(
+      describeCall({ name: "editMemo", args: { title: "회의", content: "새 내용" } }),
+    ).toContain("새 내용");
+  });
+
+  it("도구 이름이 그대로 노출되지 않는다", () => {
+    for (const name of ["editTodo", "deleteTodo", "editMemo", "deleteMemo"]) {
+      expect(describeCall({ name, args: { title: "x" } })).not.toContain(name);
+    }
+  });
+});
