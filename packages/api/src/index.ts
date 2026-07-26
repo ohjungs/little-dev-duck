@@ -29,6 +29,7 @@ export { getDuckState, applyXpAward } from "./duckState";
 
 export {
   listCalendarEvents,
+  restoreCalendarEvent,
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
@@ -39,6 +40,8 @@ export {
 export {
   listHabits,
   createHabit,
+  restoreHabit,
+  restoreHabitCheck,
   deleteHabit,
   listHabitChecks,
   HABIT_CHECK_EXPORT_LIMIT,
@@ -119,6 +122,7 @@ export {
   updatePageCover,
   softDeletePage,
   restorePage,
+  restorePageFromBackup,
   purgePage,
   publishPage,
   unpublishPage,

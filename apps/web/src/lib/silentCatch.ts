@@ -19,8 +19,10 @@
 // 새 알림 수단을 만들면 여기 추가한다(추가를 잊으면 검사가 실패하므로 조용히 새지 않는다).
 import { stripComments } from "./stripComments";
 
+// errors.push — 여러 건을 한 번에 처리하는 곳(백업 가져오기)에서 쓴다. 한 건이 실패해도 멈추지
+// 않고 계속 넣되 사유를 모아 두었다가 끝나고 함께 보여주는 방식이라, 즉시 setError를 부를 수 없다.
 const INFORMS =
-  /setError|setActionError|setState\(\s*["']error["']\s*\)|showError|setNote|flashMsg|setVersionMsg|setStandupError|console\.(error|warn)|\bthrow\b|\breturn\b/;
+  /setError|setActionError|setState\(\s*["']error["']\s*\)|showError|setNote|flashMsg|setVersionMsg|setStandupError|errors\.push|console\.(error|warn)|\bthrow\b|\breturn\b/;
 
 const HAS_COMMENT = /\/\/|\/\*/;
 

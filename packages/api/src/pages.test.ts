@@ -7,6 +7,7 @@ import {
   listChildPages,
   listPages,
   listPagesForExport,
+  restorePageFromBackup,
   listTrashedPages,
   publishPage,
   purgePage,
@@ -527,6 +528,109 @@ describe("listPagesForExport", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any;
     await expect(listPagesForExport(supabase)).rejects.toThrow("boom");
+  });
+});
+
+describe("restorePageFromBackup", () => {
+  function captureInsert() {
+    const captured: { payload?: Record<string, unknown> } = {};
+    const supabase = fakeSupabase({
+      auth: {
+        getUser: async () => ({ data: { user: { id: "99999999-9999-4999-8999-999999999999" } } }),
+      },
+      from: () => ({
+        insert: async (payload: Record<string, unknown>) => {
+          captured.payload = payload;
+          return { error: null };
+        },
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+    return { captured, supabase };
+  }
+
+  const backupPage = (over: Record<string, unknown> = {}) =>
+    ({
+      id: VALID_ROW.id,
+      userId: VALID_ROW.user_id,
+      parentId: null,
+      title: "문서",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "안녕" }] }],
+      plainText: "거짓말",
+      icon: null,
+      isTrashed: false,
+      trashedAt: null,
+      createdAt: VALID_ROW.created_at,
+      updatedAt: VALID_ROW.updated_at,
+      dbSchema: null,
+      rowProps: {},
+      isPublic: true,
+      publicSlug: "taken-slug",
+      coverUrl: null,
+      ...over,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+
+  it("같은 id로 넣는다 (계층·임베딩 참조가 끊기지 않아야 한다)", async () => {
+    const { captured, supabase } = captureInsert();
+    await restorePageFromBackup(supabase, backupPage());
+    expect(captured.payload?.id).toBe(VALID_ROW.id);
+  });
+
+  it("파일의 userId를 믿지 않고 로그인 사용자로 채운다", async () => {
+    // 남의 user_id를 실은 파일로 남의 데이터를 만들 수 없어야 한다(RLS와 별개로 계약에서도 막는다).
+    const { captured, supabase } = captureInsert();
+    await restorePageFromBackup(supabase, backupPage());
+    expect(captured.payload?.user_id).toBe("99999999-9999-4999-8999-999999999999");
+  });
+
+  it("plain_text를 파일 값이 아니라 본문에서 다시 파생한다", async () => {
+    // 손으로 편집된 파일이면 본문과 어긋나 검색 결과가 조용히 틀린다.
+    const { captured, supabase } = captureInsert();
+    await restorePageFromBackup(supabase, backupPage());
+    expect(captured.payload?.plain_text).toBe("안녕");
+  });
+
+  it("공개 상태는 복원하지 않는다", async () => {
+    // 복원했을 뿐인데 문서가 다시 인터넷에 열리면 안 되고, public_slug는 유일 제약이라
+    // 부딪히면 그 페이지가 통째로 건너뛰어진다.
+    const { captured, supabase } = captureInsert();
+    await restorePageFromBackup(supabase, backupPage());
+    expect(captured.payload).not.toHaveProperty("is_public");
+    expect(captured.payload).not.toHaveProperty("public_slug");
+  });
+
+  it("이미 있으면 성공으로 본다 (멱등 — 두 번 넣어도 안전)", async () => {
+    const supabase = fakeSupabase({
+      auth: { getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }) },
+      from: () => ({
+        insert: async () => ({ error: { code: "23505", message: "duplicate key" } }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+    await expect(restorePageFromBackup(supabase, backupPage())).resolves.toBeUndefined();
+  });
+
+  it("다른 DB 오류는 삼키지 않는다", async () => {
+    const supabase = fakeSupabase({
+      auth: { getUser: async () => ({ data: { user: { id: VALID_ROW.user_id } } }) },
+      from: () => ({
+        insert: async () => ({ error: { code: "23503", message: "foreign key violation" } }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+    await expect(restorePageFromBackup(supabase, backupPage())).rejects.toThrow(
+      "foreign key violation",
+    );
+  });
+
+  it("로그인하지 않으면 아무것도 쓰지 않는다", async () => {
+    const supabase = fakeSupabase({
+      auth: { getUser: async () => ({ data: { user: null } }) },
+    });
+    await expect(restorePageFromBackup(supabase, backupPage())).rejects.toThrow(
+      "로그인이 필요합니다.",
+    );
   });
 });
 

@@ -117,6 +117,59 @@ export async function listHabitChecks(
 // 습관 체크는 하루 × 습관 수로 빠르게 쌓여 500건은 1년도 못 간다. 행이 작아 상한을 높게 잡는다.
 export const HABIT_CHECK_EXPORT_LIMIT = 5000;
 
+// 2026-07-26 : 백업 - 가져오기 - 습관복원
+// restoreTodo/restoreMemo와 같은 계약: **같은 id로** 되살리고, 인자의 userId는 무시하고
+// 로그인 사용자로 채우며(남의 데이터를 만들 수 없어야 한다), 이미 있으면 멱등 성공으로 본다.
+// 같은 id를 유지해야 habit_checks.habit_id가 가리키는 대상이 끊기지 않는다.
+export async function restoreHabit(
+  supabase: SupabaseClient,
+  habit: Habit,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase.from("habits").insert({
+    id: habit.id,
+    user_id: user.id,
+    title: habit.title,
+    frequency: habit.frequency,
+    times_per_week: habit.timesPerWeek,
+    created_at: habit.createdAt,
+    updated_at: habit.updatedAt,
+  });
+
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}
+
+// XP를 주지 않는다. checkHabit은 체크마다 먹이·레벨을 올리는데, 복원은 과거 기록을 되돌리는
+// 것이지 오늘 습관을 수행한 게 아니다 — 백업을 두 번 넣으면 레벨이 뛰는 일이 없어야 한다.
+// (habit_id, checked_date) 유일 제약 덕에 중복 복원은 멱등이다.
+export async function restoreHabitCheck(
+  supabase: SupabaseClient,
+  check: HabitCheck,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase.from("habit_checks").insert({
+    id: check.id,
+    habit_id: check.habitId,
+    user_id: user.id,
+    checked_date: check.checkedDate,
+    created_at: check.createdAt,
+  });
+
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}
+
 export async function checkHabit(
   supabase: SupabaseClient,
   habitId: string,

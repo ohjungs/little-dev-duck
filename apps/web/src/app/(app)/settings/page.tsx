@@ -36,6 +36,7 @@ import { GmailLink } from "@/components/GmailLink";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 import { DangerZone } from "@/components/DangerZone";
 import { ExportDataButton } from "@/components/ExportDataButton";
+import { ImportDataButton } from "@/components/ImportDataButton";
 import { LocalResetButton } from "@/components/LocalResetButton";
 
 export const dynamic = "force-dynamic";
@@ -267,15 +268,17 @@ export default async function SettingsPage() {
           <CardHeader className="flex-col items-start gap-1">
             <CardTitle>
               <Download className="size-4 text-primary-accent" />
-              데이터 내보내기
+              데이터 내보내기·가져오기
             </CardTitle>
             <CardDescription>
-              할 일·메모·습관·페이지 메타데이터를 JSON 파일로 내보냅니다. 페이지 본문은 용량 상
-              제외됩니다.
+              할 일·메모·습관·습관 체크 기록·캘린더 일정·페이지(본문 포함)를 JSON 파일로
+              내보냅니다. 가져오기는 지금 데이터를 지우거나 바꾸지 않고, 이미 있는 항목은
+              건너뜁니다. 연동 계정 토큰은 안전을 위해 파일에 담지 않습니다.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-3">
             <ExportDataButton />
+            <ImportDataButton />
           </CardContent>
         </Card>
 

@@ -103,3 +103,30 @@ export async function deleteCalendarEvent(
     .eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// 2026-07-26 : 백업 - 가져오기 - 일정복원
+// restoreTodo와 같은 계약: 같은 id로 되살리고, 인자의 userId는 무시하고 로그인 사용자로
+// 채우며, 이미 있으면 멱등 성공으로 본다.
+export async function restoreCalendarEvent(
+  supabase: SupabaseClient,
+  event: CalendarEvent,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase.from("calendar_events").insert({
+    id: event.id,
+    user_id: user.id,
+    title: event.title,
+    start_at: event.startAt,
+    end_at: event.endAt,
+    created_at: event.createdAt,
+    updated_at: event.updatedAt,
+  });
+
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}

@@ -354,3 +354,49 @@ export async function getPublicPage(
     updatedAt: row.updated_at,
   };
 }
+
+// 2026-07-26 : 백업 - 가져오기 - 페이지복원
+// 이름이 restorePage가 아닌 이유: 이 저장소의 restorePage는 **휴지통에서 되돌리기**(is_trashed
+// 해제)로 이미 쓰이고 있다. 여기는 백업 파일의 행을 다시 넣는 일이라 다른 동작이다.
+//
+// restoreTodo와 같은 계약: 같은 id로 넣고(parent_id 계층과 임베딩 sourceId가 끊기지 않는다),
+// 인자의 userId는 무시하고 로그인 사용자로 채우며, 이미 있으면 멱등 성공으로 본다.
+//
+// **공개 상태는 복원하지 않는다(is_public=false, public_slug=null).** 두 가지 이유다:
+//  1) 복원했을 뿐인데 문서가 다시 인터넷에 열리면 안 된다 — 공개는 사용자가 의도적으로 하는 일이다.
+//  2) public_slug는 유일 제약이라, 남이 쓰는 슬러그와 부딪히면 23505가 나서 **그 페이지가 통째로
+//     건너뛰어진다**(중복으로 오인). 문서를 잃느니 공개 설정을 버리는 편이 낫다.
+export async function restorePageFromBackup(
+  supabase: SupabaseClient,
+  page: Page,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const content = page.content ?? [];
+  const { error } = await supabase.from("pages").insert({
+    id: page.id,
+    user_id: user.id,
+    parent_id: page.parentId,
+    title: page.title,
+    content,
+    // 파일의 plainText를 믿지 않고 본문에서 다시 파생한다 — createPage/updatePage와 같은 계약
+    // ("검색·RAG 공용이라 클라이언트를 신뢰하지 않는다"). 파일이 손으로 편집돼 본문과 어긋나
+    // 있으면 검색 결과가 조용히 틀린다.
+    plain_text: extractPlainText(content),
+    icon: page.icon,
+    is_trashed: page.isTrashed,
+    trashed_at: page.trashedAt,
+    created_at: page.createdAt,
+    updated_at: page.updatedAt,
+    db_schema: page.dbSchema,
+    row_props: page.rowProps,
+    cover_url: page.coverUrl,
+  });
+
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}
