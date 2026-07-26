@@ -54,6 +54,9 @@ export const messageSchema = z
     // **URL이 아니라 경로다** — 버킷이 비공개라 URL은 서명이 붙어 만료된다.
     // 만료된 URL을 저장해 두면 나중에 열리지 않는다.
     attachmentPath: z.string().max(300).nullable(),
+    // 답장 대상 메시지 id. 원본이 하드 삭제되면 null이 된다 —
+    // **답장이 함께 사라지면 안 되기 때문**이다(평소 삭제는 소프트 삭제라 원본 행은 남는다).
+    replyToId: z.string().uuid().nullable(),
     deletedAt: z.string().datetime({ offset: true }).nullable(),
     createdAt: z.string().datetime({ offset: true }),
   })
@@ -164,4 +167,25 @@ export function likePattern(raw: string): string | null {
     .replace(/%/g, "\\%")
     .replace(/_/g, "\\_");
   return `%${escaped}%`;
+}
+
+/**
+ * 답장 미리보기 문구. **원본을 목록에서 찾지 못하면 "찾을 수 없다"고 말한다** —
+ * 빈칸으로 두면 답장인지 아닌지도 알 수 없다(오래돼 창 밖으로 나간 원본이 흔하다).
+ */
+export const REPLY_MISSING_TEXT = "원본을 불러오지 못했어요";
+export const REPLY_PREVIEW_MAX = 40;
+
+export function replyPreview(
+  replyToId: string | null,
+  pool: readonly Pick<Message, "id" | "body" | "deletedAt">[],
+): string | null {
+  if (!replyToId) return null;
+  const target = pool.find((m) => m.id === replyToId);
+  if (!target) return REPLY_MISSING_TEXT;
+  const text = messageBody(target);
+  const chars = [...text];
+  return chars.length > REPLY_PREVIEW_MAX
+    ? `${chars.slice(0, REPLY_PREVIEW_MAX - 1).join("")}…`
+    : text;
 }

@@ -26,6 +26,7 @@ import {
   checkMessageImage,
   messageAttachment,
   messageBody,
+  replyPreview,
   pendingMigrationMessage,
   resizeTarget,
   afterSend,
@@ -78,6 +79,8 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 타이머가 없으면 화면을 새로 열기 전까지 "꺼짐"으로 남아 있다.
   const [muted, setMuted] = useState(false);
   const [pinnedAt, setPinnedAt] = useState<string | null>(null);
+  // 답장 대상. 보내고 나면 비운다 — 안 비우면 다음 말도 계속 답장이 된다.
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -332,7 +335,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
         body,
         // 재시도해도 같은 값이어야 중복이 걸러진다 — 전송마다 새로 만들지 않는다.
         clientMsgId: crypto.randomUUID(),
+        replyToId: replyTo?.id ?? null,
       });
+      setReplyTo(null);
       // 같은 id가 이미 있으면 갈아끼운다(실시간 이벤트가 먼저 도착했을 수 있다).
       setMessages((prev) =>
         prev.some((m) => m.id === saved.id) ? prev : [...prev, saved],
@@ -405,6 +410,12 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                     mine ? "bg-primary text-primary-foreground" : "bg-muted"
                   } ${m.deletedAt ? "italic opacity-60" : ""}`}
                 >
+                  {/* 답장이면 원본을 먼저 보여 준다 — 무엇에 대한 말인지 알아야 읽힌다. */}
+                  {m.replyToId && (
+                    <span className="mb-0.5 block border-l-2 border-current pl-1 text-[10px] opacity-70">
+                      {replyPreview(m.replyToId, messages)}
+                    </span>
+                  )}
                   {/* 평문 렌더 — HTML로 그리지 않는다(에이전트 응답이 섞인다). */}
                   {messageBody(m)}
                 </span>
@@ -450,6 +461,17 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                     <button
                       type="button"
                       role="menuitem"
+                      onClick={() => {
+                        setReplyTo(m);
+                        setMenuFor(null);
+                      }}
+                      className="px-3 py-1.5 text-xs hover:bg-accent"
+                    >
+                      답장
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
                       onClick={() => handleCopy(m.body)}
                       className="px-3 py-1.5 text-xs hover:bg-accent"
                     >
@@ -479,6 +501,22 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
         <p role="alert" className="border-t border-border px-3 py-2 text-xs text-destructive break-keep">
           {error}
         </p>
+      )}
+
+      {replyTo && (
+        <div className="flex items-center gap-2 border-t border-border px-2 py-1 text-xs">
+          <span className="truncate text-muted-foreground">
+            답장: {replyPreview(replyTo.id, messages)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setReplyTo(null)}
+            aria-label="답장 취소"
+            className="ml-auto rounded border border-border px-2 py-0.5"
+          >
+            취소
+          </button>
+        </div>
       )}
 
       <form onSubmit={handleSend} className="flex gap-2 border-t border-border p-2">

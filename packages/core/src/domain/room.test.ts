@@ -6,6 +6,8 @@ import {
   messageSchema,
   isRoomMuted,
   likePattern,
+  replyPreview,
+  REPLY_MISSING_TEXT,
   MUTE_DURATIONS,
   roomMemberSchema,
   sortRooms,
@@ -29,7 +31,7 @@ describe("메시지 계약", () => {
   it("사람이 보낸 메시지는 보낸 사람이 있어야 한다", () => {
     const base = {
       id: U1, roomId: U2, senderType: "user" as const, type: "text" as const,
-      body: "안녕", clientMsgId: "c1", seq: 1, attachmentPath: null, deletedAt: null, createdAt: ISO,
+      body: "안녕", clientMsgId: "c1", seq: 1, attachmentPath: null, replyToId: null, deletedAt: null, createdAt: ISO,
     };
     expect(messageSchema.safeParse({ ...base, senderUserId: U1 }).success).toBe(true);
     // 보낸 사람 없이 "사람이 보냈다"고 하면 화면이 누가 썼는지 못 그린다.
@@ -39,7 +41,7 @@ describe("메시지 계약", () => {
   it("에이전트 메시지는 보낸 사람이 없어야 한다", () => {
     const base = {
       id: U1, roomId: U2, senderType: "agent" as const, type: "text" as const,
-      body: "꽥", clientMsgId: "c2", seq: 2, attachmentPath: null, deletedAt: null, createdAt: ISO,
+      body: "꽥", clientMsgId: "c2", seq: 2, attachmentPath: null, replyToId: null, deletedAt: null, createdAt: ISO,
     };
     expect(messageSchema.safeParse({ ...base, senderUserId: null }).success).toBe(true);
     expect(messageSchema.safeParse({ ...base, senderUserId: U1 }).success).toBe(false);
@@ -48,7 +50,7 @@ describe("메시지 계약", () => {
   it("빈 본문과 4000자 초과는 거부한다", () => {
     const base = {
       id: U1, roomId: U2, senderUserId: null, senderType: "agent" as const,
-      type: "text" as const, clientMsgId: "c3", seq: 3, attachmentPath: null, deletedAt: null, createdAt: ISO,
+      type: "text" as const, clientMsgId: "c3", seq: 3, attachmentPath: null, replyToId: null, deletedAt: null, createdAt: ISO,
     };
     expect(messageSchema.safeParse({ ...base, body: "" }).success).toBe(false);
     expect(messageSchema.safeParse({ ...base, body: "x".repeat(4001) }).success).toBe(false);
@@ -215,5 +217,37 @@ describe("검색 패턴", () => {
 
   it("한글·이모지가 깨지지 않는다", () => {
     expect(likePattern("오리 🦆")).toBe("%오리 🦆%");
+  });
+});
+
+// 2026-07-27 : 메신저 - 답장 미리보기 (Phase 51)
+describe("답장 미리보기", () => {
+  const pool = [
+    { id: "m1", body: "원본 메시지", deletedAt: null },
+    { id: "m2", body: "지운 것", deletedAt: ISO },
+  ];
+
+  it("답장이 아니면 null", () => {
+    expect(replyPreview(null, pool)).toBeNull();
+  });
+
+  it("원본 본문을 보여 준다", () => {
+    expect(replyPreview("m1", pool)).toBe("원본 메시지");
+  });
+
+  it("원본을 못 찾으면 빈칸이 아니라 사실을 말한다", () => {
+    // 오래돼 창 밖으로 나간 원본이 흔하다. 빈칸이면 답장인지도 알 수 없다.
+    expect(replyPreview("없는-id", pool)).toBe(REPLY_MISSING_TEXT);
+  });
+
+  it("지운 원본은 삭제 문구로 보여 준다 (본문이 새지 않는다)", () => {
+    expect(replyPreview("m2", pool)).not.toContain("지운 것");
+  });
+
+  it("긴 원본은 코드 포인트 단위로 줄인다 (이모지가 깨지지 않게)", () => {
+    const long = { id: "m3", body: "가".repeat(100), deletedAt: null };
+    const out = replyPreview("m3", [...pool, long])!;
+    expect([...out].length).toBeLessThanOrEqual(40);
+    expect(out.endsWith("…")).toBe(true);
   });
 });

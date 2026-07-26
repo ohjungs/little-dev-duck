@@ -41,6 +41,7 @@ type MessageRow = {
   client_msg_id: string;
   seq: number;
   attachment_path: string | null;
+  reply_to_id: string | null;
   deleted_at: string | null;
   created_at: string;
 };
@@ -67,6 +68,7 @@ function messageFromRow(row: MessageRow): Message {
     clientMsgId: row.client_msg_id,
     seq: Number(row.seq),
     attachmentPath: row.attachment_path,
+    replyToId: row.reply_to_id,
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
   });
@@ -119,6 +121,8 @@ export type SendMessageInput = {
   clientMsgId: string;
   /** 첨부 이미지의 스토리지 경로. 먼저 올린 뒤 그 경로를 넘긴다. */
   attachmentPath?: string | null;
+  /** 답장 대상 메시지 id. 같은 방의 것이어야 한다(다른 방 id는 RLS에 막혀 미리보기가 빈다). */
+  replyToId?: string | null;
 };
 
 // Postgres 유니크 위반. PostgREST가 그대로 흘려 준다.
@@ -152,6 +156,7 @@ export async function sendMessage(
       body,
       client_msg_id: input.clientMsgId,
       attachment_path: input.attachmentPath ?? null,
+      reply_to_id: input.replyToId ?? null,
     })
     .select()
     .single();
