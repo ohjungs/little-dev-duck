@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { DuckLogo } from "@/components/DuckLogo";
+import { AnimatedDuckLogo } from "@/components/AnimatedDuckLogo";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
@@ -91,7 +91,7 @@ function Brand() {
   return (
     <Link href="/" className="flex items-center gap-2.5 px-2">
       <span className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
-        <DuckLogo size={24} />
+        <AnimatedDuckLogo size={24} />
       </span>
       <span className="text-sm font-semibold tracking-tight">
         Little Dev Duck
@@ -125,7 +125,7 @@ export function AppSidebar({
       <div className={cn("py-2", collapsed && "flex justify-center")}>
         {collapsed ? (
           <Link href="/" className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
-            <DuckLogo size={24} />
+            <AnimatedDuckLogo size={24} />
           </Link>
         ) : (
           <Brand />

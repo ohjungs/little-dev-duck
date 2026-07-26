@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePrefersReducedMotion } from "@ldd/mascot";
 import {
   getDuckVideoSpec,
@@ -20,11 +20,15 @@ import {
 type DuckVideoProps = {
   surface: DuckVideoSurface;
   className?: string;
+  // 영상을 못 받았을 때 대신 그릴 것. 로고처럼 **비면 자리가 뚫려 보이는** 곳에서 쓴다
+  // (poster도 같이 실패할 수 있고, 그때 <video>는 아무것도 그리지 않는다).
+  fallback?: ReactNode;
 };
 
-export function DuckVideo({ surface, className }: DuckVideoProps) {
+export function DuckVideo({ surface, className, fallback }: DuckVideoProps) {
   const reducedMotion = usePrefersReducedMotion();
   const ref = useRef<HTMLVideoElement>(null);
+  const [failed, setFailed] = useState(false);
   const spec = getDuckVideoSpec(surface);
 
   useEffect(() => {
@@ -42,6 +46,8 @@ export function DuckVideo({ surface, className }: DuckVideoProps) {
     void video.play().catch(() => {});
   }, [reducedMotion]);
 
+  if (failed && fallback) return <>{fallback}</>;
+
   return (
     <video
       ref={ref}
@@ -52,6 +58,7 @@ export function DuckVideo({ surface, className }: DuckVideoProps) {
       playsInline
       preload="none"
       disablePictureInPicture
+      onError={() => setFailed(true)}
       aria-label={spec.label}
       role="img"
       className={className}

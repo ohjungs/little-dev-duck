@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import {
   DUCK_QUACK_EMBLEM_BOUNDS,
@@ -64,7 +64,7 @@ describe("getDuckVideoSpec", () => {
   });
 
   it("참조하는 mp4와 포스터가 public에 실제로 존재한다", () => {
-    for (const surface of ["login", "welcome"] as const) {
+    for (const surface of ["login", "welcome", "logo"] as const) {
       const spec = getDuckVideoSpec(surface);
       for (const asset of [spec.src, spec.poster]) {
         expect(
@@ -76,8 +76,35 @@ describe("getDuckVideoSpec", () => {
   });
 
   it("대체 텍스트가 비어 있지 않다", () => {
-    expect(getDuckVideoSpec("login").label.length).toBeGreaterThan(0);
-    expect(getDuckVideoSpec("welcome").label.length).toBeGreaterThan(0);
+    for (const surface of ["login", "welcome", "logo"] as const) {
+      expect(getDuckVideoSpec(surface).label.length, surface).toBeGreaterThan(0);
+    }
+  });
+
+  // 2026-07-26 (피드백 1-6): 로고는 24px인데 랜딩 영상은 1280x720이다. 그걸 그대로 쓰면
+  // 브라우저가 24px을 그리려고 720p 프레임을 **모든 앱 화면에서 상시** 디코딩한다.
+  // 로고용으로 줄인 파일을 쓰는 것이 이 변경의 핵심이라, 되돌아가면 실패하게 잠근다.
+  it("로고는 랜딩용 720p 원본을 쓰지 않는다", () => {
+    const logo = getDuckVideoSpec("logo");
+    const welcome = getDuckVideoSpec("welcome");
+    expect(logo.src).not.toBe(welcome.src);
+    expect(logo.source.w).toBeLessThanOrEqual(128);
+    expect(logo.source.h).toBeLessThanOrEqual(128);
+  });
+
+  it("로고 영상은 정사각이고 반복 재생한다", () => {
+    // "계속 움직이는것처럼" — 한 번 재생하고 멈추면 요구를 만족하지 못한다.
+    const logo = getDuckVideoSpec("logo");
+    expect(logo.loop).toBe(true);
+    expect(logo.aspectRatio).toBe(1);
+    expect(logo.source.w).toBe(logo.source.h);
+  });
+
+  it("로고 파일이 원본보다 확실히 작다 (상시 노출이라 무게가 곧 비용)", () => {
+    const sizeOf = (p: string) => statSync(path.join(PUBLIC_DIR, p)).size;
+    expect(sizeOf(getDuckVideoSpec("logo").src)).toBeLessThan(
+      sizeOf(getDuckVideoSpec("welcome").src) / 4,
+    );
   });
 });
 

@@ -4,7 +4,7 @@
 // 로그인 영상은 잘린 창이 엠블럼(아치 문구~리본)을 침범하지 않는지 테스트로 지킨다.
 // 영상을 교체하면 source 크기와 EMBLEM_BOUNDS를 다시 재야 한다.
 
-export type DuckVideoSurface = "welcome" | "login";
+export type DuckVideoSurface = "welcome" | "login" | "logo";
 
 export interface Size {
   w: number;
@@ -51,6 +51,20 @@ const SPECS: Record<DuckVideoSurface, DuckVideoSpec> = {
     aspectRatio: 0.94,
     objectPosition: { x: 0.5, y: 0.395 },
     label: "꽥 하고 우는 아기오리 오프닝",
+  },
+  // 2026-07-26 (피드백 1-6): 좌상단 로고를 움직이는 오리로.
+  // **duck-idle.mp4를 그대로 쓰지 않는다.** 로고는 24px인데 원본은 1280x720이라, 브라우저가
+  // 24px짜리를 그리려고 720p 프레임을 계속 디코딩하게 된다 — 그것도 **모든 앱 화면에서 상시로**.
+  // 같은 영상에서 가운데를 정사각으로 잘라 96px로 줄인 파일을 따로 만들었다(311KB → 24.8KB).
+  // 외형은 원본 그대로다. 이미 정사각이라 여기서 크롭이 더 일어나지 않는다.
+  logo: {
+    src: "/duck-logo-96.mp4",
+    poster: "/duck-logo-96-poster.jpg",
+    source: { w: 96, h: 96 },
+    loop: true,
+    aspectRatio: 1,
+    objectPosition: { x: 0.5, y: 0.5 },
+    label: "아기오리 로고",
   },
 };
 
