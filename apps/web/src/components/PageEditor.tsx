@@ -22,8 +22,6 @@ import {
   Star,
   Table2,
   Play,
-  Printer,
-  Upload,
   X,
 } from "lucide-react";
 import type { Block } from "@blocknote/core";
@@ -49,6 +47,7 @@ import {
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { PageExportDialog } from "@/components/PageExportDialog";
 import { VersionHistory } from "@/components/VersionHistory";
 import { DatabaseView } from "@/components/DatabaseView";
 import { AiWriteAssistant } from "@/components/AiWriteAssistant";
@@ -182,6 +181,8 @@ export function PageEditor({
   const [showVersions, setShowVersions] = useState(false);
   const [versionMsg, setVersionMsg] = useState<string | null>(null);
   const [textCopied, setTextCopied] = useState(false);
+  // 내보내기·가져오기 모달 열림 상태(Phase 43 T1). 동작은 전부 기존 핸들러가 한다.
+  const [exportOpen, setExportOpen] = useState(false);
   // Phase 11: 이 페이지가 데이터베이스면 dbSchema 설정. 전환/스키마편집은 로컬 상태 + db_schema 저장.
   const [dbSchema, setDbSchema] = useState<DbSchema | null>(page.dbSchema);
 
@@ -533,32 +534,19 @@ export function PageEditor({
         >
           <Copy className="size-3.5" /> 복제
         </Button>
+        {/* 2026-07-27 (2차 피드백 2-2, Phase 43 T1): 흩어져 있던 다섯 컨트롤
+            (Markdown 내보내기 · 템플릿으로 저장 · 인쇄·PDF · 텍스트 복사 · 가져오기)을
+            모달 하나로 모았다. **동작은 하나도 바꾸지 않았다** — 모달이 같은 핸들러를 부른다.
+            도구 모음이 넘치던 근본 원인이 버튼 수라서(Phase 42 T1은 `flex-wrap`으로 증상만
+            막았다), 다섯 자리가 하나로 준다. 발표는 자주 쓰는 단독 동작이라 남긴다. */}
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          onClick={handleExport}
+          onClick={() => setExportOpen(true)}
           className="text-muted-foreground"
         >
-          <Download className="size-3.5" /> Markdown 내보내기
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleExportTemplate}
-          className="text-muted-foreground"
-        >
-          <Download className="size-3.5" /> 템플릿으로 저장
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handlePrint}
-          className="text-muted-foreground"
-        >
-          <Printer className="size-3.5" /> 인쇄 · PDF
+          <Download className="size-3.5" /> 내보내기 · 가져오기
         </Button>
         <Button
           type="button"
@@ -569,24 +557,6 @@ export function PageEditor({
         >
           <Play className="size-3.5" /> 발표
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleCopyText}
-          className="text-muted-foreground"
-        >
-          {textCopied ? "복사됨!" : "텍스트 복사"}
-        </Button>
-        <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-          <Upload className="size-3.5" /> 가져오기
-          <input
-            type="file"
-            accept=".md,.markdown,text/markdown"
-            onChange={handleImportFile}
-            className="hidden"
-          />
-        </label>
         {!dbSchema && (
           <Button
             type="button"
@@ -631,6 +601,16 @@ export function PageEditor({
           </Button>
         )}
       </div>
+      <PageExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        onExportMarkdown={handleExport}
+        onExportTemplate={handleExportTemplate}
+        onPrint={handlePrint}
+        onCopyText={handleCopyText}
+        onImportFile={handleImportFile}
+        textCopied={textCopied}
+      />
       {showVersions && (
         <VersionHistory
           pageId={page.id}
