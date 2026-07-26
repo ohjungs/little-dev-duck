@@ -472,6 +472,15 @@ export {
   PASSWORD_RESET_LINK_EXPIRED_MESSAGE,
 } from "./domain/auth-error";
 export { untrustedTextRule } from "./domain/untrusted-text";
+export {
+  buildDuckLinePrompt,
+  parseDuckLine,
+  DUCK_LINE_MOODS,
+  DUCK_LINE_MAX_CHARS,
+  type DuckLineFacts,
+  type DuckLineMood,
+  type DuckLineResult,
+} from "./domain/duck-line-prompt";
 export { buildArticleSummaryPrompt } from "./domain/news-summary-prompt";
 export { parseBackup, type BackupParseResult } from "./domain/backup-parse";
 export {

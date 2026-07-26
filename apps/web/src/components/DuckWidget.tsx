@@ -156,7 +156,24 @@ export function DuckWidget() {
         : false;
       const picked = pickFromSnapshot(snapshot, { now, today, quiet });
       if (!picked) return;
+      // **템플릿 문장을 먼저 띄운다.** LLM 응답을 기다리며 비워 두면 오리가 늦게 말하는 것처럼
+      // 보이고, 응답이 실패하면 아예 말을 못 한다. 저하 모드가 곧 기존 동작이라 이게 안전하다.
       setInitiative(picked.message);
+      // 2026-07-27 (2차 피드백 1-3, Phase 45 T1): 같은 사실을 매번 다르게 말하게 한다.
+      // 규칙이 "무엇을"을 정하고 LLM은 "어떻게"만 바꾼다 — 사실은 picked.message에서 온다.
+      // 실패·쿼터 초과는 서버가 `line: null`로 답하고, 그러면 위 템플릿이 그대로 남는다.
+      void fetch("/api/ai/duck-line", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ factLine: picked.message, mood: picked.mood }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: { line?: string | null } | null) => {
+          if (data?.line) setInitiative(data.line);
+        })
+        .catch(() => {
+          // 네트워크 실패도 조용히 넘긴다 — 오리 위젯이 죽는 것보다 템플릿 문장이 낫다.
+        });
       // 일정은 시간이 지나면 되돌릴 수 없다 — 탭이 뒤에 있어도 보이도록 알림도 함께 띄운다.
       // 권한·방해금지·하루 상한은 notifyDuck이 알아서 판단한다.
       if (picked.kind === "upcomingEvent") notifyDuck("곧 일정이 있어요", picked.message);

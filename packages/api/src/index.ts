@@ -68,6 +68,7 @@ export {
   GEMINI_GEN_MODEL,
 } from "./gemini";
 export { assistWrite } from "./aiWrite";
+export { generateDuckLine } from "./duckLine";
 
 export {
   upsertEmbedding,
