@@ -396,6 +396,9 @@ export {
 export { findPath } from "./domain/office-pathfind";
 export {
   mapWorkspaceToOfficeTasks,
+  OFFICE_TASK_SOURCES,
+  departmentsForSource,
+  type OfficeTaskSource,
   OFFICE_TASK_LIMITS,
   type OfficeTask,
 } from "./domain/office-tasks";

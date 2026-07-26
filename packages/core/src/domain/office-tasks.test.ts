@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { mapWorkspaceToOfficeTasks, OFFICE_TASK_LIMITS } from "./office-tasks";
+import { mapWorkspaceToOfficeTasks, OFFICE_TASK_LIMITS,
+  OFFICE_TASK_SOURCES,
+  departmentsForSource,
+} from "./office-tasks";
 import { DEPARTMENTS } from "./office-department";
 import type { Todo } from "./todo";
 import type { Page } from "./page";
@@ -101,7 +104,11 @@ describe("mapWorkspaceToOfficeTasks", () => {
     expect(tasks.every((t) => t.progress === 30)).toBe(true);
   });
 
-  it("부서는 완료 항목을 건너뛰고 라운드로빈 배분(deptIdx는 스킵 시 증가 안 함)", () => {
+  // 2026-07-27 정정 (2차 피드백 5-1·5-3, Phase 48 T1)
+  // 이 검사는 **일의 종류를 보지 않는 전역 라운드로빈**을 잠그고 있었다. 그게 바로 사용자가
+  // 지적한 문제다("개발자 오리가 습관 체크를 하고 있다") — 계약이 바뀌었으므로 검사도 바꾼다.
+  // 지금 지켜야 할 성질: 완료 항목은 건너뛰고, 남은 것은 **할 일을 받는 부서 안에서만** 돈다.
+  it("완료 항목은 건너뛰고, 할 일을 받는 부서 안에서만 순환한다", () => {
     const tasks = mapWorkspaceToOfficeTasks(
       [todo({ title: "A" }), todo({ title: "B", isDone: true }), todo({ title: "C" })],
       [],
@@ -109,9 +116,10 @@ describe("mapWorkspaceToOfficeTasks", () => {
       [],
       [],
     );
-    // 스킵된 B는 deptIdx를 소비하지 않으므로 A=0, C=1
-    expect(tasks[0]!.department).toBe(DEPARTMENTS[0]);
-    expect(tasks[1]!.department).toBe(DEPARTMENTS[1]);
+    const pool = departmentsForSource("todo");
+    expect(tasks.map((t) => t.title)).toEqual(["A", "C"]);
+    expect(tasks[0]!.department).toBe(pool[0]);
+    expect(tasks[1]!.department).toBe(pool[1 % pool.length]);
   });
 
   it("페이지는 progress=50, 최신 20개만, 빈 제목은 '문서 작업' 폴백", () => {
@@ -151,8 +159,9 @@ describe("mapWorkspaceToOfficeTasks", () => {
     expect(tasks.every((t) => t.progress === 100)).toBe(true);
   });
 
-  it("포모도로 부서는 deptIdx % 3으로 배분(앞 3개 부서 순환)", () => {
-    // 투두 4개(deptIdx 0..3 소비) 후 포모도로 → deptIdx=4 → 4%3=1
+  // 2026-07-27 정정: 포모도로는 **개발 직무 안에서만** 돈다(요청: 개발자는 "개발 건만").
+  // 전에는 앞 3개 부서를 돌았는데 그 순서가 우연히 개발 직무와 겹쳤을 뿐 계약이 아니었다.
+  it("포모도로는 개발 직무 안에서만 배분된다", () => {
     const tasks = mapWorkspaceToOfficeTasks(
       [todo(), todo(), todo(), todo()],
       [],
@@ -160,8 +169,10 @@ describe("mapWorkspaceToOfficeTasks", () => {
       [pomo({ completedAt: ISO })],
       [],
     );
-    const pomoTask = tasks[4]!;
-    expect(pomoTask.department).toBe(DEPARTMENTS[4 % 3]);
+    const pomoTask = tasks.find((t) => t.progress === 100)!;
+    expect(departmentsForSource("pomodoro")).toContain(pomoTask.department);
+    // 할 일이 앞에 몇 개 있든 포모도로 배분에 영향을 주지 않는다(종류별 커서가 따로다).
+    expect(pomoTask.department).toBe(departmentsForSource("pomodoro")[0]);
   });
 
   it("캘린더는 '[일정] ' 접두 + progress=0, 최신 15개만", () => {
@@ -172,10 +183,65 @@ describe("mapWorkspaceToOfficeTasks", () => {
     expect(tasks.length).toBe(OFFICE_TASK_LIMITS.events);
   });
 
-  it("deptIdx는 카테고리 전체에 걸쳐 연속 증가한다", () => {
-    // 투두 1 + 습관 1 → deptIdx: todo=0, habit=1
-    const tasks = mapWorkspaceToOfficeTasks([todo()], [], [habit()], [], []);
-    expect(tasks[0]!.department).toBe(DEPARTMENTS[0]);
-    expect(tasks[1]!.department).toBe(DEPARTMENTS[1]);
+  // 2026-07-27 정정: 커서를 **종류마다 따로** 둔다. 전에는 하나로 이어져서 앞선 종류의 개수가
+  // 뒤 종류의 부서를 바꿨다 — 할 일이 몇 개냐에 따라 습관이 어느 부서로 갈지 달라졌다는 뜻이다.
+  it("종류마다 커서가 따로다 (앞 종류의 개수가 뒤 종류 배분을 바꾸지 않는다)", () => {
+    const withTodo = mapWorkspaceToOfficeTasks([todo()], [], [habit()], [], []);
+    const withoutTodo = mapWorkspaceToOfficeTasks([], [], [habit()], [], []);
+    const habitDept = (list: typeof withTodo) =>
+      list.find((t) => t.title.startsWith("[습관]"))!.department;
+    expect(habitDept(withTodo)).toBe(habitDept(withoutTodo));
+  });
+});
+
+// 2026-07-27 : 오피스 - 직무별 원천 (2차 피드백 5-1·5-3, Phase 48 T1)
+// **사용자가 "개발자 오리가 습관 체크를 하고 있다"를 봤다.** 원인은 배분이 일의 종류를 보지 않고
+// 부서를 순서대로 돌린 것이었다. 여기서 잠그는 건 "종류에 맞는 부서에만 간다"는 성질이다.
+describe("직무별 작업 원천", () => {
+  const todo = (title: string) => ({
+    id: "t", userId: "u", title, isDone: false, dueDate: null, recurrence: null,
+    createdAt: "2026-07-27T00:00:00.000Z", updatedAt: "2026-07-27T00:00:00.000Z",
+  }) as never;
+  const habit = (title: string) => ({
+    id: "h", userId: "u", title, createdAt: "2026-07-27T00:00:00.000Z",
+  }) as never;
+
+  it("습관은 개발 직무(engineering·qa)로 가지 않는다", () => {
+    // 사용자가 실제로 본 그 화면이다 — 개발자 오리가 습관 체크를 들고 있었다.
+    const tasks = mapWorkspaceToOfficeTasks([], [], [habit("물 마시기"), habit("스트레칭")], [], []);
+    expect(tasks.length).toBeGreaterThan(0);
+    for (const t of tasks) {
+      expect(t.title).toContain("[습관]");
+      expect(["engineering", "qa"]).not.toContain(t.department);
+    }
+  });
+
+  it("할 일은 요청이 명시한 인사팀 계열로 간다", () => {
+    const tasks = mapWorkspaceToOfficeTasks([todo("보고서 쓰기")], [], [], [], []);
+    expect(departmentsForSource("todo")).toContain("hr");
+    expect(departmentsForSource("todo")).toContain(tasks[0].department);
+  });
+
+  it("모든 부서가 원천 매핑을 갖는다 (빠지면 그 부서는 영영 일이 없다)", () => {
+    for (const dept of DEPARTMENTS) {
+      expect(OFFICE_TASK_SOURCES[dept], `${dept}에 매핑이 없다`).toBeDefined();
+    }
+  });
+
+  it("모든 원천이 최소 한 부서에 배정된다 (아무도 안 받으면 그 데이터는 사라진다)", () => {
+    for (const source of ["todo", "page", "habit", "pomodoro", "event"] as const) {
+      expect(departmentsForSource(source).length, `${source}를 받는 부서가 없다`).toBeGreaterThan(0);
+    }
+  });
+
+  it("배분이 결정적이다 (같은 입력에 같은 결과)", () => {
+    const input = () =>
+      mapWorkspaceToOfficeTasks([todo("a"), todo("b"), todo("c")], [], [], [], []);
+    expect(input()).toEqual(input());
+  });
+
+  it("일이 없으면 아무 업무도 만들지 않는다 (쉬는 중 계약)", () => {
+    // 1차 5-7의 "일하는 척"으로 되돌아가지 않게 — 없는 업무를 지어내지 않는다.
+    expect(mapWorkspaceToOfficeTasks([], [], [], [], [])).toEqual([]);
   });
 });
