@@ -1,5 +1,6 @@
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
+import { assertNoUnsafeStaticPages } from "./buildStaticGuard";
 
 // 2026-07-26 : e2e - 검증신뢰성 - 낡은빌드차단
 // playwright.config의 webServer는 `next start` — **미리 빌드된 결과물**을 서빙하는 프로덕션
@@ -80,8 +81,14 @@ export function staleBuildReason(): string | null {
 }
 
 export default function globalSetup(): void {
+  // 2026-07-26 (Phase 38): 빌드 산출물을 보는 검사가 하나 더 붙었다 — 정적으로 구워진 HTML
+  // 페이지가 있으면 nonce CSP에 스크립트가 전부 막힌다. 여기가 빌드 직후에 도는 유일한 자리다.
+  // 낡은 빌드를 먼저 거른 뒤에 봐야 의미가 있으므로 순서는 아래(staleBuildReason)가 먼저다.
   const reason = staleBuildReason();
-  if (!reason) return;
+  if (!reason) {
+    assertNoUnsafeStaticPages(path.join(WEB_ROOT, ".next"));
+    return;
+  }
   throw new Error(
     [
       `e2e를 중단합니다 — ${reason}`,
