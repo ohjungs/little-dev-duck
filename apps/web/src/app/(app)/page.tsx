@@ -6,6 +6,7 @@ import { MemoWidget } from "@/components/MemoWidget";
 import { CalendarWidget } from "@/components/CalendarWidget";
 import { HabitWidget } from "@/components/HabitWidget";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
+import { NewsTopWidget } from "@/components/NewsTopWidget";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { DashboardGrid } from "@/components/DashboardGrid";
 import { LastPageLink } from "@/components/LastPageLink";
@@ -126,6 +127,11 @@ export default async function DashboardPage() {
             id: "calendar",
             label: "캘린더",
             children: <CalendarWidget />,
+          },
+          {
+            id: "news-top",
+            label: "오늘의 뉴스",
+            children: <NewsTopWidget />,
           },
         ]}
       />

@@ -162,15 +162,45 @@ describe("collectFeed", () => {
     const { supabase } = fakeSupabase();
     // 등록된 사이트 홈이 HTML만 반환하고, 그 안의 RSS 링크가 내부 메타데이터 주소를 가리키는 경우.
     const html = `<html><head><link rel="alternate" type="application/rss+xml" href="http://169.254.169.254/latest/meta-data/"></head></html>`;
-    let calls = 0;
+    const requested: string[] = [];
     const countingFetch = (async (url: string) => {
-      calls += 1;
+      requested.push(url);
       return { ok: true, url, text: async () => html } as unknown as Response;
     }) as unknown as typeof fetch;
     const result = await collectFeed(supabase, baseFeed(), { fetchImpl: countingFetch });
-    // 원 피드 1회만 fetch — 사설 대역 발견 URL은 fetch 전 차단돼 두 번째 요청이 나가지 않는다.
-    expect(calls).toBe(1);
+    // 2026-07-26: 호출 "횟수"가 아니라 **어디로 나갔는지**를 단언한다. 관용 경로 폴백이 붙으면서
+    // 정상 후보 요청 수는 늘어나는데(그건 의도), 안전 속성은 "사설 대역으로는 한 번도 안 나간다"다.
+    // 횟수로 잠그면 폴백을 늘릴 때마다 안전과 무관하게 테스트가 깨지고, 숫자만 고치다 보면
+    // 정작 사설 요청이 새어도 통과하게 된다.
+    expect(requested.some((u) => u.includes("169.254.169.254"))).toBe(false);
+    expect(requested.every((u) => u.startsWith("https://ex.com"))).toBe(true);
     expect(result.inserted).toBe(0);
+  });
+
+  it("사이트가 RSS를 광고하지 않아도 관용 경로(/rss.xml 등)로 찾아낸다", async () => {
+    const { supabase, state } = fakeSupabase();
+    const html = `<html><head><title>피드 링크가 없는 사이트</title></head><body>hi</body></html>`;
+    const requested: string[] = [];
+    const pathFetch = (async (url: string) => {
+      requested.push(url);
+      // /feed 만 진짜 피드다 — 그 앞의 후보(/rss.xml)는 HTML을 돌려준다.
+      const body = url.endsWith("/feed") ? TWO_ITEMS : html;
+      return { ok: true, url, text: async () => body } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const result = await collectFeed(supabase, baseFeed(), { fetchImpl: pathFetch });
+    expect(result.inserted).toBe(2);
+    // 다음 수집부터 곧장 가도록 feeds.url을 발견한 주소로 갱신한다.
+    expect(state.feedUpdates.some((u) => u.url === "https://ex.com/feed")).toBe(true);
+  });
+
+  it("관용 경로를 다 두드려도 없으면 조용히 0건이다(예외 아님)", async () => {
+    const { supabase } = fakeSupabase();
+    const html = `<html><head></head><body>no feed anywhere</body></html>`;
+    const htmlFetch = (async (url: string) =>
+      ({ ok: true, url, text: async () => html }) as unknown as Response) as unknown as typeof fetch;
+    const result = await collectFeed(supabase, baseFeed(), { fetchImpl: htmlFetch });
+    expect(result.inserted).toBe(0);
+    expect(result.paused).toBe(false);
   });
 });
 
@@ -226,6 +256,23 @@ describe("addFeed", () => {
     await expect(
       addFeed(addFeedSupabase({}), { url: "그냥 텍스트" }),
     ).rejects.toThrow("올바른 URL");
+  });
+
+  // 2026-07-26 : 뉴스 - 피드등록 - velog
+  // 사용자가 velog 주소를 넣었을 때 "등록은 됐는데 0건"이 되지 않아야 한다.
+  it("velog 사용자 주소는 실제 피드 주소로 바꿔 저장한다", async () => {
+    const captured: { url?: string } = {};
+    await addFeed(addFeedSupabase(captured), { url: "https://velog.io/@velopert" });
+    expect(captured.url).toBe("https://v2.velog.io/rss/@velopert");
+  });
+
+  it("아이디 없는 velog 주소는 저장하지 않고 방법을 알려준다", async () => {
+    const captured: { url?: string } = {};
+    await expect(
+      addFeed(addFeedSupabase(captured), { url: "https://velog.io" }),
+    ).rejects.toThrow("velog.io/@아이디");
+    // 저장까지 갔다가 실패한 게 아니라, 아예 insert를 하지 않았음을 확인한다.
+    expect(captured.url).toBeUndefined();
   });
 });
 

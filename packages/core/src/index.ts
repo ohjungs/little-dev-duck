@@ -243,9 +243,12 @@ export {
   type RssItem,
 } from "./domain/news";
 export {
+  COMMON_FEED_PATHS,
   RECOMMENDED_FEEDS,
   feedTopics,
+  resolveFeedUrl,
   unregisteredFeeds,
+  type FeedResolution,
   type RecommendedFeed,
 } from "./domain/news-feeds";
 export {
@@ -254,6 +257,12 @@ export {
   type ClusterableArticle,
   type ArticleCluster,
 } from "./domain/news-cluster";
+export {
+  topArticles,
+  type RankableArticle,
+  type RankedArticle,
+  type TopArticlesOptions,
+} from "./domain/news-top";
 export {
   officeEventSchema,
   eventToState,
@@ -309,6 +318,7 @@ export {
   deptColor,
   deptLabel,
   schedulePhaseLabel,
+  npcStatusLabel,
 } from "./domain/office-label";
 export {
   DEPARTMENTS,
@@ -341,8 +351,8 @@ export {
   formatClockTime,
   schedulePhase,
   phaseToWorkState,
-  simulateNpcTasks,
-  getTaskTemplates,
+  npcWorkState,
+  hasActiveWork,
   pickWanderTarget,
   wanderZone,
   type NpcTask,

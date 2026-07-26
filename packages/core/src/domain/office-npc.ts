@@ -102,62 +102,30 @@ export function phaseToWorkState(phase: NpcSchedulePhase): DuckWorkState {
   }
 }
 
-// 태스크 시뮬레이션: 게임 1분 단위로 호출. working 상태가 아니면 그대로 반환.
-export function simulateNpcTasks(npc: Npc, clock: GameClock, rng: () => number): Npc {
-  if (npc.schedulePhase !== "working") return npc;
+// 2026-07-26 : 오피스 - 직원상태 - 지어내기제거
+// 사용자 피드백 5-7 "직원들이랑 대화해보면 계속 뭐 바뀌면서 일하는척하는데 실제 일하고있는
+// 거만 보이도록해" + 5-3 "실제로 일하고있지않으면 쉬는중 표시해야지".
+//
+// **여기 있던 simulateNpcTasks가 그 '일하는 척'의 정체였다.** 하는 일이 셋이었다:
+//   ① 게임 1분마다 10% 확률로 부서별 템플릿("버그 수정 #142")에서 **없는 업무를 지어냈다**
+//   ② 진행률을 난수로 올려 **아무도 하지 않은 진척**을 만들었다
+//   ③ 만족도·생산성을 난수로 흔들었다
+// 그래서 사용자가 같은 직원에게 두 번 물어보면 매번 다른 답이 나왔다. 화면의 모든 숫자가
+// 실제 워크스페이스와 아무 관계가 없었다.
+//
+// 지금은 **실제 데이터로 만든 업무(mapWorkspaceToOfficeTasks)만** 직원이 들고 있고,
+// 그게 없으면 지어내지 않고 "쉬는 중"이라고 말한다. 없는 일을 만들어 보여주느니 비는 게 정직하다.
+// 그 결과 여기서 매 틱 할 일이 없어져 simulateNpcTasks·getTaskTemplates는 삭제했다.
 
-  const tasks = npc.tasks.map((t) => {
-    if (t.status !== "active") return t;
-    // 생산성에 비례해 분당 0.5-2% 진행 (productivity 100 = 최대 속도)
-    const prodFactor = 0.5 + (npc.productivity / 100) * 0.5;
-    const advance = prodFactor * (0.5 + rng() * 1.5);
-    const newProgress = Math.min(100, t.progress + advance);
-    if (newProgress >= 100) {
-      return { ...t, progress: 100, status: "done" as const };
-    }
-    return { ...t, progress: newProgress };
-  });
+// 직원의 지금 상태. 근무 시간이 아니면 스케줄이 결정하고, 근무 시간이면 **실제 업무 유무**가 결정한다.
+export function npcWorkState(npc: Pick<Npc, "tasks">, phase: NpcSchedulePhase): DuckWorkState {
+  if (phase !== "working") return phaseToWorkState(phase);
+  return hasActiveWork(npc) ? "typing" : "idle";
+}
 
-  // 완료된 태스크를 recentDone으로 이동(최대 3개 유지)
-  const done = tasks.filter((t) => t.status === "done");
-  const active = tasks.filter((t) => t.status !== "done");
-  const recentDone = [...done, ...npc.recentDone].slice(0, 3);
-
-  // 누적 완료 수 갱신
-  const newTasksCompleted = npc.tasksCompleted + done.length;
-
-  // 완료 시 만족도 소폭 상승 (최대 100). 태스크 없으면 소폭 하락.
-  let newSatisfaction = npc.satisfaction;
-  if (done.length > 0) {
-    newSatisfaction = Math.min(100, npc.satisfaction + done.length * 2);
-  } else if (active.length === 0 && rng() < 0.02) {
-    newSatisfaction = Math.max(0, npc.satisfaction - 1);
-  }
-
-  // 생산성: 만족도에 수렴하도록 천천히 조정 (매 분 0-1 범위 랜덤 이동)
-  const prodDelta = (newSatisfaction - npc.productivity) * 0.005;
-  const newProductivity = Math.max(0, Math.min(100, npc.productivity + prodDelta));
-
-  // 활성 태스크가 2개 미만이면 10% 확률로 새 태스크 생성
-  if (active.length < 2 && rng() < 0.1) {
-    const templates = getTaskTemplates(npc.department);
-    const template = templates[Math.floor(rng() * templates.length)];
-    active.push({
-      id: `task-${clock.totalMinutes}-${rng().toString(36).slice(2, 6)}`,
-      title: template,
-      status: "active",
-      progress: 0,
-    });
-  }
-
-  return {
-    ...npc,
-    tasks: active,
-    recentDone,
-    tasksCompleted: newTasksCompleted,
-    satisfaction: Math.round(newSatisfaction),
-    productivity: Math.round(newProductivity),
-  };
+// 실제로 붙잡고 있는 업무가 있는가. "쉬는 중" 판정의 단일 출처.
+export function hasActiveWork(npc: Pick<Npc, "tasks">): boolean {
+  return npc.tasks.some((t) => t.status === "active");
 }
 
 // 지정 존 내 랜덤 보행 가능 타일 반환. 존이 없거나 보행 가능 타일이 없으면 null.
@@ -189,45 +157,6 @@ export function wanderZone(phase: NpcSchedulePhase): string {
   }
 }
 
-// 부서별 태스크 템플릿(결정적 데이터 — LLM 없이 매핑)
-export function getTaskTemplates(dept: DepartmentId): string[] {
-  const templates: Record<DepartmentId, string[]> = {
-    engineering: [
-      "API 리팩터링", "버그 수정 #142", "코드 리뷰", "DB 마이그레이션",
-      "CI/CD 파이프라인", "단위 테스트 작성", "기능 개발", "성능 최적화",
-    ],
-    marketing: [
-      "SNS 콘텐츠 기획", "광고 성과 분석", "브랜드 가이드 업데이트",
-      "이메일 캠페인", "시장 조사 보고서", "블로그 포스트 작성",
-    ],
-    design: [
-      "UI 목업 작업", "디자인 시스템 업데이트", "아이콘 세트 제작",
-      "사용성 테스트", "와이어프레임 설계", "프로토타입 제작",
-    ],
-    hr: [
-      "채용 면접 진행", "온보딩 자료 준비", "성과 평가 정리",
-      "복리후생 검토", "교육 프로그램 기획",
-    ],
-    finance: [
-      "월간 결산", "예산 보고서 작성", "세금 신고 준비",
-      "비용 분석", "재무제표 검토",
-    ],
-    sales: [
-      "거래처 미팅 준비", "제안서 작성", "계약서 검토",
-      "영업 실적 보고", "신규 고객 발굴",
-    ],
-    support: [
-      "고객 문의 응대", "FAQ 업데이트", "버그 리포트 정리",
-      "사용자 가이드 작성", "VOC 분석",
-    ],
-    qa: [
-      "테스트 케이스 작성", "회귀 테스트 실행", "버그 재현 및 보고",
-      "자동화 스크립트 작성", "릴리스 검증",
-    ],
-    operations: [
-      "서버 모니터링", "보안 패치 적용", "백업 검증",
-      "인프라 비용 최적화", "장애 대응 매뉴얼 갱신",
-    ],
-  };
-  return templates[dept];
-}
+// (삭제됨) getTaskTemplates — 부서별 가짜 업무 문구 사전.
+// 이 목록이 존재하는 한 "실제 일하는 것만 보여준다"를 지킬 수 없어 함께 지웠다.
+// 직원이 보여줄 업무는 오직 mapWorkspaceToOfficeTasks가 실제 데이터에서 만든 것뿐이다.

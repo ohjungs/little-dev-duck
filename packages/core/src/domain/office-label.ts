@@ -36,3 +36,12 @@ const PHASE_LABELS: Record<string, string> = {
 export function schedulePhaseLabel(phase: string): string {
   return PHASE_LABELS[phase] ?? phase;
 }
+
+// 2026-07-26 : 오피스 - 상태표시 - 쉬는중 (피드백 5-3)
+// 스케줄만 보면 근무 시간엔 무조건 "업무 중"이 뜬다 — 맡은 일이 하나도 없어도 그렇다.
+// 사용자가 요구한 건 "실제로 일하고있지않으면 쉬는중 표시"라 **업무 유무를 함께** 본다.
+// 근무 시간이 아닐 때는 업무 유무가 의미 없으므로 종전 라벨 그대로다.
+export function npcStatusLabel(phase: string, hasWork: boolean): string {
+  if (phase === "working" && !hasWork) return "쉬는 중";
+  return schedulePhaseLabel(phase);
+}

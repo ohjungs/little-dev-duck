@@ -23,9 +23,7 @@ import {
   gameClockFromHm,
   formatClockTime,
   schedulePhase,
-  phaseToWorkState,
-  simulateNpcTasks,
-  getTaskTemplates,
+  npcWorkState,
   timeOfDay,
   timeOverlay,
   timeOfDayLabel,
@@ -163,28 +161,16 @@ function buildAllNpcs(map: TileMap): Npc[] {
 
   for (const dept of Object.values(DEPT_REGISTRY)) {
     const walkable = deskTilesInZone(map, dept.id);
-    const templates = getTaskTemplates(dept.id);
 
     for (let i = 0; i < dept.headcount; i++) {
       const name = DUCK_NAMES[nameIdx % DUCK_NAMES.length] ?? `오리${nameIdx}`;
       nameIdx++;
       const tile = walkable[i % Math.max(1, walkable.length)] ?? { x: 40, y: 20 };
 
-      // 초기 태스크 2개 할당
-      const tasks: NpcTask[] = [
-        {
-          id: `t-${globalId}-0`,
-          title: templates[i % templates.length] ?? "업무 중",
-          status: "active",
-          progress: Math.floor(Math.random() * 60),
-        },
-        {
-          id: `t-${globalId}-1`,
-          title: templates[(i + 1) % templates.length] ?? "태스크",
-          status: "waiting",
-          progress: 0,
-        },
-      ];
+      // 2026-07-26 (피드백 5-7): 초기 업무를 **비운다**. 예전에는 부서 템플릿에서 가짜 업무 2건과
+      // 난수 진행률(0~60%)을 심어, 워크스페이스가 텅 비어 있어도 전 직원이 일하는 것처럼 보였다.
+      // 실제 업무는 아래 realTasks 배분에서만 들어오고, 못 받은 직원은 "쉬는 중"으로 표시된다.
+      const tasks: NpcTask[] = [];
 
       const npc: Npc = {
         id: `npc-${globalId}`,
@@ -455,13 +441,6 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
       });
   }, []);
 
-  // "수고했어" 버튼 — NPC 만족도 +5 (최대 100)
-  const handleEncourage = useCallback((npcId: string) => {
-    npcsRef.current = npcsRef.current.map((n) =>
-      n.id === npcId ? { ...n, satisfaction: Math.min(100, n.satisfaction + 5) } : n,
-    );
-  }, []);
-
   // 충돌 판정: 타일맵 + NPC 위치
   const isBlockedFn = useCallback((x: number, y: number): boolean => {
     const map = mapRef.current;
@@ -635,9 +614,10 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
             realPhase === "offwork" || realPhase === "commuting" || realPhase === "leaving"
               ? "working"
               : realPhase;
-          const workState = phaseToWorkState(phase);
-          const updated = simulateNpcTasks({ ...npc, schedulePhase: phase, workState }, clock, rand);
-          return updated;
+          // 2026-07-26 (피드백 5-3·5-7): 상태는 **실제 업무 유무**로 정한다. 근무 시간에 맡은 일이
+          // 없으면 "쉬는 중"이다. 예전 simulateNpcTasks가 여기서 업무를 지어내며 상태를 흔들었다.
+          const workState = npcWorkState(npc, phase);
+          return { ...npc, schedulePhase: phase, workState };
         });
       }
 
@@ -1137,10 +1117,15 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
       const { x: psx, y: psy } = worldToScreen(cam, pwx, pwy);
 
       const bossSheet = sprites?.duckBoss;
-      // 이동 중일 때만 걷기 애니메이션, 멈추면 idle (frame 0)
-      const bossFrame = playerMovingRef.current ? Math.floor(frame / 4) % 4 : 0;
+      // 이동 중이면 걷기 행(6프레임), 멈추면 idle 행(2프레임). 프레임 수 제한은 drawDuckSprite가
+      // 행마다 알고 있으므로 여기서는 계속 증가하는 값만 넘긴다(예전엔 %4로 잘라 빈 칸을 그렸다).
+      const bossMoving = playerMovingRef.current;
+      const bossFrame = bossMoving ? Math.floor(frame / 4) : 0;
       if (bossSheet) {
-        drawDuckSprite(ctx, bossSheet, psx, psy, TILE, playerFacingRef.current, bossFrame, DUCK_SCALE);
+        drawDuckSprite(
+          ctx, bossSheet, psx, psy, TILE,
+          playerFacingRef.current, bossFrame, DUCK_SCALE, bossMoving,
+        );
       } else {
         ctx.fillStyle = "#FFD700";
         ctx.beginPath();
@@ -1291,7 +1276,6 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           <OfficeTalkPanel
             npc={talking.npc}
             onClose={() => setTalking(null)}
-            onEncourage={handleEncourage}
           />
         )}
 
@@ -1307,7 +1291,6 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         {/* 경영 관리 패널 — TAB 키 또는 버튼으로 열림 */}
         {showManagement && managementSnapshot && (
           <OfficeManagementPanel
-            company={managementSnapshot.company}
             npcs={managementSnapshot.npcs}
             clock={managementSnapshot.clock}
             onClose={() => setShowManagement(false)}

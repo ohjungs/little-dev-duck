@@ -3,18 +3,14 @@ import {
   createGameClock,
   gameClockFromHm,
   formatClockTime,
+  hasActiveWork,
+  npcWorkState,
   phaseToWorkState,
   schedulePhase,
-  simulateNpcTasks,
   tickClock,
   type Npc,
   type NpcTask,
 } from "./office-npc";
-
-// 결정적 rng — 항상 0.5 반환
-const fixedRng = () => 0.5;
-// 항상 < 0.1이 되도록 0 반환 → 새 태스크 생성 강제
-const zeroRng = () => 0;
 
 function makeNpc(overrides: Partial<Npc> = {}): Npc {
   return {
@@ -155,61 +151,63 @@ describe("phaseToWorkState", () => {
   });
 });
 
-describe("simulateNpcTasks", () => {
-  const clock = createGameClock(10);
-
-  it("offwork 상태면 태스크가 변하지 않는다", () => {
-    const task = makeTask({ progress: 10 });
-    const npc = makeNpc({ schedulePhase: "offwork", tasks: [task] });
-    const result = simulateNpcTasks(npc, clock, fixedRng);
-    expect(result.tasks[0].progress).toBe(10);
+// 2026-07-26 : 오피스 - 직원상태 - 지어내기제거 (피드백 5-3·5-7)
+// 이 블록은 원래 simulateNpcTasks(가짜 업무 생성 + 난수 진행률)를 검증했다. 그 동작 자체가
+// 사용자가 지적한 문제라 함수와 함께 삭제하고, 대신 **지어내지 않는다**를 잠근다.
+describe("hasActiveWork", () => {
+  it("활성 업무가 있으면 true", () => {
+    expect(hasActiveWork({ tasks: [makeTask({ status: "active" })] })).toBe(true);
   });
 
-  it("working 상태에서 활성 태스크 진행률이 증가한다", () => {
-    const task = makeTask({ progress: 10 });
-    const npc = makeNpc({ schedulePhase: "working", tasks: [task] });
-    const result = simulateNpcTasks(npc, clock, fixedRng);
-    expect(result.tasks[0].progress).toBeGreaterThan(10);
+  it("업무가 없으면 false", () => {
+    expect(hasActiveWork({ tasks: [] })).toBe(false);
   });
 
-  it("진행률 100% 태스크는 recentDone으로 이동한다", () => {
-    const task = makeTask({ progress: 99.5 });
-    const npc = makeNpc({ schedulePhase: "working", tasks: [task] });
-    // fixedRng=0.5, productivity=75 → prodFactor≈0.875, advance≈1.09 → 99.5+1.09>100 → done
-    const result = simulateNpcTasks(npc, clock, fixedRng);
-    expect(result.tasks).toHaveLength(0);
-    expect(result.recentDone).toHaveLength(1);
-    expect(result.recentDone[0].status).toBe("done");
+  it("대기·완료만 있으면 일하는 게 아니다", () => {
+    expect(
+      hasActiveWork({
+        tasks: [
+          makeTask({ id: "w", status: "waiting" }),
+          makeTask({ id: "d", status: "done", progress: 100 }),
+        ],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("npcWorkState", () => {
+  it("근무 시간에 실제 업무가 있으면 typing", () => {
+    expect(npcWorkState({ tasks: [makeTask({ status: "active" })] }, "working")).toBe(
+      "typing",
+    );
   });
 
-  it("recentDone은 최대 3개로 제한된다", () => {
-    const done1 = makeTask({ id: "d1", status: "done", progress: 100 });
-    const done2 = makeTask({ id: "d2", status: "done", progress: 100 });
-    const done3 = makeTask({ id: "d3", status: "done", progress: 100 });
-    // 기존 recentDone 3개, 새로 완료 1개 → 슬라이스 후 3개
-    const task = makeTask({ id: "new", progress: 99.5 });
-    const npc = makeNpc({
-      schedulePhase: "working",
-      tasks: [task],
-      recentDone: [done1, done2, done3],
-    });
-    const result = simulateNpcTasks(npc, clock, fixedRng);
-    expect(result.recentDone).toHaveLength(3);
+  it("근무 시간이어도 실제 업무가 없으면 쉬는 중(idle)이다", () => {
+    // 핵심 회귀 방지: 예전에는 여기서 없는 업무를 지어내 typing으로 보였다.
+    expect(npcWorkState({ tasks: [] }, "working")).toBe("idle");
   });
 
-  it("활성 태스크가 2개 미만이면 새 태스크를 생성할 수 있다(rng=0)", () => {
-    // zeroRng: rng() < 0.1 → 항상 true, 새 태스크 생성
-    const npc = makeNpc({ schedulePhase: "working", tasks: [] });
-    const result = simulateNpcTasks(npc, clock, zeroRng);
-    expect(result.tasks.length).toBeGreaterThanOrEqual(1);
+  it("근무 시간이 아니면 업무 유무와 무관하게 스케줄이 결정한다", () => {
+    expect(npcWorkState({ tasks: [makeTask({ status: "active" })] }, "lunch")).toBe(
+      "question",
+    );
+    expect(npcWorkState({ tasks: [makeTask({ status: "active" })] }, "offwork")).toBe(
+      "offwork",
+    );
+    expect(npcWorkState({ tasks: [] }, "commuting")).toBe("offwork");
   });
 
-  it("활성 태스크가 2개 이상이면 새 태스크를 생성하지 않는다", () => {
-    const t1 = makeTask({ id: "t1", progress: 10 });
-    const t2 = makeTask({ id: "t2", progress: 20 });
-    const npc = makeNpc({ schedulePhase: "working", tasks: [t1, t2] });
-    // zeroRng여도 active.length >= 2 이면 추가 안 함
-    const result = simulateNpcTasks(npc, clock, zeroRng);
-    expect(result.tasks).toHaveLength(2);
+  it("같은 입력에 항상 같은 결과 — 난수가 개입하지 않는다", () => {
+    // 사용자가 같은 직원에게 두 번 물어보면 같은 답이 나와야 한다(5-7의 실제 불만).
+    const npc = { tasks: [makeTask({ status: "active" })] };
+    const results = Array.from({ length: 20 }, () => npcWorkState(npc, "working"));
+    expect(new Set(results).size).toBe(1);
+  });
+
+  it("실제 Npc 객체를 그대로 넘겨도 성립한다", () => {
+    // 위 케이스들은 { tasks } 부분 객체를 쓴다. 그것만으로는 실제 호출부(완전한 Npc)와
+    // 어긋나도 통과하므로, 진짜 타입으로 한 번 통과시켜 계약을 확인한다.
+    expect(npcWorkState(makeNpc({ tasks: [] }), "working")).toBe("idle");
+    expect(npcWorkState(makeNpc({ tasks: [makeTask()] }), "working")).toBe("typing");
   });
 });

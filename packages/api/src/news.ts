@@ -3,6 +3,8 @@ import {
   feedSchema,
   articleSchema,
   parseRssItems,
+  resolveFeedUrl,
+  COMMON_FEED_PATHS,
   FEED_FAIL_THRESHOLD,
   type Feed,
   type Article,
@@ -132,7 +134,13 @@ export async function addFeed(
   input: { url: string; title?: string | null; folder?: string | null },
 ): Promise<Feed> {
   const userId = await requireUserId(supabase);
-  const url = input.url.trim();
+  // 2026-07-26 : 뉴스 - 피드등록 - 사이트규칙선적용
+  // 자동 발견이 원리적으로 불가능한 사이트(velog — 홈에 RSS 링크 없음 + 피드가 다른 도메인)를
+  // 등록 시점에 바로잡는다. 수집 때 고치면 사용자는 그 사이 "0건"만 본다.
+  // 만들 수 없는 입력은 조용히 저장하지 않는다 — 저장되면 수집될 줄 알고 기다리게 된다.
+  const resolved = resolveFeedUrl(input.url);
+  if (resolved.kind === "unresolvable") throw new Error(resolved.reason);
+  const url = resolved.url;
   let host: string;
   try {
     const parsed = new URL(url);
@@ -235,6 +243,30 @@ export type CollectDeps = {
   fetchImpl?: typeof fetch;
 };
 
+// 후보 URL 하나를 받아 "실제로 항목이 나오는 피드인지" 확인한다. 항목이 0건이거나 어떤 이유로든
+// 실패하면 null — 호출부가 다음 후보로 넘어간다.
+// 후보는 원격 HTML에서 유래하거나(자동 발견) 우리가 조립한 경로라, addFeed와 동일하게
+// **요청을 보내기 전에** 프로토콜·사설 대역을 막는다(SSRF 방어). 리다이렉트 최종 도착지도 본다.
+async function fetchFeedItems(
+  doFetch: typeof fetch,
+  candidate: string,
+): Promise<ReturnType<typeof parseRssItems> | null> {
+  try {
+    const u = new URL(candidate);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (PRIVATE_HOST.test(u.hostname)) return null;
+    const res = await doFetch(candidate, {
+      headers: { "user-agent": "LittleDevDuck/1.0 (+rss)" },
+    });
+    if (!res.ok) return null;
+    if (PRIVATE_HOST.test(new URL(res.url).hostname)) return null;
+    const items = parseRssItems(await res.text());
+    return items.length > 0 ? items : null;
+  } catch {
+    return null;
+  }
+}
+
 // 한 번의 수집에서 저장할 최대 기사 수. 상한 근거는 collectFeed 안의 주석 참조(실측).
 const MAX_ITEMS_PER_COLLECT = 50;
 // 피드 응답 크기 상한(선언된 Content-Length 기준). 실측 최대가 2.9MB였다.
@@ -281,30 +313,29 @@ export async function collectFeed(
   }
 
   let items = parseRssItems(xml);
-  // RSS 항목이 0개이고 HTML 페이지로 보이면, <link rel=alternate>로 실제 피드를 찾아 한 번 더 시도한다
-  // (사용자가 사이트 홈 URL을 등록한 경우 자동 보정). 발견 시 feeds.url을 실제 피드로 갱신해 다음부턴 바로 수집.
+  // RSS 항목이 0개이고 HTML 페이지로 보이면, 사용자가 사이트 홈 URL을 등록한 경우다. 두 단계로 보정한다.
+  //   ① <link rel=alternate>로 사이트가 광고하는 피드 주소 (대부분 여기서 잡힌다)
+  //   ② 그것도 없으면 관용 경로(/rss.xml·/feed·…)를 차례로 두드린다
+  // 2026-07-26 실측: ②로 toss.tech(/rss.xml)·tech.kakao.com(/feed)이 실제로 발견됐다.
+  // 발견 시 feeds.url을 실제 피드로 갱신해 다음 수집부터는 곧장 간다(왕복이 반복되지 않게).
   if (items.length === 0 && /<html[\s>]/i.test(xml)) {
+    const candidates: string[] = [];
     const discovered = discoverFeedUrl(xml, feed.url);
-    if (discovered && discovered !== feed.url) {
+    if (discovered) candidates.push(discovered);
+    for (const path of COMMON_FEED_PATHS) {
       try {
-        // 발견된 URL은 원격 HTML에서 유래하므로 addFeed와 동일하게 fetch 전 사전검증한다(SSRF 방어 —
-        // 사설/내부 대역 링크가 GET 요청 자체를 발사하지 못하게). 프로토콜·호스트를 먼저 막는다.
-        const dh = new URL(discovered);
-        if (dh.protocol !== "http:" && dh.protocol !== "https:") throw new Error("bad protocol");
-        if (PRIVATE_HOST.test(dh.hostname)) throw new Error("사설 주소");
-        const res2 = await doFetch(discovered, {
-          headers: { "user-agent": "LittleDevDuck/1.0 (+rss)" },
-        });
-        if (res2.ok && !PRIVATE_HOST.test(new URL(res2.url).hostname)) {
-          const xml2 = await res2.text();
-          const items2 = parseRssItems(xml2);
-          if (items2.length > 0) {
-            items = items2;
-            await supabase.from("feeds").update({ url: discovered }).eq("id", feed.id);
-          }
-        }
+        candidates.push(new URL(path, feed.url).toString());
       } catch {
-        // 자동 발견 실패는 무시(원래대로 0건 반환)
+        // 기준 URL이 이상하면 그 후보만 건너뛴다
+      }
+    }
+    for (const candidate of candidates) {
+      if (candidate === feed.url) continue;
+      const found = await fetchFeedItems(doFetch, candidate);
+      if (found) {
+        items = found;
+        await supabase.from("feeds").update({ url: candidate }).eq("id", feed.id);
+        break;
       }
     }
   }

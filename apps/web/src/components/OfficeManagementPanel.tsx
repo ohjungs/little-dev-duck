@@ -5,9 +5,8 @@
 
 import { useState } from "react";
 import {
-  formatMoney,
-  reputationStars,
-  type CompanyStats,
+  hasActiveWork,
+  npcStatusLabel,
   type Npc,
   type GameClock,
   deptColor,
@@ -16,7 +15,6 @@ import {
 import { formatClockTime } from "@ldd/core";
 
 type Props = {
-  company: CompanyStats;
   npcs: Npc[];
   clock: GameClock;
   onClose: () => void;
@@ -25,12 +23,6 @@ type Props = {
 // ---------------------------------------------------------------------------
 // 헬퍼
 // ---------------------------------------------------------------------------
-function satisfactionEmoji(val: number): string {
-  if (val >= 80) return "😊";
-  if (val >= 50) return "😐";
-  return "😞";
-}
-
 function ProgressBar({ value, color }: { value: number; color: string }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
@@ -46,7 +38,7 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 // ---------------------------------------------------------------------------
 // 메인 컴포넌트
 // ---------------------------------------------------------------------------
-export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) {
+export function OfficeManagementPanel({ npcs, clock, onClose }: Props) {
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
 
   // 부서별 그룹핑
@@ -57,29 +49,17 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
     byDept.set(npc.department, list);
   }
 
-  // 전체 생산성 평균
-  const avgProductivity =
-    npcs.length > 0
-      ? Math.round(npcs.reduce((s, n) => s + n.productivity, 0) / npcs.length)
-      : 0;
-
-  // 오늘의 성과
-  const totalTasksToday = npcs.reduce((s, n) => s + n.tasksCompleted, 0);
-  const mvp = npcs.reduce<Npc | null>(
-    (best, n) => (!best || n.tasksCompleted > best.tasksCompleted ? n : best),
-    null,
+  // 2026-07-26 (피드백 5-5·5-7): 생산성 평균·MVP·최고 생산성 부서·평판 별점 계산을 걷어냈다.
+  // 전부 시뮬레이터가 흔들던 값이라 화면에 띄워도 아무것도 알 수 없었다.
+  // 아래 셋은 **실제로 배분된 업무**만 센다.
+  const activeTaskCount = npcs.reduce(
+    (sum, n) => sum + n.tasks.filter((t) => t.status === "active").length,
+    0,
   );
-  const topDeptEntry = [...byDept.entries()].reduce<[string, number] | null>(
-    (best, [dept, members]) => {
-      const avg = Math.round(members.reduce((s, n) => s + n.productivity, 0) / members.length);
-      return !best || avg > best[1] ? [dept, avg] : best;
-    },
-    null,
-  );
-
-  // 평판 별 렌더
-  const stars = reputationStars(company.reputation);
-  const starDisplay = "★".repeat(stars) + "☆".repeat(5 - stars);
+  const workingCount = npcs.filter((n) => hasActiveWork(n)).length;
+  const idleCount = npcs.filter(
+    (n) => n.schedulePhase === "working" && !hasActiveWork(n),
+  ).length;
 
   return (
     <>
@@ -119,28 +99,10 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
             </button>
           </div>
 
-          {/* 자금 / 수익 / 지출 */}
-          <div className="flex gap-3 font-mono text-xs">
-            <div>
-              <span className="text-gray-400">자금 </span>
-              <span className="text-green-400 font-bold">₩{formatMoney(company.money)}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">수익 </span>
-              <span className="text-blue-400">₩{formatMoney(company.revenue)}/h</span>
-            </div>
-            <div>
-              <span className="text-gray-400">지출 </span>
-              <span className="text-red-400">₩{formatMoney(company.expenses)}/h</span>
-            </div>
-          </div>
-
-          {/* 평판 + 시계 */}
-          <div className="flex items-center justify-between mt-1">
-            <div className="font-mono text-xs">
-              <span className="text-yellow-400">{starDisplay}</span>
-              <span className="text-gray-400 ml-1">({company.reputation}/100)</span>
-            </div>
+          {/* 2026-07-26 (피드백 5-5): 자금·수익·지출·평판을 걷어냈다.
+              "자금 수익 이런 게임성요소들은 필요없고" — 이 숫자들은 어떤 실제 데이터와도
+              연결돼 있지 않아 보고 있어도 알 수 있는 게 없었다. 시계와 인원수만 남긴다. */}
+          <div className="flex items-center justify-end mt-1">
             <div className="font-mono text-xs text-gray-400">
               {formatClockTime(clock)} · {npcs.length}명
             </div>
@@ -155,10 +117,11 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
 
           <div className="space-y-1.5">
             {[...byDept.entries()].map(([dept, members]) => {
-              const deptAvgProd = Math.round(
-                members.reduce((s, n) => s + n.productivity, 0) / members.length,
-              );
-              const working = members.filter((n) => n.schedulePhase === "working").length;
+              // 2026-07-26 (피드백 5-7): 부서 "생산성 %"는 NPC 생성 시 난수(60~89)로 박힌 뒤
+              // 아무것도 바꾸지 않는 값이었다 — 매번 다르게 보이지만 아무 뜻도 없었다.
+              // 실제로 배분된 업무를 맡은 직원 비율로 바꾼다(막대도 같은 값을 쓴다).
+              const busy = members.filter((n) => hasActiveWork(n)).length;
+              const busyPct = Math.round((busy / members.length) * 100);
               const color = deptColor(dept);
               const isExpanded = expandedDept === dept;
 
@@ -179,16 +142,16 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
                       {deptLabel(dept)}
                     </span>
                     <span className="font-mono text-xs text-gray-400">
-                      {working}/{members.length}
+                      {busy}/{members.length}
                     </span>
                     <span className="font-mono text-xs w-8 text-right" style={{ color }}>
-                      {deptAvgProd}%
+                      {busyPct}%
                     </span>
                   </button>
 
-                  {/* 생산성 바 */}
+                  {/* 업무를 맡은 직원 비율 */}
                   <div className="px-2 pb-1.5">
-                    <ProgressBar value={deptAvgProd} color={color} />
+                    <ProgressBar value={busyPct} color={color} />
                   </div>
 
                   {/* 직원 목록 (확장) */}
@@ -196,9 +159,8 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
                     <div className="border-t border-gray-700 bg-gray-800/50">
                       <div className="px-2 py-1 flex font-mono text-[10px] text-gray-500 border-b border-gray-700">
                         <span className="flex-1">이름</span>
-                        <span className="w-14">만족도</span>
-                        <span className="w-14 text-right">급여</span>
-                        <span className="w-12 text-right">완료</span>
+                        <span className="w-20 text-right">상태</span>
+                        <span className="w-12 text-right">업무</span>
                       </div>
                       {members.map((npc) => (
                         <div
@@ -206,16 +168,15 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
                           className="px-2 py-0.5 flex font-mono text-[10px] text-gray-300
                                      hover:bg-gray-700/50 transition-colors"
                         >
+                          {/* 2026-07-26 (피드백 5-5): 급여·만족도 제거. 급여는 게임 재화이고
+                              만족도는 난수로 흔들리던 값이라 둘 다 근거가 없었다.
+                              대신 **맡은 실제 업무 건수**를 보여준다 — 이건 실제 데이터다. */}
                           <span className="flex-1 truncate">{npc.name}</span>
-                          <span className="w-14">
-                            {satisfactionEmoji(npc.satisfaction)}{" "}
-                            <span className="text-gray-400">{npc.satisfaction}</span>
-                          </span>
-                          <span className="w-14 text-right text-gray-400">
-                            ₩{formatMoney(npc.salary)}/h
+                          <span className="w-20 text-right text-gray-400">
+                            {npcStatusLabel(npc.schedulePhase, hasActiveWork(npc))}
                           </span>
                           <span className="w-12 text-right text-gray-400">
-                            {npc.tasksCompleted}건
+                            {npc.tasks.filter((t) => t.status === "active").length}건
                           </span>
                         </div>
                       ))}
@@ -227,41 +188,41 @@ export function OfficeManagementPanel({ company, npcs, clock, onClose }: Props) 
           </div>
         </div>
 
-        {/* ── 섹션: 오늘의 성과 ── */}
+        {/* ── 섹션: 지금 상황 ──
+            2026-07-26 (피드백 5-5·5-7): 원래 "오늘의 성과"였고 완료 작업·전사 생산성·최고 생산성·
+            MVP를 보여줬다. 그 값들은 전부 시뮬레이터가 난수로 만든 것이라, 가짜 업무 생성을
+            없앤 지금은 항상 0이거나 고정값이 된다. 남겨두면 "0건"이 사실인 것처럼 보인다.
+            대신 실제 워크스페이스에서 배분된 업무만 센다 — 전부 확인 가능한 숫자다. */}
         <div className="px-3 pt-4 pb-4">
           <h3 className="font-mono text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-            오늘의 성과
+            지금 상황
           </h3>
 
           <div className="border border-gray-700 rounded px-3 py-2.5 space-y-1.5">
             <div className="flex justify-between font-mono text-xs">
-              <span className="text-gray-400">완료 작업</span>
-              <span className="text-white font-bold">{totalTasksToday}건</span>
+              <span className="text-gray-400">진행 중인 업무</span>
+              <span className="text-white font-bold">{activeTaskCount}건</span>
             </div>
 
             <div className="flex justify-between font-mono text-xs">
-              <span className="text-gray-400">전사 생산성</span>
-              <span className="font-bold" style={{ color: avgProductivity >= 70 ? "#4ade80" : avgProductivity >= 40 ? "#facc15" : "#f87171" }}>
-                {avgProductivity}%
+              <span className="text-gray-400">일하는 직원</span>
+              <span className="text-white">
+                {workingCount}명 / {npcs.length}명
               </span>
             </div>
 
-            {topDeptEntry && (
+            {idleCount > 0 && (
               <div className="flex justify-between font-mono text-xs">
-                <span className="text-gray-400">최고 생산성</span>
-                <span style={{ color: deptColor(topDeptEntry[0]) }}>
-                  {deptLabel(topDeptEntry[0])} ({topDeptEntry[1]}%)
-                </span>
+                <span className="text-gray-400">쉬는 중</span>
+                <span className="text-gray-300">{idleCount}명</span>
               </div>
             )}
 
-            {mvp && mvp.tasksCompleted > 0 && (
-              <div className="flex justify-between font-mono text-xs">
-                <span className="text-gray-400">MVP</span>
-                <span className="text-yellow-300">
-                  {mvp.name} ({mvp.tasksCompleted}건)
-                </span>
-              </div>
+            {activeTaskCount === 0 && (
+              <p className="pt-1 font-mono text-[10px] leading-relaxed text-gray-500">
+                할 일·페이지·습관·일정이 없어서 직원들이 맡을 업무가 없어요.
+                업무를 만들면 여기 직원들에게 배분됩니다.
+              </p>
             )}
           </div>
         </div>

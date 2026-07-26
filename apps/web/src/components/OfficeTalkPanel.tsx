@@ -2,18 +2,15 @@
 
 // 2026-07-24 : Phase F — NPC 상세 대화 패널 (React 오버레이, 하단 시트 모바일)
 
-import { useState } from "react";
-import { deptColor, deptLabel, schedulePhaseLabel } from "@ldd/core";
+import { deptColor, deptLabel, hasActiveWork, npcStatusLabel } from "@ldd/core";
 import type { Npc } from "@ldd/core";
 
 type Props = {
   npc: Npc;
   onClose: () => void;
-  onEncourage?: (npcId: string) => void;
 };
 
-export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
-  const [encouraged, setEncouraged] = useState(false);
+export function OfficeTalkPanel({ npc, onClose }: Props) {
   const activeTasks = npc.tasks.filter((t) => t.status === "active");
   const waitingTasks = npc.tasks.filter((t) => t.status === "waiting");
 
@@ -48,7 +45,7 @@ export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
           </button>
         </div>
         <div className="text-xs mt-1 text-muted-foreground">
-          {schedulePhaseLabel(npc.schedulePhase)} · {getMoodLabel(npc.mood)}
+          {npcStatusLabel(npc.schedulePhase, hasActiveWork(npc))} · {getMoodLabel(npc.mood)}
         </div>
       </div>
 
@@ -122,23 +119,10 @@ export function OfficeTalkPanel({ npc, onClose, onEncourage }: Props) {
         </div>
       )}
 
-      {/* 액션 버튼 */}
+      {/* 액션 버튼
+          2026-07-26 (피드백 5-5): "수고했어" 버튼 제거. 누르면 만족도가 +5 됐는데 그 만족도는
+          아무 데도 영향을 주지 않는 숫자였다 — 눌러도 실제로 달라지는 게 없는 버튼이었다. */}
       <div className="p-3 pt-0 flex gap-2 border-t border-border">
-        {onEncourage && (
-          <button
-            type="button"
-            onClick={() => {
-              if (encouraged) return;
-              onEncourage(npc.id);
-              setEncouraged(true);
-              setTimeout(() => setEncouraged(false), 1000);
-            }}
-            disabled={encouraged}
-            className="flex-1 text-xs py-1.5 rounded border border-border hover:bg-accent transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {encouraged ? "격려 완료!" : "수고했어"}
-          </button>
-        )}
         <button
           type="button"
           onClick={onClose}

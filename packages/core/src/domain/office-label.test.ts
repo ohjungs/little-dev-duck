@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deptColor, deptLabel, schedulePhaseLabel } from "./office-label";
+import { deptColor, deptLabel, npcStatusLabel, schedulePhaseLabel } from "./office-label";
 import { DEPT_REGISTRY } from "./office-department";
 
 // 2026-07-26 : 사무실 - 표시이름 - 재구현제거
@@ -41,5 +41,22 @@ describe("schedulePhaseLabel", () => {
 
   it("모르는 상태는 받은 값을 그대로 돌려준다", () => {
     expect(schedulePhaseLabel("낮잠")).toBe("낮잠");
+  });
+});
+
+// 2026-07-26 : 오피스 - 상태표시 - 쉬는중 (피드백 5-3)
+describe("npcStatusLabel", () => {
+  it("근무 시간에 맡은 일이 없으면 '쉬는 중'", () => {
+    expect(npcStatusLabel("working", false)).toBe("쉬는 중");
+  });
+
+  it("근무 시간에 맡은 일이 있으면 '업무 중'", () => {
+    expect(npcStatusLabel("working", true)).toBe("업무 중");
+  });
+
+  it("근무 시간이 아니면 업무 유무와 무관하게 종전 라벨", () => {
+    expect(npcStatusLabel("lunch", false)).toBe("점심 시간");
+    expect(npcStatusLabel("offwork", false)).toBe("퇴근");
+    expect(npcStatusLabel("commuting", true)).toBe("출근 중");
   });
 });

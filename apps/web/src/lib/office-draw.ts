@@ -958,6 +958,28 @@ export function drawMinimap(
 // 열: 0-5 = 애니메이션 프레임 (이동 0-3, 대기 0-1)
 // x, y = 타일 좌상단 캔버스 좌표
 // ---------------------------------------------------------------------------
+// 2026-07-26 : 오피스 - 사장오리 - 방향표현 (피드백 5-6)
+// "사장오리가 움직이는데 좌우 위아래 모습변화나 상호작용시 변화가없어".
+// 원인을 **시트를 직접 열어 픽셀로 확인**했다(ducky_3_spritesheet.png, 192x128 = 6열 x 4행):
+//   · 4행이 방향(down/left/right/up)이라고 가정하고 행을 골랐는데, **실제로는 전 프레임이
+//     똑같은 오른쪽 옆모습**이다. 행은 방향이 아니라 애니메이션 변형이었다 → 방향을 바꿔도
+//     화면이 그대로였다.
+//   · 게다가 행마다 채워진 프레임 수가 다르다(row0=2, row1=6, row2=4, row3=6). down이 쓰던
+//     row0은 2프레임뿐인데 호출부는 4프레임을 재생해 **빈 칸 두 번**이 그려졌다 —
+//     아래로 걸으면 오리가 깜빡였다.
+//
+// 새 그림 없이 있는 자산으로 실제 변화를 만든다:
+//   · 왼쪽을 볼 땐 **좌우 반전**해 그린다(오른쪽 옆모습밖에 없으므로 이게 유일한 진짜 변화다).
+//   · 위/아래는 옆모습을 그대로 쓴다 — 없는 각도를 흉내 내지 않는다.
+//   · 프레임은 그 행에 실제로 있는 개수 안에서만 돈다(깜빡임 제거).
+// 위·아래 전용 그림이 생기면 여기 행 매핑만 되살리면 된다.
+const DUCK_FRAME = 32;
+// 행별 실제 프레임 수(위 실측값). 인덱스를 이 안에 가둬 빈 칸을 그리지 않는다.
+const DUCK_IDLE_ROW = 0;
+const DUCK_IDLE_FRAMES = 2;
+const DUCK_WALK_ROW = 1;
+const DUCK_WALK_FRAMES = 6;
+
 export function drawDuckSprite(
   ctx: CanvasRenderingContext2D,
   sheet: HTMLImageElement,
@@ -967,25 +989,32 @@ export function drawDuckSprite(
   facing: "down" | "up" | "left" | "right",
   frame: number,
   scale: number = 1,
+  moving: boolean = true,
 ): void {
-  const FRAME_W = 32;
-  const FRAME_H = 32;
-  const dirRow: Record<string, number> = { down: 0, left: 1, right: 2, up: 3 };
-  const row = dirRow[facing] ?? 0;
-  const col = frame % 6;
+  const row = moving ? DUCK_WALK_ROW : DUCK_IDLE_ROW;
+  const total = moving ? DUCK_WALK_FRAMES : DUCK_IDLE_FRAMES;
+  const col = ((frame % total) + total) % total;
 
-  const sx = col * FRAME_W;
-  const sy = row * FRAME_H;
+  const sx = col * DUCK_FRAME;
+  const sy = row * DUCK_FRAME;
   const destSize = tileSize * scale;
   // 타일 중앙 하단에 발 맞춤
   const offsetX = (tileSize - destSize) / 2;
   const offsetY = tileSize - destSize;
+  const dx = x + offsetX;
+  const dy = y + offsetY;
 
-  ctx.drawImage(
-    sheet,
-    sx, sy, FRAME_W, FRAME_H,
-    x + offsetX, y + offsetY, destSize, destSize,
-  );
+  if (facing === "left") {
+    // 캔버스를 그릴 위치에서 뒤집는다. 되돌리지 않으면 이후 모든 렌더가 뒤집힌다.
+    ctx.save();
+    ctx.translate(dx + destSize, dy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(sheet, sx, sy, DUCK_FRAME, DUCK_FRAME, 0, 0, destSize, destSize);
+    ctx.restore();
+    return;
+  }
+
+  ctx.drawImage(sheet, sx, sy, DUCK_FRAME, DUCK_FRAME, dx, dy, destSize, destSize);
 }
 
 // ---------------------------------------------------------------------------

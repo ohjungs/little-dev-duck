@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { markInList, markManyInList } from "../readArticles";
+import { markInList, markManyInList, unmarkInList } from "../readArticles";
 
 const MAX = 500;
 
@@ -31,6 +31,31 @@ describe("markInList", () => {
     expect(result[0]).toBe("new");
     // last entry of original list is dropped
     expect(result).not.toContain(`id-${MAX - 1}`);
+  });
+});
+
+describe("unmarkInList", () => {
+  it("removes the id from the list", () => {
+    expect(unmarkInList(["a", "b", "c"], "b")).toEqual(["a", "c"]);
+  });
+
+  it("leaves the list unchanged when the id is absent", () => {
+    expect(unmarkInList(["a", "b"], "z")).toEqual(["a", "b"]);
+  });
+
+  it("removes every copy if the stored list somehow has duplicates", () => {
+    expect(unmarkInList(["a", "b", "a"], "a")).toEqual(["b"]);
+  });
+
+  it("mark → unmark returns to the original list (읽음 되돌리기가 실제로 원상복구)", () => {
+    const original = ["x", "y"];
+    expect(unmarkInList(markInList(original, "new"), "new")).toEqual(original);
+  });
+
+  it("does not mutate the input", () => {
+    const ids = ["a", "b"];
+    unmarkInList(ids, "a");
+    expect(ids).toEqual(["a", "b"]);
   });
 });
 

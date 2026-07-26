@@ -5,7 +5,8 @@
 import { formatClockTime, type Npc, type GameClock,
   deptColor,
   deptLabel,
-  schedulePhaseLabel,
+  hasActiveWork,
+  npcStatusLabel,
 } from "@ldd/core";
 
 type Props = {
@@ -96,7 +97,9 @@ export function OfficeDashboard({ npcs, clock, onClose }: Props) {
                 {deptNpcs.map((n) => (
                   <div key={n.id} className="text-xs flex justify-between">
                     <span>{n.name}</span>
-                    <span className="text-muted-foreground">{schedulePhaseLabel(n.schedulePhase)}</span>
+                    <span className="text-muted-foreground">
+                      {npcStatusLabel(n.schedulePhase, hasActiveWork(n))}
+                    </span>
                   </div>
                 ))}
               </div>
