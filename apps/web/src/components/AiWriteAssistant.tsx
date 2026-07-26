@@ -6,6 +6,9 @@ import { WRITE_ACTIONS, type WriteAction } from "@ldd/core";
 import { cn } from "@/lib/utils";
 import { DuckLogo } from "@/components/DuckLogo";
 import { PAGE_TEMPLATES, templateToText } from "@/lib/pageTemplates";
+import { listPages, searchPages } from "@ldd/api";
+import { createClient } from "@/lib/supabase/client";
+import type { Page } from "@ldd/core";
 
 const LABELS: Record<WriteAction, string> = {
   summarize: "요약",
@@ -41,6 +44,12 @@ export function AiWriteAssistant() {
   const [busy, setBusy] = useState<WriteAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // 2026-07-27 (2차 피드백 2-5, Phase 45 T2): "다른 페이지 가져오기".
+  // **LLM을 부르지 않는다** — 이미 쓴 글을 그대로 가져오는 일이라 생성할 것이 없다.
+  // 검색도 `searchPages`(제목·본문 부분 일치)를 그대로 쓴다. 임베딩 검색은 이 용도에
+  // 과하고(비용·지연), 사용자는 보통 자기가 쓴 제목을 기억한다.
+  const [pageHits, setPageHits] = useState<Page[] | null>(null);
+  const [pageBusy, setPageBusy] = useState(false);
 
   const run = async (action: WriteAction) => {
     if (!text.trim() || busy) return;
@@ -73,6 +82,36 @@ export function AiWriteAssistant() {
     setError(null);
     setCopied(false);
     setResult(templateToText(template));
+  };
+
+  // 지금 글을 검색어로 관련 페이지를 찾는다. 글이 비었으면 최근 페이지를 보여 준다 —
+  // 빈 화면에서 "가져오기"를 누르는 것이 가장 흔한 경우인데 거기서 아무것도 안 나오면 막힌다.
+  const findPages = async () => {
+    if (pageBusy) return;
+    setPageBusy(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const query = text.trim().slice(0, 60);
+      const hits = query
+        ? await searchPages(supabase, query, 8)
+        : (await listPages(supabase)).slice(0, 8);
+      setPageHits(hits);
+    } catch {
+      setError("페이지를 불러오지 못했어요.");
+    } finally {
+      setPageBusy(false);
+    }
+  };
+
+  // 고른 페이지의 본문을 결과 칸에 넣는다. 붙여넣기는 사용자가 한다 —
+  // 지금 쓰던 글을 말없이 덮으면 되돌릴 수 없다.
+  const pullPage = (page: Page) => {
+    setPageHits(null);
+    setCopied(false);
+    setResult(
+      page.plainText.trim() || "(그 페이지는 아직 본문이 비어 있어요.)",
+    );
   };
 
   const copy = () => {
@@ -131,6 +170,43 @@ export function AiWriteAssistant() {
 
           {/* 2026-07-27 (2차 피드백 2-5): "템플릿 이용". 글이 없어도 쓸 수 있어야 한다 —
               템플릿은 **빈 문서에서 시작할 때** 가장 필요하다(위 액션들과 달리 입력이 필요 없다). */}
+          {/* 2026-07-27 (2차 피드백 2-5): "다른 페이지 가져오기". 지금 글을 검색어로 쓰고,
+              글이 비었으면 최근 페이지를 보여 준다. **LLM을 부르지 않는다** — 이미 쓴 글을
+              그대로 가져오는 일이라 생성할 것이 없다(쿼터도 아낀다). */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">다른 페이지</span>
+            <button
+              type="button"
+              onClick={findPages}
+              disabled={busy !== null || pageBusy}
+              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs transition-colors hover:bg-muted disabled:opacity-40"
+            >
+              {pageBusy && <Loader2 className="size-3 animate-spin" />}
+              {text.trim() ? "관련 페이지 찾기" : "최근 페이지"}
+            </button>
+            {pageHits !== null && pageHits.length === 0 && (
+              <span className="text-xs text-muted-foreground">
+                맞는 페이지가 없어요
+              </span>
+            )}
+          </div>
+          {pageHits !== null && pageHits.length > 0 && (
+            <ul className="flex flex-col gap-1">
+              {pageHits.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => pullPage(p)}
+                    className="w-full truncate rounded-md border border-border px-2.5 py-1 text-left text-xs transition-colors hover:bg-muted"
+                  >
+                    {p.icon ? `${p.icon} ` : ""}
+                    {p.title.trim() || "제목 없음"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs text-muted-foreground">템플릿</span>
             {PAGE_TEMPLATES.filter((t) => t.content.length > 0)
