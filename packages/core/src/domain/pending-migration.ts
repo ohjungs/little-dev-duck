@@ -20,8 +20,27 @@ const MISSING_COLUMN = [
   /column "[^"]*" does not exist/i,
 ];
 
+// 2026-07-27 : 오류 - 미적용마이그레이션 - 테이블없음도 (Phase 50 T2)
+// 위 목록은 **컬럼**이 없을 때만 잡는다. 메신저는 테이블 자체가 아직 없어서 여기 걸리지
+// 않았고, 사용자는 "Could not find the table 'public.rooms' in the schema cache" 원문을
+// 그대로 보게 된다. 같은 부류(알려진 대기 상태)이므로 같은 자리에서 잡는다.
+const MISSING_TABLE = [
+  // PostgREST: 스키마 캐시에 테이블이 없을 때
+  /could not find the table '[^']*'/i,
+  /\bPGRST205\b/,
+  // Postgres 원문
+  /relation "[^"]*" does not exist/i,
+];
+
 export function pendingMigrationMessage(raw: string): string | null {
   if (raw.trim() === "") return null;
-  if (!MISSING_COLUMN.some((re) => re.test(raw))) return null;
-  return "아직 준비되지 않은 기능이에요. 데이터베이스 변경이 적용되면 저장됩니다(관리자 조치 필요).";
+  if (MISSING_COLUMN.some((re) => re.test(raw))) {
+    return "아직 준비되지 않은 기능이에요. 데이터베이스 변경이 적용되면 저장됩니다(관리자 조치 필요).";
+  }
+  // 테이블이 통째로 없으면 저장뿐 아니라 **읽기도 안 된다** — 문구를 그에 맞춘다.
+  // "저장됩니다"라고 하면 화면을 열지도 못하는 사람에게 엉뚱한 안내가 된다.
+  if (MISSING_TABLE.some((re) => re.test(raw))) {
+    return "아직 준비되지 않은 기능이에요. 데이터베이스 변경이 적용되면 사용할 수 있어요(관리자 조치 필요).";
+  }
+  return null;
 }

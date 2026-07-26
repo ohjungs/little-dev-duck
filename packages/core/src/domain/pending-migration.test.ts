@@ -73,3 +73,32 @@ describe("pendingMigrationMessage — 무엇을 하라고 알려준다", () => {
     expect(msg).not.toContain("Could not find");
   });
 });
+
+// 2026-07-27 : 오류 - 미적용마이그레이션 - 테이블없음 (Phase 50 T2)
+// 메신저는 **테이블 자체가 없다.** 컬럼 검사만으로는 안 걸려서 사용자가 원문을 보게 된다.
+describe("테이블이 통째로 없을 때", () => {
+  it("PostgREST의 테이블 없음 메시지를 사람 말로 바꾼다", () => {
+    const raw = "Could not find the table 'public.rooms' in the schema cache";
+    expect(pendingMigrationMessage(raw)).toContain("아직 준비되지 않은 기능");
+  });
+
+  it("PGRST205 코드도 잡는다", () => {
+    expect(pendingMigrationMessage("PGRST205")).not.toBeNull();
+  });
+
+  it("Postgres 원문(relation does not exist)도 잡는다", () => {
+    expect(pendingMigrationMessage('relation "public.messages" does not exist')).not.toBeNull();
+  });
+
+  it("읽기도 안 되는 상황이라 '저장됩니다'라고 하지 않는다", () => {
+    // 화면을 열지도 못하는 사람에게 "저장됩니다"는 엉뚱한 안내다.
+    const msg = pendingMigrationMessage("Could not find the table 'public.rooms' in the schema cache");
+    expect(msg).toContain("사용할 수 있어요");
+    expect(msg).not.toContain("저장됩니다");
+  });
+
+  it("관계없는 오류는 그대로 둔다 (과하게 잡으면 진짜 원인을 가린다)", () => {
+    expect(pendingMigrationMessage("network timeout")).toBeNull();
+    expect(pendingMigrationMessage("permission denied for table rooms")).toBeNull();
+  });
+});
