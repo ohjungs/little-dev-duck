@@ -434,3 +434,12 @@ export {
   orderPagesParentsFirst,
   type RestorePlan,
 } from "./domain/backup-restore-plan";
+export {
+  INITIATIVE_DAILY_CAP,
+  buildInitiatives,
+  pickInitiative,
+  type InitiativeKind,
+  type InitiativeCandidate,
+  type InitiativeInput,
+  type InitiativeState,
+} from "./domain/duck-initiative";

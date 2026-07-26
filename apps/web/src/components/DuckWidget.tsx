@@ -14,6 +14,9 @@ import {
   type QuietHours,
 } from "@/lib/quietHours";
 import { notifyDuck } from "@/lib/notify";
+import { loadDuckInitiative, markSpoken } from "@/lib/duckInitiative";
+import { todayIso } from "@/lib/today";
+import { isQuietHour } from "@ldd/core";
 import {
   Card,
   CardContent,
@@ -41,6 +44,8 @@ export function DuckWidget() {
   const [celebrate, setCelebrate] = useState(false);
   const [quietHours, setQuietHours] = useState<QuietHours | null>(null);
   const [showCard, setShowCard] = useState(false);
+  // 오리가 먼저 건네는 말(피드백 1-3). 규칙으로 고른 문장이라 LLM 호출이 없다.
+  const [initiative, setInitiative] = useState<string | null>(null);
   const levelRef = useRef<number | null>(null);
   const celebrateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -107,6 +112,29 @@ export function DuckWidget() {
   const progress = duckState ? levelProgress(duckState.xp) : null;
   const ratioPercent = progress ? Math.round(progress.ratio * 100) : 0;
 
+  // 화면을 열었을 때 한 번만 판단한다. 주기적으로 돌리면 같은 상황을 하루에 여러 번 말하게 되고
+  // (core가 종류별로 막지만 굳이 조회를 반복할 이유가 없다), 조회가 늘면 무료 등급을 깎는다.
+  // quietHours가 로드된 뒤에 돌아야 방해금지가 실제로 걸린다 — 그래서 의존성에 둔다.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const today = todayIso();
+      const now = new Date();
+      const quiet = quietHours
+        ? isQuietHour(now.getHours(), quietHours.start, quietHours.end)
+        : false;
+      const picked = await loadDuckInitiative(createClient(), { now, today, quiet });
+      if (cancelled || !picked) return;
+      setInitiative(picked.message);
+      // 실제로 띄운 뒤에 기록한다 — 계산만 하고 세면 하지도 않은 말이 상한을 깎는다.
+      markSpoken(today, picked.kind);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [quietHours]);
+
+
   return (
     <Card className="h-full">
       <CardHeader>
@@ -126,6 +154,7 @@ export function DuckWidget() {
             mood={mood}
             celebrate={celebrate}
             quietHours={quietHours}
+            say={initiative}
           />
         </div>
 

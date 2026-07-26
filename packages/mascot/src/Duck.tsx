@@ -31,6 +31,9 @@ export interface DuckProps {
   celebrate?: boolean;
   // Phase 12 T2 방해금지(DND). 이 시간대(로컬)엔 유휴 혼잣말을 억제한다(밤엔 오리도 잔다). null=끔.
   quietHours?: { start: number; end: number } | null;
+  // 2026-07-26 (피드백 1-3): 오리가 먼저 거는 말. 값이 바뀌면 그 문장을 말풍선에 띄운다.
+  // 문장은 호출부가 규칙으로 만든다(LLM 아님) — 여기는 표시만 맡는다.
+  say?: string | null;
 }
 
 export function Duck({
@@ -38,6 +41,7 @@ export function Duck({
   mood = "neutral",
   celebrate = false,
   quietHours = null,
+  say = null,
 }: DuckProps) {
   const reducedMotion = usePrefersReducedMotion();
   const clickCountRef = useRef(0);
@@ -90,6 +94,16 @@ export function Duck({
     return () => clearTimeout(timer);
     // mood가 바뀌면 다음 유휴 대사부터 새 mood를 반영하도록 재스케줄한다.
   }, [mood]);
+
+  // 자율 발화(피드백 1-3). 값이 새로 들어오면 그 문장을 띄우고, 유휴 혼잣말과 겹치지 않게
+  // 마지막 상호작용 시각을 갱신한다 — 말을 건 직후에 혼잣말이 덮어쓰면 사용자가 못 읽는다.
+  useEffect(() => {
+    if (!say) return;
+    speak(say);
+    lastInteractionRef.current = Date.now();
+    // say만 의존한다. speak는 렌더마다 새로 만들어지지만 하는 일이 같고, 의존성에 넣으면
+    // 매 렌더마다 같은 문장을 다시 말한다.
+  }, [say]);
 
   useEffect(() => {
     return () => {
