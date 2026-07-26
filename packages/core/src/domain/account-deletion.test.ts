@@ -55,3 +55,22 @@ describe("확인 문구 — 두 삭제가 서로 다른 문구를 쓴다", () =>
     expect(CONTENT_DELETE_PHRASE.startsWith(ACCOUNT_DELETE_PHRASE)).toBe(false);
   });
 });
+
+describe("accountDeletionEnabled — 타입 가드", () => {
+  it("좁혀진 값을 캐스트 없이 string으로 쓸 수 있다", () => {
+    // 가드가 아니면 호출부가 `key as string`을 써야 하고, 그 캐스트는 나중에 검사를 옮기거나
+    // 지웠을 때 **undefined가 조용히 통과**하는 자리가 된다.
+    // 이 테스트는 컴파일이 곧 검증이다 — 가드를 boolean으로 되돌리면 타입체크에서 먼저 깨진다.
+    // core는 node 타입을 쓰지 않으므로(process 없음) 환경변수와 같은 모양의 값으로 대신한다.
+    const cases: (string | undefined)[] = [undefined, "  ", "real-key"];
+    const narrowedValues: string[] = [];
+    for (const key of cases) {
+      if (accountDeletionEnabled(key)) {
+        // 가드가 아니면 이 대입이 타입체크에서 깨진다.
+        const narrowed: string = key;
+        narrowedValues.push(narrowed);
+      }
+    }
+    expect(narrowedValues).toEqual(["real-key"]);
+  });
+});

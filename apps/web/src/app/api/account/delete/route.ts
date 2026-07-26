@@ -17,11 +17,28 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 //  3) 키가 없으면 503과 명확한 사유. **미설정이 안전한 기본값**이고 화면은 버튼을 아예 안 보여준다.
 //  4) 콘텐츠 먼저, 계정 마지막. 뒤집으면 세션이 죽어 콘텐츠 삭제가 중간에 멈추고
 //     사용자는 지워졌다고 믿는 남은 데이터를 갖게 된다.
+//
+// **CSRF — 재조사하지 않아도 되도록 근거를 남긴다(2026-07-26 실측).**
+// 남의 사이트가 이 라우트로 POST를 보내면 계정이 지워질까? **안 된다.**
+// `@supabase/ssr@0.12.3`이 인증 쿠키를 `sameSite: "lax"`로 굽는다(dist에서 확인) —
+// Lax는 **크로스사이트 POST에 쿠키를 싣지 않으므로** 그런 요청은 여기서 401로 떨어진다.
+// 게다가 `proxy.ts`의 공개 경로 목록에 이 경로가 없어 비로그인 요청은 그 앞에서 막힌다.
+// Origin 헤더 검사를 따로 넣지 않은 이유: 이미 막혀 있고, 검사를 잘못 짜면 **정상 요청을
+// 막는 쪽**의 위험이 더 크다(이 기능은 되돌릴 수 없어 실패가 비싸다). 측정하고 안 고쳤다.
 
 // 되돌릴 수 없는 라우트라 실수·자동화 반복 호출을 막는다. 인스턴스 메모리 기반이라 완벽하지
 // 않지만(keepalive와 같은 한계), 같은 사용자가 연달아 호출하는 사고는 잡는다.
+//
+// 2026-07-26 자체 리뷰에서 찾은 것: 성공하면 지우는데 **실패 경로에서는 항목이 영원히 남아**
+// 서로 다른 사용자가 실패할수록 맵이 계속 커졌다. 쓸 때마다 지난 항목을 걷어내 크기를 묶는다.
 const RECENT_CALLS = new Map<string, number>();
 const COOLDOWN_MS = 30_000;
+
+function pruneExpired(now: number): void {
+  for (const [id, at] of RECENT_CALLS) {
+    if (now - at >= COOLDOWN_MS) RECENT_CALLS.delete(id);
+  }
+}
 
 export async function POST() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -43,8 +60,9 @@ export async function POST() {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const last = RECENT_CALLS.get(user.id);
   const now = Date.now();
+  pruneExpired(now);
+  const last = RECENT_CALLS.get(user.id);
   if (last !== undefined && now - last < COOLDOWN_MS) {
     return NextResponse.json(
       { error: "잠시 후 다시 시도해 주세요." },
@@ -66,7 +84,8 @@ export async function POST() {
 
   // 2단계: 계정. 여기서만 service_role을 쓴다. 세션 유지가 필요 없으므로 쿠키를 다루지 않는다.
   const { url } = getSupabaseEnv();
-  const admin = createAdminClient(url, serviceKey as string, {
+  // serviceKey는 위 accountDeletionEnabled 가드로 string임이 좁혀져 있다 — 캐스트를 쓰지 않는다.
+  const admin = createAdminClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const { error } = await admin.auth.admin.deleteUser(user.id);

@@ -21,6 +21,10 @@ export const ACCOUNT_DELETE_PHRASE = "계정을 영구 삭제";
 // service_role 키가 있어야만 계정을 지울 수 있다(Supabase Admin API).
 // **미설정이 안전한 기본값이다** — 키가 없으면 기능 자체를 노출하지 않는다.
 // 환경변수를 만들어만 두고 값을 안 넣는 실수가 흔해 공백도 미설정으로 본다.
-export function accountDeletionEnabled(key: string | undefined): boolean {
+//
+// **타입 가드로 둔다(`key is string`).** boolean만 돌려주면 호출부가 `key as string` 캐스트를
+// 써야 하는데, 그 캐스트는 나중에 검사를 옮기거나 지웠을 때 **undefined가 조용히 통과**하는
+// 자리가 된다. 가드면 검사를 지우는 순간 타입체크가 먼저 운다.
+export function accountDeletionEnabled(key: string | undefined): key is string {
   return typeof key === "string" && key.trim().length > 0;
 }

@@ -15,6 +15,16 @@ const cache = new Map<
   { summary: ContributionSummary; expiresAt: number }
 >();
 
+// 2026-07-26 : 캐시 - 만료항목 - 정리
+// 넣기만 하고 지우지 않아 **한 번이라도 조회된 로그인이 영원히 남았다**(같은 날 계정 삭제
+// 라우트의 호출 기록에서 찾은 것과 같은 부류라 함께 고친다). 만료된 것만 걷어내므로
+// 살아 있는 캐시는 그대로다.
+function pruneExpired(now: number): void {
+  for (const [key, entry] of cache) {
+    if (entry.expiresAt <= now) cache.delete(key);
+  }
+}
+
 const githubLoginSchema = z.string().min(1);
 
 function getGithubLogin(user: SupabaseUser): string | null {
@@ -44,8 +54,10 @@ export async function GET() {
     return NextResponse.json({ linked: false });
   }
 
+  const now = Date.now();
+  pruneExpired(now);
   const cached = cache.get(login);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (cached && cached.expiresAt > now) {
     return NextResponse.json({ linked: true, summary: cached.summary });
   }
 
