@@ -35,7 +35,9 @@ import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
 import { GitHubMark } from "@/components/ui/github-mark";
 import { GmailLink } from "@/components/GmailLink";
 import { GithubContributionWidget } from "@/components/GithubContributionWidget";
+import { accountDeletionEnabled } from "@ldd/core";
 import { DangerZone } from "@/components/DangerZone";
+import { DeleteAccountButton } from "@/components/DeleteAccountButton";
 import { DashboardLayoutPanel } from "@/components/DashboardLayoutPanel";
 import { ProfileSettings } from "@/components/ProfileSettings";
 import { ExportDataButton } from "@/components/ExportDataButton";
@@ -382,8 +384,15 @@ export default async function SettingsPage() {
                 내 모든 콘텐츠를 영구 삭제합니다. 되돌릴 수 없어요.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col gap-3">
               <DangerZone userId={user.id} />
+              {/* 2026-07-26 (Phase 35): 계정 삭제는 service_role 키가 있어야 동작한다.
+                  **키가 없으면 버튼 자체를 렌더하지 않는다** — 없는 기능을 보여주면 눌러 보고
+                  실패한다. 서버 컴포넌트라 이 판정이 클라이언트로 새지 않는다(키 값 자체는
+                  넘기지 않고 "켜졌는가"만 본다). */}
+              {accountDeletionEnabled(process.env.SUPABASE_SERVICE_ROLE_KEY) && (
+                <DeleteAccountButton />
+              )}
             </CardContent>
           </Card>
         )}

@@ -444,6 +444,13 @@ export {
   slideTitle,
   type Slide,
 } from "./domain/slides";
+export {
+  ACCOUNT_DELETE_STEPS,
+  ACCOUNT_DELETE_PHRASE,
+  CONTENT_DELETE_PHRASE,
+  accountDeletionEnabled,
+  type AccountDeleteStep,
+} from "./domain/account-deletion";
 export { untrustedTextRule } from "./domain/untrusted-text";
 export { buildArticleSummaryPrompt } from "./domain/news-summary-prompt";
 export { parseBackup, type BackupParseResult } from "./domain/backup-parse";

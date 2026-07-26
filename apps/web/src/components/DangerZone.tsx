@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import { deleteAllMyData } from "@ldd/api";
+import { ACCOUNT_DELETE_PHRASE, CONTENT_DELETE_PHRASE } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
 // Phase 13 T3 1단계: 로그인 사용자가 자기 모든 콘텐츠를 삭제한다. 되돌리기 불가라(안전 규칙)
-// 문구 타이핑 강한 확인 게이트를 둔다. 삭제 후 로그아웃. 계정(auth) 자체 삭제는 2단계(Edge Function).
-const CONFIRM_PHRASE = "삭제합니다";
+// 문구 타이핑 강한 확인 게이트를 둔다. 삭제 후 로그아웃.
+//
+// 2026-07-26 (Phase 35): 계정(auth.users) 삭제를 2단계로 추가했다. **문구를 core로 옮겼다** —
+// 두 삭제가 서로 다른 문구를 쓴다는 계약을 테스트로 잠그려면 한곳에 있어야 한다.
+const CONFIRM_PHRASE = CONTENT_DELETE_PHRASE;
 
 export function DangerZone({ userId }: { userId: string }) {
   const [armed, setArmed] = useState(false);
