@@ -5,7 +5,7 @@
 // 빌드 시점 localhost라, 정적 프리렌더 페이지(/welcome)에 localhost가 그대로 박혀 나간다(실측).
 // VERCEL_URL은 배포마다 달라지는 프리뷰 주소라, 안정적인 프로덕션 도메인을 먼저 본다.
 
-const LOCAL_FALLBACK = "http://localhost:3000";
+const LOCAL_FALLBACK = "http://localhost:5000";
 
 export type SiteUrlEnv = {
   NEXT_PUBLIC_SITE_URL?: string;

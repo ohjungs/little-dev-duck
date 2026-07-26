@@ -126,7 +126,7 @@ test("공개 페이지가 참조하는 자원이 전부 인증 없이 받아진�
       ).map((el) => el.getAttribute("content") ?? ""),
     ];
     // 메타데이터의 절대 URL은 metadataBase 기준이라 테스트 서버와 포트가 다르다
-    // (실측: localhost:3000). 호스트가 localhost면 경로만 떼어 이 서버에 물어본다.
+    // (실측: localhost:5000). 호스트가 localhost면 경로만 떼어 이 서버에 물어본다.
     // 진짜 외부 호스트(CDN 등)는 이 검사 대상이 아니다.
     return raw
       .map((u) => {

@@ -28,7 +28,7 @@ describe("resolveSiteUrl", () => {
   });
 
   it("아무것도 없으면 로컬 개발 주소로 폴백한다", () => {
-    expect(resolveSiteUrl({})).toBe("http://localhost:3000");
+    expect(resolveSiteUrl({})).toBe("http://localhost:5000");
   });
 
   it("스킴이 없는 Vercel 호스트에 https를 붙인다", () => {
@@ -38,8 +38,8 @@ describe("resolveSiteUrl", () => {
   });
 
   it("이미 스킴이 있으면 중복해서 붙이지 않는다", () => {
-    expect(resolveSiteUrl({ NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3100" })).toBe(
-      "http://127.0.0.1:3100",
+    expect(resolveSiteUrl({ NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:5100" })).toBe(
+      "http://127.0.0.1:5100",
     );
   });
 

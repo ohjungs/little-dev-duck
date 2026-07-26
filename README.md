@@ -58,7 +58,7 @@ supabase db push                     # supabase/migrations 미적용분 적용 (
 
 ### 5. 개발 서버 / 검증
 ```bash
-pnpm dev                             # 전체(turbo). 웹만: pnpm --filter web dev → http://localhost:3000
+pnpm dev                             # 전체(turbo). 웹만: pnpm --filter web dev → http://localhost:5000
 pnpm test                            # 전 패키지 vitest
 pnpm lint                            # 전 패키지 eslint (로컬 web eslint는 느림 → 백그라운드 권장)
 pnpm build                           # 전 패키지 프로덕션 빌드

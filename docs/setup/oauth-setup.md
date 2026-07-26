@@ -9,7 +9,7 @@ Vercel 연결)는 이미 완료되어 있다.
 - Supabase 프로젝트: `iupprzfmlyfrdcctdupn` (서울 리전)
 - Supabase 콜백 URL: `https://iupprzfmlyfrdcctdupn.supabase.co/auth/v1/callback`
 - 배포 origin: `https://web-sepia-one-88.vercel.app`
-- 로컬 개발 origin: `http://localhost:3000` (또는 3001, 3000 사용 중이면 자동 대체)
+- 로컬 개발 origin: `http://localhost:5000` (또는 5001, 5000 사용 중이면 자동 대체)
 - Supabase Auth Site URL / Redirect URLs: `supabase/config.toml` + `supabase config push`로 이미 반영 완료
 
 ## 1. Google Cloud Console — 사용자 수행 필요

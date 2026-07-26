@@ -7,7 +7,7 @@ webServer는 `next start` — 즉 **미리 빌드된 결과물**을 서빙하는
 메타데이터를 고쳤는데 옛 값이 계속 나왔다). 앱 소스를 건드렸으면 반드시 빌드를 먼저 한다.
 **이건 `e2e/buildFreshness.ts`(globalSetup)가 자동으로 막는다** — 빌드가 소스보다 낡았으면
 어느 파일 때문인지 짚고 실행을 중단하므로, 잊어도 조용히 거짓 통과하지는 않는다.
-포트는 3100 (로컬 개발 서버가 보통 쓰는 3000과 겹치지 않게 분리 — 포트 충돌 방지).
+포트는 5100 (로컬 개발 서버가 쓰는 5000과 겹치지 않게 분리 — 포트 충돌 방지).
 
 `auth-redirect.spec.ts`, `responsive.spec.ts`(로그인 페이지 부분)는 로그인 없이 바로 돈다.
 `widgets.spec.ts`(투두/메모), `todo-recurrence.spec.ts`(반복 할 일),
@@ -19,16 +19,16 @@ webServer는 `next start` — 즉 **미리 빌드된 결과물**을 서빙하는
 ## 인증 세션 만들기 (최초 1회, 로컬에서 수동)
 
 Google/GitHub OAuth라 Playwright가 자동으로 로그인할 수 없다. 아래처럼
-브라우저를 직접 띄워 로그인한 뒤 세션을 저장한다. **포트는 반드시 3100**
-(playwright.config.ts의 baseURL과 동일해야 쿠키가 세션 파일에 저장된다 — 3000으로
+브라우저를 직접 띄워 로그인한 뒤 세션을 저장한다. **포트는 반드시 5100**
+(playwright.config.ts의 baseURL과 동일해야 쿠키가 세션 파일에 저장된다 — 5000으로
 로그인해서 저장하면 도메인이 달라 인증이 안 먹는다).
 
 ```
-pnpm exec playwright open http://localhost:3100/login \
+pnpm exec playwright open http://localhost:5100/login \
   --save-storage=e2e/.auth/user.json
 ```
 
-처음 실행하면 playwright.config.ts의 `webServer` 설정대로 3100 포트에 dev 서버가 자동으로
+처음 실행하면 playwright.config.ts의 `webServer` 설정대로 5100 포트에 dev 서버가 자동으로
 뜬다(잠시 대기). 브라우저 창이 열리면 Google 또는 GitHub로 실제 로그인을 완료한 뒤 창을
 닫는다. `e2e/.auth/user.json`에 세션이 저장된다. 이 파일은 `.gitignore`에 등록돼 있으니
 커밋되지 않는다(OAuth 세션 토큰이 들어있어 저장소에 올리면 안 됨). 이후
