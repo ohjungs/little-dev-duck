@@ -31,10 +31,13 @@ import {
   RECOMMENDED_FEEDS,
   resolveFeedUrl,
   unregisteredFeeds,
+  rotateRecommended,
+  dayOfYearOf,
   type Article,
   type Feed,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
+import { todayIso } from "@/lib/today";
 import { timeAgo } from "@/lib/timeAgo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -259,10 +262,17 @@ export function NewsReader() {
   }, []);
   const readSet = useMemo(() => new Set(readIds), [readIds]);
   // 이미 등록한 피드는 추천에서 뺀다(core 순수함수 — 끝 슬래시·대소문자 차이 흡수).
-  const suggestions = useMemo(
-    () => unregisteredFeeds(RECOMMENDED_FEEDS, feeds.map((f) => f.url)),
-    [feeds],
-  );
+  //
+  // 2026-07-27 (2차 피드백 4-3, Phase 47 T2-1): 남은 것을 **전부** 보여주면 며칠 만에 목록이
+  // 마르고, 사용자에겐 "추천이 갱신되지 않는다"로 보인다. 날짜 시드로 **N개씩 회전**시킨다 —
+  // 무작위가 아니라 결정적이라 **하루 안에서는 새로고침해도 같은 목록**이다(방금 본 걸 다시 찾을 수 있다).
+  const suggestions = useMemo(() => {
+    const remaining = unregisteredFeeds(
+      RECOMMENDED_FEEDS,
+      feeds.map((f) => f.url),
+    );
+    return rotateRecommended(remaining, dayOfYearOf(todayIso()), 6);
+  }, [feeds]);
 
   // 북마크 상태(localStorage) 동기화.
   useEffect(() => {

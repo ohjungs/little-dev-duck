@@ -49,6 +49,49 @@ function key(url: string): string {
   return url.trim().toLowerCase().replace(/\/+$/, "");
 }
 
+// 2026-07-27 : 추천 피드 - 회전 (2차 피드백 4-3, Phase 47 T2-1)
+// 사용자가 "추천이 갱신되지 않는다"고 했다. 실체는 `unregisteredFeeds`가 이미 등록한 것을
+// 걸러 내기 때문에 **다 등록하면 추천 섹션이 통째로 사라진다**는 것이다.
+//
+// 한 번에 전부 보여주지 않고 **N개씩 돌려 가며** 보여준다. 회전은 **날짜 시드로 결정적**이다 —
+// 무작위면 새로고침마다 흔들려 **사용자가 방금 본 추천을 다시 찾을 수 없다**.
+// 대시보드 동기부여 문구가 이미 같은 방식(연중 일차 % 개수)을 쓴다.
+//
+// **주제를 고르게 섞는다**: 그냥 잘라 내면 목록 앞쪽 주제만 계속 나오고 뒤쪽은 영영 안 보인다.
+export function rotateRecommended(
+  feeds: readonly RecommendedFeed[],
+  dayOfYear: number,
+  count: number,
+): RecommendedFeed[] {
+  if (feeds.length === 0 || count <= 0) return [];
+  if (feeds.length <= count) return [...feeds];
+  // 시작점을 날짜로 옮기며 순환한다 — 며칠에 걸쳐 전체가 한 번씩 노출된다.
+  const start = ((dayOfYear % feeds.length) + feeds.length) % feeds.length;
+  const picked: RecommendedFeed[] = [];
+  const seenTopics = new Set<string>();
+  // 1차: 주제가 겹치지 않게 고른다(한 화면에 같은 주제만 뜨지 않게).
+  for (let i = 0; i < feeds.length && picked.length < count; i += 1) {
+    const feed = feeds[(start + i) % feeds.length]!;
+    if (seenTopics.has(feed.topic)) continue;
+    seenTopics.add(feed.topic);
+    picked.push(feed);
+  }
+  // 2차: 그래도 모자라면 남은 것으로 채운다(주제 수가 count보다 적을 때).
+  for (let i = 0; i < feeds.length && picked.length < count; i += 1) {
+    const feed = feeds[(start + i) % feeds.length]!;
+    if (!picked.includes(feed)) picked.push(feed);
+  }
+  return picked;
+}
+
+// 연중 일차(1~366). 날짜 문자열만 받는다 — Date를 넘기면 시간대가 개입한다.
+export function dayOfYearOf(isoDate: string): number {
+  const [y, m, d] = isoDate.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return 0;
+  const start = Date.UTC(y, 0, 0);
+  return Math.floor((Date.UTC(y, m - 1, d) - start) / 86_400_000);
+}
+
 // 아직 등록하지 않은 추천 피드만. 빈 배열이면 UI는 추천 섹션을 숨긴다.
 export function unregisteredFeeds(
   feeds: readonly RecommendedFeed[],

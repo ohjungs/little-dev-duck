@@ -277,6 +277,8 @@ export {
   feedTopics,
   resolveFeedUrl,
   unregisteredFeeds,
+  rotateRecommended,
+  dayOfYearOf,
   type FeedResolution,
   type RecommendedFeed,
 } from "./domain/news-feeds";

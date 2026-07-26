@@ -5,6 +5,8 @@ import {
   feedTopics,
   resolveFeedUrl,
   unregisteredFeeds,
+  rotateRecommended,
+  dayOfYearOf,
 } from "./news-feeds";
 
 describe("RECOMMENDED_FEEDS", () => {
@@ -169,5 +171,73 @@ describe("COMMON_FEED_PATHS", () => {
   // 시도 횟수는 수집 1회당 추가 왕복이므로 늘릴 때 근거가 필요하다 — 상한을 테스트로 잠근다.
   it("시도 횟수가 6회를 넘지 않는다(수집 1회당 추가 왕복 비용)", () => {
     expect(COMMON_FEED_PATHS.length).toBeLessThanOrEqual(6);
+  });
+});
+
+// 2026-07-27 : 추천 피드 - 회전 (2차 피드백 4-3, Phase 47 T2-1)
+// "추천이 갱신되지 않는다"의 실체는 **다 등록하면 추천이 통째로 사라지는 것**이었다.
+// 여기서 잠그는 성질은 ① 하루 안에서는 흔들리지 않는다 ② 날이 바뀌면 달라진다
+// ③ 한 화면에 같은 주제만 뜨지 않는다 — 셋 다 사용자가 바로 알아채는 것들이다.
+describe("추천 피드 회전", () => {
+  const feeds = RECOMMENDED_FEEDS;
+
+  it("같은 날에는 같은 결과다 (새로고침마다 흔들리지 않게)", () => {
+    expect(rotateRecommended(feeds, 100, 4)).toEqual(
+      rotateRecommended(feeds, 100, 4),
+    );
+  });
+
+  it("날이 바뀌면 목록이 달라진다", () => {
+    const a = rotateRecommended(feeds, 100, 4).map((f) => f.url);
+    const b = rotateRecommended(feeds, 101, 4).map((f) => f.url);
+    expect(a).not.toEqual(b);
+  });
+
+  it("요청한 개수를 지킨다", () => {
+    expect(rotateRecommended(feeds, 0, 4)).toHaveLength(4);
+    expect(rotateRecommended(feeds, 0, 1)).toHaveLength(1);
+  });
+
+  it("한 화면에 같은 주제가 겹치지 않는다 (주제가 충분할 때)", () => {
+    const picked = rotateRecommended(feeds, 5, 3);
+    expect(new Set(picked.map((f) => f.topic)).size).toBe(picked.length);
+  });
+
+  it("전체보다 많이 요구하면 전체를 준다", () => {
+    expect(rotateRecommended(feeds, 3, 999)).toHaveLength(feeds.length);
+  });
+
+  it("빈 목록·0개 요청에도 던지지 않는다", () => {
+    expect(rotateRecommended([], 1, 3)).toEqual([]);
+    expect(rotateRecommended(feeds, 1, 0)).toEqual([]);
+  });
+
+  it("음수 시드에도 안전하다", () => {
+    // dayOfYear가 계산 실패로 0이나 음수가 되어도 화면이 죽으면 안 된다.
+    expect(rotateRecommended(feeds, -7, 3)).toHaveLength(3);
+  });
+
+  it("며칠에 걸쳐 전체가 한 번씩은 노출된다", () => {
+    // 앞쪽만 계속 나오면 뒤쪽 추천은 영영 안 보인다 — "갱신되지 않는다"가 그대로 남는다.
+    const seen = new Set<string>();
+    for (let day = 0; day < feeds.length * 2; day += 1) {
+      for (const f of rotateRecommended(feeds, day, 3)) seen.add(f.url);
+    }
+    expect(seen.size).toBe(feeds.length);
+  });
+});
+
+describe("연중 일차", () => {
+  it("1월 1일이 1이다", () => {
+    expect(dayOfYearOf("2026-01-01")).toBe(1);
+  });
+
+  it("윤년 2월 29일을 센다", () => {
+    expect(dayOfYearOf("2028-03-01")).toBe(61); // 31 + 29 + 1
+    expect(dayOfYearOf("2026-03-01")).toBe(60); // 31 + 28 + 1
+  });
+
+  it("해석할 수 없는 값은 0이다 (던지지 않는다)", () => {
+    expect(dayOfYearOf("이상한 값")).toBe(0);
   });
 });
