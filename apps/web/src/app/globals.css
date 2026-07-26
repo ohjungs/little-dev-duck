@@ -332,3 +332,14 @@
   height: auto;
   border-radius: 10px;
 }
+
+/* 2026-07-27 : 작문 도우미 - 걷는 오리 (2차 피드백 2-5, Phase 45 T2)
+   요청이 "오리가 **돌아다니면서** 돕는다"였는데 1차 처리에서는 오리가 가만히 있었다.
+   좌우로 오가며 방향을 바꾼다 — 제자리 흔들림보다 "걷는다"에 가깝다.
+   움직임 줄이기 설정은 호출부의 `motion-safe:`가 지킨다(전역에서 또 막으면 두 벌이 된다). */
+@keyframes duck-walk {
+  0%, 100% { transform: translateX(0) scaleX(1); }
+  45% { transform: translateX(6px) scaleX(1); }
+  50% { transform: translateX(6px) scaleX(-1); }
+  95% { transform: translateX(0) scaleX(-1); }
+}

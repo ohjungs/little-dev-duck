@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { dbSchemaSchema, IMPORTABLE_BLOCK_TYPES } from "@ldd/core";
-import { PAGE_TEMPLATES, templateTitle } from "../pageTemplates";
+import { PAGE_TEMPLATES, templateTitle, templateToText } from "../pageTemplates";
 
 describe("PAGE_TEMPLATES", () => {
   it("has at least one template", () => {
@@ -193,5 +193,39 @@ describe("템플릿 내용 계약", () => {
     const t = (actionItem?.content ?? []).map((i) => i.text).join("");
     expect(t).toContain("담당");
     expect(t).toContain("기한");
+  });
+});
+
+// 2026-07-27 : 작문 도우미 - 템플릿 이용 (2차 피드백 2-5, Phase 45 T2)
+// 작문 도우미에서 템플릿을 꺼낼 때 **새 페이지와 같은 구조**가 나와야 한다.
+// 정의를 새로 만들지 않고 PAGE_TEMPLATES를 옮기는 것이 그 계약이다.
+describe("templateToText", () => {
+  const meeting = PAGE_TEMPLATES.find((t) => t.key === "meeting")!;
+
+  it("제목·목록·체크박스를 마크다운 모양으로 옮긴다", () => {
+    const out = templateToText(meeting);
+    expect(out).toContain("# 회의록");
+    expect(out).toContain("## 참석자");
+    expect(out).toContain("- [ ] ");
+    expect(out).toContain("> ");
+  });
+
+  it("템플릿에 있는 안내 문구가 그대로 실린다", () => {
+    // 안내 문구가 빠지면 "빈 페이지 같다"는 그 문제가 여기서 다시 생긴다.
+    expect(templateToText(meeting)).toContain("담당");
+  });
+
+  it("빈 페이지는 빈 문자열이다", () => {
+    const blank = PAGE_TEMPLATES.find((t) => t.key === "blank")!;
+    expect(templateToText(blank)).toBe("");
+  });
+
+  it("제목 단계는 1~3으로 눌러 담는다", () => {
+    // 마크다운은 6단계까지지만 우리 템플릿은 h1·h2만 쓴다. 범위를 벗어난 값이 와도 깨지지 않아야 한다.
+    const out = templateToText({
+      ...meeting,
+      content: [{ type: "heading", props: { level: 9 }, content: [{ type: "text", text: "깊은 제목", styles: {} }] }],
+    });
+    expect(out).toBe("### 깊은 제목");
   });
 });

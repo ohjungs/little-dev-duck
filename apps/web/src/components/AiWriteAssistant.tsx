@@ -5,6 +5,7 @@ import { ChevronDown, Copy, Loader2 } from "lucide-react";
 import { WRITE_ACTIONS, type WriteAction } from "@ldd/core";
 import { cn } from "@/lib/utils";
 import { DuckLogo } from "@/components/DuckLogo";
+import { PAGE_TEMPLATES, templateToText } from "@/lib/pageTemplates";
 
 const LABELS: Record<WriteAction, string> = {
   summarize: "요약",
@@ -63,6 +64,17 @@ export function AiWriteAssistant() {
     }
   };
 
+  // 2026-07-27 (2차 피드백 2-5, Phase 45 T2): "템플릿 이용"이 요청에 있었는데 입구가 없었다.
+  // **LLM을 부르지 않는다** — 템플릿은 정해진 구조라 생성할 이유가 없다(쿼터도 아낀다).
+  // 정의는 새 페이지가 쓰는 `PAGE_TEMPLATES` 그대로다. 두 곳이 다른 구조를 보여주면 안 된다.
+  const applyTemplate = (key: string) => {
+    const template = PAGE_TEMPLATES.find((t) => t.key === key);
+    if (!template) return;
+    setError(null);
+    setCopied(false);
+    setResult(templateToText(template));
+  };
+
   const copy = () => {
     if (!result) return;
     void navigator.clipboard?.writeText(result).then(() => {
@@ -116,13 +128,37 @@ export function AiWriteAssistant() {
               </button>
             ))}
           </div>
+
+          {/* 2026-07-27 (2차 피드백 2-5): "템플릿 이용". 글이 없어도 쓸 수 있어야 한다 —
+              템플릿은 **빈 문서에서 시작할 때** 가장 필요하다(위 액션들과 달리 입력이 필요 없다). */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">템플릿</span>
+            {PAGE_TEMPLATES.filter((t) => t.content.length > 0)
+              .slice(0, 6)
+              .map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => applyTemplate(t.key)}
+                  disabled={busy !== null}
+                  className="rounded-md border border-border px-2.5 py-1 text-xs transition-colors hover:bg-muted disabled:opacity-40"
+                >
+                  {t.label}
+                </button>
+              ))}
+          </div>
           {busy && (
             // 결과가 오기까지 몇 초가 걸린다. 그 사이 아무것도 없으면 눌린 건지 알 수 없다.
             <p
               role="status"
               className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground"
             >
-              <DuckLogo size={20} />
+              {/* 2026-07-27 (2차 피드백 2-5 "오리가 돌아다니면서"): 1차에서는 오리가 가만히
+                  있었다. 기다리는 동안 좌우로 걷게 한다 — 움직임 줄이기 설정을 켠 사용자에게는
+                  `motion-safe`가 애니메이션을 빼 준다(이 저장소가 다른 화면에서 쓰는 방식). */}
+              <span className="motion-safe:animate-[duck-walk_1.6s_ease-in-out_infinite]">
+                <DuckLogo size={20} />
+              </span>
               {BUSY_LABELS[busy]}...
             </p>
           )}

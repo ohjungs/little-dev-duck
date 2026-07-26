@@ -337,3 +337,27 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     },
   },
 ];
+
+// 2026-07-27 : 작문 도우미 - 템플릿 이용 (2차 피드백 2-5, Phase 45 T2)
+// 요청이 "템플릿 이용"을 명시했는데 작문 도우미에는 그 입구가 없었다.
+// **템플릿 정의를 새로 만들지 않는다** — 위 `PAGE_TEMPLATES`를 그대로 글로 옮긴다.
+// 새 페이지를 만들 때와 **같은 구조**가 나와야 사용자가 두 곳에서 다른 걸 보지 않는다.
+export function templateToText(template: PageTemplate): string {
+  const lines: string[] = [];
+  for (const block of template.content) {
+    const text = (block.content ?? []).map((i) => i.text).join("");
+    if (block.type === "heading") {
+      const level = Number(block.props?.level ?? 2);
+      lines.push(`${"#".repeat(Math.min(Math.max(level, 1), 3))} ${text}`);
+    } else if (block.type === "bulletListItem") {
+      lines.push(`- ${text}`);
+    } else if (block.type === "checkListItem") {
+      lines.push(`- [ ] ${text}`);
+    } else if (block.type === "quote") {
+      lines.push(`> ${text}`);
+    } else {
+      lines.push(text);
+    }
+  }
+  return lines.join("\n");
+}
