@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { listMessages, sendMessage } from "@ldd/api";
+import { deleteMessage, listMessages, sendMessage } from "@ldd/api";
 import { messageBody, pendingMigrationMessage, type Message } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeRoomMessages } from "@/lib/realtime";
@@ -28,6 +28,10 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // 2026-07-27 : 메신저 - 메시지 메뉴 (Phase 50 T5)
+  // 열린 메뉴의 메시지 id. **우클릭만으로 여는 메뉴는 키보드 사용자에게 없는 기능**이라
+  // 눈에 보이는 버튼을 함께 둔다(계획이 "접근성이 가장 잘 빠지는 자리"라고 짚었다).
+  const [menuFor, setMenuFor] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -38,6 +42,40 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   }, [roomId]);
 
   useEffect(() => subscribeRoomMessages(createClient(), roomId, reload), [roomId, reload]);
+
+  // 메뉴는 Escape로 닫힌다. 열어 두고 나갈 방법이 없으면 갇힌 느낌이 든다.
+  useEffect(() => {
+    if (menuFor === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuFor(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuFor]);
+
+  async function handleCopy(text: string) {
+    setMenuFor(null);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // 클립보드는 권한·보안 컨텍스트에 따라 막힌다. 조용히 실패했다고 하지 않는다.
+      setError("복사하지 못했어요. 직접 선택해 복사해 주세요.");
+    }
+  }
+
+  async function handleDelete(id: string) {
+    setMenuFor(null);
+    try {
+      await deleteMessage(createClient(), id);
+      // 낙관적으로 화면에서 먼저 가린다 — 본문은 서버에 남고 자리도 남는다(소프트 삭제).
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, deletedAt: new Date().toISOString() } : m)),
+      );
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    }
+  }
 
   // 새 메시지가 오면 아래로. 사용자가 위를 읽는 중일 수도 있어 부드럽게만 민다.
   useEffect(() => {
@@ -80,8 +118,13 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
           messages.map((m) => {
             const mine = m.senderUserId === myUserId;
             return (
-              <li key={m.id} className={mine ? "text-right" : "text-left"}>
+              <li key={m.id} className={`relative ${mine ? "text-right" : "text-left"}`}>
                 <span
+                  onContextMenu={(e) => {
+                    if (m.deletedAt) return;
+                    e.preventDefault();
+                    setMenuFor(m.id);
+                  }}
                   className={`inline-block max-w-[80%] rounded-lg px-3 py-1.5 text-sm break-keep ${
                     mine ? "bg-primary text-primary-foreground" : "bg-muted"
                   } ${m.deletedAt ? "italic opacity-60" : ""}`}
@@ -89,6 +132,46 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                   {/* 평문 렌더 — HTML로 그리지 않는다(에이전트 응답이 섞인다). */}
                   {messageBody(m)}
                 </span>
+
+                {!m.deletedAt && (
+                  <button
+                    type="button"
+                    onClick={() => setMenuFor(menuFor === m.id ? null : m.id)}
+                    aria-expanded={menuFor === m.id}
+                    aria-label="메시지 메뉴 열기"
+                    className="ml-1 rounded px-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    ...
+                  </button>
+                )}
+
+                {menuFor === m.id && (
+                  <div
+                    role="menu"
+                    aria-label="메시지 메뉴"
+                    className="absolute right-0 z-10 mt-1 flex flex-col rounded-md border border-border bg-background text-left shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleCopy(m.body)}
+                      className="px-3 py-1.5 text-xs hover:bg-accent"
+                    >
+                      복사
+                    </button>
+                    {/* 삭제는 보낸 사람만 — 정책도 그렇게 막혀 있어 남의 것에 보여 주면 눌러도 실패한다. */}
+                    {mine && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => handleDelete(m.id)}
+                        className="px-3 py-1.5 text-xs text-destructive hover:bg-accent"
+                      >
+                        삭제
+                      </button>
+                    )}
+                  </div>
+                )}
               </li>
             );
           })
