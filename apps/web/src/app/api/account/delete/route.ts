@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { accountDeletionEnabled } from "@ldd/core";
-import { deleteAllMyData } from "@ldd/api";
+import { allowRequest, deleteAllMyData } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
@@ -26,19 +26,17 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 // Origin 헤더 검사를 따로 넣지 않은 이유: 이미 막혀 있고, 검사를 잘못 짜면 **정상 요청을
 // 막는 쪽**의 위험이 더 크다(이 기능은 되돌릴 수 없어 실패가 비싸다). 측정하고 안 고쳤다.
 
-// 되돌릴 수 없는 라우트라 실수·자동화 반복 호출을 막는다. 인스턴스 메모리 기반이라 완벽하지
-// 않지만(keepalive와 같은 한계), 같은 사용자가 연달아 호출하는 사고는 잡는다.
+// 되돌릴 수 없는 라우트라 실수·자동화 반복 호출을 막는다.
 //
-// 2026-07-26 자체 리뷰에서 찾은 것: 성공하면 지우는데 **실패 경로에서는 항목이 영원히 남아**
-// 서로 다른 사용자가 실패할수록 맵이 계속 커졌다. 쓸 때마다 지난 항목을 걷어내 크기를 묶는다.
-const RECENT_CALLS = new Map<string, number>();
+// 2026-07-26 : 인벤토리 - 재구현 (Phase 36)
+// 처음엔 여기에 **자체 Map으로 상한을 다시 만들었다.** `@ldd/api`의 `allowRequest`가 이미
+// 같은 일을 하고 테스트까지 있는데 못 찾은 것이다(CLAUDE.md 3-5절 인벤토리 위반).
+// 자체 구현을 걷어내고 공용 함수로 바꿨다 — 덕분에 키 누수도 그쪽 한 곳에서 고쳐졌다.
+//
+// **한계(공용 구현과 같다)**: 인스턴스 메모리 기반이라 서버리스 인스턴스가 여럿이면 그만큼
+// 느슨하다. 이 경로의 **실질 방어는 상한이 아니라 확인 문구 타이핑**이다 — 자동화된 반복
+// 호출은 문구를 모른다. 상한은 같은 인스턴스의 연타를 잡는 보조 수단이다.
 const COOLDOWN_MS = 30_000;
-
-function pruneExpired(now: number): void {
-  for (const [id, at] of RECENT_CALLS) {
-    if (now - at >= COOLDOWN_MS) RECENT_CALLS.delete(id);
-  }
-}
 
 export async function POST() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -60,16 +58,13 @@ export async function POST() {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const now = Date.now();
-  pruneExpired(now);
-  const last = RECENT_CALLS.get(user.id);
-  if (last !== undefined && now - last < COOLDOWN_MS) {
+  // 사용자별 키. 30초에 한 번만 허용한다.
+  if (!allowRequest(`account-delete:${user.id}`, 1, COOLDOWN_MS)) {
     return NextResponse.json(
       { error: "잠시 후 다시 시도해 주세요." },
       { status: 429 },
     );
   }
-  RECENT_CALLS.set(user.id, now);
 
   // 1단계: 콘텐츠. 사용자 세션으로 지운다 — RLS가 본인 것만 지우도록 이미 보장한다.
   try {
@@ -99,6 +94,6 @@ export async function POST() {
     );
   }
 
-  RECENT_CALLS.delete(user.id);
+  // 계정이 사라졌으니 상한 기록도 곧 창을 지나 스스로 정리된다(allowRequest가 걷어낸다).
   return NextResponse.json({ ok: true });
 }
