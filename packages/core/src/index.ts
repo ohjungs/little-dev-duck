@@ -428,6 +428,8 @@ export {
   type BackupCollections,
   type BackupCollectionKey,
 } from "./domain/backup";
+export { untrustedTextRule } from "./domain/untrusted-text";
+export { buildArticleSummaryPrompt } from "./domain/news-summary-prompt";
 export { parseBackup, type BackupParseResult } from "./domain/backup-parse";
 export {
   LOCAL_PREF_SPECS,

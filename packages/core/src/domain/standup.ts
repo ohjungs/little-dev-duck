@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { untrustedTextRule } from "./untrusted-text";
 
 export const standupInputSchema = z.object({
   todosCompleted: z.number(),
@@ -18,8 +19,12 @@ export function formatStandupPrompt(input: StandupInput, today: string): string 
     "아래 사용자의 24시간 활동 데이터를 보고 한국어로 스탠드업 노트를 작성해줘.",
     "형식: ## 어제 한 일 / ## 오늘 할 일 / ## 막힌 것 (각 섹션 2~4줄 불릿)",
     "오리 페르소나로 친근하게 쓰되 과하지 않게. 데이터가 없는 섹션은 '기록 없음'으로.",
+    // 2026-07-26 : 보안 - 프롬프트인젝션 - 스탠드업 (Phase 32 T2)
+    // 개수만 들어간다고 넘겼다가 **세어 보니 아니었다** — calendarEvents는 일정 제목(자유 텍스트)이고,
+    // 구글 캘린더 연동이 있어 **남이 만든 초대 제목**이 그대로 들어올 수 있다.
+    untrustedTextRule("활동 데이터"),
     "",
-    "--- 활동 데이터 ---",
+    "[활동 데이터]",
     `할 일: ${input.todosCompleted}/${input.todosTotal} 완료`,
     `습관: ${input.habitsChecked}/${input.habitsTotal} 체크`,
     `뽀모도로: ${input.pomodoroSessions}회, 총 ${input.pomodoroMinutes}분 집중`,

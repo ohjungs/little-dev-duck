@@ -6,6 +6,7 @@ import {
   resolveFeedUrl,
   COMMON_FEED_PATHS,
   FEED_FAIL_THRESHOLD,
+  buildArticleSummaryPrompt,
   type Feed,
   type Article,
 } from "@ldd/core";
@@ -370,13 +371,10 @@ export async function summarizeArticle(
   article: { title: string; snippet: string | null },
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
-  const prompt = [
-    "다음 뉴스 기사를 한국어 3줄로 요약해줘. 과장·클릭베이트 없이 사실만, 각 줄은 '- '로 시작.",
-    "본문 전문을 그대로 옮기지 말고 핵심만 압축해.",
-    "",
-    `제목: ${article.title}`,
-    `요약 원문: ${article.snippet ?? "(없음 — 제목 기준으로만)"}`,
-  ].join("\n");
+  // 2026-07-26 : 보안 - 프롬프트인젝션 - 뉴스요약
+  // 조립을 core로 옮겼다. 여기서 문자열을 이어 붙이면 **테스트가 닿지 않아** 인젝션 방어가
+  // 빠진 걸 아무도 못 봤다(FEATURES.md:218이 MUST로 못박은 항목인데도).
+  const prompt = buildArticleSummaryPrompt(article);
   const res = await fetchImpl(
     `${GEMINI_BASE}/models/${GEMINI_GEN_MODEL}:generateContent`,
     {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { untrustedTextRule } from "./untrusted-text";
 
 // 에디터 AI 작문 보조(노션 격차 P1 — 신규 인프라 0, 기존 Gemini 프록시 재사용). 프롬프트 빌더는 순수함수로
 // core에 두고, 실제 생성 호출은 api, 라우트/UI는 web이 담당한다. core는 외부 호출/전역을 쓰지 않는다.
@@ -34,6 +35,18 @@ const INSTRUCTION: Record<WriteAction, string> = {
 };
 
 // 작문 보조 프롬프트. 모델이 설명·머리말 없이 결과 텍스트만 출력하도록 강제한다.
+//
+// 2026-07-26 : 보안 - 프롬프트인젝션 - 작문보조 (Phase 32 T2)
+// 본문이 늘 사용자가 쓴 글은 아니다 — **가져온 템플릿 파일**(Phase 30 T3)이나 복원된 백업에서
+// 온 문단일 수 있다. 다만 여긴 "내 글을 고쳐 달라"고 부른 자리라 지시가 세면 결과가 나빠진다.
+// 그래서 **경계만 표기하고 지시는 한 줄로** 최소화한다.
 export function buildWriteAssistPrompt(action: WriteAction, text: string): string {
-  return `${INSTRUCTION[action]}\n부연 설명이나 머리말 없이 결과만 출력하세요.\n\n---\n${text}`;
+  return [
+    INSTRUCTION[action],
+    "부연 설명이나 머리말 없이 결과만 출력하세요.",
+    untrustedTextRule("글"),
+    "",
+    "[글]",
+    text,
+  ].join("\n");
 }
