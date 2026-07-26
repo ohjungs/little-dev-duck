@@ -142,6 +142,12 @@ export {
 } from "./domain/weekly-digest";
 export { rowsToCsv } from "./domain/db-export";
 export {
+  deltaE,
+  hexToLab,
+  lightness,
+  JUST_NOTICEABLE_DELTA_E,
+} from "./domain/color-distance";
+export {
   dashboardSummary,
   pomodoroStats,
   habitHeatmapData,

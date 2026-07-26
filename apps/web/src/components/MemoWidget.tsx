@@ -31,14 +31,18 @@ type LoadState = "loading" | "error" | "ready";
 // CSS 변수로 넘겨 Tailwind hover가 덮어쓸 수 있게 한다(인라인 transform이면 hover가 안 먹음).
 const NOTE_ROTATIONS = ["-2deg", "1.5deg", "-1deg", "2deg", "0.5deg"];
 
-const MEMO_COLORS = [
-  "bg-yellow-50 dark:bg-yellow-950/30",
-  "bg-pink-50 dark:bg-pink-950/30",
-  "bg-blue-50 dark:bg-blue-950/30",
-  "bg-green-50 dark:bg-green-950/30",
-  "bg-purple-50 dark:bg-purple-950/30",
-  "bg-orange-50 dark:bg-orange-950/30",
-];
+// 2026-07-27 : 메모 - 색 (2차 피드백 1-6 "메모가 잘 안보여서", Phase 44 T3)
+// 전에는 `bg-yellow-50` 같은 **-50 단계**라 흰 카드 위에서 거의 구분되지 않았다(실측 ΔE 6~10).
+// 값은 `globals.css`의 `--memo-*` 한 곳에 있다 — 여기에 클래스로 박으면 검사할 수 없다.
+// `__tests__/memoColors.test.ts`가 그 파일을 파싱해 카드 대비와 색끼리의 거리를 잰다
+// (Phase 42 T6의 잔디와 같은 방식이고, 계산은 core `deltaE` 한 벌을 쓴다).
+//
+// **색을 사용자가 고르는 것은 아직이다** — 메모마다 색을 저장하려면 `memos.color` 컬럼이
+// 필요한데 마이그레이션이 이미 네 건 밀려 있다. 지금은 여전히 목록 순서로 배정된다.
+const MEMO_COLOR_COUNT = 6;
+function memoColorStyle(index: number): React.CSSProperties {
+  return { backgroundColor: `var(--memo-${(index % MEMO_COLOR_COUNT) + 1})` };
+}
 
 const textareaClass =
   "w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none";
@@ -323,7 +327,8 @@ export function MemoWidget() {
                 <div
                   key={memo.id}
                   data-testid={`memo-${memo.id}`}
-                  className={`flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border p-3 shadow-sm ${MEMO_COLORS[index % MEMO_COLORS.length]}`}
+                  style={memoColorStyle(index)}
+                  className="flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border p-3 shadow-sm"
                 >
                   <textarea
                     value={editContent}
@@ -358,8 +363,9 @@ export function MemoWidget() {
                 <div
                   key={memo.id}
                   data-testid={`memo-${memo.id}`}
-                  style={rotationStyle(index)}
-                  className={`group flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border p-3 shadow-sm transition-all motion-safe:rotate-[var(--rot)] motion-safe:hover:-translate-y-1 motion-safe:hover:rotate-0 hover:shadow-md ${MEMO_COLORS[index % MEMO_COLORS.length]}`}
+                  // 기울기와 배경색을 한 style로 합친다 — 두 번 주면 뒤엣것이 앞엣것을 덮는다.
+                  style={{ ...rotationStyle(index), ...memoColorStyle(index) }}
+                  className="group flex min-h-36 w-40 flex-col gap-2 rounded-xl border border-border p-3 shadow-sm transition-all motion-safe:rotate-[var(--rot)] motion-safe:hover:-translate-y-1 motion-safe:hover:rotate-0 hover:shadow-md"
                 >
                   <div className="flex justify-end gap-1">
                     <button
