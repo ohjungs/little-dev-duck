@@ -1,4 +1,5 @@
 import { MessageSquare } from "lucide-react";
+import Link from "next/link";
 
 import { listRooms } from "@ldd/api";
 import { pendingMigrationMessage } from "@ldd/core";
@@ -62,10 +63,12 @@ export default async function MessagesPage() {
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border">
           {rooms.map((room) => (
-            <li key={room.id} className="p-3">
-              <span className="text-sm font-medium">
-                {room.title ?? (room.type === "agent" ? "오리와의 대화" : "이름 없는 대화")}
-              </span>
+            <li key={room.id}>
+              <Link href={`/messages/${room.id}`} className="block p-3 hover:bg-accent">
+                <span className="text-sm font-medium">
+                  {room.title ?? (room.type === "agent" ? "오리와의 대화" : "이름 없는 대화")}
+                </span>
+              </Link>
             </li>
           ))}
         </ul>
