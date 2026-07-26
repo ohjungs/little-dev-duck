@@ -8,6 +8,9 @@ import {
   listPagesForExport,
   listFeeds,
   getDuckState,
+  listPomodoroSessions,
+  listActivityDaily,
+  ACTIVITY_EXPORT_LIMIT,
   HABIT_CHECK_EXPORT_LIMIT,
   PAGE_EXPORT_LIMIT,
 } from "@ldd/api";
@@ -27,6 +30,8 @@ const QUERY_CAPS: Partial<Record<BackupCollectionKey, number>> = {
   calendarEvents: 500,
   pages: PAGE_EXPORT_LIMIT,
   habitChecks: HABIT_CHECK_EXPORT_LIMIT,
+  pomodoroSessions: 500,
+  activityDaily: ACTIVITY_EXPORT_LIMIT,
 };
 
 export const BACKUP_LABELS: Record<BackupCollectionKey, string> = {
@@ -38,11 +43,23 @@ export const BACKUP_LABELS: Record<BackupCollectionKey, string> = {
   pages: "페이지",
   feeds: "뉴스 피드",
   duckState: "오리 상태",
+  pomodoroSessions: "집중 기록",
+  activityDaily: "활동 기록",
 };
 
 export async function collectBackup(supabase: SupabaseClient): Promise<Backup> {
-  const [todos, memos, habits, habitChecks, calendarEvents, pages, feeds, duckState] =
-    await Promise.all([
+  const [
+    todos,
+    memos,
+    habits,
+    habitChecks,
+    calendarEvents,
+    pages,
+    feeds,
+    duckState,
+    pomodoroSessions,
+    activityDaily,
+  ] = await Promise.all([
       listTodos(supabase),
       listMemos(supabase),
       listHabits(supabase),
@@ -54,10 +71,23 @@ export async function collectBackup(supabase: SupabaseClient): Promise<Backup> {
       // 행이 하나뿐이라 배열로 감싼다. getDuckState는 행이 없으면 기본값 행을 만드는데,
       // 앱을 열면 어차피 만들어지는 행이라 내보내기가 그걸 앞당기는 것뿐이다.
       getDuckState(supabase).then((s) => [s]),
+      listPomodoroSessions(supabase),
+      listActivityDaily(supabase),
     ]);
 
   return buildBackup(
-    { todos, memos, habits, habitChecks, calendarEvents, pages, feeds, duckState },
+    {
+      todos,
+      memos,
+      habits,
+      habitChecks,
+      calendarEvents,
+      pages,
+      feeds,
+      duckState,
+      pomodoroSessions,
+      activityDaily,
+    },
     new Date().toISOString(),
     QUERY_CAPS,
   );

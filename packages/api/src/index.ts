@@ -22,6 +22,9 @@ export { fetchGithubContributions } from "./github";
 
 export {
   upsertActivityDaily,
+  listActivityDaily,
+  restoreActivityDaily,
+  ACTIVITY_EXPORT_LIMIT,
   type UpsertActivityDailyInput,
 } from "./activity";
 
@@ -53,6 +56,7 @@ export {
 
 export {
   listPomodoroSessions,
+  restorePomodoroSession,
   startPomodoro,
   completePomodoro,
 } from "./pomodoro";

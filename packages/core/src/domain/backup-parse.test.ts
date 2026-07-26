@@ -15,6 +15,8 @@ const validFile = () =>
           pages: [],
           feeds: [],
           duckState: [],
+          pomodoroSessions: [],
+          activityDaily: [],
         },
         "2026-07-26T00:00:00.000Z",
         {},
@@ -82,7 +84,7 @@ describe("parseBackup", () => {
 
   it("빈 백업도 유효하다 (아무것도 없는 계정)", () => {
     const empty = buildBackup(
-      { todos: [], memos: [], habits: [], habitChecks: [], calendarEvents: [], pages: [], feeds: [], duckState: [] },
+      { todos: [], memos: [], habits: [], habitChecks: [], calendarEvents: [], pages: [], feeds: [], duckState: [], pomodoroSessions: [], activityDaily: [] },
       "t",
       {},
     );

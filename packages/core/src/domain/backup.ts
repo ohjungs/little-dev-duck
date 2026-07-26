@@ -10,7 +10,8 @@
 //
 // v2(2026-07-26): feeds·duckState 추가. **버전을 올린 건 구분용이지 차단용이 아니다** —
 // v1 파일에는 두 컬렉션이 없을 뿐이고 나머지는 그대로 복원된다(parseBackup이 선택으로 받는다).
-export const BACKUP_FORMAT_VERSION = 2;
+// v3(2026-07-26): pomodoroSessions·activityDaily 추가. v1·v2도 계속 읽는다(선택 키).
+export const BACKUP_FORMAT_VERSION = 3;
 
 export type BackupCollections = {
   todos: unknown[];
@@ -24,6 +25,10 @@ export type BackupCollections = {
   // v2 추가. 오리 진행도(xp·레벨·먹이·코스튬). user_id가 기본키라 **행이 최대 1개**지만,
   // 다른 컬렉션과 모양을 맞춰 배열로 둔다(없으면 빈 배열 = 특수 분기가 필요 없다).
   duckState: unknown[];
+  // v3 추가. 집중 기록 — 통계 이력이라 잃으면 다시 만들 방법이 없다.
+  pomodoroSessions: unknown[];
+  // v3 추가. github는 재수집되지만 **claude_code는 로컬 수집기라 재수집이 어렵다** — 유일본이다.
+  activityDaily: unknown[];
 };
 
 export type BackupCollectionKey = keyof BackupCollections;
@@ -36,6 +41,7 @@ export type Backup = BackupCollections & {
 };
 
 const KEYS: BackupCollectionKey[] = [
+  "activityDaily",
   "calendarEvents",
   "duckState",
   "feeds",
@@ -43,6 +49,7 @@ const KEYS: BackupCollectionKey[] = [
   "habits",
   "memos",
   "pages",
+  "pomodoroSessions",
   "todos",
 ];
 
@@ -73,5 +80,7 @@ export function buildBackup(
     pages: [...collections.pages],
     feeds: [...collections.feeds],
     duckState: [...collections.duckState],
+    pomodoroSessions: [...collections.pomodoroSessions],
+    activityDaily: [...collections.activityDaily],
   };
 }

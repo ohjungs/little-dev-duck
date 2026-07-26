@@ -99,3 +99,30 @@ export async function completePomodoro(
   await applyXpAward(supabase, session.userId, "pomodoroComplete");
   return session;
 }
+
+// 2026-07-26 : 백업 - 집중 기록 복원 (Phase 31 T2)
+// restoreTodo와 같은 계약: 같은 id로 넣고, 인자의 userId는 무시하고 로그인 사용자로 채우며,
+// 이미 있으면 멱등 성공. **XP를 주지 않는다** — 과거 기록을 되돌리는 것이지 지금 집중한 게 아니다
+// (completePomodoro를 거치지 않고 직접 insert하는 이유).
+export async function restorePomodoroSession(
+  supabase: SupabaseClient,
+  session: PomodoroSession,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase.from("pomodoro_sessions").insert({
+    id: session.id,
+    user_id: user.id,
+    duration_minutes: session.durationMinutes,
+    tag: session.tag,
+    started_at: session.startedAt,
+    completed_at: session.completedAt,
+    created_at: session.createdAt,
+  });
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}

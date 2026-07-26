@@ -8,6 +8,8 @@ import {
   restorePageFromBackup,
   restoreFeed,
   restoreDuckState,
+  restorePomodoroSession,
+  restoreActivityDaily,
 } from "@ldd/api";
 import { parseBackup, planRestore, type Backup } from "@ldd/core";
 
@@ -84,6 +86,13 @@ export async function restoreBackup(
   // 오리 상태는 이미 있으면 건드리지 않는다(덮어쓰면 지금 레벨이 백업 시점으로 후퇴한다).
   for (const state of plan.duckState) {
     await run("오리 상태", () => restoreDuckState(supabase, state));
+  }
+  for (const s of plan.pomodoroSessions) {
+    await run("집중 기록", () => restorePomodoroSession(supabase, s));
+  }
+  // 활동 집계도 이미 있으면 건드리지 않는다(덮어쓰면 지금 집계가 백업 시점으로 후퇴한다).
+  for (const a of plan.activityDaily) {
+    await run("활동 기록", () => restoreActivityDaily(supabase, a));
   }
 
   return outcome;

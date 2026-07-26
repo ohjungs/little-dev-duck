@@ -18,6 +18,8 @@ const bundle = (over: Partial<Backup>): Backup => ({
   pages: [],
   feeds: [],
   duckState: [],
+  pomodoroSessions: [],
+  activityDaily: [],
   ...over,
 });
 

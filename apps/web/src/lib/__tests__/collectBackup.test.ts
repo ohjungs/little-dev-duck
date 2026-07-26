@@ -14,6 +14,8 @@ const listPagesForExport = vi.fn();
 const listPages = vi.fn();
 const listFeeds = vi.fn();
 const getDuckState = vi.fn();
+const listPomodoroSessions = vi.fn();
+const listActivityDaily = vi.fn();
 
 vi.mock("@ldd/api", () => ({
   listTodos: (...a: unknown[]) => listTodos(...a),
@@ -25,6 +27,9 @@ vi.mock("@ldd/api", () => ({
   listPages: (...a: unknown[]) => listPages(...a),
   listFeeds: (...a: unknown[]) => listFeeds(...a),
   getDuckState: (...a: unknown[]) => getDuckState(...a),
+  listPomodoroSessions: (...a: unknown[]) => listPomodoroSessions(...a),
+  listActivityDaily: (...a: unknown[]) => listActivityDaily(...a),
+  ACTIVITY_EXPORT_LIMIT: 3000,
   PAGE_EXPORT_LIMIT: 500,
   HABIT_CHECK_EXPORT_LIMIT: 5000,
 }));
@@ -45,6 +50,8 @@ beforeEach(() => {
   listPages.mockResolvedValue([]);
   listFeeds.mockResolvedValue([]);
   getDuckState.mockResolvedValue({ userId: "u", xp: 0, level: 1, feed: 100, costume: "default", updatedAt: "t" });
+  listPomodoroSessions.mockResolvedValue([]);
+  listActivityDaily.mockResolvedValue([]);
 });
 
 describe("collectBackup", () => {
@@ -68,6 +75,13 @@ describe("collectBackup", () => {
     expect(getDuckState).toHaveBeenCalledTimes(1);
   });
 
+  // v3: 집중 기록과 활동 집계. claude_code 활동은 로컬 수집기가 올린 유일본이다.
+  it("집중 기록과 활동 집계도 부른다", async () => {
+    await collectBackup(fakeClient);
+    expect(listPomodoroSessions).toHaveBeenCalledTimes(1);
+    expect(listActivityDaily).toHaveBeenCalledTimes(1);
+  });
+
   it("오리 상태는 행이 하나뿐이라 배열로 감싼다", async () => {
     const backup = await collectBackup(fakeClient);
     expect(backup.duckState).toHaveLength(1);
@@ -88,7 +102,7 @@ describe("collectBackup", () => {
 
   it("컬렉션과 버전을 담는다", async () => {
     const backup = await collectBackup(fakeClient);
-    expect(backup.formatVersion).toBe(2);
+    expect(backup.formatVersion).toBe(3);
     for (const key of [
       "todos",
       "memos",
@@ -97,6 +111,8 @@ describe("collectBackup", () => {
       "calendarEvents",
       "pages",
       "feeds",
+      "pomodoroSessions",
+      "activityDaily",
     ] as const) {
       expect(backup[key], key).toEqual([]);
     }

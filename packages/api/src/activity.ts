@@ -56,3 +56,50 @@ export async function upsertActivityDaily(
     }),
   );
 }
+
+// 2026-07-26 : 백업 - 활동 기록 (Phase 31 T2)
+// github 잔디는 다시 수집되지만 **claude_code는 로컬 수집기가 올린 값이라 재수집이 어렵다** —
+// 이 표는 그쪽의 유일본이다. 행이 작아 담는 비용도 거의 없다.
+export async function listActivityDaily(
+  supabase: SupabaseClient,
+  limit = ACTIVITY_EXPORT_LIMIT,
+): Promise<ActivityDailyEntry[]> {
+  const { data, error } = await supabase
+    .from("activity_daily")
+    .select("date, source, count")
+    .order("date", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) =>
+    activityDailyEntrySchema.parse({
+      date: (r as ActivityDailyRow).date,
+      source: (r as ActivityDailyRow).source,
+      count: (r as ActivityDailyRow).count,
+    }),
+  );
+}
+
+// 하루 × 소스라 1년이면 730행 남짓. 넉넉히 잡되 상한은 둔다(잘림을 감지할 수 있게).
+export const ACTIVITY_EXPORT_LIMIT = 3000;
+
+// **이미 있으면 건드리지 않는다.** (user_id, date, source) 유일 제약이 있어 중복은 멱등이고,
+// 덮어쓰면 지금 집계가 백업 시점 값으로 후퇴한다(가져오기의 "바꾸지 않는다" 계약).
+export async function restoreActivityDaily(
+  supabase: SupabaseClient,
+  entry: ActivityDailyEntry,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase.from("activity_daily").insert({
+    user_id: user.id,
+    date: entry.date,
+    source: entry.source,
+    count: entry.count,
+  });
+  if (error && (error as { code?: string }).code !== "23505") {
+    throw new Error(error.message);
+  }
+}

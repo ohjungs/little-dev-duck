@@ -14,6 +14,8 @@ const empty: BackupCollections = {
   pages: [],
   feeds: [],
   duckState: [],
+  pomodoroSessions: [],
+  activityDaily: [],
 };
 
 const fill = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `${i}` }));
@@ -37,6 +39,8 @@ describe("buildBackup", () => {
         pages: fill(6),
         feeds: fill(7),
         duckState: fill(1),
+        pomodoroSessions: [],
+        activityDaily: [],
       },
       "2026-07-26T00:00:00.000Z",
       {},

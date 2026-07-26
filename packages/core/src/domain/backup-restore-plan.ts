@@ -5,6 +5,8 @@ import { calendarEventSchema, type CalendarEvent } from "./calendar-event";
 import { pageSchema, type Page } from "./page";
 import { feedSchema, type Feed } from "./news";
 import { duckStateSchema, type DuckState } from "./duck-state";
+import { pomodoroSessionSchema, type PomodoroSession } from "./pomodoro";
+import { activityDailyEntrySchema, type ActivityDailyEntry } from "./activity-daily";
 import type { Backup, BackupCollectionKey } from "./backup";
 
 // 2026-07-26 : 백업 - 가져오기 - 복원계획
@@ -23,6 +25,8 @@ const RESTORE_ORDER: BackupCollectionKey[] = [
   "pages",
   "feeds",
   "duckState",
+  "pomodoroSessions",
+  "activityDaily",
 ];
 
 export type RestorePlan = {
@@ -34,6 +38,8 @@ export type RestorePlan = {
   pages: Page[];
   feeds: Feed[];
   duckState: DuckState[];
+  pomodoroSessions: PomodoroSession[];
+  activityDaily: ActivityDailyEntry[];
   order: BackupCollectionKey[];
   // 모양이 깨져 복원할 수 없는 항목 수. 한 줄 때문에 백업 전체를 버리지 않되,
   // 몇 개를 못 넣었는지는 사용자에게 반드시 알린다.
@@ -112,6 +118,17 @@ export function planRestore(backup: Backup): RestorePlan {
     counter,
   );
 
+  const pomodoroSessions = keepValid<PomodoroSession>(
+    backup.pomodoroSessions,
+    (v) => pomodoroSessionSchema.safeParse(v),
+    counter,
+  );
+  const activityDaily = keepValid<ActivityDailyEntry>(
+    backup.activityDaily,
+    (v) => activityDailyEntrySchema.safeParse(v),
+    counter,
+  );
+
   return {
     todos,
     memos,
@@ -121,6 +138,8 @@ export function planRestore(backup: Backup): RestorePlan {
     pages: orderPagesParentsFirst(pages),
     feeds,
     duckState,
+    pomodoroSessions,
+    activityDaily,
     order: RESTORE_ORDER,
     invalid: counter.invalid,
     total:
@@ -131,6 +150,8 @@ export function planRestore(backup: Backup): RestorePlan {
       calendarEvents.length +
       pages.length +
       feeds.length +
-      duckState.length,
+      duckState.length +
+      pomodoroSessions.length +
+      activityDaily.length,
   };
 }

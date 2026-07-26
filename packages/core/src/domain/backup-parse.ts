@@ -29,7 +29,12 @@ const REQUIRED_KEYS: BackupCollectionKey[] = [
 // v2에서 늘어난 컬렉션 — **없으면 빈 배열**로 받는다.
 // 필수로 두면 Phase 29가 내보낸 v1 파일을 우리 손으로 거부하게 된다. 버전을 올린 이유는
 // "이 파일에 무엇이 들어 있는지" 구분하기 위해서지 옛 파일을 막기 위해서가 아니다.
-const OPTIONAL_KEYS: BackupCollectionKey[] = ["feeds", "duckState"];
+const OPTIONAL_KEYS: BackupCollectionKey[] = [
+  "feeds",
+  "duckState",
+  "pomodoroSessions",
+  "activityDaily",
+];
 
 const KEYS: BackupCollectionKey[] = [...REQUIRED_KEYS, ...OPTIONAL_KEYS];
 
@@ -102,6 +107,8 @@ export function parseBackup(raw: unknown): BackupParseResult {
       pages: collections.get("pages") ?? [],
       feeds: collections.get("feeds") ?? [],
       duckState: collections.get("duckState") ?? [],
+      pomodoroSessions: collections.get("pomodoroSessions") ?? [],
+      activityDaily: collections.get("activityDaily") ?? [],
     },
   };
 }
