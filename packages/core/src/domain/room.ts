@@ -107,15 +107,20 @@ export function unreadCount(
 }
 
 /**
- * 방 목록 정렬: 고정한 방이 먼저, 그다음 최근 메시지 순.
+ * 방 목록 정렬: 고정한 방이 먼저, 그다음 최근 활동 순.
  * 정렬 기준을 화면마다 따로 쓰면 목록이 화면마다 달라진다 — 여기 한 곳에 둔다.
+ *
+ * 2026-07-27 정정: 필드 이름이 `lastMessageSeq`였는데 **그 값을 구할 방법이 없어서
+ * 아무도 이 함수를 쓰지 않았다**(죽은 코드였다). 방마다 최대 seq를 구하려면 방 개수만큼
+ * 쿼리가 늘어난다. 대신 `rooms.updated_at`을 쓰는데, 그건 이제 메시지 삽입 트리거가
+ * 갱신한다(20260727060000). **"큰 값이 더 최근"이기만 하면 되는 값**이라 이름을 그렇게 고쳤다.
  */
-export function sortRooms<T extends { pinnedAt: string | null; lastMessageSeq: number }>(
+export function sortRooms<T extends { pinnedAt: string | null; lastActivity: number }>(
   rooms: readonly T[],
 ): T[] {
   return [...rooms].sort((a, b) => {
     if ((a.pinnedAt !== null) !== (b.pinnedAt !== null)) return a.pinnedAt ? -1 : 1;
-    return b.lastMessageSeq - a.lastMessageSeq;
+    return b.lastActivity - a.lastActivity;
   });
 }
 

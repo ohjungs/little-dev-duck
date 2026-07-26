@@ -18,6 +18,7 @@ import {
   markRead,
   messageImageUrl,
   setRoomMute,
+  setRoomPin,
   sendMessage,
   uploadMessageImage,
 } from "@ldd/api";
@@ -76,6 +77,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 렌더 중에 현재 시각을 읽지 않는다. 대신 상태로 두고 **만료되면 스스로 풀리게** 한다 —
   // 타이머가 없으면 화면을 새로 열기 전까지 "꺼짐"으로 남아 있다.
   const [muted, setMuted] = useState(false);
+  const [pinnedAt, setPinnedAt] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -165,7 +167,10 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   useEffect(() => {
     let alive = true;
     void getMyMembership(createClient(), roomId).then((m) => {
-      if (alive && m) setMutedUntil(m.mutedUntil);
+      if (alive && m) {
+        setMutedUntil(m.mutedUntil);
+        setPinnedAt(m.pinnedAt);
+      }
     });
     return () => {
       alive = false;
@@ -262,6 +267,19 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     }
   }
 
+  async function handlePin() {
+    const next = pinnedAt ? null : new Date().toISOString();
+    const prev = pinnedAt;
+    setPinnedAt(next);
+    try {
+      await setRoomPin(createClient(), roomId, next);
+    } catch (err) {
+      setPinnedAt(prev);
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    }
+  }
+
   async function handlePickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     // 같은 파일을 다시 고를 수 있게 값을 비운다(안 비우면 change가 안 온다).
@@ -333,6 +351,14 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
       {/* 2026-07-27 (Phase 51 T2): 방별 음소거. **"언제까지"를 고르게 한다** —
           켜짐/꺼짐만 두면 "1시간만 조용히"를 표현할 수 없다. */}
       <div className="flex flex-wrap items-center gap-1 border-b border-border p-2 text-xs">
+        {/* 고정은 목록 순서를 바꾼다 — 그 사실을 버튼 문구로 말한다. */}
+        <button
+          type="button"
+          onClick={handlePin}
+          className="rounded border border-border px-2 py-0.5 hover:bg-accent"
+        >
+          {pinnedAt ? "목록 고정 해제" : "목록 위에 고정"}
+        </button>
         {muted ? (
           <>
             <span className="text-muted-foreground">이 방 알림이 꺼져 있어요</span>

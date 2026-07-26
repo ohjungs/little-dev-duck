@@ -1,7 +1,7 @@
 import { MessageSquare } from "lucide-react";
 import Link from "next/link";
 
-import { listRooms } from "@ldd/api";
+import { listRoomsWithPin } from "@ldd/api";
 import { pendingMigrationMessage } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,10 +32,10 @@ export default async function MessagesPage() {
     );
   }
 
-  let rooms: Awaited<ReturnType<typeof listRooms>> = [];
+  let rooms: Awaited<ReturnType<typeof listRoomsWithPin>> = [];
   let notice: string | null = null;
   try {
-    rooms = await listRooms(supabase);
+    rooms = await listRoomsWithPin(supabase);
   } catch (e) {
     const raw = e instanceof Error ? e.message : String(e);
     // 모르는 오류는 삼키지 않는다 — 원문을 보여주는 편이 낫다(저장소 관례).
@@ -66,6 +66,13 @@ export default async function MessagesPage() {
             <li key={room.id}>
               <Link href={`/messages/${room.id}`} className="block p-3 hover:bg-accent">
                 <span className="text-sm font-medium">
+                  {/* 고정한 방은 표시가 있어야 왜 위에 있는지 알 수 있다.
+                      이모지 대신 글자로 둔다(CLAUDE.md 6절). */}
+                  {room.pinnedAt && (
+                    <span className="mr-1 rounded border border-border px-1 text-[10px] text-muted-foreground">
+                      고정
+                    </span>
+                  )}
                   {room.title ?? (room.type === "agent" ? "오리와의 대화" : "이름 없는 대화")}
                 </span>
               </Link>

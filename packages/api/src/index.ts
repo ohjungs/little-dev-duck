@@ -192,5 +192,8 @@ export {
   SIGNED_URL_SECONDS,
   getMyMembership,
   setRoomMute,
+  listRoomsWithPin,
+  setRoomPin,
+  type RoomListItem,
   type SendMessageInput,
 } from "./rooms";

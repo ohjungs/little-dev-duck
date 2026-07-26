@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  sortRooms,
   checkMessageImage,
   messageAttachmentPath,
   messageSchema,
@@ -314,7 +315,7 @@ export async function messageImageUrl(
 export async function getMyMembership(
   supabase: SupabaseClient,
   roomId: string,
-): Promise<{ mutedUntil: string | null; lastReadMessageId: string | null } | null> {
+): Promise<{ mutedUntil: string | null; lastReadMessageId: string | null; pinnedAt: string | null } | null> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -322,16 +323,24 @@ export async function getMyMembership(
 
   const { data, error } = await supabase
     .from("room_members")
-    .select("muted_until, last_read_message_id")
+    .select("muted_until, last_read_message_id, pinned_at")
     .eq("room_id", roomId)
     .eq("user_id", user.id)
     .limit(1);
 
   if (error || !data) return null;
-  const rows = data as { muted_until: string | null; last_read_message_id: string | null }[];
+  const rows = data as {
+    muted_until: string | null;
+    last_read_message_id: string | null;
+    pinned_at: string | null;
+  }[];
   const row = rows[0];
   if (!row) return null;
-  return { mutedUntil: row.muted_until, lastReadMessageId: row.last_read_message_id };
+  return {
+    mutedUntil: row.muted_until,
+    lastReadMessageId: row.last_read_message_id,
+    pinnedAt: row.pinned_at,
+  };
 }
 
 /**
@@ -352,6 +361,66 @@ export async function setRoomMute(
   const { error } = await supabase
     .from("room_members")
     .update({ muted_until: mutedUntil })
+    .eq("room_id", roomId)
+    .eq("user_id", user.id);
+
+  if (error) throw new Error(error.message);
+}
+
+/** 방 + 내 고정 여부. 목록 화면이 쓰는 형태다. */
+export type RoomListItem = Room & { pinnedAt: string | null; lastActivity: number };
+
+/**
+ * 고정한 방을 위에 둔 목록. **정렬은 core `sortRooms`가 한다** —
+ * 화면마다 따로 정렬하면 목록이 화면마다 달라진다.
+ *
+ * 쿼리를 둘로 나눈다(방 · 내 멤버십). 조인 한 번보다 왕복이 하나 늘지만,
+ * 방 200개 상한에서는 차이가 없고 **정책이 다른 두 테이블을 한 쿼리에 묶지 않는 편이 안전**하다.
+ */
+export async function listRoomsWithPin(supabase: SupabaseClient): Promise<RoomListItem[]> {
+  const rooms = await listRooms(supabase);
+  if (rooms.length === 0) return [];
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pins = new Map<string, string | null>();
+  if (user) {
+    const { data } = await supabase
+      .from("room_members")
+      .select("room_id, pinned_at")
+      .eq("user_id", user.id);
+    for (const row of (data ?? []) as { room_id: string; pinned_at: string | null }[]) {
+      pins.set(row.room_id, row.pinned_at);
+    }
+  }
+
+  return sortRooms(
+    rooms.map((r) => ({
+      ...r,
+      pinnedAt: pins.get(r.id) ?? null,
+      // updated_at을 활동 시각으로 쓴다(메시지 삽입 트리거가 갱신한다).
+      // 해석 실패는 0으로 — 정렬 하나 때문에 목록이 죽으면 안 된다.
+      lastActivity: Number.isNaN(Date.parse(r.updatedAt)) ? 0 : Date.parse(r.updatedAt),
+    })),
+  );
+}
+
+/** 방 고정/해제. `null`이면 해제. */
+export async function setRoomPin(
+  supabase: SupabaseClient,
+  roomId: string,
+  pinnedAt: string | null,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { error } = await supabase
+    .from("room_members")
+    .update({ pinned_at: pinnedAt })
     .eq("room_id", roomId)
     .eq("user_id", user.id);
 

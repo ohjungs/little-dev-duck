@@ -117,17 +117,17 @@ describe("안 읽은 개수", () => {
 describe("방 목록 정렬", () => {
   it("고정한 방이 먼저, 그다음 최근 메시지 순", () => {
     const rooms = [
-      { id: "a", pinnedAt: null, lastMessageSeq: 10 },
-      { id: "b", pinnedAt: ISO, lastMessageSeq: 1 },
-      { id: "c", pinnedAt: null, lastMessageSeq: 20 },
+      { id: "a", pinnedAt: null, lastActivity: 10 },
+      { id: "b", pinnedAt: ISO, lastActivity: 1 },
+      { id: "c", pinnedAt: null, lastActivity: 20 },
     ];
     expect(sortRooms(rooms).map((r) => r.id)).toEqual(["b", "c", "a"]);
   });
 
   it("원본 배열을 바꾸지 않는다", () => {
     const rooms = [
-      { id: "a", pinnedAt: null, lastMessageSeq: 1 },
-      { id: "b", pinnedAt: null, lastMessageSeq: 2 },
+      { id: "a", pinnedAt: null, lastActivity: 1 },
+      { id: "b", pinnedAt: null, lastActivity: 2 },
     ];
     sortRooms(rooms);
     expect(rooms.map((r) => r.id)).toEqual(["a", "b"]);
