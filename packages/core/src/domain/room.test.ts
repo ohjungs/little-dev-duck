@@ -5,6 +5,7 @@ import {
   messageAttachment,
   messageSchema,
   isRoomMuted,
+  likePattern,
   MUTE_DURATIONS,
   roomMemberSchema,
   sortRooms,
@@ -185,5 +186,34 @@ describe("방 음소거", () => {
       expect(d.label.length).toBeGreaterThan(0);
       expect(d.ms).toBeGreaterThan(0);
     }
+  });
+});
+
+// 2026-07-27 : 메신저 - 검색 패턴 (Phase 51)
+// 사용자 입력이 쿼리 패턴에 닿는 자리다(CLAUDE.md 5절: 검증·이스케이프).
+describe("검색 패턴", () => {
+  it("앞뒤를 감싸 부분 일치로 만든다", () => {
+    expect(likePattern("회의")).toBe("%회의%");
+  });
+
+  it("퍼센트를 문자로 취급한다 (안 하면 '50%'가 '50 뒤에 아무거나'가 된다)", () => {
+    expect(likePattern("50%")).toBe("%50\\%%");
+  });
+
+  it("밑줄도 문자로 취급한다 (한 글자 아무거나가 아니다)", () => {
+    expect(likePattern("a_b")).toBe("%a\\_b%");
+  });
+
+  it("백슬래시를 먼저 처리한다 (나중에 하면 우리가 넣은 것까지 다시 이스케이프된다)", () => {
+    expect(likePattern("a\\b")).toBe("%a\\\\b%");
+  });
+
+  it("빈 검색어로 전부 긁어오지 않는다", () => {
+    expect(likePattern("")).toBeNull();
+    expect(likePattern("   ")).toBeNull();
+  });
+
+  it("한글·이모지가 깨지지 않는다", () => {
+    expect(likePattern("오리 🦆")).toBe("%오리 🦆%");
   });
 });

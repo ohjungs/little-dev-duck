@@ -564,6 +564,7 @@ export {
   messageBody,
   messageAttachment,
   isRoomMuted,
+  likePattern,
   MUTE_DURATIONS,
   unreadCount,
   sortRooms,

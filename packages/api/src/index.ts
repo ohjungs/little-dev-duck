@@ -193,6 +193,7 @@ export {
   getMyMembership,
   setRoomMute,
   listRoomsWithPin,
+  searchMessages,
   setRoomPin,
   type RoomListItem,
   type SendMessageInput,

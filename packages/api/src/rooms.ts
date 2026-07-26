@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  likePattern,
   sortRooms,
   checkMessageImage,
   messageAttachmentPath,
@@ -425,4 +426,33 @@ export async function setRoomPin(
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
+}
+
+/**
+ * 내 방들에서 메시지를 찾는다. **RLS가 범위를 정한다** — 멤버가 아닌 방의 메시지는
+ * 쿼리에 조건을 안 걸어도 애초에 보이지 않는다(정책이 방어선이지 이 함수가 아니다).
+ *
+ * 검색어는 `likePattern`으로 이스케이프한다 — `%`·`_`를 그대로 넘기면 사용자가 친
+ * 글자가 패턴 문법으로 해석돼 엉뚱한 결과가 나온다.
+ * 지운 메시지는 빼고, 최신순으로 준다.
+ */
+export async function searchMessages(
+  supabase: SupabaseClient,
+  query: string,
+  limit: number = MESSAGE_PAGE_SIZE,
+): Promise<Message[]> {
+  const pattern = likePattern(query);
+  // 빈 검색어로 전부 긁어오지 않는다.
+  if (pattern === null) return [];
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .is("deleted_at", null)
+    .ilike("body", pattern)
+    .order("seq", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return (data as MessageRow[]).map(messageFromRow);
 }

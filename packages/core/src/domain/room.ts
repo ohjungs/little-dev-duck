@@ -146,3 +146,22 @@ export const MUTE_DURATIONS = [
   { label: "오늘 하루", ms: 24 * 60 * 60 * 1000 },
   { label: "직접 풀 때까지", ms: 365 * 24 * 60 * 60 * 1000 },
 ] as const;
+
+/**
+ * 부분 일치 검색용 패턴으로 바꾼다. **사용자 입력이 쿼리 패턴에 그대로 닿는 자리**다.
+ *
+ * `%`와 `_`는 패턴 문법이라 그대로 두면 검색이 사용자 뜻과 달라진다 —
+ * "50%"를 찾으면 `50` 뒤에 아무거나 오는 것이 전부 걸린다. 백슬래시는 이스케이프 문자
+ * 자체라 먼저 처리해야 한다(나중에 하면 우리가 넣은 백슬래시까지 다시 이스케이프된다).
+ *
+ * 빈 문자열이면 null — **빈 검색어로 전부 긁어오지 않는다.**
+ */
+export function likePattern(raw: string): string | null {
+  const q = raw.trim();
+  if (q === "") return null;
+  const escaped = q
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+  return `%${escaped}%`;
+}

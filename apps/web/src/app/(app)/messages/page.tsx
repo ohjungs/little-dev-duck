@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { listRoomsWithPin } from "@ldd/api";
 import { pendingMigrationMessage } from "@ldd/core";
+import { MessageSearch } from "@/components/MessageSearch";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,9 @@ export default async function MessagesPage() {
         <MessageSquare className="size-5" aria-hidden="true" />
         메시지
       </h1>
+
+      {/* 테이블이 없을 땐 검색도 안 되므로 안내만 보여 준다. */}
+      {!notice && <MessageSearch />}
 
       {notice ? (
         <p
