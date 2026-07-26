@@ -16,6 +16,17 @@ export const AUTH_GENERIC_CREDENTIAL_MESSAGE =
 const AUTH_UNKNOWN_MESSAGE =
   "로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.";
 
+// 2026-07-26 : 인증 - 오류문구 - 재설정 (Phase 41 T3)
+// 비밀번호 변경은 로그인이 아니라 **모르는 오류의 폴백 문구가 달라야 한다**
+// ("로그인에 실패했습니다"가 뜨면 사용자는 방금 연 링크가 아니라 로그인을 의심한다).
+// 규칙표는 같은 것을 쓴다 — 약한 비밀번호·시도 상한은 두 흐름에서 같은 문구여야 하고,
+// 두 벌로 두면 한쪽만 고쳐진다(이 저장소가 반복해서 데인 부류).
+const PASSWORD_UPDATE_UNKNOWN_MESSAGE =
+  "비밀번호를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.";
+
+export const PASSWORD_RESET_LINK_EXPIRED_MESSAGE =
+  "재설정 링크가 만료됐거나 이미 사용됐습니다. 비밀번호 재설정을 다시 요청해 주세요.";
+
 // 판정 순서가 중요하다 — 좁은 조건을 먼저 본다. 예: "Email not confirmed"는 아래
 // 자격증명 규칙(`invalid`)에 걸리지 않지만, 순서를 뒤집어 넓은 규칙을 앞에 두면 삼켜진다.
 const RULES: { match: RegExp; message: string }[] = [
@@ -53,6 +64,26 @@ const RULES: { match: RegExp; message: string }[] = [
   },
 ];
 
+// 재설정 흐름에서만 보는 상태들. **로그인 규칙표에 섞지 않는다** — "expired"·"session missing"은
+// 로그인 실패에서도 나올 수 있고, 그때 "재설정 링크가 만료됐습니다"라고 하면 거짓말이 된다.
+// 좁은 쪽(이 표)을 먼저 보고, 안 걸리면 공용 표로 넘어간다.
+const PASSWORD_UPDATE_RULES: { match: RegExp; message: string }[] = [
+  {
+    // 재설정 링크는 1회용이고 만료된다. 자격증명 실패로 뭉뚱그리면 사용자는 자기 비밀번호를
+    // 의심하며 같은 링크를 계속 누른다 — 다음 행동(재요청)을 말해야 한다.
+    // 열거 위험 없음: 메일을 받은 본인만 도달하는 상태다.
+    match:
+      /otp_expired|flow_state_(not_found|expired)|session_not_found|auth\s+session\s+missing|(is\s+)?invalid\s+or\s+(has\s+)?expired|(link|token|otp|code).{0,20}expired|expired.{0,20}(link|token|otp|code)/,
+    message: PASSWORD_RESET_LINK_EXPIRED_MESSAGE,
+  },
+  {
+    // Supabase는 지금과 같은 비밀번호로 바꾸려 하면 거부한다. 원인을 안 말하면
+    // "왜 안 되는지 모르는 실패"가 된다 — 이것도 본인만 도달하는 상태다.
+    match: /same_password|different\s+from\s+the\s+old\s+password/,
+    message: "지금 쓰고 있는 비밀번호와 다른 비밀번호를 써 주세요.",
+  },
+];
+
 /**
  * Supabase 인증 오류 원문을 사용자에게 보여줄 한국어 문구로 바꾼다.
  *
@@ -68,4 +99,25 @@ export function authErrorMessage(raw: string | null | undefined): string {
     if (rule.match.test(text)) return rule.message;
   }
   return AUTH_UNKNOWN_MESSAGE;
+}
+
+/**
+ * 비밀번호 재설정·변경 중에 난 오류를 한국어 문구로 바꾼다.
+ *
+ * `authErrorMessage`와의 차이는 둘뿐이다:
+ * - 재설정 링크 만료·동일 비밀번호를 **먼저** 판정한다(그 흐름에서만 나오는 상태).
+ * - 모르는 오류의 폴백이 "로그인 실패"가 아니라 **"비밀번호를 바꾸지 못했습니다"**다 —
+ *   방금 링크를 눌러 들어온 사용자에게 로그인 실패라고 하면 엉뚱한 곳을 고치게 만든다.
+ *
+ * 나머지(약한 비밀번호·시도 상한 등)는 공용 규칙표를 그대로 쓴다.
+ */
+export function passwordUpdateErrorMessage(
+  raw: string | null | undefined,
+): string {
+  const text = (raw ?? "").trim().toLowerCase();
+  if (text === "") return PASSWORD_UPDATE_UNKNOWN_MESSAGE;
+  for (const rule of [...PASSWORD_UPDATE_RULES, ...RULES]) {
+    if (rule.match.test(text)) return rule.message;
+  }
+  return PASSWORD_UPDATE_UNKNOWN_MESSAGE;
 }

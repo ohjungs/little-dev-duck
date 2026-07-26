@@ -49,13 +49,50 @@ function GoogleMark() {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ initialError = "" }: { initialError?: string }) {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState("");
+
+  // 2026-07-26 : 로그인 - 비밀번호 재설정 요청 (Phase 41 T3)
+  // 이게 없으면 비밀번호를 잊은 사용자는 **영구 잠긴다**(OAuth 사용자에겐 없던 상태다).
+  //
+  // **결과를 성공/실패로 구분해 말하지 않는다(계정 열거 차단).** "가입되지 않은 이메일입니다"는
+  // 곧 어느 이메일이 가입돼 있는지 알려주는 통로다. Supabase도 같은 이유로 존재 여부와 무관하게
+  // 성공을 돌려준다 — 화면 문구도 그 계약을 따라야 의미가 있다.
+  //
+  // 메일 링크는 /auth/callback으로 들어와 코드를 세션으로 교환한 뒤 /auth/reset으로 간다.
+  // 교환 라우트를 새로 만들지 않는다(이미 OAuth가 쓰는 것이 있다).
+  const handleResetRequest = async () => {
+    if (busy) return;
+    setError("");
+    setNotice("");
+    if (email.trim() === "") {
+      setError("먼저 이메일을 입력해 주세요.");
+      return;
+    }
+    setBusy(true);
+    const supabase = createClient();
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+      });
+      // 오류가 나도 계정 존재 여부는 새어 나가면 안 된다. 발송 상한·설정 문제만
+      // 문구로 알린다(그건 계정 정보가 아니라 서비스 상태다).
+      if (err) {
+        setError(authErrorMessage(err.message));
+        return;
+      }
+      setNotice(
+        "재설정 메일을 보냈습니다. 가입된 이메일이라면 받은 메일의 링크를 눌러 주세요.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,6 +294,19 @@ export function LoginForm() {
                   ? "이메일로 로그인"
                   : "이메일로 가입"}
             </Button>
+
+            {/* 가입 탭에서는 숨긴다 — 아직 계정이 없는 사람에게 재설정은 막다른 길이다.
+                submit이 아니라 type="button"이어야 폼 제출을 가로채지 않는다. */}
+            {mode === "signin" && (
+              <button
+                type="button"
+                onClick={handleResetRequest}
+                disabled={busy}
+                className="self-center text-xs text-[#8d8474] underline underline-offset-2 transition-colors hover:text-[#e6e0d2] disabled:opacity-60"
+              >
+                비밀번호를 잊으셨나요?
+              </button>
+            )}
           </form>
 
           {/* break-keep: 모바일에서 "이메일로"가 "이/메일로"로 끊겼다(스크린샷에서 확인).

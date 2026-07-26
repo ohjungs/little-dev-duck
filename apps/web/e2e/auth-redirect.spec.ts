@@ -20,6 +20,22 @@ test("/login에 Google/GitHub 로그인 버튼이 보인다", async ({ page }) =
   ).toBeVisible();
 });
 
+// 2026-07-26 : 인증 - 비밀번호 재설정 - 세션 없는 접근 (Phase 41 T3)
+// /auth/reset은 **현재 비밀번호를 묻지 않고** 새 비밀번호를 받는 화면이다(잊어서 온 사람에게
+// 물으면 재설정이 성립하지 않는다). 그래서 세션 없이 그 폼이 렌더되면 안 된다.
+// 방어선이 둘이다: proxy.ts의 인증 게이트(여기서 검사)와 페이지 자체의 세션 판정.
+// 게이트 쪽은 경로 목록이라 **다른 이유로 편집되다 조용히 열릴 수 있다** — 그래서 못박는다.
+test("세션 없이 /auth/reset을 열면 비밀번호 폼에 닿지 못한다", async ({
+  request,
+}) => {
+  const response = await request.get("/auth/reset", { maxRedirects: 0 });
+  // 303인지까지 본다(307이면 POST 메서드가 유지돼 405가 되는 그 회귀다 — 아래 주석 참조).
+  expect(response.status(), "공개 경로로 열리면 이 값이 200이 된다").toBe(303);
+  expect(new URL(response.headers().location, "http://x").pathname).toBe(
+    "/welcome",
+  );
+});
+
 // 과거 실제 회귀: NextResponse.redirect()가 상태코드를 명시하지 않으면 기본값 307을 쓰는데,
 // 307은 원 요청의 HTTP 메서드(POST)를 그대로 유지한다. 리다이렉트 대상이 GET만 처리하는
 // 페이지 라우트라면 브라우저가 그 대상에도 POST로 재요청해 405가 발생한다.

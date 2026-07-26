@@ -21,6 +21,7 @@
 | Realtime 동시 연결 | [확인됨] 피크 동시 연결 200개, 월간 메시지 200만 건, 메시지당 최대 256KB | https://supabase.com/pricing | 2026-07-20 |
 | Edge Function 호출 | [확인됨] 월 500,000회 | https://supabase.com/pricing | 2026-07-20 |
 | 활성 프로젝트 개수 | [확인됨] Organization당 활성 프로젝트 2개까지 무료(pause된 프로젝트는 미포함) | https://supabase.com/pricing | 2026-07-20 |
+| **내장 SMTP 발송(인증 메일)** | [확인됨] **시간당 상한이 있고 프로젝트 전체 합산**이다. 대상 엔드포인트는 `/auth/v1/signup`(가입 확인) · `/auth/v1/recover`(**비밀번호 재설정**) · `/auth/v1/user`(이메일 변경) **셋의 합**. **커스텀 SMTP를 붙이기 전에는 값을 바꿀 수 없다.** [미확인] 정확한 시간당 건수 — 문서가 그 자리를 동적 값(`auth.rate_limits.email.inbuilt_smtp_per_hour`)으로 채워 원문 텍스트에 숫자가 없다. 확인 방법: 대시보드 Authentication → Rate Limits에서 현재 값을 읽는다. [확인됨] 커스텀 SMTP를 붙이면 기본값이 **시간당 신규 사용자 30명**으로 바뀐다. 가용성은 best-effort이며 문서가 프로덕션에는 커스텀 SMTP를 권한다 | https://supabase.com/docs/guides/auth/auth-smtp · https://supabase.com/docs/guides/platform/going-into-prod | 2026-07-27 |
 
 **한도 초과 시 동작**
 - DB 용량(500MB) 초과: 읽기 전용(read-only) 전환, INSERT/UPDATE 거부, SELECT는 계속 동작.
@@ -32,6 +33,11 @@
 - 공통: 80% 도달 시 결제 이메일로 경고 → 유예기간 → 미해소 시 항목별 제한. 비활성 pause는 사용량과 무관한 별도 정책.
 
 **LDD 대응책**
+- **인증 메일 상한이 하나의 통에서 나간다**(2026-07-27, Phase 41 T3): 가입 확인 메일과 비밀번호
+  재설정 메일이 **같은 시간당 한도**를 나눠 쓴다. 즉 e2e·CI가 계정을 반복 생성하면
+  **실사용자의 비밀번호 재설정이 그 시간 동안 막힐 수 있다.** 그래서 e2e는 전용 계정 하나를
+  **재사용**해야 하고(매번 새로 가입시키지 않는다), 가입 시 메일 확인(Confirm email)을 켤지는
+  이 상한을 보고 정한다 — 끄면 가입 메일이 통을 쓰지 않아 재설정 몫이 늘어난다.
 - 비활성 7일 pause 방지: GitHub Actions로 주 1~2회 실제 DB 쿼리(ping/insert) 실행하는 keepalive 워크플로 구성.
 - DB 500MB 상한 + pgvector 임베딩 저장량: 초기 개발 단계에서 가장 먼저 부딪힐 가능성이 높은 항목이므로, 임베딩 차원/보관 정책을 설계 단계에서 산정.
 - Storage/Egress: 파일 업로드 크기 제한 및 캐싱 정책으로 방어.

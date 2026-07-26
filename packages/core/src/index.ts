@@ -454,7 +454,9 @@ export {
 export { pendingMigrationMessage } from "./domain/pending-migration";
 export {
   authErrorMessage,
+  passwordUpdateErrorMessage,
   AUTH_GENERIC_CREDENTIAL_MESSAGE,
+  PASSWORD_RESET_LINK_EXPIRED_MESSAGE,
 } from "./domain/auth-error";
 export { untrustedTextRule } from "./domain/untrusted-text";
 export { buildArticleSummaryPrompt } from "./domain/news-summary-prompt";
