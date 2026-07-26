@@ -402,6 +402,7 @@ export {
   departmentsForSource,
   type OfficeTaskSource,
   OFFICE_TASK_LIMITS,
+  describeTaskSource,
   type OfficeTask,
 } from "./domain/office-tasks";
 export {

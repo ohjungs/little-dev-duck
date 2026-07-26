@@ -13,6 +13,12 @@ export type OfficeTask = {
   title: string;
   progress: number;
   department: DepartmentId;
+  // 2026-07-27 : 오피스 - 작업 원천 (2차 피드백 5-2, Phase 48 T2)
+  // "직원을 누르면 진짜 어떤 일을 하는지"의 **근거**다. 이게 없으면 상세 패널은
+  // 제목만 보여 주게 되고, 그건 1차 5-7의 "일하는 척"과 구분되지 않는다.
+  source: OfficeTaskSource;
+  // 원본 레코드의 id. 화면에서 **그 원본으로 데려가기** 위한 것이다(할 일·페이지·일정).
+  sourceId: string;
 };
 
 // 카테고리별 매핑 상한 — 전체를 다 넣으면 NPC 태스크가 과다해진다.
@@ -88,7 +94,7 @@ export function mapWorkspaceToOfficeTasks(
     if (todo.isDone) continue; // 완료된 항목은 제외
     const dept = assign("todo");
     if (!dept) continue;
-    tasks.push({ title: todo.title, progress: 30, department: dept });
+    tasks.push({ title: todo.title, progress: 30, department: dept, source: "todo", sourceId: todo.id });
   }
 
   // 페이지 — 문서 작업(progress=50)으로 배분 (최신 20개만)
@@ -96,14 +102,17 @@ export function mapWorkspaceToOfficeTasks(
     const title = page.title.trim() || "문서 작업";
     const dept = assign("page");
     if (!dept) continue;
-    tasks.push({ title, progress: 50, department: dept });
+    tasks.push({ title, progress: 50, department: dept, source: "page", sourceId: page.id });
   }
 
   // 습관 — 루틴 관리 업무(progress=20)로 배분
   for (const habit of habits) {
     const dept = assign("habit");
     if (!dept) continue;
-    tasks.push({ title: `[습관] ${habit.title}`, progress: 20, department: dept });
+    tasks.push({
+      title: `[습관] ${habit.title}`, progress: 20, department: dept,
+      source: "habit", sourceId: habit.id,
+    });
   }
 
   // 완료된 포모도로 세션 — 집중 작업 완료(progress=100)로 engineering 우선
@@ -112,15 +121,34 @@ export function mapWorkspaceToOfficeTasks(
     const label = pomo.tag ? `[포모도로] ${pomo.tag}` : `집중 ${pomo.durationMinutes}분`;
     const dept = assign("pomodoro");
     if (!dept) continue;
-    tasks.push({ title: label, progress: 100, department: dept });
+    tasks.push({ title: label, progress: 100, department: dept, source: "pomodoro", sourceId: pomo.id });
   }
 
   // 캘린더 이벤트 — 일정/회의(progress=0)로 배분 (최신 15개만)
   for (const event of events.slice(0, OFFICE_TASK_LIMITS.events)) {
     const dept = assign("event");
     if (!dept) continue;
-    tasks.push({ title: `[일정] ${event.title}`, progress: 0, department: dept });
+    tasks.push({
+      title: `[일정] ${event.title}`, progress: 0, department: dept,
+      source: "event", sourceId: event.id,
+    });
   }
 
   return tasks;
+}
+
+// 2026-07-27 : 오피스 - 원천 라벨 (2차 피드백 5-2, Phase 48 T2)
+// 상세 패널이 "이 일은 어디서 왔는가"를 사람 말로 보여 주기 위한 매핑.
+// 화면에 문자열을 흩어 놓으면 종류가 늘 때 빠뜨리기 쉬워 여기 한 군데 둔다(테스트가 누락을 잡는다).
+const SOURCE_LABELS: Record<OfficeTaskSource, string> = {
+  todo: "할 일",
+  page: "문서",
+  habit: "습관",
+  pomodoro: "집중 기록",
+  event: "일정",
+};
+
+/** 업무가 어느 데이터에서 왔는지를 한국어로. */
+export function describeTaskSource(source: OfficeTaskSource): string {
+  return SOURCE_LABELS[source];
 }

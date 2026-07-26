@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mapWorkspaceToOfficeTasks, OFFICE_TASK_LIMITS,
   OFFICE_TASK_SOURCES,
   departmentsForSource,
+  describeTaskSource,
 } from "./office-tasks";
 import { DEPARTMENTS } from "./office-department";
 import type { Todo } from "./todo";
@@ -243,5 +244,65 @@ describe("직무별 작업 원천", () => {
   it("일이 없으면 아무 업무도 만들지 않는다 (쉬는 중 계약)", () => {
     // 1차 5-7의 "일하는 척"으로 되돌아가지 않게 — 없는 업무를 지어내지 않는다.
     expect(mapWorkspaceToOfficeTasks([], [], [], [], [])).toEqual([]);
+  });
+});
+
+// 2026-07-27 : 오피스 - 작업 원천 추적 (2차 피드백 5-2, Phase 48 T2)
+// 요청: "직원을 누르면 **진짜 어떤 일을 하고 있는지** 볼 수 있도록".
+// 계획이 못박은 핵심: **"원천을 밝히는 것"이 이 Task의 핵심이다.** 상세를 보여줘도 근거가
+// 없으면 1차 5-7의 "일하는 척" 의심을 그대로 받는다. 그래서 각 업무가 **어느 데이터에서
+// 왔는지(source)와 그 원본이 무엇인지(sourceId)**를 업무 자체가 들고 다녀야 한다.
+describe("작업 원천 추적", () => {
+  it("각 업무가 자기 원천 종류를 들고 있다", () => {
+    const tasks = mapWorkspaceToOfficeTasks(
+      [todo({ title: "A" })],
+      [page({ title: "P" })],
+      [habit({ title: "H" })],
+      [pomo({ completedAt: ISO })],
+      [event({ title: "E" })],
+    );
+    const byTitle = (t: string) => tasks.find((x) => x.title.includes(t))!;
+    expect(byTitle("A").source).toBe("todo");
+    expect(byTitle("P").source).toBe("page");
+    expect(byTitle("H").source).toBe("habit");
+    expect(byTitle("E").source).toBe("event");
+    expect(tasks.find((x) => x.progress === 100)!.source).toBe("pomodoro");
+  });
+
+  it("원본 id를 그대로 들고 있다 (누르면 그 원본으로 갈 수 있게)", () => {
+    const t = todo({ id: "11111111-1111-1111-1111-111111111111", title: "원본" });
+    const tasks = mapWorkspaceToOfficeTasks([t], [], [], [], []);
+    expect(tasks[0]!.sourceId).toBe(t.id);
+  });
+
+  it("원천이 부서 배분 규칙과 어긋나지 않는다", () => {
+    // source를 필드로 들고 다니게 됐으니, 그 값이 실제 배분에 쓰인 값과 같아야 한다.
+    // 다르면 화면은 "할 일"이라 적고 실제로는 습관 부서에 가 있는 상태가 된다.
+    const tasks = mapWorkspaceToOfficeTasks(
+      [todo({ title: "A" }), todo({ title: "B" })],
+      [],
+      [habit({ title: "H" })],
+      [],
+      [],
+    );
+    for (const t of tasks) {
+      expect(departmentsForSource(t.source)).toContain(t.department);
+    }
+  });
+});
+
+describe("describeTaskSource", () => {
+  it("모든 원천에 한국어 라벨이 있다", () => {
+    // 빠진 종류가 있으면 그 업무는 화면에서 정체불명이 된다 — 근거를 못 밝히는 것과 같다.
+    for (const s of ["todo", "page", "habit", "pomodoro", "event"] as const) {
+      expect(describeTaskSource(s).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("종류마다 라벨이 다르다 (겹치면 구분이 안 된다)", () => {
+    const labels = (["todo", "page", "habit", "pomodoro", "event"] as const).map(
+      describeTaskSource,
+    );
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });

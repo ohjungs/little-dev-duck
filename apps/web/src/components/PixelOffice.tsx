@@ -368,6 +368,9 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
           title: rt.title,
           status: "active",
           progress: Math.max(0, Math.min(100, rt.progress)),
+          // 원천을 여기서 잃으면 상세 패널이 근거를 보여 줄 수 없다(Phase 48 T2).
+          source: rt.source,
+          sourceId: rt.sourceId,
         });
       }
     }

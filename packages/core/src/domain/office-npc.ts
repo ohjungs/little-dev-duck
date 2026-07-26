@@ -2,6 +2,7 @@
 // 게임 클럭: 1 실제 초 = 1 게임 분 (24 게임 시간 = 24 실제 분).
 
 import type { DepartmentId } from "./office-department";
+import type { OfficeTaskSource } from "./office-tasks";
 import type { DuckWorkState } from "./office-event";
 import type { TileMap, Vec } from "./office-tilemap";
 import { isBlocked } from "./office-tilemap";
@@ -11,6 +12,11 @@ export type NpcTask = {
   title: string;
   status: "active" | "done" | "waiting";
   progress: number; // 0-100
+  // 2026-07-27 : 오피스 - 작업 원천 (2차 피드백 5-2, Phase 48 T2)
+  // 실제 사용자 데이터에서 온 업무만 원천을 갖는다. 선택 필드인 이유가 그것이다 —
+  // 원천이 없으면 상세 패널이 **근거 없이 단정하지 않고** 그 사실을 그대로 보여 준다.
+  source?: OfficeTaskSource;
+  sourceId?: string;
 };
 
 export type NpcSchedulePhase =
