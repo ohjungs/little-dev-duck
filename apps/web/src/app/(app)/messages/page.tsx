@@ -78,6 +78,15 @@ export default async function MessagesPage() {
                     </span>
                   )}
                   {room.title ?? (room.type === "agent" ? "오리와의 대화" : "이름 없는 대화")}
+                  {room.unread > 0 && (
+                    <span
+                      className="ml-2 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
+                      aria-label={`안 읽은 메시지 ${room.unread}건`}
+                    >
+                      {/* 99를 넘으면 정확한 수보다 "많다"가 더 쓸모 있다. 창 밖은 못 세기도 한다. */}
+                      {room.unread > 99 ? "99+" : room.unread}
+                    </span>
+                  )}
                 </span>
               </Link>
             </li>

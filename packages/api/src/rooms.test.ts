@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MESSAGE_PAGE_SIZE,
+  RECENT_WINDOW,
   deleteMessage,
   listMessages,
   listRooms,
@@ -199,5 +200,19 @@ describe("markRead", () => {
   it("로그인하지 않으면 기록하지 않는다", async () => {
     const s = fakeSupabase({ user: null });
     await expect(markRead(s, ROOM_ROW.id, "m1")).rejects.toThrow("로그인");
+  });
+});
+
+// 2026-07-27 : 메신저 - 안 읽은 수 (Phase 51)
+// 방마다 count 쿼리를 돌리면 방 개수만큼 왕복이 생긴다(방 200개면 200번).
+// 한 번에 받아 방별로 나누는 대신 **창 밖은 못 센다** — 그 한계를 값으로 잠근다.
+describe("안 읽은 수 창", () => {
+  it("한 번에 훑는 개수에 상한이 있다", () => {
+    expect(RECENT_WINDOW).toBeGreaterThan(0);
+    expect(RECENT_WINDOW).toBeLessThanOrEqual(1000);
+  });
+
+  it("한 화면에 불러오는 메시지 수보다 크다 (그보다 작으면 방 하나도 못 센다)", () => {
+    expect(RECENT_WINDOW).toBeGreaterThan(MESSAGE_PAGE_SIZE);
   });
 });

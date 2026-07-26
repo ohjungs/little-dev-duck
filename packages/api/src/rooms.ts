@@ -12,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   likePattern,
   sortRooms,
+  unreadCount,
   checkMessageImage,
   messageAttachmentPath,
   messageSchema,
@@ -74,6 +75,11 @@ function messageFromRow(row: MessageRow): Message {
 // 한 번에 불러오는 메시지 상한. 방을 열면 최근 것부터 본다 —
 // 전부 불러오면 오래된 방일수록 열기가 느려진다(계획의 대용량 렌즈).
 export const MESSAGE_PAGE_SIZE = 50;
+
+// 안 읽은 수를 셀 때 훑는 최근 메시지 개수. **이 창 밖은 못 센다** —
+// 방마다 count 쿼리를 돌리면 방 개수만큼 왕복이 생겨서, 한 번에 받아 방별로 나눈다.
+// 창을 넘길 만큼 안 읽었으면 어차피 "많다"만 알면 된다(화면이 99+로 줄여 보여 준다).
+export const RECENT_WINDOW = 500;
 
 export async function listRooms(supabase: SupabaseClient): Promise<Room[]> {
   const { data, error } = await supabase
@@ -369,7 +375,12 @@ export async function setRoomMute(
 }
 
 /** 방 + 내 고정 여부. 목록 화면이 쓰는 형태다. */
-export type RoomListItem = Room & { pinnedAt: string | null; lastActivity: number };
+export type RoomListItem = Room & {
+  pinnedAt: string | null;
+  lastActivity: number;
+  /** 안 읽은 개수. 아래 창(RECENT_WINDOW) 안에서만 세므로 그보다 많으면 창 크기에서 멈춘다. */
+  unread: number;
+};
 
 /**
  * 고정한 방을 위에 둔 목록. **정렬은 core `sortRooms`가 한다** —
@@ -387,13 +398,47 @@ export async function listRoomsWithPin(supabase: SupabaseClient): Promise<RoomLi
   } = await supabase.auth.getUser();
 
   const pins = new Map<string, string | null>();
+  const reads = new Map<string, string | null>();
   if (user) {
     const { data } = await supabase
       .from("room_members")
-      .select("room_id, pinned_at")
+      .select("room_id, pinned_at, last_read_message_id")
       .eq("user_id", user.id);
-    for (const row of (data ?? []) as { room_id: string; pinned_at: string | null }[]) {
+    for (const row of (data ?? []) as {
+      room_id: string;
+      pinned_at: string | null;
+      last_read_message_id: string | null;
+    }[]) {
       pins.set(row.room_id, row.pinned_at);
+      reads.set(row.room_id, row.last_read_message_id);
+    }
+  }
+
+  // 안 읽은 수: **쿼리 한 번**으로 최근 메시지를 받아 방별로 센다.
+  // 방마다 count 쿼리를 돌리면 방 개수만큼 왕복이 생긴다(방 200개면 200번).
+  // 대신 창(window) 밖은 못 센다 — 그건 아래 주석과 타입에 적어 두었다.
+  const recent = new Map<string, { id: string; seq: number; senderUserId: string | null; deletedAt: string | null }[]>();
+  if (user) {
+    const { data } = await supabase
+      .from("messages")
+      .select("id, room_id, seq, sender_user_id, deleted_at")
+      .order("seq", { ascending: false })
+      .limit(RECENT_WINDOW);
+    for (const row of (data ?? []) as {
+      id: string;
+      room_id: string;
+      seq: number;
+      sender_user_id: string | null;
+      deleted_at: string | null;
+    }[]) {
+      const list = recent.get(row.room_id) ?? [];
+      list.push({
+        id: row.id,
+        seq: Number(row.seq),
+        senderUserId: row.sender_user_id,
+        deletedAt: row.deleted_at,
+      });
+      recent.set(row.room_id, list);
     }
   }
 
@@ -401,6 +446,7 @@ export async function listRoomsWithPin(supabase: SupabaseClient): Promise<RoomLi
     rooms.map((r) => ({
       ...r,
       pinnedAt: pins.get(r.id) ?? null,
+      unread: unreadCount(recent.get(r.id) ?? [], reads.get(r.id) ?? null, user?.id ?? null),
       // updated_at을 활동 시각으로 쓴다(메시지 삽입 트리거가 갱신한다).
       // 해석 실패는 0으로 — 정렬 하나 때문에 목록이 죽으면 안 된다.
       lastActivity: Number.isNaN(Date.parse(r.updatedAt)) ? 0 : Date.parse(r.updatedAt),

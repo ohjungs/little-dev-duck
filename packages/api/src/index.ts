@@ -187,6 +187,7 @@ export {
   deleteMessage,
   markRead,
   MESSAGE_PAGE_SIZE,
+  RECENT_WINDOW,
   uploadMessageImage,
   messageImageUrl,
   SIGNED_URL_SECONDS,
