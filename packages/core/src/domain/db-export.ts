@@ -32,17 +32,24 @@ function cellText(prop: PropertyDef, value: RowPropValue | undefined): string {
   }
 }
 
+// 2026-07-27 : CSV - 공용 조립 (Phase 46 T3)
+// 차트 데이터도 CSV로 내보내게 되면서 **같은 이스케이프가 두 곳에 필요해졌다.**
+// 복붙하면 수식 인젝션 방어가 한쪽에만 남는다 — 그건 보안 결함이 조용히 갈라지는 것이다.
+// 그래서 표 조립만 여기로 올린다(`rowsToCsv`도 이걸 쓴다).
+export function toCsv(rows: readonly (readonly string[])[]): string {
+  return rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
+}
+
 export function rowsToCsv(
   rows: readonly DbRowLike[],
   properties: readonly PropertyDef[],
 ): string {
-  const header = ["제목", ...properties.map((p) => p.name)]
-    .map(escapeCsv)
-    .join(",");
-  const lines = rows.map((row) =>
-    [row.title, ...properties.map((p) => cellText(p, row.rowProps[p.id]))]
-      .map(escapeCsv)
-      .join(","),
-  );
-  return [header, ...lines].join("\n");
+  // 이스케이프·조립은 `toCsv` 한 벌이 한다 — 여기서 다시 하면 두 벌이 된다.
+  return toCsv([
+    ["제목", ...properties.map((p) => p.name)],
+    ...rows.map((row) => [
+      row.title,
+      ...properties.map((p) => cellText(p, row.rowProps[p.id])),
+    ]),
+  ]);
 }
