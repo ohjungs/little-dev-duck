@@ -428,3 +428,9 @@ export {
   type BackupCollections,
   type BackupCollectionKey,
 } from "./domain/backup";
+export { parseBackup, type BackupParseResult } from "./domain/backup-parse";
+export {
+  planRestore,
+  orderPagesParentsFirst,
+  type RestorePlan,
+} from "./domain/backup-restore-plan";
