@@ -33,6 +33,7 @@ import {
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeRoomMessages } from "@/lib/realtime";
+import { notifyDuck } from "@/lib/notify";
 
 type Props = {
   roomId: string;
@@ -56,6 +57,10 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 2026-07-27 : 메신저 - 읽음 보내기 (Phase 51 T1)
   // 보낸 위치를 ref로 든다 — 상태로 두면 갱신할 때마다 다시 그려지고, 이 값은 화면에 안 쓰인다.
   const readRef = useRef<ReadReceiptState>({ sentSeq: null, sentAt: null });
+  // 2026-07-27 : 메신저 - 알림 (Phase 51 T2)
+  // 이미 알린 위치. **첫 렌더의 과거 메시지로 알림을 쏘지 않으려고** null로 시작하지 않고
+  // 처음 본 순간의 seq로 채운다 — 방에 들어가자마자 지난 대화가 알림으로 쏟아지면 안 된다.
+  const notifiedSeqRef = useRef<number | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -126,6 +131,28 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
       alive = false;
     };
   }, [messages, imageUrls]);
+
+  // 새 메시지 알림. **재구현하지 않는다** — `notifyDuck`이 권한·방해금지·집중 모드·
+  // 하루 상한을 이미 다 본다(계획 T2: 두 벌로 만들면 한쪽만 방해금지를 지킨다).
+  //
+  // 보고 있는 창에는 띄우지 않는다. 눈앞의 대화를 알림으로 또 알리면 성가시기만 하다.
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last) return;
+
+    // 처음 본 순간을 기준점으로 잡는다(과거 대화가 알림으로 쏟아지지 않게).
+    if (notifiedSeqRef.current === null) {
+      notifiedSeqRef.current = last.seq;
+      return;
+    }
+    if (last.seq <= notifiedSeqRef.current) return;
+    notifiedSeqRef.current = last.seq;
+
+    if (last.senderUserId === myUserId) return; // 내가 쓴 걸 나에게 알리지 않는다
+    if (typeof document !== "undefined" && !document.hidden) return;
+
+    notifyDuck("새 메시지", messageBody(last));
+  }, [messages, myUserId]);
 
   // 읽음 위치를 보낸다. **판정은 core가 하고 여기서는 실행만** 한다 —
   // 조건을 화면에 흩어 두면 어디선가 한 곳이 빠져 실시간 예산을 태운다.
