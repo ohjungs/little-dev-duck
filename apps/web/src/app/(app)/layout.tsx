@@ -8,7 +8,12 @@ import { ShortcutsHelp } from "@/components/ShortcutsHelp";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { getMyAccess } from "@ldd/api";
-import { canAdminister, canUseFeature, type FeatureKey } from "@ldd/core";
+import {
+  canAdminister,
+  canUseFeature,
+  resolveDisplayName,
+  type FeatureKey,
+} from "@ldd/core";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +46,15 @@ export default async function AppLayout({
   // 설정을 못 읽어도(마이그레이션 전 등) 종전대로 동작한다.
   const access = await getMyAccess(supabase).catch(() => null);
 
-  const displayName =
-    access?.displayName ??
-    (user.user_metadata.full_name as string | undefined) ??
-    (user.user_metadata.name as string | undefined) ??
-    user.email ??
-    "사용자";
+  // 2026-07-27 (2차 피드백 1-2): 같은 계산이 대시보드에도 있었고 **규칙이 서로 달랐다.**
+  // core `resolveDisplayName` 한 벌로 모았다. 여기서 바뀌는 것은 마지막 폴백뿐이다 —
+  // 이메일 대신 "사용자"다. 이 컴포넌트는 이름 바로 아래에 이메일을 따로 그려서
+  // 폴백이 이메일이면 **같은 주소가 두 줄로 겹쳐 보였다**(AppNav.tsx:188~189).
+  const displayName = resolveDisplayName({
+    profileName: access?.displayName,
+    metadataFullName: user.user_metadata.full_name,
+    metadataName: user.user_metadata.name,
+  });
   const email = user.email ?? "";
 
   // 끈 기능의 메뉴는 아예 보여주지 않는다. 실제 차단은 각 화면·RLS가 하고 여기선 숨기기만 한다 —

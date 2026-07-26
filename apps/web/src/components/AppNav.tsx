@@ -190,8 +190,12 @@ export function AppSidebar({
             </div>
           )}
         </div>
+        {/* 2026-07-27 (2차 피드백 1-9): 폭 240px 한 줄에 컨트롤 3개인데 `flex-wrap`이 없어
+            좁아지면 넘쳤다. 요청("로그아웃 버튼이 고정이라 유동적으로 아래로 움직이게")을
+            **레이아웃 깨짐**으로 읽었다 — 깨진 것이면 이게 답이고, 배치 기능을 원한 것이었다
+            해도 해가 없다. 배치 기능(사용자가 옮기는 것)은 추측으로 만들지 않는다. */}
         {!collapsed && (
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <ThemeToggle />
             <WalkingModeToggle />
             <form action="/auth/logout" method="post" className="ml-auto">

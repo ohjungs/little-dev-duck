@@ -85,3 +85,43 @@ test.describe("홈 화면 반응형 (인증 필요)", () => {
     });
   }
 });
+
+// 2026-07-27 : 페이지 - 도구모음 - 넘침 (2차 피드백 2-1, Phase 42 T1)
+// 도구 모음 버튼 9개가 `max-w-3xl`(768px) 한 줄에 들어가는데 `flex-wrap`이 없어 좁은 창에서
+// 넘쳤다. `flex-wrap`으로 고쳤고, **그 자리에 검사가 없어서** 다시 넘쳐도 아무도 모른다.
+//
+// **이 검사는 지금 돌지 않는다** — 로그인 세션이 있어야 페이지 편집기에 닿는다(44건과 같은 처지,
+// Phase 41 T5가 켜면 함께 돈다). 실행되지 않은 테스트는 문서라는 걸 이 저장소가 여러 번 적었다.
+// 그래도 넣는 이유는 **켜지는 시점에 이 회귀가 자동으로 잡히게** 하기 위해서다.
+test.describe("페이지 편집기 도구 모음 (인증 필요)", () => {
+  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
+  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
+
+  // 사용자가 지적한 조건이 "전체화면이 아닌 상태"다 — 넓은 창에서는 여백이 남아 안 보인다.
+  for (const width of [1024, 1280]) {
+    test(`뷰포트 ${width}: 도구 모음이 가로 넘침을 만들지 않는다`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/pages");
+      // 트리의 페이지 링크로 연다. **testid를 새로 심지 않았다** — 없는 testid를 쓰면
+      // 선택자가 영영 안 맞아 "살아 있는 척 죽은 테스트"가 된다(휴지통 링크는 뺀다).
+      const firstPage = page
+        .locator('a[href^="/pages/"]:not([href="/pages/trash"])')
+        .first();
+      // 페이지가 하나도 없을 수 있다 — 그때는 편집기가 없으므로 검사할 것도 없다.
+      test.skip(
+        (await firstPage.count()) === 0,
+        "페이지가 없어 편집기를 열 수 없다",
+      );
+      await firstPage.click();
+      await page.waitForURL(/\/pages\/[^/]+$/);
+
+      const overflow = await getBodyOverflow(page);
+      expect(
+        overflow.scrollWidth,
+        "도구 모음이 넘치면 문서 전체에 가로 스크롤이 생긴다",
+      ).toBeLessThanOrEqual(overflow.clientWidth);
+    });
+  }
+});

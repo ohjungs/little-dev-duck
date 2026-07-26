@@ -485,7 +485,11 @@ export function PageEditor({
 
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 px-2 py-10">
-      <div className="no-print flex items-center justify-end gap-1 px-4">
+      {/* 2026-07-27 (2차 피드백 2-1): 버튼 9개가 max-w-3xl(768px) 한 줄에 들어가는데
+          `flex-wrap`이 없어 좁은 창에서 넘쳤다(사용자가 지적한 범위가 정확히 이 div의 자식
+          전체다). 줄바꿈은 **깨지지 않게 하는 즉시 조치**일 뿐이고, 근본은 버튼이 너무 많은
+          것이다 — Phase 43이 4개로 줄인다. 그때까지 사용자가 깨진 화면을 보지 않게 한다. */}
+      <div className="no-print flex flex-wrap items-center justify-end gap-1 px-4">
         {versionMsg && (
           <span className="mr-auto text-xs text-muted-foreground" role="status">
             {versionMsg}

@@ -453,6 +453,10 @@ export {
 } from "./domain/account-deletion";
 export { pendingMigrationMessage } from "./domain/pending-migration";
 export {
+  resolveDisplayName,
+  DISPLAY_NAME_FALLBACK,
+} from "./domain/display-name";
+export {
   authErrorMessage,
   passwordUpdateErrorMessage,
   AUTH_GENERIC_CREDENTIAL_MESSAGE,

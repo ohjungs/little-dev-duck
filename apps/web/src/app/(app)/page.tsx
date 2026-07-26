@@ -12,7 +12,12 @@ import { DashboardGrid } from "@/components/DashboardGrid";
 import { LastPageLink } from "@/components/LastPageLink";
 import { getGreeting, getTimeEmoji } from "@/lib/greeting";
 import { getMyAccess } from "@ldd/api";
-import { EMPTY_LAYOUT, canUseFeature, visibleWidgets } from "@ldd/core";
+import {
+  EMPTY_LAYOUT,
+  canUseFeature,
+  visibleWidgets,
+  resolveDisplayName,
+} from "@ldd/core";
 import { DASHBOARD_WIDGETS } from "@/lib/dashboardWidgets";
 
 export const dynamic = "force-dynamic";
@@ -79,11 +84,15 @@ export default async function DashboardPage() {
   ).map((w) => w.id);
   const shownIds = visibleWidgets(allowedIds, access?.dashboardLayout ?? EMPTY_LAYOUT);
 
-  const displayName =
-    (user?.user_metadata.full_name as string | undefined) ??
-    (user?.user_metadata.name as string | undefined) ??
-    user?.email ??
-    "사용자";
+  // 2026-07-27 (2차 피드백 1-2): 인사말이 **프로필에서 바꾼 이름을 무시**하고 있었다.
+  // 사이드바는 같은 값을 이미 프로필 우선으로 계산했는데 여기만 안 읽었다 — 두 벌이라 갈렸다.
+  // 이 화면은 위 70행에서 `access`를 이미 받아 두고 권한 판정에만 쓰고 있었다(데이터는 있었다).
+  // 계산은 core `resolveDisplayName` 한 벌로 옮겼다.
+  const displayName = resolveDisplayName({
+    profileName: access?.displayName,
+    metadataFullName: user?.user_metadata.full_name,
+    metadataName: user?.user_metadata.name,
+  });
 
   const dateLabel = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
