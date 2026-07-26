@@ -103,3 +103,20 @@ describe("templateTitle", () => {
     );
   });
 });
+
+// 2026-07-26 : 활성화 - 템플릿 - 일기·포트폴리오·회고록 (피드백 2-3)
+// 사용자가 이름을 직접 댄 템플릿들이다. 지우거나 이름을 바꾸면 요구가 조용히 사라지므로
+// 존재 자체를 검사로 잠근다.
+describe("사용자가 요청한 템플릿(피드백 2-3)", () => {
+  it.each(["회의록", "일기", "포트폴리오", "회고록"])("'%s' 템플릿이 있다", (label) => {
+    expect(PAGE_TEMPLATES.some((t) => t.label === label)).toBe(true);
+  });
+
+  it("새로 추가한 템플릿들도 본문이 비어 있지 않다(고르면 백지가 아니어야 한다)", () => {
+    for (const key of ["diary", "portfolio", "retrospective"]) {
+      const t = PAGE_TEMPLATES.find((x) => x.key === key);
+      expect(t, `${key} 템플릿이 없다`).toBeDefined();
+      expect(t!.content.length).toBeGreaterThan(0);
+    }
+  });
+});

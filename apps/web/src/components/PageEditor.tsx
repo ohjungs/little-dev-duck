@@ -54,6 +54,7 @@ import {
   toggleFavorite,
 } from "@/lib/favorites";
 import { recordRecentPage } from "@/lib/recentPages";
+import { decodeTextBytes } from "@/lib/decodeTextFile";
 import { timeAgo } from "@/lib/timeAgo";
 
 // 파일명에 못 쓰는 문자·제어문자를 -로 치환하고 끝의 점/공백을 정리한다(공백은 중간에선 보존).
@@ -283,13 +284,23 @@ export function PageEditor({
   );
 
   // .md 파일을 읽어 본문으로 가져온다(현재 문서 대체). replaceBlocks가 onChange를 발화해 자동 저장된다.
+  //
+  // 2026-07-26 (피드백 2-1 "가져오기 … 전부 글자가 깨지고"): `file.text()`를 쓰지 않는다.
+  // 그건 무조건 UTF-8로 해석해서, 한국어 Windows에서 흔한 CP949 파일이 전부 깨졌다.
+  // decodeTextBytes가 BOM·UTF-8 검증으로 인코딩을 판별한다(정상 UTF-8 파일 동작은 그대로).
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ""; // 같은 파일 재선택 허용
     if (!file || !importMd.current) return;
     try {
-      await importMd.current(await file.text());
-      flashMsg("Markdown을 가져왔습니다.");
+      const { text, encoding } = decodeTextBytes(await file.arrayBuffer());
+      await importMd.current(text);
+      // 어떤 인코딩으로 읽었는지 밝힌다. 조용히 바꿔 읽으면 결과가 어색할 때 원인을 알 수 없다.
+      flashMsg(
+        encoding === "utf-8"
+          ? "Markdown을 가져왔습니다."
+          : `Markdown을 가져왔습니다 (${encoding} 파일로 읽음).`,
+      );
     } catch {
       flashMsg("가져오기에 실패했습니다.");
     }
