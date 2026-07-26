@@ -597,3 +597,13 @@ export {
   afterSend,
   type ReadReceiptState,
 } from "./domain/read-receipt";
+
+// 2026-07-27 : 메신저 - 메시지 반응 (Phase 51)
+export {
+  REACTION_EMOJIS,
+  summarizeReactions,
+  shouldRemoveReaction,
+  type Reaction,
+  type ReactionEmoji,
+  type ReactionSummary,
+} from "./domain/reaction";

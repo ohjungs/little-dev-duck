@@ -195,6 +195,8 @@ export {
   setRoomMute,
   listRoomsWithPin,
   searchMessages,
+  listReactions,
+  toggleReaction,
   setRoomPin,
   type RoomListItem,
   type SendMessageInput,

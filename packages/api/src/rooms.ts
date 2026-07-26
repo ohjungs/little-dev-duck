@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  shouldRemoveReaction,
   likePattern,
   sortRooms,
   unreadCount,
@@ -18,6 +19,7 @@ import {
   messageSchema,
   roomSchema,
   type Message,
+  type Reaction,
   type Room,
   type RoomType,
 } from "@ldd/core";
@@ -506,4 +508,59 @@ export async function searchMessages(
 
   if (error) throw new Error(error.message);
   return (data as MessageRow[]).map(messageFromRow);
+}
+
+// ---------------------------------------------------------------------------
+// 메시지 반응
+// ---------------------------------------------------------------------------
+/** 이 메시지들에 달린 반응을 **한 번에** 가져온다(메시지마다 부르면 왕복이 그만큼 늘어난다). */
+export async function listReactions(
+  supabase: SupabaseClient,
+  messageIds: readonly string[],
+): Promise<Reaction[]> {
+  if (messageIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("message_reactions")
+    .select("message_id, user_id, emoji")
+    .in("message_id", [...messageIds]);
+
+  // 반응을 못 읽어도 대화는 보여야 한다 — 빈 목록으로 준다.
+  if (error || !data) return [];
+  return (data as { message_id: string; user_id: string; emoji: string }[]).map((r) => ({
+    messageId: r.message_id,
+    userId: r.user_id,
+    emoji: r.emoji,
+  }));
+}
+
+/**
+ * 반응을 달거나 뗀다. **이미 단 것인지는 현재 목록으로 판정한다** —
+ * 화면 상태로 판정하면 다른 기기에서 단 반응을 모르고 또 달게 되고, 유니크 제약에 막힌다.
+ */
+export async function toggleReaction(
+  supabase: SupabaseClient,
+  current: readonly Reaction[],
+  messageId: string,
+  emoji: string,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  if (shouldRemoveReaction(current, messageId, user.id, emoji)) {
+    const { error } = await supabase
+      .from("message_reactions")
+      .delete()
+      .eq("message_id", messageId)
+      .eq("user_id", user.id)
+      .eq("emoji", emoji);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("message_reactions")
+    .insert({ message_id: messageId, user_id: user.id, emoji });
+  if (error) throw new Error(error.message);
 }

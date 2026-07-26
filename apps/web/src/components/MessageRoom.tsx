@@ -14,11 +14,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   deleteMessage,
   listMessages,
+  listReactions,
   getMyMembership,
   markRead,
   messageImageUrl,
   setRoomMute,
   setRoomPin,
+  toggleReaction,
   sendMessage,
   uploadMessageImage,
 } from "@ldd/api";
@@ -27,6 +29,8 @@ import {
   messageAttachment,
   messageBody,
   replyPreview,
+  summarizeReactions,
+  REACTION_EMOJIS,
   pendingMigrationMessage,
   resizeTarget,
   afterSend,
@@ -35,6 +39,7 @@ import {
   isRoomMuted,
   MUTE_DURATIONS,
   type Message,
+  type Reaction,
   type ReadReceiptState,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
@@ -81,6 +86,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   const [pinnedAt, setPinnedAt] = useState<string | null>(null);
   // 답장 대상. 보내고 나면 비운다 — 안 비우면 다음 말도 계속 답장이 된다.
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
 
   const reload = useCallback(async () => {
     try {
@@ -120,6 +126,28 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
       setMessages((prev) =>
         prev.map((m) => (m.id === id ? { ...m, deletedAt: new Date().toISOString() } : m)),
       );
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    }
+  }
+
+  // 반응을 한 번에 불러온다. 메시지마다 부르면 왕복이 목록 길이만큼 늘어난다.
+  useEffect(() => {
+    if (messages.length === 0) return;
+    let alive = true;
+    void listReactions(createClient(), messages.map((m) => m.id)).then((rs) => {
+      if (alive) setReactions(rs);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [messages]);
+
+  async function handleReact(messageId: string, emoji: string) {
+    try {
+      await toggleReaction(createClient(), reactions, messageId, emoji);
+      setReactions(await listReactions(createClient(), messages.map((m) => m.id)));
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       setError(pendingMigrationMessage(raw) ?? raw);
@@ -420,6 +448,29 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                   {messageBody(m)}
                 </span>
 
+                {/* 달린 반응 — 다시 누르면 해제된다는 걸 테두리로 보여 준다. */}
+                {(() => {
+                  const summary = summarizeReactions(reactions, m.id, myUserId);
+                  if (summary.length === 0) return null;
+                  return (
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      {summary.map((s2) => (
+                        <button
+                          key={s2.emoji}
+                          type="button"
+                          onClick={() => void handleReact(m.id, s2.emoji)}
+                          aria-label={`${s2.emoji} ${s2.count}개${s2.mine ? ", 내가 달았음" : ""}`}
+                          className={`rounded-full border px-1.5 text-[11px] ${
+                            s2.mine ? "border-primary" : "border-border"
+                          }`}
+                        >
+                          {s2.emoji} {s2.count}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+
                 {(() => {
                   const path = messageAttachment(m);
                   if (!path) return null;
@@ -458,6 +509,23 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                     aria-label="메시지 메뉴"
                     className="absolute right-0 z-10 mt-1 flex flex-col rounded-md border border-border bg-background text-left shadow-lg"
                   >
+                    <div className="flex gap-0.5 border-b border-border px-1 py-1">
+                      {REACTION_EMOJIS.map((e) => (
+                        <button
+                          key={e}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setMenuFor(null);
+                            void handleReact(m.id, e);
+                          }}
+                          aria-label={`${e} 반응 달기`}
+                          className="rounded px-1 text-sm hover:bg-accent"
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
                     <button
                       type="button"
                       role="menuitem"
