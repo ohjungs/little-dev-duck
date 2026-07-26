@@ -4,8 +4,17 @@
 > 이 문서가 더하는 것은 **중복 대조**다 — 734개 중 **이미 있는 것 / 이미 계획된 것 / 진짜 새 것**을
 > 코드로 확인해 갈랐다. 그게 없으면 **이미 있는 것을 다시 만든다**(CLAUDE.md 3-5절 최고 심각도).
 >
+> **2026-07-26 갱신 — 734항목 전부가 Phase에 배정됐다.** 처음에는 Group 0~2만 계획하고
+> Group 3·4는 카탈로그 보관으로 뒀는데, 사용자가 **"전부 계획값으로"** 요청해 전수 배정했다.
+> 배정 결과는 **[messenger-assignment.md](messenger-assignment.md)** — 코드로 생성했고
+> **누락·중복·유령 ID를 0으로 검증**했다.
+>
 > 실행 계획: [Phase 50](../plans/phase_50.md)(Group 0) · [Phase 51](../plans/phase_51.md)(Group 1) ·
-> [Phase 52](../plans/phase_52.md)(Group 2). Group 3·4는 이 카탈로그에 보관한다.
+> [Phase 52](../plans/phase_52.md)(Group 2) · [53](../plans/phase_53.md) 그룹방·연락처 ·
+> [54](../plans/phase_54.md) 메시지 심화 · [55](../plans/phase_55.md) 검색·보관·미디어 ·
+> [56](../plans/phase_56.md) 알림·설정 · [57](../plans/phase_57.md) 접근성·플랫폼 ·
+> [58](../plans/phase_58.md) 운영·보안·인증 · [59](../plans/phase_59.md) 마스코트·에이전트 ·
+> [60](../plans/phase_60.md) 보류 항목의 **해제 전제**.
 
 ---
 
