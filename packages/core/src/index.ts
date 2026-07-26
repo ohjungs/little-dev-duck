@@ -408,6 +408,7 @@ export {
   isHidden,
   toggleHidden,
   moveWidget,
+  reorderWidget,
   visibleWidgets,
   type DashboardLayout,
 } from "./domain/dashboard-layout";

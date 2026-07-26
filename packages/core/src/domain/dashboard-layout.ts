@@ -97,6 +97,31 @@ export function moveWidget(
   return { order: next, hidden: [...layout.hidden] };
 }
 
+// 2026-07-27 : 대시보드 - 배치 - 끌어다 놓기 (2차 피드백 1-5, Phase 44 T2)
+// `moveWidget`은 한 칸씩만 옮긴다. 드래그는 **임의 위치로 한 번에** 옮기므로 별도 계산이 필요하다.
+// 화면에서 배열을 직접 주무르지 않는 이유는 `moveWidget`과 같다 — 순서 계산이 두 벌이 되면
+// 대시보드와 설정 화면이 서로 다른 순서를 보여 준다.
+//
+// **끼워 넣기(insert)지 자리 바꾸기(swap)가 아니다.** 드래그는 "여기로 가져다 놓는다"는
+// 동작이라, 스왑하면 놓은 자리의 카드가 원래 자리로 튀어 사용자가 기대한 결과와 달라진다.
+export function reorderWidget(
+  available: readonly string[],
+  layout: DashboardLayout,
+  id: string,
+  toIndex: number,
+): DashboardLayout {
+  const order = resolveOrder(available, layout);
+  const from = order.indexOf(id);
+  if (from === -1) return layout;
+  // 범위를 벗어난 목적지는 양 끝으로 눌러 담는다(드롭 좌표는 목록 밖에서도 올 수 있다).
+  const to = Math.min(Math.max(toIndex, 0), order.length - 1);
+  if (to === from) return layout;
+  const next = [...order];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved!);
+  return { order: next, hidden: [...layout.hidden] };
+}
+
 // 실제로 그릴 위젯 id 목록(순서 적용 + 숨김 제외).
 export function visibleWidgets(
   available: readonly string[],

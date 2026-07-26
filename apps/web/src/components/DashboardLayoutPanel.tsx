@@ -7,6 +7,7 @@ import {
   EMPTY_LAYOUT,
   isHidden,
   moveWidget,
+  reorderWidget,
   resolveOrder,
   toggleHidden,
   type DashboardLayout,
@@ -21,8 +22,14 @@ import { cn } from "@/lib/utils";
 // "대쉬보드 구성을 바꿀수있으면 좋겠고 카드형식으로 움직일수있으면 좋겠어",
 // "카드 형태의 … 기능들을 보이거나 안보이게하는 기능을 관리자 기능안에".
 //
-// 드래그 대신 위/아래 버튼을 쓴다. 드래그는 라이브러리(dnd-kit 등)를 들여와야 하고 키보드로는
-// 쓸 수 없다. 카드가 12개뿐이라 버튼 한 번으로 충분하고, 탭 이동만으로도 전부 조작된다.
+// 2026-07-27 (2차 피드백 1-5, Phase 44 T2): **사용자가 같은 요청을 다시 했다.**
+// 1차에서 위/아래 버튼으로 처리하고 "완료"로 적었지만, 원한 것은 **끌어다 놓기**였다.
+// 그때의 반대 근거는 두 가지였다 — "라이브러리를 들여와야 한다"와 "키보드로 못 쓴다".
+// 둘 다 피했다: **HTML5 네이티브 드래그**(의존성 0개, ponytail 사다리 4단계 "플랫폼 네이티브")를
+// 쓰고, **위/아래 버튼을 그대로 남긴다**(키보드·보조기기 경로는 버튼이 담당).
+//
+// 순서 계산은 여전히 core에 있다(`reorderWidget`). 화면에서 배열을 주무르면 대시보드와
+// 이 화면이 서로 다른 순서를 보여 준다.
 //
 // 규칙 계산은 전부 core `dashboard-layout`에 있다. 여기서는 그리고 저장만 한다 —
 // 순서 계산을 화면에서 또 하면 대시보드와 이 화면이 서로 다른 순서를 보여 준다.
@@ -34,6 +41,10 @@ export function DashboardLayoutPanel() {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // 지금 끌고 있는 카드 id와 그 카드가 놓일 자리. 놓을 자리를 화면에 보여 주지 않으면
+  // 사용자는 어디에 떨어질지 모르고 놓는다.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -90,15 +101,51 @@ export function DashboardLayoutPanel() {
     <div className="flex flex-col gap-2">
       {note && <p className="text-xs text-destructive">{note}</p>}
 
+      {/* 끌 수 있다는 사실을 말해 준다 — 드래그는 보이지 않는 기능이라 안내가 없으면
+          있는 줄 모른다. 키보드 사용자를 위한 화살표 버튼도 함께 알린다. */}
+      <p className="text-xs text-muted-foreground">
+        카드를 끌어서 순서를 바꿀 수 있어요. 화살표 버튼으로도 옮길 수 있습니다.
+      </p>
       <ol className="flex flex-col gap-1.5">
         {order.map((id, index) => {
           const hidden = isHidden(layout, id);
           return (
             <li
               key={id}
+              // 2026-07-27 (2차 피드백 1-5): 끌어다 놓기. 저장 중에는 끌 수 없게 한다 —
+              // 저장이 도는 중에 순서를 또 바꾸면 어느 쪽이 남는지 예측할 수 없다.
+              draggable={!saving}
+              onDragStart={(e) => {
+                setDragId(id);
+                e.dataTransfer.effectAllowed = "move";
+                // 일부 브라우저는 데이터가 없으면 드래그를 시작하지 않는다.
+                e.dataTransfer.setData("text/plain", id);
+              }}
+              onDragEnd={() => {
+                setDragId(null);
+                setDropIndex(null);
+              }}
+              onDragOver={(e) => {
+                if (dragId === null) return;
+                // 기본 동작을 막아야 드롭이 허용된다(HTML5 드래그의 규칙).
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                setDropIndex(index);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragId === null) return;
+                apply(reorderWidget(WIDGET_IDS, layout, dragId, index));
+                setDragId(null);
+                setDropIndex(null);
+              }}
               className={cn(
                 "flex items-center gap-2 rounded-lg border border-border px-2.5 py-2",
                 hidden && "bg-muted/40",
+                !saving && "cursor-grab active:cursor-grabbing",
+                dragId === id && "opacity-50",
+                // 놓일 자리를 선으로 알린다 — 안 보이면 어디에 떨어질지 모르고 놓는다.
+                dropIndex === index && dragId !== id && "ring-2 ring-primary/60",
               )}
             >
               <span className="w-5 shrink-0 text-center text-xs tabular-nums text-muted-foreground">

@@ -7,6 +7,7 @@ import {
   resolveOrder,
   toggleHidden,
   visibleWidgets,
+  reorderWidget,
   type DashboardLayout,
 } from "./dashboard-layout";
 
@@ -169,5 +170,58 @@ describe("moveWidget", () => {
     const snapshot = JSON.parse(JSON.stringify(before));
     moveWidget(AVAILABLE, before, "todo", "up");
     expect(before).toEqual(snapshot);
+  });
+});
+
+// 2026-07-27 : 대시보드 - 배치 - 끌어다 놓기 (2차 피드백 1-5, Phase 44 T2)
+// 1차에서는 위/아래 버튼으로 처리했고 "완료"로 적었는데, 사용자가 **같은 요청을 다시** 했다.
+// 버튼은 최소 구현이었고 원한 것은 드래그였다. 여기서 잠그는 것은 드래그가 기대대로
+// **끼워 넣기**로 동작한다는 성질이다(자리 바꾸기가 아니다).
+describe("reorderWidget", () => {
+  const ids = ["a", "b", "c", "d"];
+  const empty = { order: [], hidden: [] };
+
+  it("끌어다 놓은 자리에 끼워 넣는다 (스왑이 아니다)", () => {
+    // a를 c 자리(index 2)로: [b, c, a, d] — 스왑이면 [c, b, a, d]가 되어 c가 튄다.
+    expect(reorderWidget(ids, empty, "a", 2).order).toEqual(["b", "c", "a", "d"]);
+  });
+
+  it("뒤에서 앞으로도 같은 규칙이다", () => {
+    expect(reorderWidget(ids, empty, "d", 0).order).toEqual(["d", "a", "b", "c"]);
+  });
+
+  it("범위를 벗어난 목적지는 양 끝으로 눌러 담는다", () => {
+    // 드롭 좌표는 목록 밖에서도 온다 — 던지면 안 되고 가장 가까운 자리에 놓는다.
+    expect(reorderWidget(ids, empty, "a", 99).order).toEqual(["b", "c", "d", "a"]);
+    expect(reorderWidget(ids, empty, "d", -5).order).toEqual(["d", "a", "b", "c"]);
+  });
+
+  it("제자리에 놓으면 아무것도 바꾸지 않는다", () => {
+    const layout = { order: ["b", "a"], hidden: ["c"] };
+    expect(reorderWidget(ids, layout, "b", 0)).toBe(layout);
+  });
+
+  it("없는 id는 무시한다", () => {
+    const layout = { order: ["a"], hidden: [] };
+    expect(reorderWidget(ids, layout, "없음", 0)).toBe(layout);
+  });
+
+  it("숨김 목록은 건드리지 않는다", () => {
+    const out = reorderWidget(ids, { order: [], hidden: ["c"] }, "a", 3);
+    expect(out.hidden).toEqual(["c"]);
+  });
+
+  it("저장된 순서가 일부만 있어도 화면 순서 기준으로 옮긴다", () => {
+    // 부분 저장 상태에서 인덱스를 세면 화면에 보이는 위치와 어긋난다(moveWidget과 같은 이유).
+    const out = reorderWidget(ids, { order: ["d"], hidden: [] }, "a", 0);
+    // 해소된 순서는 [d, a, b, c] → a를 0으로 = [a, d, b, c]
+    expect(out.order).toEqual(["a", "d", "b", "c"]);
+  });
+
+  it("입력을 바꾸지 않는다", () => {
+    const layout = { order: ["a", "b"], hidden: ["c"] };
+    const snapshot = JSON.stringify(layout);
+    reorderWidget(ids, layout, "a", 1);
+    expect(JSON.stringify(layout)).toBe(snapshot);
   });
 });
