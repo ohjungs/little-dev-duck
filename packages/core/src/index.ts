@@ -554,3 +554,19 @@ export {
   type TemplateFile,
   type TemplateParseResult,
 } from "./domain/template-file";
+
+// 2026-07-27 : 메신저 - 방·메시지 계약 (Phase 50 T1)
+export {
+  roomSchema,
+  roomTypeSchema,
+  roomMemberSchema,
+  messageSchema,
+  messageBody,
+  unreadCount,
+  sortRooms,
+  DELETED_MESSAGE_TEXT,
+  type Room,
+  type RoomType,
+  type RoomMember,
+  type Message,
+} from "./domain/room";

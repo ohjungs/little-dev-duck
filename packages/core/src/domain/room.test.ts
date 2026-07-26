@@ -1,0 +1,136 @@
+import { describe, expect, it } from "vitest";
+import {
+  DELETED_MESSAGE_TEXT,
+  messageBody,
+  messageSchema,
+  roomMemberSchema,
+  sortRooms,
+  unreadCount,
+} from "./room";
+
+const U1 = "11111111-1111-4111-8111-111111111111";
+const U2 = "22222222-2222-4222-8222-222222222222";
+const ISO = "2026-07-27T00:00:00.000Z";
+
+function msg(o: Partial<{ id: string; seq: number; senderUserId: string | null; deletedAt: string | null }> = {}) {
+  return {
+    id: o.id ?? "aaaaaaaa-0000-4000-8000-000000000001",
+    seq: o.seq ?? 1,
+    senderUserId: o.senderUserId === undefined ? U2 : o.senderUserId,
+    deletedAt: o.deletedAt ?? null,
+  };
+}
+
+describe("메시지 계약", () => {
+  it("사람이 보낸 메시지는 보낸 사람이 있어야 한다", () => {
+    const base = {
+      id: U1, roomId: U2, senderType: "user" as const, type: "text" as const,
+      body: "안녕", clientMsgId: "c1", seq: 1, deletedAt: null, createdAt: ISO,
+    };
+    expect(messageSchema.safeParse({ ...base, senderUserId: U1 }).success).toBe(true);
+    // 보낸 사람 없이 "사람이 보냈다"고 하면 화면이 누가 썼는지 못 그린다.
+    expect(messageSchema.safeParse({ ...base, senderUserId: null }).success).toBe(false);
+  });
+
+  it("에이전트 메시지는 보낸 사람이 없어야 한다", () => {
+    const base = {
+      id: U1, roomId: U2, senderType: "agent" as const, type: "text" as const,
+      body: "꽥", clientMsgId: "c2", seq: 2, deletedAt: null, createdAt: ISO,
+    };
+    expect(messageSchema.safeParse({ ...base, senderUserId: null }).success).toBe(true);
+    expect(messageSchema.safeParse({ ...base, senderUserId: U1 }).success).toBe(false);
+  });
+
+  it("빈 본문과 4000자 초과는 거부한다", () => {
+    const base = {
+      id: U1, roomId: U2, senderUserId: null, senderType: "agent" as const,
+      type: "text" as const, clientMsgId: "c3", seq: 3, deletedAt: null, createdAt: ISO,
+    };
+    expect(messageSchema.safeParse({ ...base, body: "" }).success).toBe(false);
+    expect(messageSchema.safeParse({ ...base, body: "x".repeat(4001) }).success).toBe(false);
+    expect(messageSchema.safeParse({ ...base, body: "x".repeat(4000) }).success).toBe(true);
+  });
+});
+
+describe("멤버 계약", () => {
+  const base = {
+    id: U1, roomId: U2, lastReadMessageId: null, mutedUntil: null,
+    pinnedAt: null, createdAt: ISO,
+  };
+
+  it("사람 멤버는 userId가 있어야 하고 에이전트는 없어야 한다", () => {
+    expect(roomMemberSchema.safeParse({ ...base, memberType: "user", userId: U1 }).success).toBe(true);
+    expect(roomMemberSchema.safeParse({ ...base, memberType: "user", userId: null }).success).toBe(false);
+    expect(roomMemberSchema.safeParse({ ...base, memberType: "agent", userId: null }).success).toBe(true);
+    // 오리는 auth.users에 없다 — userId를 붙이면 DB CHECK와 갈라진다.
+    expect(roomMemberSchema.safeParse({ ...base, memberType: "agent", userId: U1 }).success).toBe(false);
+  });
+});
+
+describe("삭제된 메시지", () => {
+  it("본문 대신 안내 문구를 보여 준다 (자리는 남긴다)", () => {
+    expect(messageBody({ body: "비밀", deletedAt: ISO })).toBe(DELETED_MESSAGE_TEXT);
+    expect(messageBody({ body: "비밀", deletedAt: ISO })).not.toContain("비밀");
+  });
+
+  it("안 지운 메시지는 그대로", () => {
+    expect(messageBody({ body: "안녕", deletedAt: null })).toBe("안녕");
+  });
+});
+
+describe("안 읽은 개수", () => {
+  const list = [msg({ id: "m1", seq: 1 }), msg({ id: "m2", seq: 2 }), msg({ id: "m3", seq: 3 })];
+
+  it("읽음 위치가 없으면 전부 안 읽음", () => {
+    expect(unreadCount(list, null, U1)).toBe(3);
+  });
+
+  it("읽음 위치보다 뒤에 온 것만 센다", () => {
+    expect(unreadCount(list, "m2", U1)).toBe(1);
+    expect(unreadCount(list, "m3", U1)).toBe(0);
+  });
+
+  it("내가 보낸 메시지는 세지 않는다", () => {
+    const mine = [msg({ id: "a", seq: 1, senderUserId: U1 }), msg({ id: "b", seq: 2 })];
+    expect(unreadCount(mine, null, U1)).toBe(1);
+  });
+
+  it("지운 메시지는 세지 않는다", () => {
+    const withDeleted = [msg({ id: "a", seq: 1, deletedAt: ISO }), msg({ id: "b", seq: 2 })];
+    expect(unreadCount(withDeleted, null, U1)).toBe(1);
+  });
+
+  it("읽음 위치가 목록에 없으면 0이라고 단정하지 않는다", () => {
+    // 이미 지나갔거나 아직 안 불러온 경우다. 0으로 처리하면 뱃지가 조용히 사라진다.
+    expect(unreadCount(list, "없는-id", U1)).toBe(3);
+  });
+
+  it("빈 목록은 0", () => {
+    expect(unreadCount([], null, U1)).toBe(0);
+    expect(unreadCount([], "m1", U1)).toBe(0);
+  });
+});
+
+describe("방 목록 정렬", () => {
+  it("고정한 방이 먼저, 그다음 최근 메시지 순", () => {
+    const rooms = [
+      { id: "a", pinnedAt: null, lastMessageSeq: 10 },
+      { id: "b", pinnedAt: ISO, lastMessageSeq: 1 },
+      { id: "c", pinnedAt: null, lastMessageSeq: 20 },
+    ];
+    expect(sortRooms(rooms).map((r) => r.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("원본 배열을 바꾸지 않는다", () => {
+    const rooms = [
+      { id: "a", pinnedAt: null, lastMessageSeq: 1 },
+      { id: "b", pinnedAt: null, lastMessageSeq: 2 },
+    ];
+    sortRooms(rooms);
+    expect(rooms.map((r) => r.id)).toEqual(["a", "b"]);
+  });
+
+  it("빈 목록에도 던지지 않는다", () => {
+    expect(sortRooms([])).toEqual([]);
+  });
+});
