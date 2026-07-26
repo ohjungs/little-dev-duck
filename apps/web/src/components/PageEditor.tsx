@@ -41,6 +41,7 @@ import {
   unpublishPage,
   updatePage,
   updatePageCover,
+  recordEvent,
 } from "@ldd/api";
 import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
@@ -150,6 +151,20 @@ export function PageEditor({
   useEffect(() => {
     recordRecentPage({ id: page.id, title: page.title, icon: page.icon });
   }, [page.id, page.title, page.icon]);
+
+  // 2026-07-26 (피드백 3-1 방문 로그): 어느 페이지를 언제 열었는지 남긴다.
+  // localStorage MRU와 별개다 — 그건 기기마다 따로이고 최근 몇 개만 들고 있어서
+  // "자주 방문하는 페이지·평균 방문 횟수"를 낼 수 없다.
+  //
+  // **page.id에만 의존한다.** title/icon까지 넣으면 제목을 한 글자 고칠 때마다 방문이
+  // 한 번씩 더 기록돼 통계가 부풀려진다(위의 MRU는 최신값으로 덮어쓰므로 상관없다).
+  useEffect(() => {
+    void recordEvent(supabase, {
+      name: "page:view",
+      detail: page.title.trim() || "제목 없음",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 방문 1회만 기록(제목 변경은 새 방문이 아니다)
+  }, [supabase, page.id]);
 
   // 이 페이지를 참조하는 페이지 목록(백링크). 마운트 시 1회 조회.
   const [backlinks, setBacklinks] = useState<

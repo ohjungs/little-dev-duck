@@ -6,6 +6,7 @@ import {
   listUnsummarizedArticles,
   summarizeArticle,
   setArticleSummary,
+  recordEvent,
 } from "@ldd/api";
 import { isLddError } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
@@ -69,9 +70,24 @@ export async function POST() {
       }
     }
 
+    // 2026-07-26 (피드백 3-2 배치 로그): 자동 작업이 언제 돌아 무엇을 했는지 남긴다.
+    // recordEvent는 절대 던지지 않으므로 수집 결과가 로그 때문에 유실되지 않는다.
+    await recordEvent(supabase, {
+      name: "batch:news-collect",
+      detail: `피드 수집`,
+      result: `새 기사 ${collected}건 · 요약 ${summarized}건${pausedNow.length ? ` · 일시정지 ${pausedNow.length}` : ""}`,
+    });
+
     return NextResponse.json({ collected, summarized, paused: pausedNow });
   } catch (error) {
     console.error("뉴스 수집 실패", { userId: user.id, error });
+    // 실패도 남긴다 — 에러 로그(3-2)는 실패가 기록될 때만 의미가 있다.
+    await recordEvent(supabase, {
+      name: "batch:news-collect",
+      detail: "피드 수집",
+      status: "error",
+      result: error instanceof Error ? error.message : "알 수 없는 오류",
+    });
     return NextResponse.json(
       { error: "수집에 실패했어요. 잠시 후 다시 시도해주세요." },
       { status: 502 },

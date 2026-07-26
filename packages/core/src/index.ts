@@ -409,3 +409,15 @@ export {
   visibleWidgets,
   type DashboardLayout,
 } from "./domain/dashboard-layout";
+export {
+  LOG_KIND_LABELS,
+  logKind,
+  logName,
+  summarizeLogs,
+  summarizeVisits,
+  type LogKind,
+  type LogEntryLike,
+  type LogStats,
+  type LogCount,
+  type VisitStats,
+} from "./domain/log-stats";

@@ -37,6 +37,7 @@ import {
 } from "@ldd/core";
 import { HabitHeatmap } from "./HabitHeatmap";
 import { createClient } from "@/lib/supabase/client";
+import { ActivityLogView } from "@/components/ActivityLogView";
 import { todayIso } from "@/lib/today";
 import { activeStreak, shiftDate, weekBounds } from "@/lib/insightsDates";
 import { localDateKey } from "@/lib/localDateKey";
@@ -75,7 +76,7 @@ export function InsightsView() {
   >("idle");
   const [standupError, setStandupError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "done">("idle");
-  const [tab, setTab] = useState<"overview" | "tasks" | "focus">("overview");
+  const [tab, setTab] = useState<"overview" | "tasks" | "focus" | "logs">("overview");
 
   useEffect(() => {
     const supabase = createClient();
@@ -274,6 +275,8 @@ export function InsightsView() {
     { id: "overview" as const, label: "개요" },
     { id: "tasks" as const, label: "할 일·습관" },
     { id: "focus" as const, label: "집중" },
+    // 2026-07-26 (피드백 3-1·3-2): 방문·배치·에러·작업 로그.
+    { id: "logs" as const, label: "로그" },
   ];
 
   return (
@@ -484,6 +487,9 @@ export function InsightsView() {
     )}
       </div>
       )}
+
+      {/* 2026-07-26 (피드백 3-1·3-2): 활동 로그. 계산은 core log-stats, 조회는 api listActionLog. */}
+      {tab === "logs" && <ActivityLogView />}
     </div>
   );
 }
