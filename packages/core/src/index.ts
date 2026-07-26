@@ -30,6 +30,15 @@ export {
   startOfWeek,
 } from "./domain/date-util";
 export {
+  resolveDateRange,
+  dateRangeDays,
+  isWithinRange,
+  DATE_RANGE_PRESETS,
+  DATE_RANGE_LABELS,
+  type DateRange,
+  type DateRangePreset,
+} from "./domain/date-range";
+export {
   DAY_CODES,
   parseRecurrence,
   serializeRecurrence,

@@ -34,6 +34,12 @@ import {
   type HeatmapDay,
   type PomodoroStats,
   type Todo,
+  resolveDateRange,
+  dateRangeDays,
+  isWithinRange,
+  DATE_RANGE_PRESETS,
+  DATE_RANGE_LABELS,
+  type DateRangePreset,
 } from "@ldd/core";
 import { HabitHeatmap } from "./HabitHeatmap";
 import { createClient } from "@/lib/supabase/client";
@@ -77,6 +83,13 @@ export function InsightsView() {
   const [standupError, setStandupError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "done">("idle");
   const [tab, setTab] = useState<"overview" | "tasks" | "focus" | "logs">("overview");
+  // 2026-07-27 (2차 피드백 3-1 "어떻게 기간별로 조회할수있는지", Phase 46 T2):
+  // 전에는 기간이 90일 고정이었다. **계산은 core `resolveDateRange`가 한다** — 화면에서
+  // 날짜를 세면 같은 "최근 7일"이 화면마다 다른 날을 가리킨다(이 저장소가 겪은 하루 밀림).
+  //
+  // **다시 받지 않고 이미 받은 90일치를 걸러 쓴다.** 기간을 바꿀 때마다 조회하면 무료 티어
+  // 대역폭을 먹는다(CONSTRAINTS_FREE_TIER.md) — 90일이 최대 구간이라 재조회가 필요 없다.
+  const [preset, setPreset] = useState<DateRangePreset>("last90");
 
   useEffect(() => {
     const supabase = createClient();
@@ -118,6 +131,18 @@ export function InsightsView() {
     };
     void run();
   }, []);
+
+  // 고른 기간을 실제 날짜로 푼다. **"오늘"은 화면 기준(로컬)이다** — 서버에서 다시 구하면
+  // KST 00~09시에 하루 어긋난다(이 저장소의 TZ 정책).
+  const range = resolveDateRange(preset, todayIso());
+  const rangeFrom = range.from;
+  const rangeTo = range.to;
+  const rangeDays = dateRangeDays(range);
+  // 이미 받은 90일치에서 고른 구간만 남긴다(재조회 없음 — 대역폭 보호).
+  const rangeHeatmap = (heatmap ?? []).filter((d) => isWithinRange(d.date, range));
+  const rangeCheckCount = rawChecks.filter((c) =>
+    isWithinRange(c.checkedDate, range),
+  ).length;
 
   async function handleStandup() {
     setStandupState("loading");
@@ -445,8 +470,34 @@ export function InsightsView() {
     </div>
     {heatmap && (
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-muted-foreground">습관 체크 (최근 90일)</h2>
-        <HabitHeatmap data={heatmap} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">
+            습관 체크 ({DATE_RANGE_LABELS[preset]})
+          </h2>
+          {/* 2026-07-27 (2차 피드백 3-1): 기간 선택. 고른 구간의 실제 날짜를 함께 보여 준다 —
+              "최근 7일"이 어디부터 어디까지인지 화면이 말하지 않으면 사용자가 셈을 해야 한다. */}
+          <div className="flex flex-wrap items-center gap-1" role="group" aria-label="조회 기간">
+            {DATE_RANGE_PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPreset(p)}
+                aria-pressed={preset === p}
+                className={`rounded-md px-2 py-1 text-xs transition-colors ${
+                  preset === p
+                    ? "bg-muted font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                {DATE_RANGE_LABELS[p]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {rangeFrom} ~ {rangeTo} ({rangeDays}일) · 체크 {rangeCheckCount}회
+        </p>
+        <HabitHeatmap data={rangeHeatmap} />
       </section>
     )}
       </div>
