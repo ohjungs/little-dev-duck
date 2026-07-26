@@ -1,0 +1,51 @@
+이 폴더의 .ogg 파일은 Kenney(kenney.nl)가 배포한 CC0 자산이다.
+2026-07-26에 아래 두 팩에서 필요한 것만 골라 담았다. 원문 라이선스를 그대로 옮긴다.
+  - Interface Sounds : typing / interact / door-open / door-close
+  - RPG Audio        : footstep-1 / footstep-2
+
+===== Interface Sounds =====
+	
+
+	Interface Sounds (1.0)
+
+	Created/distributed by Kenney (www.kenney.nl)
+	Creation date: 11-02-2020
+
+			------------------------------
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	This content is free to use in personal, educational and commercial projects.
+	Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
+
+			------------------------------
+
+	Donate:   http://support.kenney.nl
+	Patreon:  http://patreon.com/kenney/
+
+	Follow on Twitter for updates:
+	http://twitter.com/KenneyNL
+
+===== RPG Audio =====
+	
+
+	RPG Audio
+
+	by  Kenney Vleugels (Kenney.nl)
+
+			------------------------------
+
+	License (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	You may use these assets in personal and commercial projects.
+	Credit (Kenney or www.kenney.nl) would be nice but is not mandatory.
+
+			------------------------------
+
+	Donate:   http://support.kenney.nl
+	Request:  http://request.kenney.nl
+
+	Follow on Twitter for updates:
+	@KenneyNL

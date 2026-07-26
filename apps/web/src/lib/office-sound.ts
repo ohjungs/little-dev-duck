@@ -1,191 +1,138 @@
-// 2026-07-24 : Phase H — Web Audio API 사운드 매니저
-// 외부 오디오 파일 없음. OscillatorNode + GainNode 순수 절차적 생성.
-// 브라우저 autoplay 정책 준수: 첫 사용자 제스처 이후 init() 호출.
+// 2026-07-26 : 오피스 - 사운드 - 실제녹음교체 (피드백 5-1)
+// "일단 사운드가 이상해, 다른 실제 상용화된 제품이나, 무료 에셋에 있는 사운드를 가져와서 쓰도록해".
+//
+// 종전에는 외부 파일 없이 Web Audio 오실레이터로 전부 합성했다. 두 가지가 문제였다:
+//   ① BGM이 **사인파 C장조 3화음을 끊김 없이 계속 울리는 드론**이었다. 사무실 소리가 아니라
+//      의료기기 경고음에 가깝다. 이번에 걷어냈다 — 사무실은 원래 조용하다. 못 들어 본 소리로
+//      바꾸느니 없애는 쪽이 낫다.
+//   ② 발소리·타이핑이 사각파 삑 소리였다. 실제 녹음으로 교체했다.
+//
+// 자산: Kenney(kenney.nl) CC0 — Interface Sounds / RPG Audio. 원문 라이선스는
+// `public/sounds/LICENSE.txt`에 그대로 넣어 뒀다. CC0라 표기 의무는 없지만 출처를 남기지 않으면
+// 다음 사람이 라이선스를 다시 조사해야 한다.
+//
+// 파일 재생이 실패해도(네트워크·코덱) 오피스가 조용해지기만 하고 죽지 않는다 — 부가 기능이다.
+
+const SFX_SRC = {
+  typing: ["/sounds/typing.ogg"],
+  interact: ["/sounds/interact.ogg"],
+  doorOpen: ["/sounds/door-open.ogg"],
+  doorClose: ["/sounds/door-close.ogg"],
+  // 발소리는 두 개를 번갈아 쓴다. 같은 파일만 반복하면 기계적으로 들린다(왼발·오른발).
+  footstep: ["/sounds/footstep-1.ogg", "/sounds/footstep-2.ogg"],
+} as const;
+
+type SfxName = keyof typeof SFX_SRC;
+
+// 소리별 기본 음량. 발소리·타이핑은 자주 울리므로 낮게 잡는다 — 같은 음량이면 금세 거슬린다.
+const SFX_VOLUME: Record<SfxName, number> = {
+  typing: 0.18,
+  interact: 0.45,
+  doorOpen: 0.4,
+  doorClose: 0.4,
+  footstep: 0.22,
+};
+
+// 같은 소리가 겹쳐 울릴 수 있게 요소를 복제해 재생한다. 원본 요소를 재생하면 이전 재생이 끊긴다.
+const POOL_SIZE = 3;
 
 export class OfficeSoundManager {
-  private ctx: AudioContext | null = null;
-  private bgmGain: GainNode | null = null;
-  private sfxGain: GainNode | null = null;
+  private pools = new Map<string, HTMLAudioElement[]>();
+  private cursor = new Map<string, number>();
   private _muted = false;
-  private _bgmPlaying = false;
+  private loaded = false;
+  // 발소리 좌/우 번갈기.
+  private stepAlt = 0;
 
-  // ---------------------------------------------------------------------------
-  // 내부 초기화 — 첫 사용자 제스처 후에만 호출
-  // ---------------------------------------------------------------------------
-  private init(): AudioContext {
-    if (!this.ctx) {
-      this.ctx = new AudioContext();
-
-      this.bgmGain = this.ctx.createGain();
-      this.bgmGain.gain.value = this._muted ? 0 : 0.08;
-      this.bgmGain.connect(this.ctx.destination);
-
-      this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.value = this._muted ? 0 : 0.15;
-      this.sfxGain.connect(this.ctx.destination);
-    }
-    // suspended 상태는 사용자 제스처 맥락에서 재개
-    if (this.ctx.state === "suspended") {
-      void this.ctx.resume();
-    }
-    return this.ctx;
-  }
-
-  // ---------------------------------------------------------------------------
-  // 공개 API
-  // ---------------------------------------------------------------------------
   get muted(): boolean {
     return this._muted;
   }
 
   toggleMute(): boolean {
     this._muted = !this._muted;
-    if (this.bgmGain) this.bgmGain.gain.value = this._muted ? 0 : 0.08;
-    if (this.sfxGain) this.sfxGain.gain.value = this._muted ? 0 : 0.15;
     return this._muted;
   }
 
-  // ---------------------------------------------------------------------------
-  // BGM — C장조 3화음 패드 (C4·E4·G4), LFO 비브라토 + 로우패스
-  // ---------------------------------------------------------------------------
-  startBgm(): void {
-    if (this._bgmPlaying) return;
-    const ctx = this.init();
-    if (!this.bgmGain) return;
-
-    const freqs = [261.63, 329.63, 392.0]; // C4, E4, G4
-
-    for (const freq of freqs) {
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-
-      // 부드러운 LFO 비브라토
-      const lfo = ctx.createOscillator();
-      lfo.frequency.value = 0.2 + Math.random() * 0.3;
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.value = 2; // ±2Hz 깊이
-      lfo.connect(lfoGain);
-      lfoGain.connect(osc.frequency);
-      lfo.start();
-
-      // 따뜻한 로우패스
-      const filter = ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.value = 800;
-
-      osc.connect(filter);
-      filter.connect(this.bgmGain);
-      osc.start();
+  // 첫 사용자 제스처 이후 호출한다(브라우저 자동재생 정책). 여러 번 불러도 한 번만 준비한다.
+  private ensureLoaded(): void {
+    if (this.loaded || typeof Audio === "undefined") return;
+    this.loaded = true;
+    for (const srcs of Object.values(SFX_SRC)) {
+      for (const src of srcs) {
+        const pool: HTMLAudioElement[] = [];
+        for (let i = 0; i < POOL_SIZE; i++) {
+          const el = new Audio(src);
+          el.preload = "auto";
+          pool.push(el);
+        }
+        this.pools.set(src, pool);
+        this.cursor.set(src, 0);
+      }
     }
+  }
 
-    this._bgmPlaying = true;
+  private playSrc(src: string, volume: number): void {
+    const pool = this.pools.get(src);
+    if (!pool || pool.length === 0) return;
+    const i = this.cursor.get(src) ?? 0;
+    this.cursor.set(src, (i + 1) % pool.length);
+    const el = pool[i];
+    el.volume = Math.max(0, Math.min(1, volume));
+    el.currentTime = 0;
+    // play()는 Promise를 돌려주고 자동재생 차단 시 reject한다. 잡지 않으면 콘솔에 미처리 거부가 쌓인다.
+    void el.play().catch(() => {
+      // 재생 실패는 조용히 넘긴다 — 소리는 부가 기능이고, 실패해도 오피스는 그대로 동작해야 한다.
+    });
+  }
+
+  private play(name: SfxName): void {
+    if (this._muted) return;
+    this.ensureLoaded();
+    const srcs = SFX_SRC[name];
+    const src =
+      name === "footstep" ? srcs[this.stepAlt++ % srcs.length] : srcs[0];
+    this.playSrc(src, SFX_VOLUME[name]);
+  }
+
+  playFootstep(): void {
+    this.play("footstep");
+  }
+
+  playInteract(): void {
+    this.play("interact");
+  }
+
+  playTyping(): void {
+    this.play("typing");
+  }
+
+  playDoor(): void {
+    this.play("doorOpen");
+  }
+
+  playDoorClose(): void {
+    this.play("doorClose");
+  }
+
+  // BGM은 없앴다(위 주석 참조). 호출부를 한 번에 고치지 않아도 되도록 no-op으로 남긴다 —
+  // 없는 메서드를 부르면 화면 전체가 죽지만, 소리가 안 나는 건 아무것도 망가뜨리지 않는다.
+  startBgm(): void {
+    /* 의도적 no-op: 드론 BGM 제거 */
   }
 
   stopBgm(): void {
-    // 오실레이터는 살려두고 게인만 0으로 — 재시작 비용 절감
-    if (this.bgmGain) this.bgmGain.gain.value = 0;
-    this._bgmPlaying = false;
+    /* 의도적 no-op: 드론 BGM 제거 */
   }
 
-  // ---------------------------------------------------------------------------
-  // SFX: 발소리 — 짧은 스퀘어파 노이즈 버스트
-  // ---------------------------------------------------------------------------
-  playFootstep(): void {
-    if (this._muted) return;
-    const ctx = this.init();
-    if (!this.sfxGain) return;
-
-    const osc = ctx.createOscillator();
-    osc.type = "square";
-    osc.frequency.value = 150 + Math.random() * 100;
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.05);
-  }
-
-  // ---------------------------------------------------------------------------
-  // SFX: 상호작용 (E키 / NPC 대화) — 두 음 짧은 상승 칩튠
-  // ---------------------------------------------------------------------------
-  playInteract(): void {
-    if (this._muted) return;
-    const ctx = this.init();
-    if (!this.sfxGain) return;
-
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(523, ctx.currentTime);        // C5
-    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.08); // E5
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-  }
-
-  // ---------------------------------------------------------------------------
-  // SFX: 타이핑 — 매우 짧은 고음 클릭
-  // ---------------------------------------------------------------------------
-  playTyping(): void {
-    if (this._muted) return;
-    const ctx = this.init();
-    if (!this.sfxGain) return;
-
-    const osc = ctx.createOscillator();
-    osc.type = "square";
-    osc.frequency.value = 800 + Math.random() * 400;
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.03, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.02);
-  }
-
-  // ---------------------------------------------------------------------------
-  // SFX: 문 — 저음 하강 덜컥 소리
-  // ---------------------------------------------------------------------------
-  playDoor(): void {
-    if (this._muted) return;
-    const ctx = this.init();
-    if (!this.sfxGain) return;
-
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(200, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.1);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 정리
-  // ---------------------------------------------------------------------------
   dispose(): void {
-    this.ctx?.close();
-    this.ctx = null;
-    this.bgmGain = null;
-    this.sfxGain = null;
-    this._bgmPlaying = false;
+    for (const pool of this.pools.values()) {
+      for (const el of pool) {
+        el.pause();
+        el.src = "";
+      }
+    }
+    this.pools.clear();
+    this.cursor.clear();
+    this.loaded = false;
   }
 }
