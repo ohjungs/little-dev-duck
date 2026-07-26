@@ -23,19 +23,71 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WidgetSkeleton } from "@/components/Skeleton";
+import {
+  notifyDuck,
+  notifyPermission,
+  notifySupported,
+  requestNotifyPermission,
+} from "@/lib/notify";
+
+// 2026-07-27 : 뽀모도로 - 완료 알림 (2차 피드백 1-4, Phase 44 T1)
+// **계획의 `[추정]`을 코드로 확정했다: 이 소리는 한 번도 난 적이 없을 가능성이 매우 높다.**
+// 전에는 완료 시점에 `new AudioContext()`를 만들었는데, 브라우저는 **사용자 제스처 없이 만든
+// 컨텍스트를 `suspended`로 시작**시킨다. 타이머 만료는 제스처가 아니다.
+// 게다가 완료할 때마다 새 컨텍스트를 만들고 닫지 않아 누수까지 있었다.
+//
+// 고친 방식: **컨텍스트를 시작 버튼(진짜 제스처) 때 한 번 만들어 재사용**한다.
+// 그러면 `suspended`도 누수도 함께 사라진다 — 새 파일도 새 의존성도 필요 없다.
+//
+// **소리 자체는 합성음으로 남긴다(정직하게).** 계획은 실제 음원 파일로 바꾸라고 했지만
+// `public/sounds/`에 있는 CC0 자산 7개는 문·발소리·타이핑이라 알람으로 쓸 것이 없고,
+// 외부에서 새 자산을 내려받는 것은 라이선스 확인이 필요해 이번 범위 밖으로 뒀다.
+// 대신 단발 삐 소리를 **두 음 차임**으로 바꿨다 — 이 저장소가 "사인파를 이상한 사운드로
+// 지적받아 걷어낸" 전례가 있어서, 알람처럼 들리는 형태로 다듬었다.
+let sharedAudioCtx: AudioContext | null = null;
+
+// 사용자 제스처(시작 버튼) 안에서 부른다. 이미 있으면 재사용하고, 정지 상태면 깨운다.
+function primeAudio(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sharedAudioCtx ??= new AudioContext();
+    if (sharedAudioCtx.state === "suspended") void sharedAudioCtx.resume();
+  } catch {
+    // 오디오를 못 쓰는 환경(정책·권한)에서도 타이머 자체는 돌아야 한다.
+  }
+}
 
 function playCompletionSound(): void {
-  const ctx = new AudioContext();
-  const osc = ctx.createOscillator();
-  osc.type = "sine";
-  osc.frequency.value = 523; // C5
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.3, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.5);
+  const ctx = sharedAudioCtx;
+  // 제스처 때 만들어 두지 못했으면 소리를 포기한다 — 여기서 새로 만들어 봐야
+  // `suspended`로 시작해 어차피 들리지 않는다(그게 전에 있던 결함이다).
+  if (!ctx || ctx.state !== "running") return;
+  // 두 음(높은音 → 낮은音)으로 짧게. 단발 삐 소리보다 "끝났다"로 들린다.
+  const notes: { freq: number; at: number }[] = [
+    { freq: 880, at: 0 },
+    { freq: 587, at: 0.18 },
+  ];
+  for (const note of notes) {
+    const osc = ctx.createOscillator();
+    osc.type = "triangle"; // 사인보다 덜 날카롭다
+    osc.frequency.value = note.freq;
+    const gain = ctx.createGain();
+    const start = ctx.currentTime + note.at;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.25, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + 0.36);
+  }
+}
+
+// 소리 끄기(기기별 취향이라 localStorage). 오피스 사운드에도 같은 스위치가 있다.
+const MUTE_KEY = "ldd-pomodoro-muted";
+function isMuted(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(MUTE_KEY) === "1";
 }
 
 // 집중 모드 플래그. DuckWidget 등 다른 컴포넌트가 이 이벤트를 수신해 알림을 억제한다.
@@ -105,6 +157,19 @@ export function PomodoroWidget() {
   const [remaining, setRemaining] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [celebrate, setCelebrate] = useState(false);
+  // 소리 끄기. 초기값을 렌더 중에 읽으면 서버 렌더와 어긋나 하이드레이션이 깨진다.
+  const [muted, setMuted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR/hydration 안전: 마운트 후 1회 동기화
+    setMuted(isMuted());
+  }, []);
+  const toggleMuted = () => {
+    setMuted((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(MUTE_KEY, next ? "1" : "0");
+      return next;
+    });
+  };
   const [actionError, setActionError] = useState<string | null>(null);
 
   // 태그 입력 상태
@@ -198,7 +263,10 @@ export function PomodoroWidget() {
         disableFocusMode();
         setRunning(false);
         setActiveId(null);
-        playCompletionSound();
+        if (!muted) playCompletionSound();
+        // **알림은 새로 만들지 않는다** — `notifyDuck`이 권한·방해금지 시간대·하루 총량을
+        // 이미 전부 판정한다(재구현은 인벤토리 위반이고, 판정이 두 벌이면 한쪽만 고쳐진다).
+        notifyDuck("집중 시간이 끝났어요", "뽀모도로 한 판을 마쳤습니다. 잠깐 쉬어 가세요.");
         setCelebrate(true);
         await fetchSessions();
         // completePomodoro가 서버에서 XP를 적립하므로 오리 표시 갱신 신호를 보낸다.
@@ -224,6 +292,13 @@ export function PomodoroWidget() {
   };
 
   const handleStart = async () => {
+    // 오디오 컨텍스트는 **이 제스처 안에서** 만들어야 소리가 난다(위 주석 참조).
+    primeAudio();
+    // 알림 권한도 여기서 묻는다 — 페이지 로드 시 물으면 사용자는 반사적으로 거부하고,
+    // 한 번 거부되면 브라우저 설정을 직접 열기 전에는 되돌릴 수 없다.
+    if (notifySupported() && notifyPermission() === "default") {
+      void requestNotifyPermission();
+    }
     setActionError(null);
     setCelebrate(false);
     const tag = tagInput.trim() || null;
@@ -321,6 +396,18 @@ export function PomodoroWidget() {
                 집중 완료! 오리가 뿌듯해합니다.
               </div>
             )}
+            {/* 2026-07-27 (2차 피드백 1-4): 소리 끄기. 알림이 생겼으니 끌 수단도 함께 준다 —
+                오피스 사운드에도 같은 스위치가 있다(요청에는 없지만 소리는 늘 끌 수 있어야 한다). */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={toggleMuted}
+                aria-pressed={muted}
+                className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {muted ? "완료음 켜기" : "완료음 끄기"}
+              </button>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">집중 길이</span>
               <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
