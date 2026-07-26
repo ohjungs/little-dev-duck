@@ -40,6 +40,8 @@ import {
   DATE_RANGE_PRESETS,
   DATE_RANGE_LABELS,
   type DateRangePreset,
+  weekdayCounts,
+  busiestWeekday,
 } from "@ldd/core";
 import { BarChart } from "@/components/BarChart";
 import { HabitHeatmap } from "./HabitHeatmap";
@@ -141,9 +143,13 @@ export function InsightsView() {
   const rangeDays = dateRangeDays(range);
   // 이미 받은 90일치에서 고른 구간만 남긴다(재조회 없음 — 대역폭 보호).
   const rangeHeatmap = (heatmap ?? []).filter((d) => isWithinRange(d.date, range));
-  const rangeCheckCount = rawChecks.filter((c) =>
-    isWithinRange(c.checkedDate, range),
-  ).length;
+  const rangeChecks = rawChecks.filter((c) => isWithinRange(c.checkedDate, range));
+  const rangeCheckCount = rangeChecks.length;
+  // 2026-07-27 (2차 피드백 3-3, Phase 46 T4): 요일별 패턴. **우리 데이터로 만들 수 있는 것만
+  // 넣는다** — 날짜 문자열(habit_checks.checked_date)만 있으면 되는 통계다. 없는 데이터로
+  // 만든 수치는 1차 4-5의 "조회수"와 같은 함정이 된다.
+  const weekdays = weekdayCounts(rangeChecks.map((c) => c.checkedDate));
+  const busiest = busiestWeekday(weekdays);
 
   async function handleStandup() {
     setStandupState("loading");
@@ -152,7 +158,7 @@ export function InsightsView() {
       const res = await fetch("/api/ai/standup", { method: "POST" });
       const json = (await res.json()) as { pageId?: string; error?: string };
       if (!res.ok || !json.pageId) {
-        setStandupError(json.error ?? "스탠드업 생성에 실패했어요.");
+        setStandupError(json.error ?? "활동 요약을 만들지 못했어요.");
         setStandupState("error");
         return;
       }
@@ -321,7 +327,7 @@ export function InsightsView() {
             ) : (
               <Sparkles className="size-4" />
             )}
-            스탠드업 생성
+            오늘 활동 요약 만들기
           </button>
           <button
             type="button"
@@ -332,6 +338,14 @@ export function InsightsView() {
             {copyState === "done" ? "복사됨" : "통계 텍스트 복사"}
           </button>
         </div>
+        {/* 2026-07-27 (2차 피드백 3-3 "스탠드업은 무슨기능인지 모르겠어서"): 이름이 기능을
+            설명하지 않았다("스탠드업"은 애자일 용어다). **기능을 지우지 않았다** — 동작은 쓸
+            만하고 Phase 32가 인젝션 방어까지 붙여 뒀다. 이름과 안내만 바꾼다.
+            **무엇이 만들어지는지 미리 말한다** — 통계 화면에서 페이지가 생기는 건 예상 밖이다. */}
+        <p className="w-full text-xs text-muted-foreground">
+          오늘 한 일·습관·집중 시간을 요약한 <span className="font-medium">새 페이지</span>를
+          만들어 바로 열어 줍니다.
+        </p>
         {standupState === "error" && standupError && (
           <p className="text-sm text-destructive">{standupError}</p>
         )}
@@ -509,6 +523,29 @@ export function InsightsView() {
           ariaLabel={`${DATE_RANGE_LABELS[preset]} 습관 체크 추이`}
         />
         <HabitHeatmap data={rangeHeatmap} />
+      </section>
+    )}
+    {heatmap && (
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">요일별 패턴</h2>
+        {/* 데이터가 없을 때 **왜 비었는지 말한다**(Phase 42 T2의 교훈) — 빈 차트만 두면
+            고장으로 보인다. */}
+        {busiest ? (
+          <>
+            <p className="text-xs text-muted-foreground">
+              이 기간에는 <span className="font-medium text-foreground">{busiest.label}요일</span>에
+              가장 많이 했어요 ({busiest.count}회).
+            </p>
+            <BarChart
+              points={weekdays.map((w) => ({ label: w.label, value: w.count }))}
+              ariaLabel={`${DATE_RANGE_LABELS[preset]} 요일별 습관 체크`}
+            />
+          </>
+        ) : (
+          <p className="py-4 text-sm text-muted-foreground">
+            이 기간에는 습관 체크 기록이 없어요. 습관을 하나 체크하면 여기에 패턴이 쌓입니다.
+          </p>
+        )}
       </section>
     )}
       </div>

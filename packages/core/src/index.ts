@@ -151,6 +151,13 @@ export {
 } from "./domain/weekly-digest";
 export { rowsToCsv, toCsv } from "./domain/db-export";
 export {
+  weekdayOf,
+  weekdayCounts,
+  busiestWeekday,
+  WEEKDAY_LABELS,
+  type WeekdayCount,
+} from "./domain/weekday-stats";
+export {
   buildBarChart,
   describeBarChart,
   type BarPoint,
