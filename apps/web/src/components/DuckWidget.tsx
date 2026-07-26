@@ -14,7 +14,13 @@ import {
   type QuietHours,
 } from "@/lib/quietHours";
 import { notifyDuck } from "@/lib/notify";
-import { loadDuckInitiative, markSpoken } from "@/lib/duckInitiative";
+import {
+  loadInitiativeSnapshot,
+  pickFromSnapshot,
+  markSpoken,
+  type InitiativeSnapshot,
+} from "@/lib/duckInitiative";
+import { onAppAction } from "@/lib/appActionSignal";
 import { todayIso } from "@/lib/today";
 import { isQuietHour } from "@ldd/core";
 import {
@@ -46,6 +52,7 @@ export function DuckWidget() {
   const [showCard, setShowCard] = useState(false);
   // 오리가 먼저 건네는 말(피드백 1-3). 규칙으로 고른 문장이라 LLM 호출이 없다.
   const [initiative, setInitiative] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<InitiativeSnapshot | null>(null);
   const levelRef = useRef<number | null>(null);
   const celebrateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -112,27 +119,54 @@ export function DuckWidget() {
   const progress = duckState ? levelProgress(duckState.xp) : null;
   const ratioPercent = progress ? Math.round(progress.ratio * 100) : 0;
 
-  // 화면을 열었을 때 한 번만 판단한다. 주기적으로 돌리면 같은 상황을 하루에 여러 번 말하게 되고
-  // (core가 종류별로 막지만 굳이 조회를 반복할 이유가 없다), 조회가 늘면 무료 등급을 깎는다.
-  // quietHours가 로드된 뒤에 돌아야 방해금지가 실제로 걸린다 — 그래서 의존성에 둔다.
+  // 워크스페이스 상태는 **한 번만** 읽는다. 새 일정·할 일이 생기면 승인 실행 신호가 다시 읽게 한다
+  // (오리가 만든 것도, 위젯에서 만든 것도 아닌 경우는 다음 방문에 반영된다 — 조회를 늘리지 않는다).
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    const load = () => {
+      void (async () => {
+        const snap = await loadInitiativeSnapshot(createClient(), {
+          now: new Date(),
+          today: todayIso(),
+        });
+        if (!cancelled) setSnapshot(snap);
+      })();
+    };
+    load();
+    const off = onAppAction(
+      ["createTodo", "addCalendarEvent", "editTodo", "deleteTodo", "checkHabit", "completeTodo"],
+      load,
+    );
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, []);
+
+  // 판단은 **1분마다 다시** 한다(네트워크 0회 — 스냅샷과 지금 시각만 쓴다).
+  // 처음엔 화면을 연 순간에만 판단했는데, 그러면 오후 1시에 열어 둔 채 3시 일정을 맞아도
+  // 아무 말도 안 한다 — "내일 아침에 알려줘" 같은 예약이 실제로는 알려주지 않는 셈이었다.
+  useEffect(() => {
+    if (!snapshot) return;
+    const tick = () => {
       const today = todayIso();
       const now = new Date();
       const quiet = quietHours
         ? isQuietHour(now.getHours(), quietHours.start, quietHours.end)
         : false;
-      const picked = await loadDuckInitiative(createClient(), { now, today, quiet });
-      if (cancelled || !picked) return;
+      const picked = pickFromSnapshot(snapshot, { now, today, quiet });
+      if (!picked) return;
       setInitiative(picked.message);
+      // 일정은 시간이 지나면 되돌릴 수 없다 — 탭이 뒤에 있어도 보이도록 알림도 함께 띄운다.
+      // 권한·방해금지·하루 상한은 notifyDuck이 알아서 판단한다.
+      if (picked.kind === "upcomingEvent") notifyDuck("곧 일정이 있어요", picked.message);
       // 실제로 띄운 뒤에 기록한다 — 계산만 하고 세면 하지도 않은 말이 상한을 깎는다.
       markSpoken(today, picked.kind);
-    })();
-    return () => {
-      cancelled = true;
     };
-  }, [quietHours]);
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, [snapshot, quietHours]);
 
 
   return (
