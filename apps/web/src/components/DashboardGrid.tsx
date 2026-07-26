@@ -108,6 +108,20 @@ export function DashboardGrid({ widgets }: DashboardGridProps) {
     setCollapsed(toggleCollapse(id));
   };
 
+  // 2026-07-26 (피드백 1-5): 카드를 전부 숨기면 빈 화면만 남아 되돌릴 방법이 안 보인다.
+  // 어디서 다시 켜는지 알려 준다.
+  if (widgets.length === 0) {
+    return (
+      <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+        표시할 카드가 없어요.{" "}
+        <a href="/admin" className="text-primary-accent hover:underline">
+          관리자 → 대시보드 구성
+        </a>
+        에서 다시 켤 수 있어요.
+      </p>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       {widgets.map((slot) => (

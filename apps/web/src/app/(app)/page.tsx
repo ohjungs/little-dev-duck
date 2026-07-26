@@ -11,6 +11,9 @@ import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { DashboardGrid } from "@/components/DashboardGrid";
 import { LastPageLink } from "@/components/LastPageLink";
 import { getGreeting, getTimeEmoji } from "@/lib/greeting";
+import { getMyAccess } from "@ldd/api";
+import { EMPTY_LAYOUT, canUseFeature, visibleWidgets } from "@ldd/core";
+import { DASHBOARD_WIDGETS } from "@/lib/dashboardWidgets";
 
 export const dynamic = "force-dynamic";
 
@@ -46,11 +49,35 @@ function getDailyMotivation(): string {
   return MOTIVATIONS[dayOfYear % MOTIVATIONS.length];
 }
 
+// 배치가 고른 id 순서대로, 준비된 위젯 정의를 꺼내 DashboardGrid가 받는 모양으로 만든다.
+// 정의가 없는 id(예전 배치에 남은 위젯)는 조용히 건너뛴다 — core resolveOrder가 이미 걸러내지만
+// 여기서도 막아 두면 정의와 목록이 어긋났을 때 화면이 죽지 않는다.
+type WidgetDef = { label: string; className?: string; children: React.ReactNode };
+function pickWidgets(ids: string[], defs: Record<string, WidgetDef>) {
+  return ids
+    .filter((id) => defs[id])
+    .map((id) => ({ id, ...defs[id] }));
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // 배치·권한을 서버에서 한 번 읽는다. 실패해도 대시보드는 기본 배치로 뜬다 —
+  // 설정을 못 읽었다고 화면 전체가 비면 안 된다.
+  const access = await getMyAccess(supabase).catch(() => null);
+  const allowedIds = DASHBOARD_WIDGETS.filter(
+    (w) =>
+      w.feature === null ||
+      !access ||
+      canUseFeature(
+        { role: access.role, disabledFeatures: access.disabledFeatures },
+        w.feature,
+      ),
+  ).map((w) => w.id);
+  const shownIds = visibleWidgets(allowedIds, access?.dashboardLayout ?? EMPTY_LAYOUT);
 
   const displayName =
     (user?.user_metadata.full_name as string | undefined) ??
@@ -88,52 +115,28 @@ export default async function DashboardPage() {
 
       <LastPageLink />
 
+      {/* 2026-07-26 (피드백 1-2·1-5·6-2): 어떤 카드를 어떤 순서로 그릴지는 사용자 배치와
+          관리자 기능 토글이 함께 정한다. 판정은 core 순수 함수에 있고 여기서는 고르기만 한다.
+          비어 있으면(전부 숨김) DashboardGrid가 안내를 띄운다. */}
       <DashboardGrid
-        widgets={[
-          {
-            id: "duck",
+        widgets={pickWidgets(shownIds, {
+          duck: {
             label: "오리",
             className: "md:col-span-1 xl:col-start-3 xl:row-start-1",
             children: <DuckWidget />,
           },
-          {
-            id: "chat",
+          chat: {
             label: "오리 채팅",
             className: "md:col-span-2 xl:col-start-1 xl:col-span-2 xl:row-start-1",
             children: <DuckChatPanel />,
           },
-          {
-            id: "todo",
-            label: "할 일",
-            children: <TodoWidget />,
-          },
-          {
-            id: "habit",
-            label: "습관",
-            children: <HabitWidget />,
-          },
-          {
-            id: "pomodoro",
-            label: "뽀모도로",
-            children: <PomodoroWidget />,
-          },
-          {
-            id: "memo",
-            label: "메모",
-            className: "md:col-span-2",
-            children: <MemoWidget />,
-          },
-          {
-            id: "calendar",
-            label: "캘린더",
-            children: <CalendarWidget />,
-          },
-          {
-            id: "news-top",
-            label: "오늘의 뉴스",
-            children: <NewsTopWidget />,
-          },
-        ]}
+          todo: { label: "할 일", children: <TodoWidget /> },
+          habit: { label: "습관", children: <HabitWidget /> },
+          pomodoro: { label: "뽀모도로", children: <PomodoroWidget /> },
+          memo: { label: "메모", className: "md:col-span-2", children: <MemoWidget /> },
+          calendar: { label: "캘린더", children: <CalendarWidget /> },
+          "news-top": { label: "오늘의 뉴스", children: <NewsTopWidget /> },
+        })}
       />
     </div>
   );

@@ -103,9 +103,13 @@ function Brand() {
 export function AppSidebar({
   displayName,
   email,
+  hiddenHrefs = [],
 }: {
   displayName: string;
   email: string;
+  // 2026-07-26 (피드백 6-2): 관리자가 끈 기능·역할에 없는 메뉴는 아예 그리지 않는다.
+  // 무엇을 숨길지는 서버(레이아웃)가 정한다 — 클라이언트에서 권한을 다시 판정하면 갈라진다.
+  hiddenHrefs?: string[];
 }) {
   const pathname = usePathname();
   const hasPendingTodos = usePendingTodos();
@@ -135,7 +139,7 @@ export function AppSidebar({
       )}
 
       <nav className="mt-2 flex flex-col gap-0.5">
-        {NAV.map((item) => {
+        {NAV.filter((item) => !hiddenHrefs.includes(item.href)).map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
           const showDot = item.href === "/" && hasPendingTodos;
@@ -223,7 +227,7 @@ const MOBILE_NAV = [
   { href: "/settings", label: "설정", icon: Settings },
 ];
 
-export function AppMobileBar() {
+export function AppMobileBar({ hiddenHrefs = [] }: { hiddenHrefs?: string[] }) {
   const pathname = usePathname();
   const hasPendingTodos = usePendingTodos();
   return (
@@ -231,7 +235,7 @@ export function AppMobileBar() {
       aria-label="하단 탐색"
       className="no-print fixed bottom-0 left-0 right-0 z-30 flex min-h-14 justify-around border-t border-border bg-background/95 backdrop-blur-md pb-safe md:hidden"
     >
-      {MOBILE_NAV.map((item) => {
+      {MOBILE_NAV.filter((item) => !hiddenHrefs.includes(item.href)).map((item) => {
         const active = isActive(pathname, item.href);
         const Icon = item.icon;
         const showDot = item.href === "/" && hasPendingTodos;

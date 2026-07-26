@@ -155,3 +155,12 @@ export {
 export { listBacklinks, updatePageLinks } from "./pageLinks";
 
 export { listTodosForDuck, listEventsForDuck } from "./duckQueries";
+export {
+  getMyAccess,
+  listAccessProfiles,
+  setUserRole,
+  setUserDisabledFeatures,
+  updateMyProfile,
+  saveMyDashboardLayout,
+  type AccessProfile,
+} from "./access";

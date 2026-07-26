@@ -384,3 +384,28 @@ export {
   type EmployeeStats,
 } from "./domain/office-company";
 export { pageEmbedText } from "./domain/page-embed";
+export {
+  ROLES,
+  DEFAULT_ROLE,
+  FEATURES,
+  roleSchema,
+  parseRole,
+  isFeatureKey,
+  parseDisabledFeatures,
+  canUseFeature,
+  canAdminister,
+  roleLabel,
+  type Role,
+  type FeatureKey,
+  type Access,
+} from "./domain/access";
+export {
+  EMPTY_LAYOUT,
+  parseDashboardLayout,
+  resolveOrder,
+  isHidden,
+  toggleHidden,
+  moveWidget,
+  visibleWidgets,
+  type DashboardLayout,
+} from "./domain/dashboard-layout";
