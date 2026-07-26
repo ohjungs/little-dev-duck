@@ -6,6 +6,7 @@ import {
   getPublicPage,
   listChildPages,
   listPages,
+  listPagesForExport,
   listTrashedPages,
   publishPage,
   purgePage,
@@ -448,6 +449,84 @@ describe("soft delete lifecycle", () => {
     await expect(
       purgePage(fakeSupabase(), VALID_ROW.id),
     ).resolves.toBeUndefined();
+  });
+});
+
+// 2026-07-26: "내 데이터 내보내기"가 페이지 **본문을 통째로 빠뜨리고** 있었다.
+// listPages가 content를 일부러 빼는데(사이드바용) 백업이 그걸 그대로 썼기 때문이다.
+// 본문 없는 백업은 제목 목록일 뿐이라, 여기서 "본문을 실제로 요청하는가"를 잠근다.
+describe("listPagesForExport", () => {
+  function captureSelect() {
+    const seen: string[] = [];
+    return {
+      seen,
+      supabase: fakeSupabase({
+        from: () => ({
+          select: (cols: string) => {
+            seen.push(cols);
+            return {
+              eq: () => ({
+                order: () => ({
+                  limit: async () => ({ data: [VALID_ROW], error: null }),
+                }),
+              }),
+            };
+          },
+        }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any,
+    };
+  }
+
+  it("본문(content)을 포함해 조회한다", async () => {
+    const { seen, supabase } = captureSelect();
+    await listPagesForExport(supabase);
+    // 목록용처럼 컬럼을 나열하면 content가 빠진다 — 전체를 받아야 한다.
+    expect(seen[0]).toBe("*");
+  });
+
+  it("본문을 Page.content로 실어 돌려준다", async () => {
+    const result = await listPagesForExport(fakeSupabase());
+    expect(result).toHaveLength(1);
+    expect(result[0].content).toEqual([]);
+  });
+
+  it("휴지통 페이지는 백업에 넣지 않는다", async () => {
+    // 사용자가 지운 문서가 백업으로 되살아나면 삭제가 삭제가 아니게 된다.
+    const calls: unknown[][] = [];
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          eq: (col: string, val: unknown) => {
+            calls.push([col, val]);
+            return {
+              order: () => ({
+                limit: async () => ({ data: [VALID_ROW], error: null }),
+              }),
+            };
+          },
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+    await listPagesForExport(supabase);
+    expect(calls).toEqual([["is_trashed", false]]);
+  });
+
+  it("DB 에러면 예외를 던진다", async () => {
+    const supabase = fakeSupabase({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            order: () => ({
+              limit: async () => ({ data: null, error: { message: "boom" } }),
+            }),
+          }),
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+    await expect(listPagesForExport(supabase)).rejects.toThrow("boom");
   });
 });
 

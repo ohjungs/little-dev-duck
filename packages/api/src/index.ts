@@ -41,6 +41,7 @@ export {
   createHabit,
   deleteHabit,
   listHabitChecks,
+  HABIT_CHECK_EXPORT_LIMIT,
   listHabitChecksInRange,
   checkHabit,
   uncheckHabit,
@@ -107,6 +108,8 @@ export { allowRequest } from "./rateLimit";
 
 export {
   listPages,
+  listPagesForExport,
+  PAGE_EXPORT_LIMIT,
   listChildPages,
   searchPages,
   listTrashedPages,

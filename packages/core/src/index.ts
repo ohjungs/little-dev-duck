@@ -421,3 +421,10 @@ export {
   type LogCount,
   type VisitStats,
 } from "./domain/log-stats";
+export {
+  BACKUP_FORMAT_VERSION,
+  buildBackup,
+  type Backup,
+  type BackupCollections,
+  type BackupCollectionKey,
+} from "./domain/backup";

@@ -75,6 +75,25 @@ export async function listPages(supabase: SupabaseClient): Promise<Page[]> {
   return (data as PageRow[]).map(fromRow);
 }
 
+// 2026-07-26 : 페이지 - 내보내기 - 본문포함조회
+// listPages가 content를 빼는 건 의도다(사이드바가 문서 전체를 매번 받을 이유가 없다).
+// 백업은 정확히 반대 요구라 전용 조회를 둔다 — 본문 없는 백업은 제목 목록일 뿐이다.
+// 목록용 select를 넓히는 대신 여기서만 full fetch 한다(목록 화면 전송량 보존).
+export async function listPagesForExport(supabase: SupabaseClient): Promise<Page[]> {
+  const { data, error } = await supabase
+    .from("pages")
+    .select("*")
+    .eq("is_trashed", false)
+    .order("created_at", { ascending: true })
+    .limit(PAGE_EXPORT_LIMIT);
+  if (error) throw new Error(error.message);
+  return (data as PageRow[]).map(fromRow);
+}
+
+// 내보내기 조회 상한. 돌아온 개수가 이 값과 같으면 뒤가 잘렸을 수 있어 core buildBackup이
+// 사용자에게 알린다(조용히 자른 백업은 백업이 아니다).
+export const PAGE_EXPORT_LIMIT = 500;
+
 // 제목/본문 부분일치 검색(휴지통 제외). Cmd+K 팔레트용. plain_text는 저장 시 서버가 파생했고
 // 마이그레이션의 pg_trgm GIN이 ilike를 가속한다. PostgREST or() 필터는 콤마/괄호/따옴표/역슬래시가
 // 구문 예약문자라 사용자 입력을 그대로 넣으면 필터 인젝션이 되므로, ilike 와일드카드(%,_)까지 포함해

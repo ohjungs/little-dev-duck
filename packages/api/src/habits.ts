@@ -96,17 +96,26 @@ export async function deleteHabit(
   if (error) throw new Error(error.message);
 }
 
+// limit은 선택 — 주지 않으면 종전대로 상한 없이 조회한다(기존 호출부 동작 불변).
+// 내보내기만 상한을 명시한다: 상한을 걸어야 "돌아온 개수 == 상한"으로 잘림을 감지할 수 있고,
+// 상한이 없으면 PostgREST 서버 기본값에서 **조용히** 잘려도 알 방법이 없다.
 export async function listHabitChecks(
   supabase: SupabaseClient,
+  limit?: number,
 ): Promise<HabitCheck[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("habit_checks")
     .select("*")
     .order("checked_date", { ascending: false });
+  if (limit !== undefined) query = query.limit(limit);
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
   return (data as HabitCheckRow[]).map(fromCheckRow);
 }
+
+// 습관 체크는 하루 × 습관 수로 빠르게 쌓여 500건은 1년도 못 간다. 행이 작아 상한을 높게 잡는다.
+export const HABIT_CHECK_EXPORT_LIMIT = 5000;
 
 export async function checkHabit(
   supabase: SupabaseClient,
