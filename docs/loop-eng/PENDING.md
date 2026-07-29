@@ -343,3 +343,19 @@ CI에 게이트를 걸었습니다 — `pnpm audit --prod --audit-level high --i
 
 → 인증 방식을 늘리는 것은 **확정 스택 변경**이라 비용과 되돌리는 방법을
 [DECISIONS.md 12번](../DECISIONS.md)에 적어 뒀습니다.
+
+## 12. 결정 필요 — 브리핑 카드에 기사 이미지 넣기 (DB 컬럼 1개)
+
+**무엇**: cherrypick처럼 이슈 카드에 대표 이미지를 넣으려면 RSS의 enclosure·media:content
+태그에서 이미지 URL을 뽑아 저장할 자리가 필요합니다. 지금 `articles` 테이블에는 이미지
+컬럼이 없습니다.
+
+**왜 멈췄나**: 컬럼 추가는 DDL(마이그레이션)이라 실행 전 확인을 받기로 한 규칙
+(CLAUDE.md 5절) 대상입니다. down 스크립트와 함께 준비해 두고 승인만 기다립니다.
+
+**승인 시 할 일**: `alter table articles add column image_url text` 마이그레이션(+down) →
+`parseRssItems`에 이미지 추출 확장 → 카드에 이미지 표시(없으면 지금처럼 텍스트 카드).
+외부 사이트 og-image 크롤링은 하지 않습니다(비용·저작권 — 계획 Phase 61 방향 그대로).
+
+**안 해도 되는 선택**: 텍스트 카드만으로도 브리핑은 완결입니다. 보류하셔도 기능 손실은
+이미지뿐입니다.

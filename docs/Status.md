@@ -1,5 +1,17 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 61](plans/phase_61.md) T4: 한 장씩 보기·글자 크기
+> cherrypick 보기 옵션 두 가지. **T4의 코드-완결 조각은 이것으로 끝** — 남은 RSS 이미지는
+> articles 컬럼 추가(DDL)가 필요해 [PENDING 12번](loop-eng/PENDING.md)으로 사용자 결정 대기.
+>
+> - 한 장씩 보기: 카드 1장 + 이전/다음 + n/m. 목록과 **같은 카드 마크업 한 벌**(issueCard).
+>   한 장 모드에선 요약을 줄이지 않는다(넘겨 읽는 모드). 위치는 파생 clamp — 필터로 목록이
+>   줄어도 범위를 안 벗어난다(effect 리셋 없음).
+> - 글자 크기 "가+"(기본/크게) — 보기 방식과 함께 기기별 localStorage(briefingPref 한 곳,
+>   dataSaverPref와 같은 결).
+> - 검증: turbo lint·test·build **18/18 GREEN**. 실기: [mv 101번](loop-eng/manual-verification.md).
+> - **Phase 61 코드-완결분 전체 완료** (T1 선정 → T2 카드·진행·XP → T3 날짜·카테고리 → T4 보기).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 61](plans/phase_61.md) T3: 브리핑 날짜·카테고리
 > 오늘/어제/지난주 탭 + 달력 + 카테고리 칩. cherrypick 탐색 구조가 갖춰졌다.
 >

@@ -16,10 +16,19 @@ import {
   topicForUrl,
   type Article,
   type BriefingMode,
+  type DailyIssue,
   type Feed,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { markArticleRead } from "@/lib/readArticles";
+import {
+  getBriefingFont,
+  getBriefingView,
+  setBriefingFont,
+  setBriefingView,
+  type BriefingFont,
+  type BriefingView,
+} from "@/lib/briefingPref";
 import { consumeBriefingXpBudget } from "@/lib/briefingXp";
 import { emitXpChanged } from "@/lib/xpSignal";
 import { recordClientError } from "@/lib/clientErrorLog";
@@ -46,6 +55,10 @@ export function DailyBriefing({ articles, feeds, readSet }: Props) {
   const [pickedDate, setPickedDate] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const todayKst = kstDateString(new Date());
+  // 2026-07-29 : 보기 옵션 (Phase 61 T4). 취향은 기기별 localStorage(briefingPref 한 곳).
+  const [view, setView] = useState<BriefingView>(() => getBriefingView());
+  const [font, setFont] = useState<BriefingFont>(() => getBriefingFont());
+  const [idx, setIdx] = useState(0);
 
   const briefing = useMemo(() => {
     const range = briefingRange(mode, todayKst, pickedDate || undefined);
@@ -58,6 +71,9 @@ export function DailyBriefing({ articles, feeds, readSet }: Props) {
   // 카테고리 필터는 보기다 — 선정(10개)을 다시 돌리지 않고 보이는 것만 거른다.
   const categories = useMemo(() => [...new Set(items.map((i) => i.category))], [items]);
   const visibleItems = category === null ? items : items.filter((i) => i.category === category);
+  // 한 장씩 보기의 현재 위치. 필터·날짜가 바뀌어 목록이 줄어도 범위를 벗어나지 않게 잘라 쓴다
+  // (effect로 리셋하지 않는다 — 파생값이면 파생으로 계산한다).
+  const safeIdx = Math.min(idx, Math.max(0, visibleItems.length - 1));
 
   const total = items.length;
   const done = items.filter((i) => readSet.has(i.article.id)).length;
@@ -133,6 +149,35 @@ export function DailyBriefing({ articles, feeds, readSet }: Props) {
           }}
           className="rounded border border-border bg-background px-1.5 py-0.5"
         />
+        {/* 보기 옵션(T4): 목록/한 장씩 전환 + 글자 크기. */}
+        <button
+          type="button"
+          onClick={() => {
+            const next: BriefingView = view === "list" ? "single" : "list";
+            setView(next);
+            setBriefingView(next);
+            setIdx(0);
+          }}
+          className="rounded-full border border-border px-2.5 py-1 transition-colors hover:bg-accent"
+        >
+          {view === "list" ? "한 장씩 보기" : "목록으로 보기"}
+        </button>
+        <button
+          type="button"
+          aria-pressed={font === "large"}
+          aria-label="브리핑 글자 크게"
+          onClick={() => {
+            const next: BriefingFont = font === "large" ? "base" : "large";
+            setFont(next);
+            setBriefingFont(next);
+          }}
+          className={
+            "rounded-full border border-border px-2.5 py-1 transition-colors hover:bg-accent" +
+            (font === "large" ? " bg-primary/15 font-medium" : "")
+          }
+        >
+          가+
+        </button>
         {categories.length > 1 && (
           <span className="ml-auto flex flex-wrap items-center gap-1">
             <button
@@ -178,42 +223,82 @@ export function DailyBriefing({ articles, feeds, readSet }: Props) {
             ? "오늘 발행·수집된 기사가 아직 없어요. 수집을 눌러 새 기사를 모아 보세요."
             : "이 기간에 발행·수집된 기사가 없어요."}
         </p>
+      ) : view === "single" && visibleItems.length > 0 ? (
+        // 한 장씩 보기(T4) — 카드 한 장 + 이전/다음. 요약은 줄이지 않는다(넘겨 읽는 모드다).
+        <div>
+          {issueCard(visibleItems[safeIdx]!, false)}
+          <div className="mt-2 flex items-center justify-between text-xs">
+            <button
+              type="button"
+              onClick={() => setIdx(Math.max(0, safeIdx - 1))}
+              disabled={safeIdx === 0}
+              className="rounded-md border border-border px-3 py-1.5 hover:bg-accent disabled:opacity-40"
+            >
+              이전
+            </button>
+            <span className="text-muted-foreground">{`${safeIdx + 1} / ${visibleItems.length}`}</span>
+            <button
+              type="button"
+              onClick={() => setIdx(Math.min(visibleItems.length - 1, safeIdx + 1))}
+              disabled={safeIdx >= visibleItems.length - 1}
+              className="rounded-md border border-border px-3 py-1.5 hover:bg-accent disabled:opacity-40"
+            >
+              다음
+            </button>
+          </div>
+        </div>
       ) : (
         <ol className="grid gap-2 sm:grid-cols-2">
-          {visibleItems.map(({ rank, category: cat, article: a, feedCount }) => {
-            const read = readSet.has(a.id);
-            return (
-              <li key={a.id}>
-                <a
-                  href={a.link}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => markArticleRead(a.id)}
-                  className={
-                    "block h-full rounded-2xl border border-border bg-card p-3 transition-colors hover:border-primary/40" +
-                    (read ? " opacity-60" : "")
-                  }
-                >
-                  <div className="mb-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className="font-mono font-semibold text-primary-accent">
-                      {String(rank).padStart(2, "0")}
-                    </span>
-                    <span className="rounded border border-border px-1">{cat}</span>
-                    {feedCount > 1 && <span>{feedCount}개 매체</span>}
-                    {read && <span>읽음</span>}
-                  </div>
-                  <p className="text-sm font-medium leading-snug break-keep">{a.title}</p>
-                  {(a.summary ?? a.snippet) && (
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground break-keep">
-                      {a.summary ?? a.snippet}
-                    </p>
-                  )}
-                </a>
-              </li>
-            );
-          })}
+          {visibleItems.map((item) => (
+            <li key={item.article.id}>{issueCard(item, true)}</li>
+          ))}
         </ol>
       )}
     </section>
   );
+
+  // 카드 한 장 — 목록·한 장씩이 같은 마크업을 쓴다(갈라지면 한쪽만 고쳐진다).
+  function issueCard(item: DailyIssue<Article>, clampSummary: boolean) {
+    const { rank, category: cat, article: a, feedCount } = item;
+    const read = readSet.has(a.id);
+    return (
+      <a
+        href={a.link}
+        target="_blank"
+        rel="noreferrer"
+        onClick={() => markArticleRead(a.id)}
+        className={
+          "block h-full rounded-2xl border border-border bg-card p-3 transition-colors hover:border-primary/40" +
+          (read ? " opacity-60" : "")
+        }
+      >
+        <div className="mb-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="font-mono font-semibold text-primary-accent">
+            {String(rank).padStart(2, "0")}
+          </span>
+          <span className="rounded border border-border px-1">{cat}</span>
+          {feedCount > 1 && <span>{feedCount}개 매체</span>}
+          {read && <span>읽음</span>}
+        </div>
+        <p
+          className={
+            (font === "large" ? "text-base" : "text-sm") + " font-medium leading-snug break-keep"
+          }
+        >
+          {a.title}
+        </p>
+        {(a.summary ?? a.snippet) && (
+          <p
+            className={
+              (font === "large" ? "text-sm" : "text-xs") +
+              (clampSummary ? " line-clamp-2" : "") +
+              " mt-1 text-muted-foreground break-keep"
+            }
+          >
+            {a.summary ?? a.snippet}
+          </p>
+        )}
+      </a>
+    );
+  }
 }
