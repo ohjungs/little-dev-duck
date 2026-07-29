@@ -14,6 +14,8 @@ import {
   MUTE_DURATIONS,
   roomMemberSchema,
   sortRooms,
+  todoTitleFrom,
+  conversionReceiptText,
   unreadCount,
 } from "./room";
 
@@ -319,5 +321,51 @@ describe("attachmentDeleted (뷰어를 닫을 신호)", () => {
 
   it("빈 목록이면 거짓", () => {
     expect(attachmentDeleted([], "p1")).toBe(false);
+  });
+});
+
+// 2026-07-29 : 메신저 - 메시지를 워크스페이스로 (Phase 52 T1)
+describe("todoTitleFrom (메시지 → 할 일 제목)", () => {
+  it("짧은 본문은 그대로", () => {
+    expect(todoTitleFrom("우유 사기")).toBe("우유 사기");
+  });
+
+  it("줄바꿈·연속 공백은 한 칸으로 (여러 줄 메시지가 제목에 그대로 들어가면 목록이 깨진다)", () => {
+    expect(todoTitleFrom("우유\n사기   그리고\n\n빵")).toBe("우유 사기 그리고 빵");
+  });
+
+  it("200자를 넘으면 코드 포인트 단위로 줄인다 (todo 계약 max 200)", () => {
+    const long = "가".repeat(300);
+    const title = todoTitleFrom(long);
+    expect([...title].length).toBe(200);
+    expect(title.endsWith("…")).toBe(true);
+  });
+
+  it("이모지가 경계에서 깨지지 않는다", () => {
+    const emoji = "🦆".repeat(300);
+    const title = todoTitleFrom(emoji);
+    expect([...title].length).toBe(200);
+    // 잘린 자리 앞까지 전부 온전한 오리여야 한다.
+    expect([...title].slice(0, 199).every((c) => c === "🦆")).toBe(true);
+  });
+
+  it("앞뒤 공백을 정리한다", () => {
+    expect(todoTitleFrom("  우유  ")).toBe("우유");
+  });
+});
+
+describe("conversionReceiptText (변환 영수증 문구)", () => {
+  it("할 일 변환을 말한다", () => {
+    expect(conversionReceiptText("todo", "우유 사기")).toBe('"우유 사기" 메시지를 할 일로 만들었어요');
+  });
+
+  it("메모 저장을 말한다", () => {
+    expect(conversionReceiptText("memo", "회의 내용")).toBe('"회의 내용" 메시지를 메모로 저장했어요');
+  });
+
+  it("긴 본문은 미리보기 길이로 줄인다 (영수증이 원문만큼 길면 대화가 밀린다)", () => {
+    const text = conversionReceiptText("todo", "가".repeat(100));
+    expect(text).toContain("…");
+    expect([...text].length).toBeLessThan(70);
   });
 });

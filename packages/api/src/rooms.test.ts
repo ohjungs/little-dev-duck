@@ -47,6 +47,7 @@ function fakeSupabase(opts: {
   messages?: unknown[];
   members?: unknown[];
   insertError?: { code?: string; message: string } | null;
+  onInsert?: (table: string, row: Record<string, unknown>) => void;
   onUpdate?: (table: string, patch: Record<string, unknown>) => void;
   user?: { id: string } | null;
 } = {}) {
@@ -67,14 +68,17 @@ function fakeSupabase(opts: {
     };
     return {
       select: () => selectChain,
-      insert: () => ({
-        select: () => ({
-          single: async () =>
-            opts.insertError
-              ? { data: null, error: opts.insertError }
-              : { data: messages[0] ?? messageRow(), error: null },
-        }),
-      }),
+      insert: (row: Record<string, unknown>) => {
+        opts.onInsert?.(table, row);
+        return {
+          select: () => ({
+            single: async () =>
+              opts.insertError
+                ? { data: null, error: opts.insertError }
+                : { data: messages[0] ?? messageRow(), error: null },
+          }),
+        };
+      },
       update: (patch: Record<string, unknown>) => {
         opts.onUpdate?.(table, patch);
         return { eq: () => ({ eq: async () => ({ error: null }), error: null, then: undefined }) };
@@ -232,5 +236,22 @@ describe("listRoomAttachments", () => {
 
   it("빈 방이면 빈 배열", async () => {
     expect(await listRoomAttachments(fakeSupabase({ messages: [] }), ROOM_ROW.id)).toEqual([]);
+  });
+});
+
+// 2026-07-29 : 메신저 - 변환 영수증 (Phase 52 T1)
+describe("sendMessage 종류", () => {
+  it("system 종류가 그대로 저장된다 (변환 영수증)", async () => {
+    const inserted: Record<string, unknown>[] = [];
+    const s = fakeSupabase({ onInsert: (_t, row) => inserted.push(row) });
+    await sendMessage(s, { roomId: ROOM_ROW.id, body: "영수증", clientMsgId: "c9", type: "system" });
+    expect(inserted[0]?.type).toBe("system");
+  });
+
+  it("종류를 안 주면 text다 (기존 호출부 하위호환)", async () => {
+    const inserted: Record<string, unknown>[] = [];
+    const s = fakeSupabase({ onInsert: (_t, row) => inserted.push(row) });
+    await sendMessage(s, { roomId: ROOM_ROW.id, body: "안녕", clientMsgId: "c10" });
+    expect(inserted[0]?.type).toBe("text");
   });
 });

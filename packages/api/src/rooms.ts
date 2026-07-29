@@ -125,6 +125,11 @@ export type SendMessageInput = {
   attachmentPath?: string | null;
   /** 답장 대상 메시지 id. 같은 방의 것이어야 한다(다른 방 id는 RLS에 막혀 미리보기가 빈다). */
   replyToId?: string | null;
+  /**
+   * 메시지 종류. 기본 "text". "system"은 변환 영수증처럼 **화면이 회색 안내줄로 그리는**
+   * 기록용이다 — 말풍선이 아니라서 보낸 사람 표시도 메뉴도 없다.
+   */
+  type?: "text" | "system";
 };
 
 // Postgres 유니크 위반. PostgREST가 그대로 흘려 준다.
@@ -154,7 +159,7 @@ export async function sendMessage(
       room_id: input.roomId,
       sender_user_id: user.id,
       sender_type: "user",
-      type: "text",
+      type: input.type ?? "text",
       body,
       client_msg_id: input.clientMsgId,
       attachment_path: input.attachmentPath ?? null,

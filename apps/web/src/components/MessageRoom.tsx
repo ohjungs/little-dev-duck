@@ -12,6 +12,8 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  createMemo,
+  createTodo,
   deleteMessage,
   downloadMessageImage,
   listMessages,
@@ -41,8 +43,10 @@ import {
   isRoomMuted,
   MUTE_DURATIONS,
   attachmentDeleted,
+  conversionReceiptText,
   dayDivider,
   firstUnreadId,
+  todoTitleFrom,
   galleryNav,
   galleryPaths,
   isNearBottom,
@@ -146,6 +150,32 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     } catch {
       // 클립보드는 권한·보안 컨텍스트에 따라 막힌다. 조용히 실패했다고 하지 않는다.
       setError("복사하지 못했어요. 직접 선택해 복사해 주세요.");
+    }
+  }
+
+  // 2026-07-29 : 메신저 - 메시지를 워크스페이스로 (Phase 52 T1)
+  // **생성 로직을 재구현하지 않는다** — 할 일·메모를 만드는 그 함수(createTodo·createMemo)를
+  // 그대로 부른다(계획: 재구현은 인벤토리 위반). 생성은 되돌릴 수 있어 승인 카드 없이 바로 한다.
+  // 변환 뒤 방에 system 영수증을 남긴다 — 표시가 없으면 같은 메시지를 두 번 변환한다.
+  async function handleConvert(m: Message, kind: "todo" | "memo") {
+    setMenuFor(null);
+    try {
+      const client = createClient();
+      if (kind === "todo") {
+        await createTodo(client, { title: todoTitleFrom(messageBody(m)) });
+      } else {
+        await createMemo(client, { content: messageBody(m) });
+      }
+      const saved = await sendMessage(client, {
+        roomId,
+        body: conversionReceiptText(kind, messageBody(m)),
+        clientMsgId: crypto.randomUUID(),
+        type: "system",
+      });
+      setMessages((prev) => (prev.some((x) => x.id === saved.id) ? prev : [...prev, saved]));
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
     }
   }
 
@@ -595,6 +625,12 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                   <span aria-hidden className="h-px flex-1 bg-primary/50" />
                 </li>
               )}
+              {m.type === "system" ? (
+                // 변환 영수증 같은 기록. 말풍선이 아니라 회색 안내줄 — 메뉴도 반응도 없다.
+                <li className="py-0.5 text-center text-[11px] text-muted-foreground break-keep">
+                  {messageBody(m)}
+                </li>
+              ) : (
               <li className={`relative ${mine ? "text-right" : "text-left"}`}>
                 <span
                   onContextMenu={(e) => {
@@ -717,6 +753,23 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                     >
                       답장
                     </button>
+                    {/* 워크스페이스로 변환(Phase 52 T1). 생성은 되돌릴 수 있어 바로 실행한다. */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void handleConvert(m, "todo")}
+                      className="px-3 py-1.5 text-xs hover:bg-accent"
+                    >
+                      할 일로 만들기
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void handleConvert(m, "memo")}
+                      className="px-3 py-1.5 text-xs hover:bg-accent"
+                    >
+                      메모로 저장
+                    </button>
                     <button
                       type="button"
                       role="menuitem"
@@ -739,6 +792,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                   </div>
                 )}
               </li>
+              )}
               </Fragment>
             );
           })

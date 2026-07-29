@@ -214,6 +214,37 @@ export function galleryNav(
   };
 }
 
+// 2026-07-29 : 메신저 - 메시지를 워크스페이스로 (Phase 52 T1)
+// 변환은 기존 생성 함수(createTodo·createMemo)를 부른다 — 생성 로직 재구현 금지(계획).
+// 여기는 그 앞의 **결정적 가공**만 둔다: 제목 다듬기와 영수증 문구.
+
+/** todo 계약(title max 200)에 맞춘다. 코드 포인트 단위라 이모지가 경계에서 깨지지 않는다. */
+export const TODO_TITLE_MAX = 200;
+
+export function todoTitleFrom(body: string): string {
+  // 여러 줄 메시지가 제목에 그대로 들어가면 목록이 깨진다 — 공백류는 한 칸으로.
+  const flat = body.replace(/\s+/g, " ").trim();
+  const chars = [...flat];
+  return chars.length > TODO_TITLE_MAX
+    ? `${chars.slice(0, TODO_TITLE_MAX - 1).join("")}…`
+    : flat;
+}
+
+/**
+ * 변환 영수증(system 메시지) 문구. **원본 메시지에 표시를 남기지 않으면 같은 메시지를
+ * 두 번 변환한다**(계획 T1). 컬럼 추가 없이 방 안의 system 메시지로 흔적을 남긴다.
+ */
+export function conversionReceiptText(kind: "todo" | "memo", body: string): string {
+  const chars = [...body.replace(/\s+/g, " ").trim()];
+  const preview =
+    chars.length > REPLY_PREVIEW_MAX
+      ? `${chars.slice(0, REPLY_PREVIEW_MAX - 1).join("")}…`
+      : chars.join("");
+  return kind === "todo"
+    ? `"${preview}" 메시지를 할 일로 만들었어요`
+    : `"${preview}" 메시지를 메모로 저장했어요`;
+}
+
 /**
  * 답장 미리보기 문구. **원본을 목록에서 찾지 못하면 "찾을 수 없다"고 말한다** —
  * 빈칸으로 두면 답장인지 아닌지도 알 수 없다(오래돼 창 밖으로 나간 원본이 흔하다).
