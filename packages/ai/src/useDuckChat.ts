@@ -122,6 +122,9 @@ export function useDuckChat(options: UseDuckChatOptions = {}): UseDuckChatResult
 
       setError(null);
       setPending(true);
+      // 2026-07-29 (Phase 64 T2): 직전 대화 동봉 — "아까 그거" 같은 후속 발화가 성립한다.
+      // 상한 절단은 서버(clampHistory) 한 곳이 담당한다.
+      const history = messages.map((m) => ({ role: m.role, content: m.content }));
       setMessages((prev) => [
         ...prev,
         { role: "user", content: question, createdAt: now() },
@@ -131,7 +134,7 @@ export function useDuckChat(options: UseDuckChatOptions = {}): UseDuckChatResult
         const res = await fetchImpl(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question }),
+          body: JSON.stringify({ question, history }),
         });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as DuckChatResponse;
@@ -154,7 +157,7 @@ export function useDuckChat(options: UseDuckChatOptions = {}): UseDuckChatResult
         setPending(false);
       }
     },
-    [endpoint, rulePhrase, fetchImpl, now, pending, addDuckMessage],
+    [endpoint, rulePhrase, fetchImpl, now, pending, addDuckMessage, messages],
   );
 
   const approve = useCallback(async () => {

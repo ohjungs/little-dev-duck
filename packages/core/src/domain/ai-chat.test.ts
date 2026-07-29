@@ -4,8 +4,7 @@ import {
   buildRagPrompt,
   chatMessageSchema,
   routeUtterance,
-  ruleReply,
-} from "./ai-chat";
+  ruleReply, clampHistory, historyPromptSection, HISTORY_MAX_TURNS, HISTORY_TURN_CHARS } from "./ai-chat";
 
 describe("ruleReply", () => {
   it("인사에 제대로 응답한다(안녕/하이/hello)", () => {
@@ -178,5 +177,44 @@ describe("routeUtterance — 집중 타이머 발화", () => {
     for (const t of ["25분 집중 시작해줘", "뽀모도로 시작", "집중 그만", "타이머 중지"]) {
       expect(routeUtterance(t), t).toBe("llm");
     }
+  });
+});
+
+// 2026-07-29 : 오리 - 멀티턴 대화 맥락 (Phase 64 T1)
+describe("clampHistory (직전 대화 상한)", () => {
+  const t = (role: "user" | "duck", content: string) => ({ role, content });
+
+  it("최근 턴만 남긴다 (오래된 것부터 버림)", () => {
+    const h = Array.from({ length: 10 }, (_, i) => t("user", `말${i}`));
+    const out = clampHistory(h);
+    expect(out).toHaveLength(HISTORY_MAX_TURNS);
+    expect(out[0]!.content).toBe("말4"); // 10개 중 마지막 6개
+  });
+
+  it("턴당 글자 상한으로 자른다 (자름 표시 …)", () => {
+    const out = clampHistory([t("duck", "가".repeat(600))]);
+    expect([...out[0]!.content].length).toBe(HISTORY_TURN_CHARS + 1); // 500 + …
+    expect(out[0]!.content.endsWith("…")).toBe(true);
+  });
+
+  it("빈·공백 발화는 버린다, 빈 배열은 빈 배열", () => {
+    expect(clampHistory([t("user", "  "), t("duck", "답")])).toHaveLength(1);
+    expect(clampHistory([])).toEqual([]);
+  });
+});
+
+describe("historyPromptSection", () => {
+  it("발화자 라벨과 함께 절을 만든다", () => {
+    const s = historyPromptSection([
+      { role: "user", content: "SK 마감 언제야?" },
+      { role: "duck", content: "8월 1일이에요." },
+    ]);
+    expect(s).toContain("[직전 대화]");
+    expect(s).toContain("사용자: SK 마감 언제야?");
+    expect(s).toContain("오리: 8월 1일이에요.");
+  });
+
+  it("비어 있으면 null — 빈 절을 프롬프트에 넣지 않는다", () => {
+    expect(historyPromptSection([])).toBeNull();
   });
 });

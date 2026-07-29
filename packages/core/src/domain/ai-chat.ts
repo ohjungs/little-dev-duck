@@ -103,3 +103,41 @@ export function buildRagContext(contextChunks: string[]): string {
 export function buildRagPrompt(question: string, contextChunks: string[]): string {
   return [buildRagContext(contextChunks), "", "[질문]", question].join("\n");
 }
+
+// 2026-07-29 : 오리 - 멀티턴 대화 맥락 (Phase 64 T1)
+// 직전 대화를 프롬프트에 실을 때의 상한. 무료 쿼터(입력 토큰)를 지키는 보증이 이 숫자다 —
+// 상한 없이 실으면 대화가 길어질수록 턴당 비용이 무한정 자란다.
+export const HISTORY_MAX_TURNS = 6;
+export const HISTORY_TURN_CHARS = 500;
+
+export const historyTurnSchema = z.object({
+  role: chatRoleSchema,
+  // 서버가 절단하므로 넉넉히 받되, 명백한 남용(초장문)은 형식 오류로 거른다.
+  content: z.string().min(1).max(4000),
+});
+export type HistoryTurn = z.infer<typeof historyTurnSchema>;
+
+/** 최근 턴·턴당 글자 상한 적용. 초과는 거부가 아니라 절단 — 후속 발화를 살리는 쪽이 목적이다. */
+export function clampHistory(history: readonly HistoryTurn[]): HistoryTurn[] {
+  return history
+    .filter((t) => t.content.trim() !== "")
+    .slice(-HISTORY_MAX_TURNS)
+    .map((t) => {
+      const chars = [...t.content];
+      return chars.length > HISTORY_TURN_CHARS
+        ? { role: t.role, content: `${chars.slice(0, HISTORY_TURN_CHARS).join("")}…` }
+        : { role: t.role, content: t.content };
+    });
+}
+
+/**
+ * 프롬프트의 "직전 대화" 절. 비면 null — 빈 절은 노이즈다.
+ * 발화자 라벨은 화면 표기와 같은 말(사용자/오리)로 — 모델이 역할을 헷갈리지 않게 한다.
+ */
+export function historyPromptSection(history: readonly HistoryTurn[]): string | null {
+  if (history.length === 0) return null;
+  const lines = history.map(
+    (t) => `${t.role === "user" ? "사용자" : "오리"}: ${t.content}`,
+  );
+  return ["[직전 대화]", ...lines, "(위는 참고 맥락이다. 아래 질문에 답하라.)"].join("\n");
+}

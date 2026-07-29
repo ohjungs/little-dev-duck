@@ -131,8 +131,14 @@ export {
   ruleReply,
   buildRagContext,
   buildRagPrompt,
+  clampHistory,
+  historyPromptSection,
+  historyTurnSchema,
+  HISTORY_MAX_TURNS,
+  HISTORY_TURN_CHARS,
   type ChatRole,
   type ChatMessage,
+  type HistoryTurn,
   type UtteranceRoute,
 } from "./domain/ai-chat";
 export {

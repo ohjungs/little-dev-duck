@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildRagContext, routeUtterance } from "@ldd/core";
+import { buildRagContext, clampHistory, historyPromptSection, routeUtterance, type HistoryTurn } from "@ldd/core";
 import { geminiEmbed } from "./gemini";
 import { searchEmbeddings } from "./embeddings";
 import { runAgentTurn, type Adapter, type AgentResult } from "./agent";
@@ -18,6 +18,9 @@ export async function runDuckTurn(
   adapter: Adapter,
   fetchImpl: typeof fetch = fetch,
   extraSystemNote?: string,
+  // 2026-07-29 (Phase 64 T1): 직전 대화. 상한(clampHistory)은 여기 한 곳에서 건다 —
+  // 호출부마다 걸면 한쪽만 고쳐진다. rule 라우팅·RAG 검색은 최신 발화만 본다(잡음·쿼터).
+  history?: readonly HistoryTurn[],
 ): Promise<DuckTurnResult> {
   if (routeUtterance(question) === "rule") {
     return { status: "rule" };
@@ -25,7 +28,11 @@ export async function runDuckTurn(
 
   const [queryVector] = await geminiEmbed([question], apiKey, fetchImpl);
   const sources = await searchEmbeddings(supabase, queryVector, 5);
-  const systemPrompt = [buildRagContext(sources.map((s) => s.content)), extraSystemNote]
+  const systemPrompt = [
+    buildRagContext(sources.map((s) => s.content)),
+    historyPromptSection(clampHistory(history ?? [])),
+    extraSystemNote,
+  ]
     .filter(Boolean)
     .join("\n\n");
 

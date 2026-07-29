@@ -1052,10 +1052,19 @@ export function MessageRoom({ roomId, roomType = null, initialMessages, myUserId
   async function requestDuckReply(question: string) {
     setDuckThinking(true);
     try {
+      // 2026-07-29 (Phase 64 T3): 방의 최근 대화를 동봉 — 후속 발화("아까 그거") 성립.
+      // system 영수증·삭제분은 뺀다(맥락이 아니라 잡음). 상한 절단은 서버 한 곳.
+      const history = messages
+        .filter((m) => m.type === "text" && m.deletedAt === null)
+        .slice(-8)
+        .map((m) => ({
+          role: m.senderType === "agent" ? ("duck" as const) : ("user" as const),
+          content: messageBody(m),
+        }));
       const res = await fetch("/api/ai/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, history }),
       });
       if (!res.ok) throw new Error(`오리 응답 실패 (${res.status})`);
       const data = (await res.json()) as DuckChatResponse;

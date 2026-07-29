@@ -12,7 +12,8 @@ import {
   runDuckTurn,
   type Adapter,
 } from "@ldd/api";
-import { isLddError, userMessage } from "@ldd/core";
+import { historyTurnSchema, isLddError, userMessage, type HistoryTurn } from "@ldd/core";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireGeminiKey } from "@/lib/apiHelpers";
 
@@ -62,17 +63,32 @@ export async function POST(request: Request) {
   const apiKey = keyOrError;
 
   let question: unknown;
+  let rawHistory: unknown;
   try {
-    question = (await request.json())?.question;
+    const body = await request.json();
+    question = body?.question;
+    rawHistory = body?.history;
   } catch {
     // 본문이 JSON이 아니면 아래 스키마 검증이 400으로 답한다 — 여기서 따로 알리지 않는다.
     question = undefined;
+    rawHistory = undefined;
   }
   if (typeof question !== "string" || question.trim().length === 0) {
     return NextResponse.json({ error: "질문이 필요합니다." }, { status: 400 });
   }
   if (question.length > MAX_QUESTION_LEN) {
     return NextResponse.json({ error: "질문이 너무 깁니다." }, { status: 400 });
+  }
+
+  // 2026-07-29 (Phase 64 T1): 직전 대화(선택). 형식이 틀리면 거부, 길이 초과는 runDuckTurn의
+  // clampHistory가 절단한다(거부와 절단의 경계 — 형식은 계약, 길이는 예산).
+  let history: HistoryTurn[] | undefined;
+  if (rawHistory !== undefined) {
+    const parsed = z.array(historyTurnSchema).max(50).safeParse(rawHistory);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "대화 기록 형식이 올바르지 않습니다." }, { status: 400 });
+    }
+    history = parsed.data;
   }
 
   const [googleTokens, githubTokens, gmailTokens] = await Promise.all([
@@ -104,6 +120,7 @@ export async function POST(request: Request) {
       adapter,
       fetch,
       unavailableNote.length > 0 ? unavailableNote : undefined,
+      history,
     );
     return NextResponse.json(result);
   } catch (error) {
