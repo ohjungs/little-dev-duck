@@ -12,6 +12,7 @@ import {
   ChevronRight,
   FileText,
   LayoutDashboard,
+  MessagesSquare,
   Newspaper,
   Search,
   Settings,
@@ -76,6 +77,9 @@ function SearchTrigger() {
 const NAV = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
   { href: "/pages", label: "페이지", icon: FileText },
+  // 2026-07-29 : 내비 - 메신저 입구 (사용자 보고: "기능이 전부 안 보인다" — /messages에
+  // 다 만들어 놓고 메뉴를 안 달았다. 라우트는 Phase 51부터 있었다.)
+  { href: "/messages", label: "메신저", icon: MessagesSquare },
   { href: "/insights", label: "통계", icon: BarChart3 },
   { href: "/news", label: "뉴스", icon: Newspaper },
   { href: "/office", label: "오피스", icon: Building2 },
@@ -231,6 +235,7 @@ export function AppSidebar({
 const MOBILE_NAV = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
   { href: "/pages", label: "페이지", icon: FileText },
+  { href: "/messages", label: "메신저", icon: MessagesSquare },
   { href: "/office", label: "오피스", icon: Building2 },
   { href: "/news", label: "뉴스", icon: Newspaper },
   { href: "/settings", label: "설정", icon: Settings },
