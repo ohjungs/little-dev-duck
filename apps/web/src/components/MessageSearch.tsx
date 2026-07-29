@@ -9,11 +9,16 @@ import Link from "next/link";
 
 import { searchMessages } from "@ldd/api";
 import {
+  formatTranscript,
+  kstDateString,
   messageBody,
   pendingMigrationMessage,
   splitByQuery,
+  transcriptFileName,
+  transcriptJson,
   type Message,
   type MessageSearchFilter,
+  type TranscriptFormat,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { clearRecentList, pushRecentList, readRecentList } from "@/lib/recentList";
@@ -64,6 +69,35 @@ export function MessageSearch() {
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     void runSearch(q);
+  }
+
+  // 2026-07-29 : 메신저 - 검색 결과 내보내기 (Phase 55 T1 L-020)
+  // 대화 내보내기와 **같은 포매터 한 벌**(formatTranscript·transcriptJson)을 쓴다 —
+  // 발화자·삭제 문구·KST 정책이 파일마다 다르면 안 된다. 결과는 화면에 있는 것 그대로다
+  // (재조회하지 않는다 — 재조회하면 화면과 파일이 다를 수 있다).
+  async function handleExportResults(format: Exclude<TranscriptFormat, "md">) {
+    if (!results || results.length === 0) return;
+    setError(null);
+    try {
+      const {
+        data: { user },
+      } = await createClient().auth.getUser();
+      const text =
+        format === "txt"
+          ? formatTranscript(results, user?.id ?? "")
+          : transcriptJson(results, user?.id ?? "");
+      const blob = new Blob([text], {
+        type: format === "txt" ? "text/plain;charset=utf-8" : "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = transcriptFileName(`검색 ${q.trim()}`, kstDateString(new Date()), format);
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   return (
@@ -173,6 +207,21 @@ export function MessageSearch() {
           {results.length === 0 ? (
             <p className="text-xs text-muted-foreground">찾는 말이 없어요.</p>
           ) : (
+            <>
+            {/* 결과 내보내기(L-020) — 화면에 보이는 결과 그대로를 파일로. */}
+            <div className="mb-1 flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground">{`결과 ${results.length}건 내보내기`}</span>
+              {(["txt", "json"] as const).map((fmt) => (
+                <button
+                  key={fmt}
+                  type="button"
+                  onClick={() => void handleExportResults(fmt)}
+                  className="rounded border border-border px-2 py-0.5 hover:bg-accent"
+                >
+                  {`.${fmt}`}
+                </button>
+              ))}
+            </div>
             <ul className="divide-y divide-border rounded-lg border border-border">
               {results.map((m) => (
                 <li key={m.id}>
@@ -195,6 +244,7 @@ export function MessageSearch() {
                 </li>
               ))}
             </ul>
+            </>
           )}
         </div>
       )}

@@ -1,5 +1,23 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T1: 검색 결과 내보내기 (L-020) + **Q-005 계약 검토 결론**
+> **Q-005(카카오톡 txt 가져오기) 계약 검토 — 사용자 결정 대기(PENDING).**
+> 마이그레이션 원문으로 확인한 사실:
+> ① `messages.seq`는 `generated always as identity` — 클라이언트 지정 불가, 순서는
+> 시간순 순차 insert로만 보존(가능). ② `created_at`은 default라 명시 삽입을 스키마·정책이
+> 막지 않는다 [추정 — 실 insert로 확인 필요]. ③ **`sender_type`이 'user'(본인 uid 강제)와
+> 'agent'(null 강제)뿐** — 카카오톡 "상대방" 발화를 표현할 자리가 없다. 본인으로 넣으면
+> 위조, 오리로 넣으면 사칭. **정직한 구현에는 스키마 확장이 필요하다**(예: sender_name
+> 컬럼 또는 'imported' sender_type + RLS 확장). DDL = 계약 변경 = 사고 게이트 —
+> 무인 루프가 임의로 진행하지 않는다. 원하는 방향을 알려주면 마이그레이션(down 포함)
+> 초안부터 만든다.
+>
+> **L-020 검색 결과 내보내기 (구현 완료)**: 결과 목록 위 ".txt·.json" 버튼 —
+> 대화 내보내기와 **같은 포매터 한 벌**(formatTranscript·transcriptJson) 재사용,
+> 화면에 보이는 결과 그대로(재조회 없음 — 재조회하면 화면과 파일이 다를 수 있다).
+> 파일명에 검색어 포함. 검증: turbo lint·test·build **18/18 GREEN**.
+> 실기 확인: [manual-verification.md 73번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T1: 방 이름 필터 (L-023) + 표시 제목 공용화
 > 방 표시 제목 폴백(`title ?? "오리와의 대화"/"이름 없는 대화"`)이 **목록과 전달 대화상자
 > 두 곳에 인라인 중복**돼 있었다 — core `roomDisplayTitle`로 모으고 세 소비자(목록·전달·
