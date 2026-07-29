@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/timeAgo";
 import { createClient } from "@/lib/supabase/client";
 import { emitXpChanged } from "@/lib/xpSignal";
+import { recordToDuckRoom } from "@/lib/duckRoomLog";
 import { onAppAction } from "@/lib/appActionSignal";
 import { todayIso } from "@/lib/today";
 import {
@@ -262,6 +263,9 @@ export function PomodoroWidget() {
         await fetchSessions();
         // completePomodoro가 서버에서 XP를 적립하므로 오리 표시 갱신 신호를 보낸다.
         emitXpChanged();
+        // 2026-07-29 (Phase 59 T1 S-009): 오리 방에 하루의 기록을 남긴다 —
+        // 방이 없으면 스킵, 실패도 조용히(lib 계약). 완료 처리와는 무관하게 뒤에서.
+        void recordToDuckRoom(supabase, "뽀모도로 집중 한 판을 마쳤어요.");
       } catch {
         if (!cancelled) {
           disableFocusMode();

@@ -1,5 +1,17 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 59](plans/phase_59.md) T1: 뽀모도로 → 오리 방 기록 (S-009 일부)
+> 계획이 "값이 가장 확실"이라 한 T1(연동 심화)의 첫 조각 — 뽀모도로를 마치면 오리 방에
+> system 안내줄이 남는다. **오리 방이 하루의 기록이 되기 시작한다**(제품 정체성 방향).
+>
+> - lib `recordToDuckRoom`(테스트 3건): 원칙 둘을 계약으로 — **방을 만들지 않는다**
+>   (없으면 조용히 스킵 — 사용자가 안 만든 방을 자동 생성하면 놀란다) · **실패는 조용히**
+>   (본 기능이 기록 때문에 죽으면 안 된다, 진단 기록만).
+> - 전송은 기존 sendMessage type:"system"(변환 영수증과 같은 관례) — 새 배관 0.
+> - PomodoroWidget 완료 경로에 fire-and-forget 한 줄. 습관 체크(S-009 나머지)는 다음 조각.
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 94번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 59](plans/phase_59.md) **착수** — T3: 대화 XP (Y-007)
 > phase_58의 무인-가능 조각 소진 → phase_59("제품 정체성 — 고르는 게 일") 진입.
 > 계획 원칙 "결정 없이 만들 수 있는 것부터" + **선행 차단이 오늘 풀린 항목**을 골랐다:
