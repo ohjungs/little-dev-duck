@@ -12,7 +12,8 @@
 //
 // 이 모듈은 순수하다. 읽기 함수를 받아 조립하고, 쓰기 목록을 돌려줄 뿐 localStorage를 모른다.
 
-export type QuietHoursPref = { start: number; end: number };
+// 2026-07-29 (Phase 56 T1 M-011): days(0=일~6=토) 추가 — 없으면 매일(하위호환, v4 이전 파일 그대로 복원).
+export type QuietHoursPref = { start: number; end: number; days?: number[] };
 export type LocalPrefValue = string[] | QuietHoursPref;
 export type LocalPrefs = Record<string, LocalPrefValue>;
 
@@ -66,10 +67,21 @@ function toIdList(v: unknown): string[] | null {
 // 외부 파일이 주는 값이라 "아마 이 뜻이겠지"로 해석하면 사용자가 모르는 설정이 생긴다.
 function toQuietHours(v: unknown): QuietHoursPref | null {
   if (!isRecord(v)) return null;
-  const { start, end } = v;
+  const { start, end, days } = v;
   const ok = (n: unknown): n is number =>
     typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 23;
-  return ok(start) && ok(end) ? { start, end } : null;
+  if (!ok(start) || !ok(end)) return null;
+  // days는 선택(없으면 매일). 있으면 0-6 정수만, 중복 제거 — 범위 밖은 버린다(아는 척 금지).
+  if (days === undefined) return { start, end };
+  if (!Array.isArray(days)) return { start, end };
+  const validDays = [
+    ...new Set(
+      days.filter(
+        (d): d is number => typeof d === "number" && Number.isInteger(d) && d >= 0 && d <= 6,
+      ),
+    ),
+  ];
+  return { start, end, days: validDays };
 }
 
 function coerce(spec: LocalPrefSpec, v: unknown): LocalPrefValue | null {

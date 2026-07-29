@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { isQuietHour, type DuckMood } from "@ldd/core";
+import { isQuietNow, type DuckMood } from "@ldd/core";
 import { pickClickPhrase, pickIdlePhrase, pickPhrase } from "./phrases";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
@@ -83,7 +83,9 @@ export function Duck({
       timer = setTimeout(() => {
         const idleFor = Date.now() - lastInteractionRef.current;
         const q = quietHoursRef.current;
-        const quiet = q ? isQuietHour(new Date().getHours(), q.start, q.end) : false;
+        const quiet = q
+          ? isQuietNow({ hour: new Date().getHours(), weekday: new Date().getDay() }, q)
+          : false;
         if (idleFor >= IDLE_MIN_MS && !quiet) {
           speak(pickIdlePhrase(mood));
         }

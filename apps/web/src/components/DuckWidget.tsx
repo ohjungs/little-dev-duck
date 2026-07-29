@@ -22,7 +22,7 @@ import {
 } from "@/lib/duckInitiative";
 import { onAppAction } from "@/lib/appActionSignal";
 import { todayIso } from "@/lib/today";
-import { isQuietHour } from "@ldd/core";
+import { isQuietNow } from "@ldd/core";
 import {
   Card,
   CardContent,
@@ -152,7 +152,7 @@ export function DuckWidget() {
       const today = todayIso();
       const now = new Date();
       const quiet = quietHours
-        ? isQuietHour(now.getHours(), quietHours.start, quietHours.end)
+        ? isQuietNow({ hour: now.getHours(), weekday: now.getDay() }, quietHours)
         : false;
       const picked = pickFromSnapshot(snapshot, { now, today, quiet });
       if (!picked) return;

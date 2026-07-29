@@ -1,6 +1,6 @@
 // Phase 12 T4 브라우저 알림 채널. 오리가 주요 이벤트(레벨 업 등)를 OS 네이티브 알림으로 알린다.
 // 방해금지 시간대(T2)와 하루 총량 상한을 준수한다. 프로필/서버 없이 localStorage로 상태 관리(ponytail).
-import { isQuietHour, nextDailyCount, type DailyCount } from "@ldd/core";
+import { isQuietNow, nextDailyCount, type DailyCount } from "@ldd/core";
 import { readQuietHours } from "./quietHours";
 import { isFocusMode } from "./focusMode";
 // notifyHistory는 이 파일에서 **타입만** 가져가므로 순환은 런타임에 존재하지 않는다.
@@ -70,7 +70,8 @@ export function notifyBlockReason(now: Date = new Date()): NotifyBlockReason | n
   if (notifyPermission() !== "granted") return "permission";
   if (isFocusMode()) return "focus";
   const q = readQuietHours();
-  if (q && isQuietHour(now.getHours(), q.start, q.end)) return "quiet";
+  // 요일 조건(M-011)까지 본다 — days 없으면 매일(기존 설정 그대로).
+  if (q && isQuietNow({ hour: now.getHours(), weekday: now.getDay() }, q)) return "quiet";
   if (!peekDailyBudget(localDate(now))) return "cap";
   return null;
 }

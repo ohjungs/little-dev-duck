@@ -244,3 +244,24 @@ describe("알림 키워드 백업", () => {
     });
   });
 });
+
+// 2026-07-29 : 방해금지 - 요일 백업 (Phase 56 T1 M-011)
+describe("방해금지 요일(days) 백업", () => {
+  it("days가 없던 옛 값은 그대로 통과한다 (하위호환)", () => {
+    expect(parseLocalPrefs({ "ldd:quietHours": { start: 22, end: 7 } })).toEqual({
+      "ldd:quietHours": { start: 22, end: 7 },
+    });
+  });
+
+  it("days는 0-6 정수만 남기고 중복을 제거한다", () => {
+    expect(
+      parseLocalPrefs({ "ldd:quietHours": { start: 22, end: 7, days: [1, 1, 9, -1, "월", 5] } }),
+    ).toEqual({ "ldd:quietHours": { start: 22, end: 7, days: [1, 5] } });
+  });
+
+  it("days가 배열이 아니면 버리고 시각만 살린다", () => {
+    expect(
+      parseLocalPrefs({ "ldd:quietHours": { start: 22, end: 7, days: "매일" } }),
+    ).toEqual({ "ldd:quietHours": { start: 22, end: 7 } });
+  });
+});

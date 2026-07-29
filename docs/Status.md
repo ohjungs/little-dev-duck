@@ -1,5 +1,19 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 56](plans/phase_56.md) T1: 요일별 방해금지 (M-011)
+> 계획 원문 "**QuietHoursSetting의 확장. 재구현 금지**" 그대로 — 새 판정을 만들지 않고
+> 기존 한 벌을 넓혔다. 소비자 3곳(알림 notify · 위젯 DuckWidget · 마스코트 혼잣말)이
+> **같은 `isQuietNow`**를 쓴다.
+>
+> - core `isQuietNow`(테스트 4건): `days`(0=일~6=토) 없으면 매일 — **옛 설정이 그대로
+>   동작한다**(하위호환). 자정 넘는 구간의 요일 판정은 **지금 요일 기준**(월요일만 켜면
+>   화요일 새벽은 시끄러움) — 시작-요일 역산 같은 규칙은 설정 화면으로 설명할 수 없다.
+> - 백업 coercion(local-prefs)·web lib 파싱에 days 확장(0-6 정수만·중복 제거, 테스트 3건).
+> - 설정 UI: 요일 체크박스(기본 전부). 전부 켜짐이면 days를 저장하지 않아 옛 셰이프
+>   유지. **전부 끄면 "적용되지 않아요" 경고**(키워드 빈 목록과 같은 정직 패턴).
+> - 검증: core 1312건 / turbo lint·test·build **18/18 GREEN** (mascot 포함).
+> - 실기 확인: [manual-verification.md 78번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 56](plans/phase_56.md) T1: 알림 히스토리 (M-028)
 > M-031(지금 왜 막히나)의 짝 — "**아까** 알림이 왜 안 왔지?"의 사후 기록.
 > 새 로그 테이블은 만들지 않았다(계획 M-034의 결) — 알림 상한·권한이 기기별이므로
