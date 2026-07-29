@@ -576,6 +576,7 @@ export {
   attachmentDeleted,
   canEditMessage,
   mergeAroundWindow,
+  mergeMessages,
   todoTitleFrom,
   conversionReceiptText,
   TODO_TITLE_MAX,

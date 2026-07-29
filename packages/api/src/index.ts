@@ -193,6 +193,7 @@ export {
   downloadMessageImage,
   listRoomAttachments,
   listMessagesAround,
+  listMessagesBefore,
   updateMessage,
   SIGNED_URL_SECONDS,
   getMyMembership,

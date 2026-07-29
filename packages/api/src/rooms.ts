@@ -120,6 +120,28 @@ export async function listMessages(
   return (data as MessageRow[]).map(messageFromRow).reverse();
 }
 
+// 2026-07-29 : 메신저 - 위로 스크롤 과거 로딩 (Phase 51 T3 후속)
+/**
+ * 이 seq **이전** 조각을 불러온다(위로 스크롤). 최신순으로 잘라 받아 오래된 순으로 돌려준다 —
+ * 앞에 이어 붙이면 바로 화면 순서가 된다. 빈 배열이면 처음까지 온 것이다.
+ */
+export async function listMessagesBefore(
+  supabase: SupabaseClient,
+  roomId: string,
+  beforeSeq: number,
+  limit: number = MESSAGE_PAGE_SIZE,
+): Promise<Message[]> {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("room_id", roomId)
+    .lt("seq", beforeSeq)
+    .order("seq", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as MessageRow[]).map(messageFromRow).reverse();
+}
+
 // 2026-07-29 : 메신저 - 표적 주변 로딩 (Phase 51 T3 잔여 L-005)
 /**
  * 표적 메시지 **주변 창**을 불러온다(검색 점프용). 표적이 최근 페이지 밖에 있어도

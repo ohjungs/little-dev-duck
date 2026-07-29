@@ -227,6 +227,24 @@ export function mergeAroundWindow<T>(before: readonly T[], after: readonly T[]):
   return [...before].reverse().concat(after);
 }
 
+// 2026-07-29 : 메신저 - 과거 로딩·실시간 병합 (Phase 51 T3 후속)
+/**
+ * 두 메시지 목록을 seq 순서로 합친다. **겹치면 fresh 쪽이 이긴다** —
+ * 수정·삭제가 반영된 최신 행이 오기 때문이다.
+ *
+ * 실시간 갱신이 목록을 통째로 갈아치우게 두면 옛 구간을 보던 사용자가 최신으로 튕긴다
+ * (사이클 9의 알려진 한계). 병합이면 옛 구간과 새 도착이 함께 남는다.
+ */
+export function mergeMessages<T extends { id: string; seq: number }>(
+  loaded: readonly T[],
+  fresh: readonly T[],
+): T[] {
+  const byId = new Map<string, T>();
+  for (const m of loaded) byId.set(m.id, m);
+  for (const m of fresh) byId.set(m.id, m);
+  return [...byId.values()].sort((a, b) => a.seq - b.seq);
+}
+
 // 2026-07-29 : 메신저 - 메시지 수정 (Phase 51 T4 잔여 I-010)
 /**
  * 이 메시지를 수정할 수 있는가. 내가 보낸 **글(text)** 메시지만 —

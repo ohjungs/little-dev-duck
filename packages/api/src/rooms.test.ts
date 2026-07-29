@@ -5,6 +5,7 @@ import {
   deleteMessage,
   listMessages,
   listMessagesAround,
+  listMessagesBefore,
   listRoomAttachments,
   listRooms,
   markRead,
@@ -306,5 +307,18 @@ describe("listMessagesAround", () => {
   it("표적을 찾지 못하면 null (호출부가 평소 목록으로 폴백한다)", async () => {
     const list = await listMessagesAround(fakeSupabase({ messages: [] }), ROOM_ROW.id, "없는-id");
     expect(list).toBeNull();
+  });
+});
+
+describe("listMessagesBefore", () => {
+  it("최신순으로 받아 오래된 순으로 돌려준다 (위로 이어 붙일 조각)", async () => {
+    const rows = [messageRow({ id: "aaaaaaaa-0000-4000-8000-000000000005", seq: 5 }),
+                  messageRow({ id: "aaaaaaaa-0000-4000-8000-000000000004", seq: 4 })];
+    const list = await listMessagesBefore(fakeSupabase({ messages: rows }), ROOM_ROW.id, 6);
+    expect(list.map((m) => m.seq)).toEqual([4, 5]);
+  });
+
+  it("더 없으면 빈 배열 (호출부가 '처음까지 왔다'로 안다)", async () => {
+    expect(await listMessagesBefore(fakeSupabase({ messages: [] }), ROOM_ROW.id, 1)).toEqual([]);
   });
 });

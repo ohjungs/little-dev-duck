@@ -14,6 +14,7 @@ import {
   REPLY_MISSING_TEXT,
   MUTE_DURATIONS,
   mergeAroundWindow,
+  mergeMessages,
   roomMemberSchema,
   sortRooms,
   todoTitleFrom,
@@ -418,5 +419,36 @@ describe("mergeAroundWindow", () => {
 
   it("둘 다 비면 빈 배열", () => {
     expect(mergeAroundWindow([], [])).toEqual([]);
+  });
+});
+
+// 2026-07-29 : 메신저 - 과거 로딩·실시간 병합 (Phase 51 T3 후속)
+describe("mergeMessages", () => {
+  const m = (id: string, seq: number) => msg({ id, seq });
+
+  it("두 목록을 seq 순서로 합친다", () => {
+    const loaded = [m("a", 1), m("b", 2)];
+    const fresh = [m("c", 5), m("d", 6)];
+    expect(mergeMessages(loaded, fresh).map((x) => x.seq)).toEqual([1, 2, 5, 6]);
+  });
+
+  it("겹치는 메시지는 새 값으로 하나만 남는다 (수정·삭제 반영)", () => {
+    const loaded = [msg({ id: "a", seq: 1, deletedAt: null })];
+    const fresh = [msg({ id: "a", seq: 1, deletedAt: ISO })];
+    const out = mergeMessages(loaded, fresh);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.deletedAt).toBe(ISO);
+  });
+
+  it("옛 구간을 보는 중 최신이 와도 옛 구간이 사라지지 않는다", () => {
+    // 사이클 9의 알려진 한계: reload가 목록을 최신 50개로 갈아치웠다.
+    const oldWindow = [m("o1", 10), m("o2", 11)];
+    const latest = [m("n1", 90), m("n2", 91)];
+    expect(mergeMessages(oldWindow, latest).map((x) => x.seq)).toEqual([10, 11, 90, 91]);
+  });
+
+  it("빈 쪽이 있어도 동작한다", () => {
+    expect(mergeMessages([], [m("a", 1)]).map((x) => x.seq)).toEqual([1]);
+    expect(mergeMessages([m("a", 1)], []).map((x) => x.seq)).toEqual([1]);
   });
 });

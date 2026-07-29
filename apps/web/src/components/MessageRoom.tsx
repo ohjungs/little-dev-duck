@@ -9,7 +9,7 @@
 // **낙관적 UI**: 보내면 즉시 목록에 붙인다. 그래서 중복이 생길 수 있고, 그 방어가
 // `clientMsgId`다(같은 값으로 재시도하면 서버가 이미 저장한 것을 돌려준다).
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
   coerceEventStart,
@@ -19,6 +19,7 @@ import {
   deleteMessage,
   downloadMessageImage,
   listMessages,
+  listMessagesBefore,
   listReactions,
   listRoomAttachments,
   getMyMembership,
@@ -51,6 +52,7 @@ import {
   dayDivider,
   firstUnreadId,
   matchSlashCommands,
+  mergeMessages,
   parseSlashCommand,
   slashReceiptText,
   todoTitleFrom,
@@ -147,10 +149,21 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   const [flashId, setFlashId] = useState<string | null>(null);
   const [focusMissing, setFocusMissing] = useState(false);
   const focusDoneRef = useRef(false);
+  // 2026-07-29 : 메신저 - 위로 스크롤 과거 로딩 (Phase 51 T3 후속)
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const loadingOlderRef = useRef(false); // 상태보다 먼저 잠근다 — 스크롤 이벤트는 몰려온다
+  const reachedStartRef = useRef(false); // 빈 응답 = 처음까지 왔다. 더 묻지 않는다
+  // 위에 이어 붙인 직후 스크롤 보정값. 안 하면 목록이 늘어난 만큼 화면이 아래로 밀린다.
+  const anchorRef = useRef<{ prevHeight: number; prevTop: number } | null>(null);
+  // 꼬리(마지막 메시지)가 바뀌었을 때만 "새 메시지" 처리 — 위에 이어 붙인 것은 새 도착이 아니다.
+  const tailIdRef = useRef<string | null>(null);
 
   const reload = useCallback(async () => {
     try {
-      setMessages(await listMessages(createClient(), roomId));
+      const fresh = await listMessages(createClient(), roomId);
+      // **갈아치우지 않고 병합한다** — 옛 구간(검색 점프·위로 로딩)을 보는 중에
+      // 실시간 이벤트가 와도 보던 자리가 사라지지 않는다. 겹치면 새 값이 이긴다(수정·삭제 반영).
+      setMessages((prev) => mergeMessages(prev, fresh));
     } catch {
       // 실시간 갱신 실패는 화면을 죽이지 않는다 — 이미 있는 목록을 그대로 둔다.
     }
@@ -411,13 +424,52 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   // **새 메시지가 왔다고 무조건 끌어내리지 않는다.** 위쪽 대화를 읽는 중에 화면이 튀면
   // 읽던 자리를 잃고, 그게 "스크롤이 이상하다"는 인상이 된다.
   // 바닥 근처면 따라 내려가고, 아니면 버튼으로 알린 뒤 사용자가 누를 때 내려간다.
+  // **꼬리가 그대로면(위에 과거를 이어 붙인 경우) 새 도착이 아니다** — 아무것도 하지 않는다.
   useEffect(() => {
+    const tail = messages[messages.length - 1]?.id ?? null;
+    if (tail === tailIdRef.current) return;
+    tailIdRef.current = tail;
     if (atBottomRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
       return;
     }
     setShowJump(true);
-  }, [messages.length]);
+  }, [messages]);
+
+  // 위에 이어 붙인 직후, 보던 메시지가 그 자리에 남도록 스크롤을 보정한다.
+  // 그리기 전에 맞춰야 눈에 안 띈다 — 그래서 layout 효과다.
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    const el = listRef.current;
+    if (!anchor || !el) return;
+    anchorRef.current = null;
+    el.scrollTop = el.scrollHeight - anchor.prevHeight + anchor.prevTop;
+  }, [messages]);
+
+  /** 위로 스크롤해 과거 조각을 불러온다. 빈 응답이면 처음까지 온 것 — 더 묻지 않는다. */
+  async function loadOlder() {
+    const el = listRef.current;
+    const first = messages[0];
+    if (!el || !first || loadingOlderRef.current || reachedStartRef.current) return;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    const prevHeight = el.scrollHeight;
+    const prevTop = el.scrollTop;
+    try {
+      const older = await listMessagesBefore(createClient(), roomId, first.seq);
+      if (older.length === 0) {
+        reachedStartRef.current = true;
+        return;
+      }
+      anchorRef.current = { prevHeight, prevTop };
+      setMessages((prev) => mergeMessages(older, prev));
+    } catch {
+      // 과거 로딩 실패로 대화를 막지 않는다. 다시 스크롤하면 재시도된다.
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
+    }
+  }
 
   function handleListScroll() {
     const el = listRef.current;
@@ -426,6 +478,8 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     atBottomRef.current = near;
     // 바닥에 닿으면 알림 버튼은 할 일이 없다.
     if (near && showJump) setShowJump(false);
+    // 꼭대기 근처면 과거를 이어 붙인다. 가드는 loadOlder 안에 있다(이벤트는 몰려온다).
+    if (el.scrollTop <= 40) void loadOlder();
   }
 
   function jumpToBottom() {
@@ -721,6 +775,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         className="h-full space-y-2 overflow-y-auto p-3"
         aria-label="대화 내용"
       >
+        {loadingOlder && (
+          <li className="py-1 text-center text-[11px] text-muted-foreground">
+            이전 대화 불러오는 중
+          </li>
+        )}
         {/* 서버가 표적 주변을 실어 주므로(L-005) 여기 걸리는 건 그 사이 지워졌거나
             열 수 없게 된 경우다. 조용히 바닥으로 가면 점프가 고장 난 것처럼 보인다. */}
         {focusMissing && (
