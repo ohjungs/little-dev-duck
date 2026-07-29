@@ -8,6 +8,7 @@
 //   3. 카테고리 라벨 — 피드의 주제에서 온다(기사별 LLM 분류는 쓰지 않는다, 무료 원칙).
 //      모르는 피드는 지어내지 않고 "종합"이다.
 
+import { kstDayRange } from "./search-filter";
 import { topArticles, type RankableArticle, type TopArticlesEmptyReason } from "./news-top";
 
 export const DAILY_ISSUE_LIMIT = 10;
@@ -78,4 +79,48 @@ export function dailyIssues<T extends RankableArticle>(
     // 창 안에 기사가 있었지만 전부 상한에 걸리는 일은 없다(상한은 피드별이라 최소 1개는 남는다).
     reason: items.length === 0 ? ranked.reason : null,
   };
+}
+
+// 2026-07-29 : 뉴스 - 브리핑 날짜 탭 (Phase 61 T3)
+// 탭·달력이 고른 날을 dailyIssues의 (now, windowHours)로 바꾼다. **날짜 경계는 KST 한 벌**
+// (kstDayRange — 검색 필터와 같은 판정). "지난주"는 오늘 00:00 KST 이전 7일 — 오늘을
+// 섞으면 "오늘" 탭과 겹쳐 같은 기사가 두 탭에 나온다.
+
+export type BriefingMode = "today" | "yesterday" | "week" | "date";
+
+export interface BriefingRange {
+  now: string;
+  windowHours: number;
+}
+
+// 'YYYY-MM-DD'를 하루 앞으로. 월·연 경계는 Date의 UTC 연산이 처리한다(순수 날짜 산술 —
+// 시간대 변환이 아니므로 UTC 고정이 맞다).
+function previousDay(day: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const t = Date.parse(`${day}T00:00:00.000Z`);
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t - 24 * 60 * 60 * 1000);
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${mm}-${dd}`;
+}
+
+/**
+ * @param todayKst 오늘의 KST 날짜('YYYY-MM-DD') — 호출부가 주입해 테스트가 시각과 무관하게 성립.
+ * @param date mode가 "date"일 때 고른 날짜. 그 외 모드에선 무시한다.
+ */
+export function briefingRange(
+  mode: BriefingMode,
+  todayKst: string,
+  date?: string,
+): BriefingRange | null {
+  if (mode === "week") {
+    const { fromIso } = kstDayRange(todayKst, undefined);
+    return fromIso ? { now: fromIso, windowHours: 7 * 24 } : null;
+  }
+  const day =
+    mode === "today" ? todayKst : mode === "yesterday" ? previousDay(todayKst) : (date ?? null);
+  if (day === null) return null;
+  const { toIso } = kstDayRange(undefined, day);
+  return toIso ? { now: toIso, windowHours: 24 } : null;
 }

@@ -1,5 +1,16 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 61](plans/phase_61.md) T3: 브리핑 날짜·카테고리
+> 오늘/어제/지난주 탭 + 달력 + 카테고리 칩. cherrypick 탐색 구조가 갖춰졌다.
+>
+> - core `briefingRange`(테스트 5건): 탭 → (now, windowHours) 변환. **KST 경계는
+>   kstDayRange 한 벌**(검색 필터와 같은 판정). 지난주 = 오늘 00:00 KST 이전 7일(오늘 제외
+>   — 겹치면 같은 기사가 두 탭에 나온다). 월 경계 어제 계산 테스트로 잠금.
+> - DailyBriefing: 탭·달력·카테고리 칩(카드에 있는 카테고리만, 2개 이상일 때). 진행 n/10과
+>   완주 XP는 **오늘 탭 전용**. 카테고리 필터는 보기만 거른다(선정 재실행 없음).
+> - 검증: turbo lint·test·build **18/18 GREEN**. 실기: [mv 100번](loop-eng/manual-verification.md).
+> - Phase 61 잔여: T4(한 장씩 보기·글자 크기·RSS 이미지 — 후순위).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 61](plans/phase_61.md) T2: 오늘의 브리핑 카드
 > 뉴스 화면 상단에 하루 10개 이슈 카드(번호·카테고리·제목·요약·n개 매체) + "오늘의 진행
 > n/10". cherrypick 벤치마킹의 화면 절반이 붙었다.

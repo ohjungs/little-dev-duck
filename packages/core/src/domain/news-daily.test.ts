@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dailyIssues } from "./news-daily";
+import { briefingRange, dailyIssues } from "./news-daily";
 import { topicForUrl } from "./news-feeds";
 
 const NOW = "2026-07-29T09:00:00.000Z";
@@ -83,5 +83,45 @@ describe("topicForUrl", () => {
 
   it("모르는 URL은 null — 지어내지 않는다", () => {
     expect(topicForUrl("https://example.com/rss")).toBeNull();
+  });
+});
+
+// 2026-07-29 : 뉴스 - 브리핑 날짜 탭 창 계산 (Phase 61 T3)
+describe("briefingRange (KST 날짜 창)", () => {
+  it("오늘: 그 KST 날의 끝을 기준으로 24시간 창", () => {
+    expect(briefingRange("today", "2026-07-29")).toEqual({
+      now: "2026-07-29T15:00:00.000Z", // 다음날 00:00 KST
+      windowHours: 24,
+    });
+  });
+
+  it("어제: 하루 앞 날짜의 24시간 창", () => {
+    expect(briefingRange("yesterday", "2026-07-29")).toEqual({
+      now: "2026-07-28T15:00:00.000Z",
+      windowHours: 24,
+    });
+  });
+
+  it("지난주: 오늘 00:00 KST 이전 7일 창 (오늘 제외)", () => {
+    expect(briefingRange("week", "2026-07-29")).toEqual({
+      now: "2026-07-28T15:00:00.000Z", // 오늘 00:00 KST
+      windowHours: 168,
+    });
+  });
+
+  it("특정 날짜: 그 날의 24시간 창, 잘못된 날짜는 null", () => {
+    expect(briefingRange("date", "2026-07-29", "2026-07-01")).toEqual({
+      now: "2026-07-01T15:00:00.000Z",
+      windowHours: 24,
+    });
+    expect(briefingRange("date", "2026-07-29", "잘못된값")).toBeNull();
+    expect(briefingRange("date", "2026-07-29")).toBeNull();
+  });
+
+  it("월 경계를 넘는 어제 계산도 맞다", () => {
+    expect(briefingRange("yesterday", "2026-08-01")).toEqual({
+      now: "2026-07-31T15:00:00.000Z",
+      windowHours: 24,
+    });
   });
 });

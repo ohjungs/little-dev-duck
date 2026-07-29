@@ -307,6 +307,9 @@ export {
 } from "./domain/news-top";
 export {
   dailyIssues,
+  briefingRange,
+  type BriefingMode,
+  type BriefingRange,
   DAILY_ISSUE_LIMIT,
   DAILY_ISSUE_WINDOW_HOURS,
   DAILY_ISSUE_PER_FEED_CAP,
