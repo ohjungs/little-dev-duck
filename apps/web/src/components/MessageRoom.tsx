@@ -78,9 +78,11 @@ type Props = {
   roomId: string;
   initialMessages: Message[];
   myUserId: string;
+  /** 검색에서 넘어온 "이 메시지로" 표적. 있으면 바닥 대신 그 메시지에서 시작한다. */
+  focusId?: string | null;
 };
 
-export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
+export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -118,7 +120,8 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   const [unreadAnchor, setUnreadAnchor] = useState<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
   // 바닥 근처인지. 상태로 두면 스크롤할 때마다 다시 그린다 — 이 값은 아래 효과에서만 읽는다.
-  const atBottomRef = useRef(true);
+  // 표적이 있으면 "바닥 아님"으로 시작한다 — 아니면 마운트 스크롤이 표적을 지나쳐 바닥으로 간다.
+  const atBottomRef = useRef(focusId === null);
   const [showJump, setShowJump] = useState(false);
   // 2026-07-29 : 메신저 - 전체화면 뷰어 (Phase 51 T5)
   // 열려 있는 사진의 경로. null이면 닫힘. 순서·양옆 판정은 core가 한다.
@@ -138,6 +141,12 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 2026-07-29 : 메신저 - 입력 임시저장 (Phase 54 선행)
   // 초안을 불러오기 전에 저장 효과가 빈 값으로 덮어쓰지 않도록 순서를 잠근다.
   const draftLoadedRef = useRef(false);
+  // 2026-07-29 : 메신저 - 검색 원문 점프 (Phase 51 T3 잔여 L-003)
+  // 반짝임 표시 중인 메시지. 표적이 로드 창 밖(최근 50개보다 오래됨)이면 안내를 띄운다 —
+  // 조용히 바닥으로 가면 사용자는 점프가 고장 났다고 느낀다.
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const [focusMissing, setFocusMissing] = useState(false);
+  const focusDoneRef = useRef(false);
 
   const reload = useCallback(async () => {
     try {
@@ -360,6 +369,24 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 현재 시각은 렌더 중에 읽을 수 없다(순수성). 마운트 시 1회
     setTodayKey(kstDateString(new Date()));
   }, []);
+
+  // 검색 표적으로 이동(1회). 렌더가 끝나야 요소가 있으므로 효과에서 찾는다.
+  useEffect(() => {
+    if (focusId === null || focusDoneRef.current) return;
+    focusDoneRef.current = true;
+
+    const el = document.getElementById(`msg-${focusId}`);
+    if (!el) {
+      // 최근 50개 창 밖(또는 삭제됨). 조용히 실패하지 않는다 — 옛 메시지 로딩은 별도 슬라이스.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- DOM 존재 여부는 렌더 후에만 알 수 있다. 마운트 시 1회
+      setFocusMissing(true);
+      return;
+    }
+    el.scrollIntoView({ block: "center" });
+    setFlashId(focusId);
+    const t = setTimeout(() => setFlashId(null), 2500);
+    return () => clearTimeout(t);
+  }, [focusId]);
 
   // 쓰다 만 초안 복원. 서버 렌더에는 localStorage가 없어 마운트 후에 읽는다 —
   // 초기값으로 읽으면 서버와 첫 화면이 달라진다(hydration 불일치).
@@ -694,6 +721,12 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
         className="h-full space-y-2 overflow-y-auto p-3"
         aria-label="대화 내용"
       >
+        {/* 검색 표적이 로드 창 밖일 때. 조용히 바닥으로 가면 점프가 고장 난 것처럼 보인다. */}
+        {focusMissing && (
+          <li role="status" className="rounded border border-border bg-muted/40 p-2 text-center text-xs text-muted-foreground break-keep">
+            찾은 메시지가 최근 50개보다 오래돼 여기에 보이지 않아요.
+          </li>
+        )}
         {messages.length === 0 ? (
           <li className="text-sm text-muted-foreground">아직 주고받은 말이 없어요.</li>
         ) : (
@@ -727,7 +760,12 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                   {messageBody(m)}
                 </li>
               ) : (
-              <li className={`relative ${mine ? "text-right" : "text-left"}`}>
+              <li
+                id={`msg-${m.id}`}
+                className={`relative ${mine ? "text-right" : "text-left"} ${
+                  flashId === m.id ? "rounded-lg ring-2 ring-primary" : ""
+                }`}
+              >
                 {editing?.id === m.id ? (
                   /* 인라인 수정. Enter 저장 · Escape 취소 — 대화 흐름에서 벗어나지 않는다. */
                   <form

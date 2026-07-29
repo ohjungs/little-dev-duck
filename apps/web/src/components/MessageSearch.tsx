@@ -8,7 +8,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { searchMessages } from "@ldd/api";
-import { messageBody, pendingMigrationMessage, type Message } from "@ldd/core";
+import { messageBody, pendingMigrationMessage, splitByQuery, type Message } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 
 export function MessageSearch() {
@@ -69,8 +69,21 @@ export function MessageSearch() {
             <ul className="divide-y divide-border rounded-lg border border-border">
               {results.map((m) => (
                 <li key={m.id}>
-                  <Link href={`/messages/${m.roomId}`} className="block p-2 text-xs hover:bg-accent">
-                    {messageBody(m)}
+                  {/* 원문 점프(L-003): 방이 아니라 그 메시지로. 하이라이트(L-002)는 core 조각을
+                      React로 그린다 — HTML 문자열을 만들지 않는다(평문 렌더 원칙). */}
+                  <Link
+                    href={`/messages/${m.roomId}?focus=${m.id}`}
+                    className="block p-2 text-xs hover:bg-accent"
+                  >
+                    {splitByQuery(messageBody(m), q).map((part, i) =>
+                      part.hit ? (
+                        <mark key={i} className="rounded-sm bg-yellow-200 px-0.5 dark:bg-yellow-700">
+                          {part.text}
+                        </mark>
+                      ) : (
+                        <span key={i}>{part.text}</span>
+                      ),
+                    )}
                   </Link>
                 </li>
               ))}

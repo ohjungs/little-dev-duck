@@ -11,10 +11,14 @@ export const dynamic = "force-dynamic";
 
 export default async function MessageRoomPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ focus?: string }>;
 }) {
   const { id } = await params;
+  // 검색에서 넘어온 "이 메시지로" 표적(L-003). 없으면 평소처럼 바닥에서 시작한다.
+  const { focus } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -49,7 +53,12 @@ export default async function MessageRoomPage({
           {notice}
         </p>
       ) : (
-        <MessageRoom roomId={id} initialMessages={initial} myUserId={user.id} />
+        <MessageRoom
+          roomId={id}
+          initialMessages={initial}
+          myUserId={user.id}
+          focusId={focus ?? null}
+        />
       )}
     </div>
   );
