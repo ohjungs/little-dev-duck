@@ -495,6 +495,7 @@ export {
   ACCOUNT_DELETE_STEPS,
   ACCOUNT_DELETE_PHRASE,
   CONTENT_DELETE_PHRASE,
+  SETTINGS_RESET_PHRASE,
   accountDeletionEnabled,
   type AccountDeleteStep,
 } from "./domain/account-deletion";

@@ -18,6 +18,10 @@ export const CONTENT_DELETE_PHRASE = "삭제합니다";
 // 되돌릴 수 없는 쪽까지 지운다. 한쪽이 다른 쪽의 앞부분이 되지 않게도 골랐다.
 export const ACCOUNT_DELETE_PHRASE = "계정을 영구 삭제";
 
+// 2026-07-29 (Phase 56 T2 T-031): 이 기기의 브라우저 저장값(설정·즐겨찾기 등)만 초기화할 때의
+// 문구. DB는 건드리지 않지만 되돌릴 수 없기는 같다 — 위 두 문구와 다르고 접두어도 아니게 골랐다.
+export const SETTINGS_RESET_PHRASE = "설정을 초기화";
+
 // service_role 키가 있어야만 계정을 지울 수 있다(Supabase Admin API).
 // **미설정이 안전한 기본값이다** — 키가 없으면 기능 자체를 노출하지 않는다.
 // 환경변수를 만들어만 두고 값을 안 넣는 실수가 흔해 공백도 미설정으로 본다.

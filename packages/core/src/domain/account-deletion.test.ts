@@ -3,6 +3,7 @@ import {
   ACCOUNT_DELETE_STEPS,
   ACCOUNT_DELETE_PHRASE,
   CONTENT_DELETE_PHRASE,
+  SETTINGS_RESET_PHRASE,
   accountDeletionEnabled,
 } from "./account-deletion";
 
@@ -53,6 +54,21 @@ describe("확인 문구 — 두 삭제가 서로 다른 문구를 쓴다", () =>
     // "삭제합니다"와 "삭제합니다 계정"처럼 겹치면 잘못 입력해도 통과하는 구간이 생긴다.
     expect(ACCOUNT_DELETE_PHRASE.startsWith(CONTENT_DELETE_PHRASE)).toBe(false);
     expect(CONTENT_DELETE_PHRASE.startsWith(ACCOUNT_DELETE_PHRASE)).toBe(false);
+  });
+});
+
+// 2026-07-29 (Phase 56 T2 T-031): 설정 초기화 문구까지 세 개가 전부 서로 다르고 접두어도 아니다.
+describe("확인 문구 — 설정 초기화 포함 상호 구별", () => {
+  it("세 문구가 전부 다르고, 어느 것도 다른 것의 앞부분이 아니다", () => {
+    const phrases = [CONTENT_DELETE_PHRASE, ACCOUNT_DELETE_PHRASE, SETTINGS_RESET_PHRASE];
+    for (let i = 0; i < phrases.length; i++) {
+      for (let j = 0; j < phrases.length; j++) {
+        if (i === j) continue;
+        expect(phrases[i]).not.toBe(phrases[j]);
+        expect(phrases[i]!.startsWith(phrases[j]!)).toBe(false);
+      }
+    }
+    expect(SETTINGS_RESET_PHRASE.trim().length).toBeGreaterThan(0);
   });
 });
 

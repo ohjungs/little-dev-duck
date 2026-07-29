@@ -35,6 +35,7 @@ import { MessageStorageCard } from "@/components/MessageStorageCard";
 import { MessageNotifySetting } from "@/components/MessageNotifySetting";
 import { DataSaverSetting } from "@/components/DataSaverSetting";
 import { buildLabel } from "@/lib/buildInfo";
+import { SettingsResetCard } from "@/components/SettingsResetCard";
 import { HealthStatus } from "@/components/HealthStatus";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
@@ -442,6 +443,21 @@ export default async function SettingsPage() {
         <h2 id="settings-danger" className="mb-3 mt-2 text-sm font-semibold tracking-tight text-muted-foreground">위험</h2>
         {/* 다단(masonry)은 묶음마다 따로 잡는다 — 하나로 묶으면 제목이 열 사이를 가로지른다. */}
         <div className="columns-1 gap-4 md:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid">
+        {/* 2026-07-29 (Phase 56 T2 T-031): 기기 설정 초기화 — DB는 안 건드린다(전체 삭제와 구분). */}
+        <Card className="border-destructive/30">
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <RotateCcw className="size-4 text-destructive" />
+              이 기기 설정 초기화
+            </CardTitle>
+            <CardDescription>
+              이 브라우저에 저장된 설정·기록을 지웁니다. 계정 데이터는 그대로예요.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SettingsResetCard />
+          </CardContent>
+        </Card>
         {user && (
           <Card className="border-destructive/30">
             <CardHeader className="flex-col items-start gap-1">
