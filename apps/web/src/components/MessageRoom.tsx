@@ -16,6 +16,7 @@ import {
   downloadMessageImage,
   listMessages,
   listReactions,
+  listRoomAttachments,
   getMyMembership,
   markRead,
   messageImageUrl,
@@ -39,6 +40,7 @@ import {
   shouldSendRead,
   isRoomMuted,
   MUTE_DURATIONS,
+  attachmentDeleted,
   dayDivider,
   firstUnreadId,
   galleryNav,
@@ -109,7 +111,13 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 2026-07-29 : 메신저 - 전체화면 뷰어 (Phase 51 T5)
   // 열려 있는 사진의 경로. null이면 닫힘. 순서·양옆 판정은 core가 한다.
   const [viewerPath, setViewerPath] = useState<string | null>(null);
+  // 뷰어가 오가는 경로 목록. **연 자리에 따라 다르다** — 대화에서 열면 지금 창의 사진들,
+  // 모아보기에서 열면 방 전체 사진들. 하나로 합치면 옛 사진에서 이전/다음이 끊긴다.
+  const [viewerPaths, setViewerPaths] = useState<string[]>([]);
   const [downloading, setDownloading] = useState(false);
+  // 방 전체 사진 모아보기. null이면 닫힘, 로딩 중엔 빈 배열과 구분해야 해서 "loading".
+  const [gallery, setGallery] = useState<string[] | "loading" | null>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -317,14 +325,51 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   }
 
   // 보는 중에 그 사진이 지워지면(실시간 삭제) 뷰어를 닫는다 — 지운 사진이 계속 떠 있으면
-  // 지운 사람에게 안 지워진 것이다. 신호는 core가 준다(index -1).
+  // 지운 사람에게 안 지워진 것이다. **지워진 것으로 확인된 때만** 닫는다(core 판정) —
+  // 창 밖이라 모르는 옛 사진(모아보기에서 연 것)을 모른다고 닫으면 안 된다.
   useEffect(() => {
     if (viewerPath === null) return;
-    if (galleryNav(galleryPaths(messages), viewerPath).index === -1) {
+    if (attachmentDeleted(messages, viewerPath)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 삭제는 실시간 구독으로 도착한다. 이벤트 핸들러에서 알 수 있는 일이 아니다
       setViewerPath(null);
     }
   }, [viewerPath, messages]);
+
+  /** 아직 주소 없는 경로들의 서명 URL을 받아 채운다(인라인 효과와 같은 병합 방식). */
+  const fillUrls = useCallback(async (paths: string[]) => {
+    const missing = paths.filter((p) => !(p in imageUrls));
+    if (missing.length === 0) return;
+    const client = createClient();
+    const pairs = await Promise.all(
+      missing.map(async (p) => [p, await messageImageUrl(client, p)] as const),
+    );
+    setImageUrls((prev) => {
+      const next = { ...prev };
+      for (const [p, u] of pairs) if (u) next[p] = u;
+      return next;
+    });
+  }, [imageUrls]);
+
+  // 모아보기가 열리거나 위의 뷰어가 닫히면 초점을 모아보기로 — Escape가 계속 먹게.
+  // 인라인 콜백 ref로 매 렌더 focus하면 뷰어가 초점을 뺏겨 화살표 키가 죽는다.
+  const galleryOpen = gallery !== null;
+  useEffect(() => {
+    if (galleryOpen && !viewerPath) galleryRef.current?.focus();
+  }, [galleryOpen, viewerPath]);
+
+  /** 방 전체 사진 모아보기 열기. 실패하면 안내하고 닫는다 — 빈 격자를 성공처럼 두지 않는다. */
+  async function openGallery() {
+    setGallery("loading");
+    try {
+      const paths = await listRoomAttachments(createClient(), roomId);
+      setGallery(paths);
+      void fillUrls(paths);
+    } catch (err) {
+      setGallery(null);
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    }
+  }
 
   /** 원본 저장. Blob URL(같은 출처)로 받아야 저장이 된다 — api 주석 참조. */
   async function handleDownload() {
@@ -481,6 +526,13 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
         >
           {pinnedAt ? "목록 고정 해제" : "목록 위에 고정"}
         </button>
+        <button
+          type="button"
+          onClick={() => void openGallery()}
+          className="rounded border border-border px-2 py-0.5 hover:bg-accent"
+        >
+          사진 모아보기
+        </button>
         {muted ? (
           <>
             <span className="text-muted-foreground">이 방 알림이 꺼져 있어요</span>
@@ -598,7 +650,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                       {/* 누르면 전체화면. 링크 아닌 버튼 — 페이지 이동이 아니라 화면 상태다. */}
                       <button
                         type="button"
-                        onClick={() => setViewerPath(path)}
+                        onClick={() => {
+                          // 대화에서 열면 지금 창의 사진들 사이를 오간다.
+                          setViewerPaths(galleryPaths(messages));
+                          setViewerPath(path);
+                        }}
                         aria-label="사진 크게 보기"
                         className="cursor-zoom-in"
                       >
@@ -690,11 +746,69 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
         <div ref={bottomRef} />
       </ul>
 
+      {/* 방 전체 사진 모아보기(Phase 51 T5). 뷰어(z-50)보다 아래라 썸네일을 누르면 위로 뜬다. */}
+      {gallery !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="사진 모아보기"
+          tabIndex={-1}
+          ref={galleryRef}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !viewerPath) setGallery(null);
+          }}
+          className="absolute inset-0 z-40 flex flex-col bg-background"
+        >
+          <div className="flex items-center justify-between border-b border-border px-3 py-2 text-sm">
+            <span>사진 모아보기</span>
+            <button
+              type="button"
+              onClick={() => setGallery(null)}
+              aria-label="모아보기 닫기"
+              className="rounded border border-border px-2 py-0.5 text-xs hover:bg-accent"
+            >
+              닫기
+            </button>
+          </div>
+          {gallery === "loading" ? (
+            <p className="p-4 text-sm text-muted-foreground">사진 목록을 불러오는 중</p>
+          ) : gallery.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">주고받은 사진이 없어요.</p>
+          ) : (
+            <ul className="grid flex-1 grid-cols-3 gap-1 overflow-y-auto p-2 sm:grid-cols-4">
+              {/* 최근 것을 먼저 보여 준다 — 찾는 사진은 대개 최근 것이다. 뷰어 순서는 대화 순서 그대로. */}
+              {[...gallery].reverse().map((p) => (
+                <li key={p}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewerPaths(gallery);
+                      setViewerPath(p);
+                    }}
+                    aria-label="사진 크게 보기"
+                    className="block aspect-square w-full overflow-hidden rounded border border-border"
+                  >
+                    {imageUrls[p] ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- 서명 URL은 만료되는 임시 주소라 next/image 최적화 대상이 아니다.
+                      <img src={imageUrls[p]} alt="첨부 이미지" className="size-full object-cover" />
+                    ) : (
+                      <span className="flex size-full items-center justify-center text-[10px] text-muted-foreground">
+                        불러오는 중
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* 전체화면 뷰어. 열림 상태·순서 판정은 위에서 — 이 컴포넌트는 그리기만 한다. */}
       {viewerPath && (
         <MessageImageViewer
           url={imageUrls[viewerPath] ?? null}
-          nav={galleryNav(galleryPaths(messages), viewerPath)}
+          nav={galleryNav(viewerPaths, viewerPath)}
           onNavigate={setViewerPath}
           onClose={() => setViewerPath(null)}
           onDownload={() => void handleDownload()}

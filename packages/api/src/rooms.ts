@@ -320,6 +320,35 @@ export async function messageImageUrl(
 }
 
 /**
+ * 이 방에서 주고받은 사진 경로 전부(모아보기). **화면의 메시지 창은 최근 일부만 들고 있어서**
+ * 거기서 뽑으면 옛 사진이 빠진다 — 그래서 따로 조회한다. 지운 메시지의 사진은 제외.
+ *
+ * 최신 것부터 상한까지만 받고 **오래된 순으로 돌려준다** — 뷰어의 이전/다음이
+ * 대화 순서와 같아야 헷갈리지 않는다. 상한을 넘는 아주 옛 사진은 모아보기에 안 나온다(정직한 한계).
+ */
+export const GALLERY_LIMIT = 500;
+
+export async function listRoomAttachments(
+  supabase: SupabaseClient,
+  roomId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("attachment_path, seq")
+    .eq("room_id", roomId)
+    .not("attachment_path", "is", null)
+    .is("deleted_at", null)
+    .order("seq", { ascending: false })
+    .limit(GALLERY_LIMIT);
+  if (error || !data) throw new Error(error?.message ?? "사진 목록을 불러오지 못했어요.");
+  const rows = data as { attachment_path: string | null; seq: number }[];
+  return rows
+    .filter((r): r is { attachment_path: string; seq: number } => r.attachment_path !== null)
+    .sort((a, b) => a.seq - b.seq)
+    .map((r) => r.attachment_path);
+}
+
+/**
  * 이미지 원본을 Blob으로 내려받는다(전체화면 뷰어의 저장 버튼).
  * **서명 URL에 `download` 속성을 붙이는 방식은 안 된다** — 다른 출처라 브라우저가
  * 속성을 무시하고 이미지로 이동해 버린다. SDK로 받아 Blob URL(같은 출처)로 저장한다.

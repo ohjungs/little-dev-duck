@@ -573,6 +573,7 @@ export {
   sortRooms,
   galleryPaths,
   galleryNav,
+  attachmentDeleted,
   DELETED_MESSAGE_TEXT,
   type Room,
   type RoomType,

@@ -184,6 +184,18 @@ export function galleryPaths(
 }
 
 /**
+ * 보고 있는 그 사진의 메시지가 **지워진 것으로 확인**됐는가 — 뷰어를 닫을 신호.
+ * 목록에 없어 모르는 사진은 거짓이다. 모른다고 닫아 버리면
+ * 갤러리에서 연 옛 사진(현재 창 밖)이 전부 닫힌다.
+ */
+export function attachmentDeleted(
+  messages: readonly Pick<Message, "attachmentPath" | "deletedAt">[],
+  path: string,
+): boolean {
+  return messages.some((m) => m.attachmentPath === path && m.deletedAt !== null);
+}
+
+/**
  * 지금 보는 사진의 위치와 양옆. **끝에서 반대편으로 감지 않는다** —
  * 순환하면 "몇 장 중 몇 장째"라는 감을 잃고 같은 사진을 두 번 보게 된다.
  * 보는 중에 그 사진이 지워져 목록에서 빠지면 index -1 — 뷰어가 닫을 신호다.

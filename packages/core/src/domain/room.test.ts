@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DELETED_MESSAGE_TEXT,
+  attachmentDeleted,
   galleryNav,
   galleryPaths,
   messageBody,
@@ -296,5 +297,27 @@ describe("galleryPaths / galleryNav (Phase 51 T5 전체화면 뷰어)", () => {
 
   it("빈 갤러리에서는 전부 null", () => {
     expect(galleryNav([], "p1")).toEqual({ prev: null, next: null, index: -1, total: 0 });
+  });
+});
+
+describe("attachmentDeleted (뷰어를 닫을 신호)", () => {
+  const am = (path: string | null, deletedAt: string | null) => ({
+    attachmentPath: path, deletedAt,
+  });
+
+  it("그 사진의 메시지가 지워졌으면 참", () => {
+    expect(attachmentDeleted([am("p1", "2026-07-27T00:00:00.000Z")], "p1")).toBe(true);
+  });
+
+  it("살아 있으면 거짓", () => {
+    expect(attachmentDeleted([am("p1", null)], "p1")).toBe(false);
+  });
+
+  it("창 밖이라 모르는 사진은 거짓 (모른다고 닫아 버리면 갤러리에서 연 옛 사진이 다 닫힌다)", () => {
+    expect(attachmentDeleted([am("p1", null)], "옛날사진")).toBe(false);
+  });
+
+  it("빈 목록이면 거짓", () => {
+    expect(attachmentDeleted([], "p1")).toBe(false);
   });
 });

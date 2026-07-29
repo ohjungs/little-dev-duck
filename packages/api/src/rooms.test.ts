@@ -4,6 +4,7 @@ import {
   RECENT_WINDOW,
   deleteMessage,
   listMessages,
+  listRoomAttachments,
   listRooms,
   markRead,
   sendMessage,
@@ -58,6 +59,8 @@ function fakeSupabase(opts: {
     const result = async () => ({ data: rows, error: null });
     const selectChain: Record<string, unknown> = {
       eq: () => selectChain,
+      not: () => selectChain,
+      is: () => selectChain,
       order: () => selectChain,
       limit: result,
       then: undefined,
@@ -215,5 +218,19 @@ describe("안 읽은 수 창", () => {
 
   it("한 화면에 불러오는 메시지 수보다 크다 (그보다 작으면 방 하나도 못 센다)", () => {
     expect(RECENT_WINDOW).toBeGreaterThan(MESSAGE_PAGE_SIZE);
+  });
+});
+
+// 2026-07-29 : 메신저 - 방별 사진 모아보기 (Phase 51 T5)
+describe("listRoomAttachments", () => {
+  it("경로를 오래된 순으로 돌려준다 (뷰어 이동 순서와 같아야 한다)", async () => {
+    // 서버는 최신순으로 잘라 받는다 — 목이 그 응답을 흉내 낸다.
+    const rows = [{ attachment_path: "r/p3.webp", seq: 3 }, { attachment_path: "r/p1.webp", seq: 1 }];
+    const list = await listRoomAttachments(fakeSupabase({ messages: rows }), ROOM_ROW.id);
+    expect(list).toEqual(["r/p1.webp", "r/p3.webp"]);
+  });
+
+  it("빈 방이면 빈 배열", async () => {
+    expect(await listRoomAttachments(fakeSupabase({ messages: [] }), ROOM_ROW.id)).toEqual([]);
   });
 });
