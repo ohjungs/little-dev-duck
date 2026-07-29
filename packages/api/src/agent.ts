@@ -6,6 +6,7 @@ import {
   type ToolCall,
   type ToolDeclaration,
   type ToolResult,
+  kstFullDateLabel,
 } from "@ldd/core";
 import { GEMINI_GEN_MODEL, safeBody, upstreamError } from "./gemini";
 
@@ -123,10 +124,8 @@ const TOOL_PREFERENCE_GUARD =
 // 뒤 날짜로 생성되는 버그로 확인됐다(2026-07-23). "내일/이번 주/다음 주" 같은 상대 날짜를 정확히 계산하려면
 // 매 턴 실제 오늘 날짜(KST)를 명시적으로 알려줘야 한다. now는 테스트에서 고정 주입.
 function buildDateContext(now: () => Date): string {
-  const label = new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    dateStyle: "full",
-  }).format(now());
+  // KST 라벨은 core 한 벌(X-013) — 홈 인사와 같은 문자열 규칙을 쓴다.
+  const label = kstFullDateLabel(now());
   return `오늘은 ${label}(한국 시간)이다. "내일/모레/이번 주/다음 주" 같은 상대 날짜 표현은 반드시 이 날짜를 기준으로 계산하라.`;
 }
 

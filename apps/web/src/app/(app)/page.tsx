@@ -17,22 +17,15 @@ import {
   canUseFeature,
   visibleWidgets,
   resolveDisplayName,
+  kstHourOf,
+  kstFullDateLabel,
 } from "@ldd/core";
 import { DASHBOARD_WIDGETS } from "@/lib/dashboardWidgets";
 
 export const dynamic = "force-dynamic";
 
-// 서버 컴포넌트(force-dynamic)는 Vercel의 UTC 시간을 쓰므로, 인사·아이콘·날짜를 반드시
-// KST(Asia/Seoul) 기준으로 계산한다. 안 그러면 한국 밤에도 UTC 오후가 잡혀 "오후 ☀️"가 뜬다.
-function kstHour(): number {
-  return Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Seoul",
-      hour: "2-digit",
-      hourCycle: "h23",
-    }).format(new Date()),
-  );
-}
+// 서버 컴포넌트(force-dynamic)는 Vercel의 UTC 시간을 쓴다 — KST 계산은 core 한 벌
+// (kstHourOf·kstFullDateLabel, X-013)을 쓴다. 안 그러면 한국 밤에도 "오후 ☀️"가 뜬다.
 
 // 날짜 기반으로 하루 동안 일관된 동기부여 메시지를 고른다(무작위 아님).
 const MOTIVATIONS = [
@@ -94,15 +87,9 @@ export default async function DashboardPage() {
     metadataName: user?.user_metadata.name,
   });
 
-  const dateLabel = new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  }).format(new Date());
+  const dateLabel = kstFullDateLabel(new Date());
 
-  const h = kstHour();
+  const h = kstHourOf(new Date());
   const greeting = getGreeting(h);
   const timeEmoji = getTimeEmoji(h);
   const motivation = getDailyMotivation();

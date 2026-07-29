@@ -1,5 +1,20 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) T1: KST 계산 core 승격 (X-013)
+> 계획이 "이 Task에서 가장 값이 크다"고 지목한 항목 — 하루 밀림을 여러 번 겪어 eslint
+> 규칙까지 만든 저장소인데, UTC→KST 표시 계산이 **네 곳에 따로** 있었다: 홈 인사
+> `kstHour()`(로컬 함수) · 오피스 시계 포맷터 · agent 날짜 프롬프트 · 대화 내보내기 시각.
+>
+> - core date-util에 한 벌 승격(테스트 6건): `kstHourMinute`·`kstHourOf`·`kstFullDateLabel`
+>   ·`kstTimeString`. 포맷터 캐시도 core가 갖는다(오피스 게임 루프처럼 반복 호출 자리).
+>   UTC 자정 경계(15:30Z = KST 00:30)를 테스트로 잠금.
+> - 소비자 4곳 교체(동작 보존): 홈 인사·날짜 라벨 / PixelOffice kstClock / agent
+>   buildDateContext / transcript kstTime(내부 중복 삭제). 전체 green이 보존 근거 —
+>   특히 기존 transcript 테스트가 시각 규칙 동일함을 보증.
+> - **정적 잠금**: apps/web에 "Asia/Seoul" 리터럴 금지 스캔 + core 한 벌 존재 확인.
+> - 검증: core 1329건 / turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 85번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) **착수** — T1: 모션 축소 판정 한 벌 (X-006)
 > phase_56의 무-마이그레이션 조각 소진 → phase_57 draft를 stale 가드(Tauri 옵션 A 유지 ·
 > a11y 기반 유지) 통과 후 꺼냈다. 계획이 core 승격 대상으로 못박은 X-006부터:

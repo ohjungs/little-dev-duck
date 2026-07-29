@@ -4,6 +4,10 @@ import {
   kstDateString,
   startOfWeek,
   toLocalDateString,
+  kstHourMinute,
+  kstHourOf,
+  kstFullDateLabel,
+  kstTimeString,
 } from "./date-util";
 
 // 서버(UTC)에서 쓰는 KST 날짜. 테스트 머신 타임존과 무관하게 성립하도록 UTC 순간으로 고정한다.
@@ -100,5 +104,43 @@ describe("startOfWeek", () => {
   it("시각 성분은 버리고 그 날 자정을 돌려준다", () => {
     const r = startOfWeek(new Date(2026, 6, 22, 15, 30));
     expect([r.getHours(), r.getMinutes()]).toEqual([0, 0]);
+  });
+});
+
+// 2026-07-29 : 시간대 - KST 표시 한 벌 승격 (Phase 57 T1 X-013)
+// 이 저장소는 날짜 하루 밀림을 여러 번 겪어 eslint 규칙까지 만들었다. UTC 저장·KST 표시
+// 계산이 화면 곳곳(홈 인사·오피스 시계·agent 프롬프트·대화 시각)에 따로 있었다 — 한 벌로.
+describe("kstHourMinute / kstHourOf", () => {
+  it("UTC 자정 직전이 KST 다음날 새벽이 된다 (하루 밀림의 그 경계)", () => {
+    const hm = kstHourMinute(new Date("2026-07-28T15:30:00.000Z"));
+    expect(hm).toEqual({ hour: 0, minute: 30 });
+    expect(kstHourOf(new Date("2026-07-28T15:30:00.000Z"))).toBe(0);
+  });
+
+  it("정오·자정 경계", () => {
+    expect(kstHourOf(new Date("2026-07-29T03:00:00.000Z"))).toBe(12);
+    expect(kstHourMinute(new Date("2026-07-28T14:59:00.000Z"))).toEqual({
+      hour: 23,
+      minute: 59,
+    });
+  });
+});
+
+describe("kstFullDateLabel", () => {
+  it("ko-KR 연월일·요일 라벨 (홈 인사·agent 프롬프트 공용)", () => {
+    const label = kstFullDateLabel(new Date("2026-07-28T15:30:00.000Z"));
+    expect(label).toContain("2026년");
+    expect(label).toContain("7월 29일");
+    expect(label).toContain("수요일");
+  });
+});
+
+describe("kstTimeString", () => {
+  it("ISO를 KST 시:분으로 (대화 내보내기의 그 규칙)", () => {
+    expect(kstTimeString("2026-07-28T15:30:00.000Z")).toBe("00:30");
+  });
+
+  it("해석 불가면 --:-- (줄 하나 때문에 죽지 않는다)", () => {
+    expect(kstTimeString("깨진값")).toBe("--:--");
   });
 });

@@ -47,6 +47,7 @@ import {
   type CharacterLook,
   type CharFacing,
   type OfficeTask,
+  kstHourMinute,
 } from "@ldd/core";
 import { InputManager } from "@/lib/office-input";
 import { OfficeSoundManager } from "@/lib/office-sound";
@@ -63,17 +64,9 @@ import { loadCharacterAssets, drawCharacter, type CharacterAssets } from "@/lib/
 // ---------------------------------------------------------------------------
 // 오피스 시계를 실제 KST 시각에 동기화한다(빠른 게임 시뮬 대신 실시간 반영 — "게임처럼 보이지만
 // 게임은 아닌" 실제 시간 오피스). 밤이면 실제로 직원들이 퇴근한 상태로 보인다.
-// 포맷터는 한 번만 생성해 재사용한다(매 프레임 new Intl.DateTimeFormat은 낭비 — 루프에서 호출됨).
-const KST_FORMAT = new Intl.DateTimeFormat("en-US", {
-  timeZone: "Asia/Seoul",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
+// KST 계산은 core 한 벌(kstHourMinute, X-013) — 포맷터 캐시도 core가 갖는다(루프에서 호출됨).
 function kstClock(): GameClock {
-  const parts = KST_FORMAT.formatToParts(new Date());
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
-  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const { hour, minute } = kstHourMinute(new Date());
   return gameClockFromHm(hour, minute);
 }
 

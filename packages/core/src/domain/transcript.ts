@@ -5,19 +5,8 @@
 // 이건 "이 방을 파일로 들고 나가기"라는 별개의 작은 문이다.
 
 import { dayKey } from "./message-timeline";
+import { kstTimeString } from "./date-util";
 import { messageBody, type Message } from "./room";
-
-/** 그 시각의 KST 시:분. 해석 불가면 "--:--" — 줄 하나 때문에 내보내기가 죽으면 안 된다. */
-function kstTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "--:--";
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Seoul",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(d);
-}
 
 type TranscriptMessage = Pick<
   Message,
@@ -49,9 +38,9 @@ export function formatTranscript(
     }
     const body = messageBody(m); // 지운 것은 안내 문구로 — 내보내기가 삭제를 되살리면 안 된다
     if (m.type === "system") {
-      lines.push(`${kstTime(m.createdAt)} (알림) ${body}`);
+      lines.push(`${kstTimeString(m.createdAt)} (알림) ${body}`);
     } else {
-      lines.push(`${kstTime(m.createdAt)} ${senderLabel(m, myUserId)}: ${body}`);
+      lines.push(`${kstTimeString(m.createdAt)} ${senderLabel(m, myUserId)}: ${body}`);
     }
   }
 
@@ -79,9 +68,9 @@ export function formatTranscriptMarkdown(
     // 본문은 이스케이프 없이 그대로 담는다 — 파일의 원문 충실이 렌더 모양보다 먼저다.
     const body = messageBody(m);
     if (m.type === "system") {
-      lines.push(`**${kstTime(m.createdAt)}** (알림) ${body}`, "");
+      lines.push(`**${kstTimeString(m.createdAt)}** (알림) ${body}`, "");
     } else {
-      lines.push(`**${kstTime(m.createdAt)} ${senderLabel(m, myUserId)}**: ${body}`, "");
+      lines.push(`**${kstTimeString(m.createdAt)} ${senderLabel(m, myUserId)}**: ${body}`, "");
     }
   }
 

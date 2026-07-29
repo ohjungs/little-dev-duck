@@ -27,6 +27,53 @@ export function kstDateString(now: Date): string {
   }).format(now);
 }
 
+// 2026-07-29 : 시간대 - KST 표시 한 벌 승격 (Phase 57 T1 X-013)
+// UTC 저장·KST 표시 계산이 화면 곳곳(홈 인사 kstHour · 오피스 시계 · agent 날짜 프롬프트 ·
+// 대화 시각)에 따로 있었다 — 이 저장소는 날짜 하루 밀림을 여러 번 겪어 eslint 규칙까지
+// 만든 이력이 있다(메신저는 시간을 훨씬 많이 다룬다). 여기 한 벌로 모은다.
+// 포맷터는 모듈에서 한 번만 만든다 — 오피스 게임 루프처럼 반복 호출되는 자리가 있다.
+
+const KST_HM_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Seoul",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+const KST_FULL_DATE_FORMAT = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  weekday: "long",
+});
+
+/** KST 시·분. 오피스 시계·인사말처럼 "지금 몇 시인가"가 필요한 자리의 한 벌. */
+export function kstHourMinute(now: Date): { hour: number; minute: number } {
+  const parts = KST_HM_FORMAT.formatToParts(now);
+  const pick = (type: "hour" | "minute") =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { hour: pick("hour"), minute: pick("minute") };
+}
+
+export function kstHourOf(now: Date): number {
+  return kstHourMinute(now).hour;
+}
+
+/** ko-KR 연월일·요일 라벨("2026년 7월 29일 수요일"). 홈 인사와 agent 날짜 프롬프트 공용. */
+export function kstFullDateLabel(now: Date): string {
+  return KST_FULL_DATE_FORMAT.format(now);
+}
+
+/** ISO 시각의 KST 시:분. 해석 불가면 "--:--" — 줄 하나 때문에 표시 전체가 죽으면 안 된다. */
+export function kstTimeString(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "--:--";
+  const { hour, minute } = kstHourMinute(d);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(hour)}:${p(minute)}`;
+}
+
 // 그 날짜가 속한 주의 월요일(로컬 기준). 주간 단위 산출물(회고·다이제스트)이 요일과 무관하게
 // 같은 주차 키를 갖게 한다. 일요일은 그 주의 마지막 날로 본다(ISO-8601).
 export function startOfWeek(date: Date): Date {
