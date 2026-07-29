@@ -1,5 +1,12 @@
 # Pixel Office Expansion -- Stardew Valley-Style Office Simulation
 
+> **상태: 구현 완료 확인 (2026-07-29 loop-eng 전수 대조)** — 이 로드맵의 핵심 축은 전부
+> 코드에 존재한다: 타일맵·카메라·맵 빌더(office-tilemap/camera/map-builder), 스프라이트/
+> 캐릭터(office-character), 부서·회사(office-department/company), NPC 상태머신·A*
+> (office-npc/pathfind), 게임 시계(office-time), 터치 입력(lib/office-input), 사운드
+> (lib/office-sound), 미니맵(M 키, PixelOffice HUD). **이 문서로 새 작업을 시작하지 말 것** —
+> 잔여가 있다면 코드 대조로 다시 확인하고 새 계획을 별도로 세운다. 아래는 설계 기록 보존용.
+
 작성일 2026-07-24. 근거: Phase 16-17 완료 상태(PixelOffice.tsx Canvas 2D, office-play.ts/office-event.ts core)에서
 Stardew Valley 스타일 회사 시뮬레이션으로 확장하기 위한 종합 아키텍처 설계.
 
