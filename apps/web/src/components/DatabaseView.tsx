@@ -180,12 +180,16 @@ export function DatabaseView({
     const removed = rows?.find((r) => r.id === rowId);
     if (!removed) return;
     setRows((rs) => (rs ?? []).filter((r) => r.id !== rowId));
-    softDeletePage(supabase, rowId).catch(() => {
-      setRows((rs) =>
-        (rs ?? []).some((r) => r.id === rowId) ? (rs ?? []) : [...(rs ?? []), removed],
-      );
-      showError("행 삭제에 실패했습니다. 다시 시도해 주세요.");
-    });
+    softDeletePage(supabase, rowId)
+      // 지운 행의 임베딩을 비운다(PageWorkspace 삭제와 같은 관례 — 빈 텍스트 재인덱싱).
+      // 안 지우면 오리가 지운 행을 근거로 답한다. 복원 시 TrashView가 다시 인덱싱한다.
+      .then(() => void reindexSource({ sourceType: "page", sourceId: rowId, text: "" }))
+      .catch(() => {
+        setRows((rs) =>
+          (rs ?? []).some((r) => r.id === rowId) ? (rs ?? []) : [...(rs ?? []), removed],
+        );
+        showError("행 삭제에 실패했습니다. 다시 시도해 주세요.");
+      });
   };
 
   const handleMoveRow = (rowId: string, optionId: string | null) => {
