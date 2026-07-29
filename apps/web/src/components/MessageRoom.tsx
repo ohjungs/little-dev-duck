@@ -9,7 +9,7 @@
 // **낙관적 UI**: 보내면 즉시 목록에 붙인다. 그래서 중복이 생길 수 있고, 그 방어가
 // `clientMsgId`다(같은 값으로 재시도하면 서버가 이미 저장한 것을 돌려준다).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   deleteMessage,
@@ -38,6 +38,10 @@ import {
   shouldSendRead,
   isRoomMuted,
   MUTE_DURATIONS,
+  dayDivider,
+  firstUnreadId,
+  isNearBottom,
+  kstDateString,
   type Message,
   type Reaction,
   type ReadReceiptState,
@@ -87,6 +91,17 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 답장 대상. 보내고 나면 비운다 — 안 비우면 다음 말도 계속 답장이 된다.
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  // 2026-07-29 : 메신저 - 구분선·스크롤 (Phase 51 T6)
+  // 오늘 날짜(KST)는 렌더 중에 읽지 않는다(순수성). 채워지기 전에는 구분선이 "오늘" 대신
+  // 날짜를 그대로 적는데, 틀린 말이 아니라서 깜빡여도 해가 없다.
+  const [todayKey, setTodayKey] = useState("");
+  // **들어온 순간의 읽음 위치**를 붙잡아 둔다. 읽음 표시는 들어가자마자 갱신되므로
+  // 서버 값을 계속 따라가면 구분선이 뜨자마자 사라진다 — "어디까지 읽었는지"를 못 보게 된다.
+  const [unreadAnchor, setUnreadAnchor] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  // 바닥 근처인지. 상태로 두면 스크롤할 때마다 다시 그린다 — 이 값은 아래 효과에서만 읽는다.
+  const atBottomRef = useRef(true);
+  const [showJump, setShowJump] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -201,6 +216,8 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
       if (alive && m) {
         setMutedUntil(m.mutedUntil);
         setPinnedAt(m.pinnedAt);
+        // 여기서 한 번만 잡는다. 이후 읽음 표시가 나가도 이 값은 그대로 둔다.
+        setUnreadAnchor(m.lastReadMessageId);
       }
     });
     return () => {
@@ -257,10 +274,39 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     };
   }, [messages, myUserId, roomId]);
 
-  // 새 메시지가 오면 아래로. 사용자가 위를 읽는 중일 수도 있어 부드럽게만 민다.
+  // 오늘이 며칠인지는 한 번만 정한다(KST). 자정을 넘겨 방을 켜 둔 경우는
+  // 구분선 문구가 하루 늦게 갱신되는데, 그걸 맞추자고 타이머를 두지는 않는다.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 현재 시각은 렌더 중에 읽을 수 없다(순수성). 마운트 시 1회
+    setTodayKey(kstDateString(new Date()));
+  }, []);
+
+  // 2026-07-29 : 메신저 - 스크롤 - 읽는 중 보호 (Phase 51 T6)
+  // **새 메시지가 왔다고 무조건 끌어내리지 않는다.** 위쪽 대화를 읽는 중에 화면이 튀면
+  // 읽던 자리를 잃고, 그게 "스크롤이 이상하다"는 인상이 된다.
+  // 바닥 근처면 따라 내려가고, 아니면 버튼으로 알린 뒤 사용자가 누를 때 내려간다.
+  useEffect(() => {
+    if (atBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      return;
+    }
+    setShowJump(true);
   }, [messages.length]);
+
+  function handleListScroll() {
+    const el = listRef.current;
+    if (!el) return;
+    const near = isNearBottom(el.scrollTop, el.clientHeight, el.scrollHeight);
+    atBottomRef.current = near;
+    // 바닥에 닿으면 알림 버튼은 할 일이 없다.
+    if (near && showJump) setShowJump(false);
+  }
+
+  function jumpToBottom() {
+    atBottomRef.current = true;
+    setShowJump(false);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }
 
   /**
    * 보내기 전에 브라우저에서 줄인다. **스토리지가 1GB뿐이라 리사이즈는 생존 조건**이라고
@@ -379,6 +425,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     }
   }
 
+  // 목록 전체에 한 번만 계산한다 — 메시지마다 부르면 목록 길이의 제곱만큼 훑는다.
+  const unreadId = firstUnreadId(messages, unreadAnchor, myUserId);
+
   return (
     <div className="flex h-[60vh] flex-col rounded-lg border border-border">
       {/* 2026-07-27 (Phase 51 T2): 방별 음소거. **"언제까지"를 고르게 한다** —
@@ -420,14 +469,41 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
         )}
       </div>
 
-      <ul className="flex-1 space-y-2 overflow-y-auto p-3" aria-label="대화 내용">
+      <div className="relative flex-1 overflow-hidden">
+      <ul
+        ref={listRef}
+        onScroll={handleListScroll}
+        className="h-full space-y-2 overflow-y-auto p-3"
+        aria-label="대화 내용"
+      >
         {messages.length === 0 ? (
           <li className="text-sm text-muted-foreground">아직 주고받은 말이 없어요.</li>
         ) : (
-          messages.map((m) => {
+          messages.map((m, i) => {
             const mine = m.senderUserId === myUserId;
+            // 날짜 경계는 KST로 나눈다(core). 화면에서 날짜를 비교하면 기기 시간대에 따라
+            // 구분선이 다른 자리에 생긴다.
+            const divider = dayDivider(messages[i - 1]?.createdAt ?? null, m.createdAt, todayKey);
+            const unreadHere = m.id === unreadId;
             return (
-              <li key={m.id} className={`relative ${mine ? "text-right" : "text-left"}`}>
+              <Fragment key={m.id}>
+              {/* 선은 장식이라 숨기고 날짜 글자만 읽히게 둔다. role="separator"를 주면
+                  구분선 자체가 구조물로 읽혀 **안의 날짜가 안 읽히는** 리더가 있다. */}
+              {divider && (
+                <li className="flex items-center gap-2 py-1 text-center">
+                  <span aria-hidden className="h-px flex-1 bg-border" />
+                  <span className="text-[11px] text-muted-foreground">{divider}</span>
+                  <span aria-hidden className="h-px flex-1 bg-border" />
+                </li>
+              )}
+              {unreadHere && (
+                <li className="flex items-center gap-2 py-1">
+                  <span aria-hidden className="h-px flex-1 bg-primary/50" />
+                  <span className="text-[11px] text-primary">여기까지 읽었어요</span>
+                  <span aria-hidden className="h-px flex-1 bg-primary/50" />
+                </li>
+              )}
+              <li className={`relative ${mine ? "text-right" : "text-left"}`}>
                 <span
                   onContextMenu={(e) => {
                     if (m.deletedAt) return;
@@ -559,11 +635,24 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                   </div>
                 )}
               </li>
+              </Fragment>
             );
           })
         )}
         <div ref={bottomRef} />
       </ul>
+
+      {/* 위쪽을 읽는 중에 새 말이 오면 여기로 알린다. 안 알리면 아래에 뭐가 온 줄 모른다. */}
+      {showJump && (
+        <button
+          type="button"
+          onClick={jumpToBottom}
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-border bg-background px-3 py-1 text-xs shadow-md hover:bg-accent"
+        >
+          새 메시지 ↓
+        </button>
+      )}
+      </div>
 
       {error && (
         <p role="alert" className="border-t border-border px-3 py-2 text-xs text-destructive break-keep">

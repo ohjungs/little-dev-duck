@@ -607,3 +607,13 @@ export {
   type ReactionEmoji,
   type ReactionSummary,
 } from "./domain/reaction";
+
+// 2026-07-29 : 메신저 - 날짜·미읽음 구분선 (Phase 51 T6)
+export {
+  NEAR_BOTTOM_PX,
+  dayDivider,
+  dayKey,
+  dayLabel,
+  firstUnreadId,
+  isNearBottom,
+} from "./domain/message-timeline";
