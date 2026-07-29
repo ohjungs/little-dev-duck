@@ -7,6 +7,14 @@
 //     **에러가 아니라 "이미 보낸 그 메시지"로 되돌려 준다** — 재시도한 사용자에게
 //     "실패했습니다"를 보여 주면 같은 말을 두 번 쓰게 된다.
 //   - 순서는 서버가 부여한 `seq`로만 매긴다. 클라이언트 시각으로 정렬하지 않는다.
+//
+// 2026-07-29 : 보안 - CSRF 확인 (Phase 58 T5 U-012, 재조사 아님 — Phase 36 실측 적용)
+// 메시지 전송에는 **서버 API Route가 없다** — 이 파일의 모든 쓰기는 supabase-js가
+// PostgREST로 직결하며, 인증은 쿠키가 아니라 **Authorization 헤더의 JWT**로 간다.
+// 크로스사이트 폼·이미지 태그는 커스텀 헤더를 실을 수 없으므로 이 경로로 CSRF가
+// 성립하지 않는다(쿠키 자동 전송에 기대지 않아 sameSite 논거보다 강한 성질).
+// 서버 라우트 쪽 근거는 apps/web/src/app/api/account/delete/route.ts 주석 참조
+// (@supabase/ssr이 인증 쿠키를 sameSite: "lax"로 굽는 것을 Phase 36이 dist에서 실측).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
