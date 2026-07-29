@@ -16,12 +16,21 @@ import {
   type MessageSearchFilter,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
+import { clearRecentList, pushRecentList, readRecentList } from "@/lib/recentList";
+
+// 2026-07-29 : 메신저 - 최근 검색어 (Phase 55 T1 L-017)
+// 백업(localPrefs)에는 담지 않는다 — 파생값이라 쓰면 다시 쌓인다(local-prefs.ts의 판단).
+const RECENT_SEARCHES_KEY = "ldd:recent-searches";
+const RECENT_SEARCHES_MAX = 10;
 
 export function MessageSearch() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Message[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<string[]>(() =>
+    typeof window !== "undefined" ? readRecentList(RECENT_SEARCHES_KEY) : [],
+  );
   // 2026-07-29 : 메신저 - 검색 필터 (Phase 55 T1 L-006~L-008)
   // 필터는 "찾기"를 누를 때 적용된다 — 바꿀 때마다 검색하면 날짜를 고르는 중간에도 쿼리가 나간다.
   const [sender, setSender] = useState<"" | "user" | "agent">("");
@@ -29,9 +38,9 @@ export function MessageSearch() {
   const [to, setTo] = useState("");
   const [withImage, setWithImage] = useState(false);
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (busy) return;
+  // 제출 버튼과 최근 검색어 클릭이 같은 경로를 쓴다 — 갈라지면 필터 적용도 갈라진다.
+  async function runSearch(term: string) {
+    if (busy || term.trim() === "") return;
     setBusy(true);
     setError(null);
     try {
@@ -41,13 +50,20 @@ export function MessageSearch() {
         to: to === "" ? undefined : to,
         withImage: withImage || undefined,
       };
-      setResults(await searchMessages(createClient(), q, filter));
+      setResults(await searchMessages(createClient(), term, filter));
+      // 성공한 검색만 남긴다 — 실패한 검색어가 쌓이면 목록이 못 쓰게 된다.
+      setRecent(pushRecentList(RECENT_SEARCHES_KEY, term.trim(), RECENT_SEARCHES_MAX));
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       setError(pendingMigrationMessage(raw) ?? raw);
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    void runSearch(q);
   }
 
   return (
@@ -114,6 +130,36 @@ export function MessageSearch() {
           사진만
         </label>
       </div>
+
+      {/* 최근 검색어 — 성공한 검색만 쌓인다. 클릭하면 지금 필터로 다시 찾는다. */}
+      {recent.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs">
+          <span className="text-muted-foreground">최근</span>
+          {recent.map((term) => (
+            <button
+              key={term}
+              type="button"
+              onClick={() => {
+                setQ(term);
+                void runSearch(term);
+              }}
+              className="rounded-full border border-border px-2 py-0.5 hover:bg-accent"
+            >
+              {term}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              clearRecentList(RECENT_SEARCHES_KEY);
+              setRecent([]);
+            }}
+            className="px-1 text-muted-foreground hover:text-foreground"
+          >
+            지우기
+          </button>
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="mt-2 text-xs text-destructive break-keep">

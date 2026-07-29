@@ -8,31 +8,11 @@
 
 import { useState } from "react";
 
+import { pushRecentList, readRecentList } from "@/lib/recentList";
+
 // 카테고리별 큐레이션 이모지. 라이브러리 없이 정적 배열(ponytail).
 const RECENT_EMOJIS_KEY = "ldd:recent-emojis";
 const RECENT_MAX = 20;
-
-function getRecentEmojis(): string[] {
-  try {
-    const raw = localStorage.getItem(RECENT_EMOJIS_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((x): x is string => typeof x === "string");
-  } catch {
-    return [];
-  }
-}
-
-function addRecentEmoji(emoji: string): void {
-  try {
-    const prev = getRecentEmojis().filter((e) => e !== emoji);
-    const next = [emoji, ...prev].slice(0, RECENT_MAX);
-    localStorage.setItem(RECENT_EMOJIS_KEY, JSON.stringify(next));
-  } catch {
-    // localStorage 접근 불가 환경에서는 조용히 무시
-  }
-}
 
 type EmojiCategoryKey = "recent" | "objects" | "animals" | "food" | "activities" | "symbols";
 
@@ -100,16 +80,12 @@ export function EmojiPicker({
   const [activeCategory, setActiveCategory] = useState<EmojiCategoryKey>("objects");
   // 지연 초기화: typeof window 가드로 SSR에서도 안전. 마운트 시점에만 1회 실행된다.
   const [recentEmojis, setRecentEmojis] = useState<string[]>(() =>
-    typeof window !== "undefined" ? getRecentEmojis() : [],
+    typeof window !== "undefined" ? readRecentList(RECENT_EMOJIS_KEY) : [],
   );
 
   const handleSelect = (emoji: string) => {
-    addRecentEmoji(emoji);
-    // 선택 직후 picker 내부의 최근 목록도 즉시 반영한다(localStorage 재읽기 불필요).
-    setRecentEmojis((prev) => {
-      const next = [emoji, ...prev.filter((e) => e !== emoji)].slice(0, RECENT_MAX);
-      return next;
-    });
+    // 저장과 화면 갱신을 한 결과로 — 검색의 최근 검색어와 같은 recentList 한 벌이다.
+    setRecentEmojis(pushRecentList(RECENT_EMOJIS_KEY, emoji, RECENT_MAX));
     onSelect(emoji);
   };
 

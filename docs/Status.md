@@ -1,5 +1,19 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T1: 최근 검색어 (L-017) + recentList 공용화
+> "localStorage 최근 목록"의 **두 번째 소비자**가 생겨(이모지 피커에 이어 검색) 피커 추출 때와
+> 같은 원칙으로 공용 lib로 꺼냈다 — 두 곳이 정책(중복 하나·최신 앞·상한·조용한 실패) 한 벌을 쓴다.
+>
+> - lib `recentList`(테스트 9건): read·push·clear. storage 주입으로 node 테스트 가능,
+>   접근 차단 환경(사생활 모드)에서도 기능이 죽지 않는다.
+> - EmojiPicker를 **동작 보존** 교체(키·상한 20 그대로, 전체 테스트 green이 근거).
+> - 검색: 성공한 검색만 최근에 남긴다(실패어가 쌓이면 목록이 못 쓰게 된다) · 칩 클릭은
+>   제출과 **같은 runSearch 경로**(필터 동일 적용) · 지우기 버튼 · 최대 10.
+> - **백업(localPrefs)에는 안 담는다** — local-prefs.ts가 이미 "파생값이라 쓰면 다시
+>   쌓인다"고 결정해 둔 항목이다(선례 준수).
+> - 검증: web 테스트 파일 62(+1) / turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 69번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T1: 검색 필터 (L-006~L-008)
 > 검색 심화의 첫 조각 — 기존 부분일치 검색(Phase 51 방식) 위에 얹었고 마이그레이션 0건.
 >
