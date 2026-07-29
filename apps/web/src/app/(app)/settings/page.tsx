@@ -36,6 +36,7 @@ import { MessageNotifySetting } from "@/components/MessageNotifySetting";
 import { DataSaverSetting } from "@/components/DataSaverSetting";
 import { buildLabel } from "@/lib/buildInfo";
 import { SettingsResetCard } from "@/components/SettingsResetCard";
+import { DiagnosticsExportButton } from "@/components/DiagnosticsExportButton";
 import { HealthStatus } from "@/components/HealthStatus";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
@@ -422,6 +423,8 @@ export default async function SettingsPage() {
               <p className="text-muted-foreground">
                 Next.js 16 + Supabase + Gemini AI
               </p>
+              {/* T-027: 문제 보고에 첨부할 진단 꾸러미. */}
+              <DiagnosticsExportButton />
               <ul className="space-y-1 text-muted-foreground">
                 <li>블록 에디터 (BlockNote)</li>
                 <li>AI 오리 비서 (Gemini)</li>

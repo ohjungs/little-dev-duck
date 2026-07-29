@@ -1,5 +1,16 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 56](plans/phase_56.md) T2: 진단 로그 내보내기 (T-027)
+> "왜 안 되지"를 물을 때 첨부할 꾸러미(.json) — 활동 로그(200건, 요약은 core가 이미
+> 200자 캡)·알림 기록·설정 키 **이름**·userAgent.
+>
+> - **localStorage 값은 담지 않는다**(시크릿 렌즈) — 초안·개인 데이터가 들어 있을 수 있다.
+>   키 이름만으로 "어떤 설정이 존재하는가"는 충분하다. 이 배제를 테스트로 잠금(3건).
+> - 파일 스스로 말한다(note): "키 이름만 담고 값은 담지 않습니다."
+> - 조립은 순수함수(lib buildDiagnostics), 수집은 버튼 — 이 저장소의 분업 관례 그대로.
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 83번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 56](plans/phase_56.md) T2: 기기 설정 초기화 (T-031)
 > 되돌릴 수 없는 동작 — [Phase 35](plans/phase_35.md)의 계약(문구 타이핑 · 위험 동작마다
 > **다른** 문구)을 그대로 썼다. 계획 원문: "확인 문구를 다르게 쓴다 — 손이 기억한 대로
