@@ -937,8 +937,11 @@ export async function getRoom(supabase: SupabaseClient, roomId: string): Promise
 /**
  * 오리와의 대화방을 보장한다 — 있으면 그 방, 없으면 만든다(본인 + 오리 멤버).
  * 멤버 삽입이 실패하면 방이 껍데기로 남으므로 그 오류를 그대로 던진다(조용히 성공 금지).
+ * created: 이번 호출로 새로 만들었는지 — 호출부가 첫 인사를 이때만 넣는다(중복 인사 방지).
  */
-export async function ensureAgentRoom(supabase: SupabaseClient): Promise<Room> {
+export async function ensureAgentRoom(
+  supabase: SupabaseClient,
+): Promise<{ room: Room; created: boolean }> {
   const { data: existing, error: findError } = await supabase
     .from("rooms")
     .select("*")
@@ -946,7 +949,8 @@ export async function ensureAgentRoom(supabase: SupabaseClient): Promise<Room> {
     .order("created_at", { ascending: true })
     .limit(1);
   if (findError) throw new Error(findError.message);
-  if (existing && existing.length > 0) return roomFromRow(existing[0] as RoomRow);
+  if (existing && existing.length > 0)
+    return { room: roomFromRow(existing[0] as RoomRow), created: false };
 
   const {
     data: { user },
@@ -966,7 +970,7 @@ export async function ensureAgentRoom(supabase: SupabaseClient): Promise<Room> {
     { room_id: room.id, member_type: "agent", user_id: null },
   ]);
   if (memberError) throw new Error(memberError.message);
-  return room;
+  return { room, created: true };
 }
 
 /**

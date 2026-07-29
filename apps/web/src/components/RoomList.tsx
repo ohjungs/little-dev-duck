@@ -9,7 +9,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { ensureAgentRoom, type RoomListItem } from "@ldd/api";
+import { ensureAgentRoom, sendAgentMessage, type RoomListItem } from "@ldd/api";
 import { filterRoomsByTitle, roomDisplayTitle } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 
@@ -30,7 +30,19 @@ export function RoomList({ rooms }: { rooms: RoomListItem[] }) {
     setOpening(true);
     setError(null);
     try {
-      const room = await ensureAgentRoom(createClient());
+      const client = createClient();
+      const { room, created } = await ensureAgentRoom(client);
+      // 처음 만든 방이면 오리가 먼저 인사한다 — 빈 화면으로 시작하면 "아무것도 없다"로
+      // 보인다(사용자 피드백의 잔재). 기존 방에는 안 넣는다(중복 인사 방지). 인사 실패는
+      // 입장을 막지 않는다 — 방은 이미 있다.
+      if (created) {
+        await sendAgentMessage(client, {
+          roomId: room.id,
+          body:
+            "꽥! 오리예요. 여기서 무엇이든 물어보세요 — 할 일·일정·노트·지원 현황을 알고 있어요.\n/를 입력하면 쓸 수 있는 명령도 보여요.",
+          clientMsgId: crypto.randomUUID(),
+        }).catch(() => {});
+      }
       router.push(`/messages/${room.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
