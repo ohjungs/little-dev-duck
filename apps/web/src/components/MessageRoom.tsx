@@ -54,11 +54,13 @@ import {
   conversionReceiptText,
   dayDivider,
   firstUnreadId,
+  formatTranscript,
   matchSlashCommands,
   mergeMessages,
   parseSlashCommand,
   slashReceiptText,
   todoTitleFrom,
+  transcriptFileName,
   galleryNav,
   galleryPaths,
   isNearBottom,
@@ -254,6 +256,43 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       setError(pendingMigrationMessage(raw) ?? raw);
     } finally {
       setSavingEdit(false);
+    }
+  }
+
+  // 2026-07-29 : 메신저 - 대화 내보내기 (Phase 55 T2 Q-001)
+  const [exporting, setExporting] = useState(false);
+
+  /**
+   * 방 전체를 .txt로 내려받는다. 화면 창(50개) 밖의 과거까지 **전부** 읽는다 —
+   * 일부만 담고 "내보냈다"고 하면 안 된다. 상한(100회 왕복)은 무한 루프 방지 가드다.
+   */
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const client = createClient();
+      let all = await listMessages(client, roomId);
+      for (let i = 0; i < 100; i++) {
+        const first = all[0];
+        if (!first) break;
+        const older = await listMessagesBefore(client, roomId, first.seq);
+        if (older.length === 0) break;
+        all = mergeMessages(older, all);
+      }
+      const text = formatTranscript(all, myUserId);
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = transcriptFileName(null, kstDateString(new Date()));
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -644,7 +683,10 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
    * 줄이지 못하면(캔버스 실패 등) **원본으로 올리지 않고 멈춘다** — 상한을 조용히 넘기지 않는다.
    */
   async function shrink(file: File): Promise<Blob> {
-    const bitmap = await createImageBitmap(file);
+    // 2026-07-29 (K-008·K-009): canvas 재인코드는 EXIF를 통째로 버린다 — **촬영 위치(GPS)가
+    // 서버에 올라가지 않는다**(확인: toBlob은 픽셀만 인코드한다). 다만 방향(orientation)도
+    // EXIF에 있으므로 명시적으로 반영해 읽는다 — 안 하면 세로 사진이 눕는 브라우저가 있다.
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
     const { width, height } = resizeTarget(bitmap.width, bitmap.height);
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -846,6 +888,14 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
           className="rounded border border-border px-2 py-0.5 hover:bg-accent"
         >
           사진 모아보기
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleExport()}
+          disabled={exporting}
+          className="rounded border border-border px-2 py-0.5 hover:bg-accent disabled:opacity-50"
+        >
+          {exporting ? "내보내는 중" : "대화 내보내기(.txt)"}
         </button>
         {muted ? (
           <>

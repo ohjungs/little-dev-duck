@@ -600,6 +600,9 @@ export { linkifyParts, type LinkPart } from "./domain/linkify";
 // 2026-07-29 : 메신저 - 코드 블록 분리 (Phase 54 T3)
 export { codeFenceParts, type CodeFencePart } from "./domain/code-fence";
 
+// 2026-07-29 : 메신저 - 대화 내보내기 (Phase 55 T2 Q-001)
+export { formatTranscript, transcriptFileName } from "./domain/transcript";
+
 // 2026-07-29 : 메신저 - 슬래시 커맨드 (Phase 52 T2)
 export {
   SLASH_COMMANDS,

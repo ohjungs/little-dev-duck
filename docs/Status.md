@@ -1,5 +1,20 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T2·T3: EXIF 제거 확인 + 대화 .txt 내보내기
+> Phase 54 코드-완결 잔여 소진 → 55 스윕에서 두 조각.
+>
+> - **K-008·K-009**: 계획의 추정("canvas를 거치면 EXIF가 날아간다")을 **확인하고 기록**했다 —
+>   `toBlob`은 픽셀만 인코드하므로 **촬영 위치(GPS)가 서버에 올라가지 않는다.** 추가로
+>   `createImageBitmap`에 `imageOrientation: "from-image"`를 명시 — 방향도 EXIF에 있어서
+>   안 하면 세로 사진이 눕는 브라우저가 있다(회전 보정 K-009까지 한 줄로).
+> - **Q-001**: 방 헤더 "대화 내보내기(.txt)" — 화면 창(50개) 밖 과거까지 **전부** 읽어 담는다
+>   (일부만 담고 내보냈다고 하지 않는다 · 무한 루프 가드 100회). core `formatTranscript`
+>   (테스트 9건): KST 날짜 구분줄(`dayKey` 재사용) · 시각 · 나/오리/상대 라벨 · **지운 메시지는
+>   안내 문구로**(내보내기가 삭제를 되살리면 안 된다) · system은 "(알림)". 파일명은 OS 금지
+>   문자 제거(`transcriptFileName`). **새 백업 체계를 만들지 않았다**(백업 v4 그대로).
+> - 검증: core 1258건(파일 91) / turbo lint·test·build **18/18 GREEN**.
+> - 실물 확인: [manual-verification.md 64번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — Phase 54 T1 + 56 선행: 여러 줄 입력(textarea) + 전송 키 설정
 > **스레드(T2)는 착수하지 않았다** — `last_read_message_id` 모델 재설계가 낀 계약 변경이라
 > 무인 루프의 임의 판단 범위 밖(계획 스스로 "착수 전에 판단한다" 게이트). 대신 F-003이
