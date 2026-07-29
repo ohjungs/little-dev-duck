@@ -1,5 +1,15 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 56](plans/phase_56.md) T2: 버전 정보 (T-023)
+> 설정 "앱 정보"의 **하드코딩 "v1.0.0"이 어떤 배포와도 무관한 낡은 표기**였다(정직 위반
+> 발견). 실제 배포 커밋으로 교체 — 오늘만 17번 배포한 제품에 고정 버전 문자열은 거짓말이다.
+>
+> - lib `buildLabel`(테스트 3건): Vercel이 주입하는 `VERCEL_GIT_COMMIT_SHA`를 7자로 —
+>   해시가 없거나(로컬) 형식이 아니면 "개발 빌드"(아는 척하지 않는다). 비밀 아님(공개 repo 해시).
+> - 서버 컴포넌트에서 env 읽기라 클라이언트 노출 경로 없음.
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 81번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 56](plans/phase_56.md) T2: 데이터 절약 모드 (T-009)
 > 계획이 "값이 실제로 있다"고 못박은 항목 — 무료 티어 대역폭(5GB/월) 대책의 다음 단계.
 > 지연 로딩(K-024)이 "화면 밖은 나중에"라면 이건 "**누르기 전엔 아예 안 받는다**".

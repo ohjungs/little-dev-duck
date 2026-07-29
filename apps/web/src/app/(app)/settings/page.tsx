@@ -34,6 +34,7 @@ import { SendKeySetting } from "@/components/SendKeySetting";
 import { MessageStorageCard } from "@/components/MessageStorageCard";
 import { MessageNotifySetting } from "@/components/MessageNotifySetting";
 import { DataSaverSetting } from "@/components/DataSaverSetting";
+import { buildLabel } from "@/lib/buildInfo";
 import { HealthStatus } from "@/components/HealthStatus";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
@@ -410,7 +411,10 @@ export default async function SettingsPage() {
               <Info className="size-4 text-primary-accent" />
               앱 정보
             </CardTitle>
-            <CardDescription>Little Dev Duck v1.0.0</CardDescription>
+            {/* T-023: 고정 버전 문자열은 어떤 배포와도 무관했다 — 실제 배포 커밋을 보여준다. */}
+            <CardDescription>
+              {`Little Dev Duck · ${buildLabel(process.env.VERCEL_GIT_COMMIT_SHA)}`}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 text-sm">
