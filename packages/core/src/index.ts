@@ -596,6 +596,11 @@ export {
 // 2026-07-29 : 메신저 - 검색 하이라이트 (Phase 51 T3 잔여)
 export { splitByQuery, type HighlightPart } from "./domain/search-highlight";
 export { kstDayRange, type MessageSearchFilter } from "./domain/search-filter";
+export {
+  STORAGE_FREE_TIER_BYTES,
+  formatBytes,
+  storageUsagePercent,
+} from "./domain/storage-usage";
 
 // 2026-07-29 : 메신저 - URL 링크화 (Phase 54)
 export { linkifyParts, type LinkPart } from "./domain/linkify";

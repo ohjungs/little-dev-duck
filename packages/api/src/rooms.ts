@@ -221,6 +221,53 @@ export async function firstMessageOnOrAfter(
   return row ? messageFromRow(row) : null;
 }
 
+// 2026-07-29 : 메신저 - 저장 공간 사용량 (Phase 55 T2 Q-022)
+/** 폴더당 목록 조회 상한. 닿으면 그 뒤가 있는지 알 수 없어 근사치로 표시한다. */
+export const STORAGE_LIST_LIMIT = 1000;
+
+export type MessengerStorageUsage = {
+  totalBytes: number;
+  fileCount: number;
+  /** 조회 상한에 닿았거나 크기를 모르는 항목이 있어 실제보다 적게 셌을 수 있다. */
+  approximate: boolean;
+};
+
+/**
+ * 메신저 첨부가 쓰는 스토리지 총량. 첨부는 방별 폴더(`방id/파일id.ext`)에 있으므로
+ * 내 방 목록을 돌며 폴더별로 합산한다. Phase 55의 착수 기준("사용량 50% 초과?")을
+ * 보는 계기판 — **모르는 것은 근사치라고 말한다**(조용히 적게 세지 않는다).
+ */
+export async function messengerStorageUsage(
+  supabase: SupabaseClient,
+): Promise<MessengerStorageUsage> {
+  const rooms = await listRooms(supabase);
+  let totalBytes = 0;
+  let fileCount = 0;
+  // 방 목록 자체가 상한에 닿았으면 못 본 방의 첨부도 셈에서 빠진다.
+  let approximate = rooms.length >= ROOM_LIST_LIMIT;
+
+  for (const room of rooms) {
+    const { data, error } = await supabase.storage
+      .from(BUCKET)
+      .list(room.id, { limit: STORAGE_LIST_LIMIT });
+    if (error) throw new Error(error.message);
+    const entries = data ?? [];
+    if (entries.length >= STORAGE_LIST_LIMIT) approximate = true;
+    for (const entry of entries) {
+      const size = (entry.metadata as { size?: number } | null)?.size;
+      if (typeof size === "number") {
+        totalBytes += size;
+        fileCount += 1;
+      } else {
+        // 크기를 모르는 항목(폴더 등)이 있다 — 실측이 아니라고 표시한다.
+        approximate = true;
+      }
+    }
+  }
+
+  return { totalBytes, fileCount, approximate };
+}
+
 // 2026-07-29 : 메신저 - 표적 주변 로딩 (Phase 51 T3 잔여 L-005)
 /**
  * 표적 메시지 **주변 창**을 불러온다(검색 점프용). 표적이 최근 페이지 밖에 있어도

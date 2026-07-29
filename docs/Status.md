@@ -1,5 +1,19 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T2: 저장 공간 계기판 (Q-022)
+> Phase 55의 착수 기준이 "**스토리지 사용량 50% 초과?**"인데 그 숫자를 볼 수단이 없었다 —
+> 계기판부터 만들었다(측정 없는 기준은 기준이 아니다).
+>
+> - core `formatBytes`·`storageUsagePercent`(테스트 5건): 100% 초과를 자르지 않고 그대로,
+>   작은 사용량도 0으로 안 뭉갬(소수 1자리). 한도 상수는 한 곳(`STORAGE_FREE_TIER_BYTES`).
+> - api `messengerStorageUsage`(테스트 4건): 방별 폴더(`방id/…`)를 돌며 크기 합산.
+>   **모르는 것은 근사치라고 말한다** — 폴더 목록 상한(1000)·크기 미상 항목·방 200 상한에
+>   닿으면 approximate. 조회 실패는 0을 돌려주지 않고 던진다.
+> - 설정 카드 "메신저 저장 공간": **버튼을 눌렀을 때만** 계산(방 수 × 목록 조회라 공짜가
+>   아니다). 게이지(progressbar aria) + 50% 초과 시 경고색·정리 안내.
+> - 검증: core 1292건 / api 41건 / turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 74번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T1: 검색 결과 내보내기 (L-020) + **Q-005 계약 검토 결론**
 > **Q-005(카카오톡 txt 가져오기) 계약 검토 — 사용자 결정 대기(PENDING).**
 > 마이그레이션 원문으로 확인한 사실:

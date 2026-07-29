@@ -3,6 +3,7 @@ import {
   MESSAGE_PAGE_SIZE,
   fetchAllRoomMessages,
   firstMessageOnOrAfter,
+  messengerStorageUsage,
   RECENT_WINDOW,
   deleteMessage,
   listMessages,
@@ -469,5 +470,86 @@ describe("firstMessageOnOrAfter", () => {
     const { supabase, calls } = capturing([messageRow({ seq: 1 })]);
     expect(await firstMessageOnOrAfter(supabase, ROOM_ROW.id, "29-07-2026")).toBeNull();
     expect(calls).toEqual([]);
+  });
+});
+
+// 2026-07-29 : 메신저 - 저장 공간 사용량 (Phase 55 T2 Q-022)
+describe("messengerStorageUsage", () => {
+  function storageSupabase(opts: {
+    rooms: Array<{ id: string }>;
+    // 방 id → storage.list 응답 파일들
+    files: Record<string, Array<{ name: string; metadata: { size: number } | null }>>;
+    listError?: string;
+  }) {
+    const roomRows = opts.rooms.map((r) => ({ ...ROOM_ROW, id: r.id }));
+    const selectChain: Record<string, unknown> = {
+      eq: () => selectChain,
+      order: () => selectChain,
+      limit: async () => ({ data: roomRows, error: null }),
+    };
+    return {
+      from: () => ({ select: () => selectChain }),
+      storage: {
+        from: () => ({
+          list: async (folder: string) =>
+            opts.listError
+              ? { data: null, error: { message: opts.listError } }
+              : { data: opts.files[folder] ?? [], error: null },
+        }),
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 테스트용 최소 목
+    } as any;
+  }
+
+  const R1 = "11111111-1111-4111-8111-111111111111";
+  const R2 = "22222222-2222-4222-8222-222222222221";
+
+  it("방별 폴더의 파일 크기를 전부 합산한다", async () => {
+    const usage = await messengerStorageUsage(
+      storageSupabase({
+        rooms: [{ id: R1 }, { id: R2 }],
+        files: {
+          [R1]: [
+            { name: "a.webp", metadata: { size: 1000 } },
+            { name: "b.webp", metadata: { size: 500 } },
+          ],
+          [R2]: [{ name: "c.webp", metadata: { size: 250 } }],
+        },
+      }),
+    );
+    expect(usage.totalBytes).toBe(1750);
+    expect(usage.fileCount).toBe(3);
+    expect(usage.approximate).toBe(false);
+  });
+
+  it("한 폴더가 조회 상한에 닿으면 근사치로 표시한다", async () => {
+    const many = Array.from({ length: 1000 }, (_, i) => ({
+      name: `${i}.webp`,
+      metadata: { size: 1 },
+    }));
+    const usage = await messengerStorageUsage(
+      storageSupabase({ rooms: [{ id: R1 }], files: { [R1]: many } }),
+    );
+    expect(usage.approximate).toBe(true);
+    expect(usage.totalBytes).toBe(1000);
+  });
+
+  it("크기를 모르는 항목이 있으면 근사치로 표시한다 (아는 척하지 않는다)", async () => {
+    const usage = await messengerStorageUsage(
+      storageSupabase({
+        rooms: [{ id: R1 }],
+        files: { [R1]: [{ name: "폴더같은것", metadata: null }] },
+      }),
+    );
+    expect(usage.approximate).toBe(true);
+    expect(usage.fileCount).toBe(0);
+  });
+
+  it("조회 실패는 조용히 0을 돌려주지 않고 던진다", async () => {
+    await expect(
+      messengerStorageUsage(
+        storageSupabase({ rooms: [{ id: R1 }], files: {}, listError: "boom" }),
+      ),
+    ).rejects.toThrow("boom");
   });
 });

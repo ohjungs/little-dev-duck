@@ -2,6 +2,7 @@ import Image from "next/image";
 import {
   Activity,
   Bell,
+  Database,
   CalendarClock,
   Download,
   Info,
@@ -30,6 +31,7 @@ import { AppearanceSetting } from "@/components/AppearanceSetting";
 import { QuietHoursSetting } from "@/components/QuietHoursSetting";
 import { NotifySetting } from "@/components/NotifySetting";
 import { SendKeySetting } from "@/components/SendKeySetting";
+import { MessageStorageCard } from "@/components/MessageStorageCard";
 import { HealthStatus } from "@/components/HealthStatus";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
@@ -127,6 +129,21 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <SendKeySetting />
+          </CardContent>
+        </Card>
+        {/* 2026-07-29 (Q-022): 무료 티어 1GB의 계기판. 50% 초과가 정리(Phase 55 T3) 착수 기준이다. */}
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Database className="size-4 text-primary-accent" />
+              메신저 저장 공간
+            </CardTitle>
+            <CardDescription>
+              대화에 올린 사진이 쓰는 저장 공간을 무료 한도(1GB) 대비로 보여줍니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MessageStorageCard />
           </CardContent>
         </Card>
         {/* 2026-07-26 (피드백 6-1·1-2·1-5): 대시보드 구성도 "내 것"이라 설정에 둔다.
