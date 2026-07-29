@@ -42,6 +42,7 @@ import { timeAgo } from "@/lib/timeAgo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DailyBriefing } from "@/components/DailyBriefing";
 import {
   getReadArticles,
   markArticleRead,
@@ -536,6 +537,10 @@ export function NewsReader() {
               );
             })}
           </div>
+        )}
+        {/* 오늘의 브리핑(Phase 61 T2) — 하루 10개 이슈 카드. 읽음은 아래 목록과 같은 한 벌. */}
+        {state === "ready" && (
+          <DailyBriefing articles={articles} feeds={feeds} readSet={readSet} />
         )}
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">

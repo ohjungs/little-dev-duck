@@ -1,5 +1,17 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 61](plans/phase_61.md) T2: 오늘의 브리핑 카드
+> 뉴스 화면 상단에 하루 10개 이슈 카드(번호·카테고리·제목·요약·n개 매체) + "오늘의 진행
+> n/10". cherrypick 벤치마킹의 화면 절반이 붙었다.
+>
+> - `DailyBriefing` 신규 — 선정은 core dailyIssues, **읽음은 기존 read-articles 한 벌**
+>   (카드에서 열면 아래 목록 읽음 표시와 같이 움직인다 — 추적 두 벌 금지).
+> - 완주(10/10) 시 오리 칭찬 + XP +10(core XP_REWARDS.briefingDone, 잠금 테스트) —
+>   하루 1회 게이트(briefingXp, msgXpBudget과 같은 nextDailyCount 한 벌).
+> - 빈 상태 구분: 기사 0건 / 24시간 창 밖(windowHours를 문구에 그대로).
+> - 검증: turbo lint·test·build **18/18 GREEN**. 실기: [mv 99번](loop-eng/manual-verification.md).
+> - 다음: T3 — 날짜(오늘/어제/지난주·달력)·카테고리 필터.
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 61](plans/phase_61.md) T1: 데일리 이슈 선정 core
 > 하루 10개 이슈 선정 로직(cherrypick 벤치마킹의 심장). **topArticles 한 벌 재사용** —
 > 이 층이 더한 것은 24시간 창·피드별 상한(3)·카테고리 라벨(topicForUrl → 없으면 종합)뿐.

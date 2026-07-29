@@ -12,3 +12,11 @@ describe("XP_REWARDS.messageSent", () => {
     for (const v of others) expect(XP_REWARDS.messageSent).toBeLessThan(v);
   });
 });
+
+// 2026-07-29 : 뉴스 - 브리핑 완주 XP (Phase 61 T2)
+describe("XP_REWARDS.briefingDone", () => {
+  it("하루 1회짜리 완주 보상 — 대화(1)보다 크고 뽀모도로(15) 이하", () => {
+    expect(XP_REWARDS.briefingDone).toBeGreaterThan(XP_REWARDS.messageSent);
+    expect(XP_REWARDS.briefingDone).toBeLessThanOrEqual(XP_REWARDS.pomodoroComplete);
+  });
+});

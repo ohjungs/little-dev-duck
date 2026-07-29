@@ -10,6 +10,9 @@ export const XP_REWARDS = {
   // 2026-07-29 (Phase 59 T3 Y-007): 대화 1건. **일부러 가장 작다** — 대화는 할 일 완료 같은
   // 성취가 아니라 접촉이고, 값을 키우면 도배가 XP 농사가 된다(호출부가 하루 상한도 건다).
   messageSent: 1,
+  // 2026-07-29 (Phase 61 T2): 데일리 브리핑 10개 완주. 하루 1회만 주므로(호출부 게이트)
+  // 할 일 완료와 같은 급으로 둔다.
+  briefingDone: 10,
 } as const;
 
 export type XpSource = keyof typeof XP_REWARDS;
