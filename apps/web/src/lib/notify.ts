@@ -3,6 +3,8 @@
 import { isQuietHour, nextDailyCount, type DailyCount } from "@ldd/core";
 import { readQuietHours } from "./quietHours";
 import { isFocusMode } from "./focusMode";
+// notifyHistory는 이 파일에서 **타입만** 가져가므로 순환은 런타임에 존재하지 않는다.
+import { recordNotifyHistory } from "./notifyHistory";
 
 const CAP_KEY = "ldd:notifyCount";
 const DAILY_CAP = 10;
@@ -77,11 +79,18 @@ export function notifyBlockReason(now: Date = new Date()): NotifyBlockReason | n
 // (집중 모드 억제를 **여기서** 한다 — 호출부마다 확인하게 두면 한 곳씩 빠진다. Phase 51 T2의 교훈.)
 export function notifyDuck(title: string, body: string): void {
   const now = new Date();
-  if (notifyBlockReason(now) !== null) return;
-  if (!consumeDailyBudget(localDate(now))) return;
+  const reason = notifyBlockReason(now);
+  // 2026-07-29 (Phase 56 T1 M-028): 발송이든 차단이든 결과를 기록한다 —
+  // "아까 왜 안 왔지?"에 답할 수 있게. 본문은 안 남긴다(제목이면 어떤 알림인지 안다).
+  if (reason !== null) {
+    recordNotifyHistory({ at: now.toISOString(), title, outcome: reason });
+    return;
+  }
+  if (!consumeDailyBudget(localDate(now))) return; // 진단 직후 소진된 드문 경합 — 기록 없이 조용히
   try {
     new Notification(title, { body, icon: "/duck-logo.png" });
   } catch {
     // 일부 환경(모바일 등)은 Notification 생성자 직접 호출을 막음 — 조용히 무시
   }
+  recordNotifyHistory({ at: now.toISOString(), title, outcome: "fired" });
 }
