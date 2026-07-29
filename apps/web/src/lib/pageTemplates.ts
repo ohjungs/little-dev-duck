@@ -82,6 +82,13 @@ function heading(t: string, level: 1 | 2 | 3): TemplateBlock {
 function para(t = ""): TemplateBlock {
   return { type: "paragraph", content: t ? text(t) : [] };
 }
+// 2026-07-29 : 메신저 - 노트 변환 (Phase 59 T1 S-007)
+// 평문(메시지 본문)을 paragraph 블록 배열로. 블록 리터럴을 밖에서 다시 만들지 않도록
+// 템플릿의 para 한 벌을 그대로 쓴다. 빈 줄도 빈 paragraph로 보존한다(문단 구분 유지).
+export function textToBlocks(text: string): TemplateBlock[] {
+  return text.split("\n").map((line) => para(line.trim() === "" ? "" : line));
+}
+
 function bullet(t: string): TemplateBlock {
   return { type: "bulletListItem", content: text(t) };
 }

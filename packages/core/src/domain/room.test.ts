@@ -369,6 +369,11 @@ describe("conversionReceiptText (변환 영수증 문구)", () => {
     expect(conversionReceiptText("memo", "회의 내용")).toBe('"회의 내용" 메시지를 메모로 저장했어요');
   });
 
+  // 2026-07-29 : 메신저 - 노트 변환 (Phase 59 T1 S-007)
+  it("노트 변환을 말한다", () => {
+    expect(conversionReceiptText("page", "회의 정리")).toBe('"회의 정리" 메시지를 노트로 만들었어요');
+  });
+
   it("긴 본문은 미리보기 길이로 줄인다 (영수증이 원문만큼 길면 대화가 밀린다)", () => {
     const text = conversionReceiptText("todo", "가".repeat(100));
     expect(text).toContain("…");

@@ -16,6 +16,7 @@ import {
   coerceEventStart,
   createCalendarEvent,
   createMemo,
+  createPage,
   createTodo,
   deleteMessage,
   downloadMessageImage,
@@ -100,6 +101,7 @@ import { notifyDuck } from "@/lib/notify";
 import { loadDraft, saveDraft } from "@/lib/messageDraft";
 import { isComposingEnter, shouldSendOnKey, type SendKeyMode } from "@/lib/composition";
 import { getSendKeyMode } from "@/lib/sendKeyPref";
+import { textToBlocks } from "@/lib/pageTemplates";
 import { MessageImageViewer } from "@/components/MessageImageViewer";
 import { EmojiPicker } from "@/components/EmojiPicker";
 
@@ -311,12 +313,19 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   // **생성 로직을 재구현하지 않는다** — 할 일·메모를 만드는 그 함수(createTodo·createMemo)를
   // 그대로 부른다(계획: 재구현은 인벤토리 위반). 생성은 되돌릴 수 있어 승인 카드 없이 바로 한다.
   // 변환 뒤 방에 system 영수증을 남긴다 — 표시가 없으면 같은 메시지를 두 번 변환한다.
-  async function handleConvert(m: Message, kind: "todo" | "memo") {
+  async function handleConvert(m: Message, kind: "todo" | "memo" | "page") {
     setMenuFor(null);
     try {
       const client = createClient();
       if (kind === "todo") {
         await createTodo(client, { title: todoTitleFrom(messageBody(m)) });
+      } else if (kind === "page") {
+        // 2026-07-29 : 메신저 - 노트 변환 (Phase 59 T1 S-007). 제목은 할 일 변환과
+        // 같은 한 줄 규칙(todoTitleFrom), 본문은 템플릿 블록 한 벌(textToBlocks)로.
+        await createPage(client, {
+          title: todoTitleFrom(messageBody(m)),
+          content: textToBlocks(messageBody(m)),
+        });
       } else {
         await createMemo(client, { content: messageBody(m) });
       }
@@ -1479,6 +1488,14 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                       className="px-3 py-1.5 text-xs hover:bg-accent"
                     >
                       메모로 저장
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void handleConvert(m, "page")}
+                      className="px-3 py-1.5 text-xs hover:bg-accent"
+                    >
+                      노트로 만들기
                     </button>
                     <button
                       type="button"

@@ -313,15 +313,15 @@ export function todoTitleFrom(body: string): string {
  * 변환 영수증(system 메시지) 문구. **원본 메시지에 표시를 남기지 않으면 같은 메시지를
  * 두 번 변환한다**(계획 T1). 컬럼 추가 없이 방 안의 system 메시지로 흔적을 남긴다.
  */
-export function conversionReceiptText(kind: "todo" | "memo", body: string): string {
+export function conversionReceiptText(kind: "todo" | "memo" | "page", body: string): string {
   const chars = [...body.replace(/\s+/g, " ").trim()];
   const preview =
     chars.length > REPLY_PREVIEW_MAX
       ? `${chars.slice(0, REPLY_PREVIEW_MAX - 1).join("")}…`
       : chars.join("");
-  return kind === "todo"
-    ? `"${preview}" 메시지를 할 일로 만들었어요`
-    : `"${preview}" 메시지를 메모로 저장했어요`;
+  if (kind === "todo") return `"${preview}" 메시지를 할 일로 만들었어요`;
+  if (kind === "page") return `"${preview}" 메시지를 노트로 만들었어요`;
+  return `"${preview}" 메시지를 메모로 저장했어요`;
 }
 
 /**

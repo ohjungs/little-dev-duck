@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 59](plans/phase_59.md) T1: 메시지 → 노트 변환 (S-007)
+> 메시지 메뉴에 "노트로 만들기"가 붙었다 — 할 일·메모 변환(Phase 52)과 같은 자리,
+> 같은 영수증 관례. 대화에서 나온 내용을 워크스페이스 문서로 승격하는 T1 네 번째 조각.
+>
+> - core `conversionReceiptText`에 "page" 종류(테스트 1건 RED→GREEN) — 영수증 문구
+>   한 벌 유지("…메시지를 노트로 만들었어요").
+> - web `textToBlocks`(pageTemplates): 평문 → paragraph 블록. **블록 리터럴을 다시
+>   만들지 않고 템플릿의 para 한 벌 재사용.** 빈 줄은 빈 문단으로 보존(문단 구분 유지).
+> - MessageRoom: `createPage` 재사용(재구현 금지), 제목은 할 일 변환과 같은
+>   todoTitleFrom 한 줄 규칙. 생성은 되돌릴 수 있어 확인 없이 바로 실행(기존 결).
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 97번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 59](plans/phase_59.md) T1: 메시지 속 노트 링크 (S-006)
 > 메시지에 붙여넣은 내 페이지 URL이 맨 주소 대신 **"노트: 제목"**으로 보인다 —
 > 메신저와 워크스페이스(노트)가 이어지는 T1 방향의 세 번째 조각.
