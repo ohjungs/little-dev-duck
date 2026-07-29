@@ -7,6 +7,9 @@ export const XP_REWARDS = {
   commit: 5,
   habitCheck: 8,
   pomodoroComplete: 15,
+  // 2026-07-29 (Phase 59 T3 Y-007): 대화 1건. **일부러 가장 작다** — 대화는 할 일 완료 같은
+  // 성취가 아니라 접촉이고, 값을 키우면 도배가 XP 농사가 된다(호출부가 하루 상한도 건다).
+  messageSent: 1,
 } as const;
 
 export type XpSource = keyof typeof XP_REWARDS;

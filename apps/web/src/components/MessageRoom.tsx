@@ -19,6 +19,7 @@ import {
   createTodo,
   deleteMessage,
   downloadMessageImage,
+  applyXpAward,
   fetchAllRoomMessages,
   firstMessageOnOrAfter,
   listMessages,
@@ -86,6 +87,8 @@ import { getMsgNotifyMode, getNotifyKeywords } from "@/lib/msgNotifyPref";
 import { getDataSaver } from "@/lib/dataSaverPref";
 import { isOffline, OFFLINE_SEND_MESSAGE } from "@/lib/offlineGuard";
 import { recordClientError } from "@/lib/clientErrorLog";
+import { consumeMessageXpBudget } from "@/lib/msgXpBudget";
+import { emitXpChanged } from "@/lib/xpSignal";
 import { prefersReducedMotionNow } from "@ldd/mascot";
 import { notifyBlockReason } from "@/lib/notify";
 import { describeMessageNotifyStatus } from "@/lib/notifyStatus";
@@ -1018,6 +1021,18 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         prev.some((m) => m.id === saved.id) ? prev : [...prev, saved],
       );
       setDraft("");
+      // 2026-07-29 (Phase 59 T3 Y-007): 대화 XP — 오리를 키우는 접촉. **전송 성공 뒤**
+      // 비동기로, 실패는 조용히(전송은 성공했는데 XP 에러를 보이면 전송이 실패한 줄 안다).
+      // 소액(1XP) + 하루 상한 — 선행 조건이던 harden_security_definer는 오늘 적용 확인됨.
+      if (consumeMessageXpBudget()) {
+        void applyXpAward(createClient(), myUserId, "messageSent")
+          .then(() => emitXpChanged())
+          .catch((e: unknown) => {
+            recordClientError(
+              `대화 XP 지급 실패: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          });
+      }
       // 민감 정보 경고(U-016) — 종류 라벨만 판단하고 값은 다루지 않는다(core 계약).
       const sensitiveHits = detectSensitiveInfo(body);
       setSensitiveNote(

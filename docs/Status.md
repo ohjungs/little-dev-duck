@@ -1,5 +1,21 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 59](plans/phase_59.md) **착수** — T3: 대화 XP (Y-007)
+> phase_58의 무인-가능 조각 소진 → phase_59("제품 정체성 — 고르는 게 일") 진입.
+> 계획 원칙 "결정 없이 만들 수 있는 것부터" + **선행 차단이 오늘 풀린 항목**을 골랐다:
+> Y-007은 "연결만 하면 된다"인데 `award_xp` 권한 결함(PENDING 1)이 조건이었고,
+> `harden_security_definer`가 **오늘 적용 확인**돼 경로를 늘려도 되는 상태가 됐다.
+>
+> - core `XP_REWARDS.messageSent = 1` — **보상표에서 가장 작음을 테스트로 잠금**
+>   (대화는 성취가 아니라 접촉, 도배가 XP 농사가 되면 안 된다).
+> - lib `msgXpBudget`: 하루 상한 20건(최대 20XP/일 = 할 일 2개 수준) —
+>   core `nextDailyCount` 재사용(알림 상한과 한 벌). 클라이언트 상한의 한계는 주석에 정직 기술.
+> - MessageRoom: **전송 성공 뒤** 비동기 지급 + `emitXpChanged`(위젯 즉시 갱신).
+>   실패는 조용히 + 진단 기록(전송이 실패한 줄 알면 같은 말을 두 번 쓴다).
+>   슬래시 커맨드는 조기 return이라 제외.
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 93번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 58](plans/phase_58.md) T5: CSRF 확인·주석 (U-012)
 > 계획 지시: "메시지 전송 라우트에도 같은 근거가 적용되는지 **확인하고 주석에 남긴다** —
 > 재조사 금지(Phase 36이 실측해 뒀다)."
