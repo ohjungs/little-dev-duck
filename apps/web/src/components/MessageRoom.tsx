@@ -82,6 +82,8 @@ import {
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { getMsgNotifyMode, getNotifyKeywords } from "@/lib/msgNotifyPref";
+import { notifyBlockReason } from "@/lib/notify";
+import { describeMessageNotifyStatus } from "@/lib/notifyStatus";
 import { subscribeRoomMessages } from "@/lib/realtime";
 import { notifyDuck } from "@/lib/notify";
 import { loadDraft, saveDraft } from "@/lib/messageDraft";
@@ -340,6 +342,20 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       setJumping(false);
     }
   }
+
+  // 2026-07-29 (Phase 56 T1): "지금 이 방 알림이 오는가" 한 줄. 판정이 다섯 겹이라
+  // 사용자가 추적할 수 없다 — 합성 문구는 lib이, 판정은 기존 것들이 한다.
+  const [notifyStatusLine, setNotifyStatusLine] = useState<string | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 시각·localStorage는 렌더 중에 읽을 수 없다. 마운트·음소거 변경 시 1회
+    setNotifyStatusLine(
+      describeMessageNotifyStatus({
+        blockReason: notifyBlockReason(),
+        mode: getMsgNotifyMode(),
+        keywordCount: getNotifyKeywords().length,
+      }),
+    );
+  }, [muted]);
 
   /** 전달 대상 고르기 열기. 방 목록을 그때 읽는다 — 새 방이 생겼어도 최신이 보이게. */
   async function openForward(m: Message) {
@@ -1006,7 +1022,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
           </>
         ) : (
           <>
-            <span className="text-muted-foreground">알림 끄기</span>
+            {/* 전역 게이트·알림 방식까지 합쳐 "지금 오는가"를 한 줄로(방 음소거는 아래 버튼이 말한다). */}
+            {notifyStatusLine && (
+              <span className="text-muted-foreground">{notifyStatusLine}</span>
+            )}
+            <span className="text-muted-foreground">끄기:</span>
             {MUTE_DURATIONS.map((d) => (
               <button
                 key={d.label}
