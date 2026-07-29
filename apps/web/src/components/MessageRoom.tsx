@@ -1225,6 +1225,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                         <img
                           src={url}
                           alt="첨부 이미지"
+                          // 화면 밖 사진은 내려받지 않는다 — 무료 티어 대역폭 5GB/월 (K-024)
+                          loading="lazy"
+                          decoding="async"
                           className="inline-block max-h-60 max-w-full rounded-lg border border-border"
                         />
                       </button>
@@ -1395,7 +1398,13 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                   >
                     {imageUrls[p] ? (
                       // eslint-disable-next-line @next/next/no-img-element -- 서명 URL은 만료되는 임시 주소라 next/image 최적화 대상이 아니다.
-                      <img src={imageUrls[p]} alt="첨부 이미지" className="size-full object-cover" />
+                      <img
+                        src={imageUrls[p]}
+                        alt="첨부 이미지"
+                        loading="lazy"
+                        decoding="async"
+                        className="size-full object-cover"
+                      />
                     ) : (
                       <span className="flex size-full items-center justify-center text-[10px] text-muted-foreground">
                         불러오는 중

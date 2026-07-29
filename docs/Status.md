@@ -1,5 +1,16 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T3: 첨부 이미지 지연 로딩 (K-024)
+> 무료 티어 대역폭(5GB/월) 방어 — 대화·갤러리의 `<img>`에 `loading="lazy"`+`decoding="async"`.
+> 화면 밖 사진은 스크롤 전에 내려받지 않는다. **블러 플레이스홀더는 안 만들었다**(썸네일
+> 인프라 필요 — Phase 51 경로에서 별도 판단, 지금은 YAGNI).
+>
+> - 정책을 **정적 검사로 잠금**(`lazyMessageImages.test.ts`): MessageRoom의 모든 `<img>`에
+>   lazy가 없으면 실패 — 다음에 이미지가 추가될 때 조용히 빠지는 회귀를 막는다.
+> - 확대 뷰어(MessageImageViewer)는 사용자가 연 것이라 즉시 로드 유지(의도된 예외, 검사 주석에 명시).
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 71번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T4: 날짜로 이동 (E-039)
 > 새 배관 없이 기존 것 두 벌의 조합: **kstDayRange**(검색 필터의 KST 경계)로 그 날 시작을
 > 구하고, 점프는 검색의 **`?focus=` 경로**(주변 로딩 L-005 · 스크롤 · 강조)에 그대로 맡겼다.
