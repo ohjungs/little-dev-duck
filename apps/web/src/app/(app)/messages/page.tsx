@@ -1,9 +1,9 @@
 import { MessageSquare } from "lucide-react";
-import Link from "next/link";
 
 import { listRoomsWithPin } from "@ldd/api";
 import { pendingMigrationMessage } from "@ldd/core";
 import { MessageSearch } from "@/components/MessageSearch";
+import { RoomList } from "@/components/RoomList";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -65,33 +65,8 @@ export default async function MessagesPage() {
           아직 대화가 없어요.
         </p>
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border">
-          {rooms.map((room) => (
-            <li key={room.id}>
-              <Link href={`/messages/${room.id}`} className="block p-3 hover:bg-accent">
-                <span className="text-sm font-medium">
-                  {/* 고정한 방은 표시가 있어야 왜 위에 있는지 알 수 있다.
-                      이모지 대신 글자로 둔다(CLAUDE.md 6절). */}
-                  {room.pinnedAt && (
-                    <span className="mr-1 rounded border border-border px-1 text-[10px] text-muted-foreground">
-                      고정
-                    </span>
-                  )}
-                  {room.title ?? (room.type === "agent" ? "오리와의 대화" : "이름 없는 대화")}
-                  {room.unread > 0 && (
-                    <span
-                      className="ml-2 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
-                      aria-label={`안 읽은 메시지 ${room.unread}건`}
-                    >
-                      {/* 99를 넘으면 정확한 수보다 "많다"가 더 쓸모 있다. 창 밖은 못 세기도 한다. */}
-                      {room.unread > 99 ? "99+" : room.unread}
-                    </span>
-                  )}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        // 목록 렌더·이름 필터(L-023)는 클라이언트 컴포넌트가 맡는다.
+        <RoomList rooms={rooms} />
       )}
     </div>
   );

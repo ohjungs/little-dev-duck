@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T1: 방 이름 필터 (L-023) + 표시 제목 공용화
+> 방 표시 제목 폴백(`title ?? "오리와의 대화"/"이름 없는 대화"`)이 **목록과 전달 대화상자
+> 두 곳에 인라인 중복**돼 있었다 — core `roomDisplayTitle`로 모으고 세 소비자(목록·전달·
+> 필터)가 한 벌을 쓴다. 필터가 raw title이 아니라 **보이는 제목**으로 거른다는 게 핵심:
+> 제목 없는 오리 방이 "오리"로 걸린다.
+>
+> - core `roomDisplayTitle`·`filterRoomsByTitle`(테스트 7건): 부분일치 · 대소문자 무시 ·
+>   빈 검색어는 전체. 픽스처의 방 타입 오기("dm")를 core build가 잡아 "direct"로 교정.
+> - `RoomList` 클라이언트 컴포넌트 추출: 서버가 실어 준 목록(상한 200)을 왕복 0회로
+>   거른다. **방 6개 미만이면 입력을 숨긴다** — 방 두 개에 검색창은 소음이다.
+> - 검증: core 1287건(room 79) / turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 72번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T3: 첨부 이미지 지연 로딩 (K-024)
 > 무료 티어 대역폭(5GB/월) 방어 — 대화·갤러리의 `<img>`에 `loading="lazy"`+`decoding="async"`.
 > 화면 밖 사진은 스크롤 전에 내려받지 않는다. **블러 플레이스홀더는 안 만들었다**(썸네일

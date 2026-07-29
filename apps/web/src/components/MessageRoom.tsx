@@ -42,6 +42,7 @@ import {
   messageAttachment,
   messageBody,
   replyPreview,
+  roomDisplayTitle,
   summarizeReactions,
   REACTION_EMOJIS,
   pendingMigrationMessage,
@@ -1511,7 +1512,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                     disabled={forwardBusy}
                     className="w-full p-3 text-left text-sm hover:bg-accent disabled:opacity-50"
                   >
-                    {r.title ?? (r.type === "agent" ? "오리와의 대화" : "이름 없는 대화")}
+                    {roomDisplayTitle(r)}
                   </button>
                 </li>
               ))}

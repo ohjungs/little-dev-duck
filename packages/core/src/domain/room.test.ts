@@ -21,6 +21,8 @@ import {
   todoTitleFrom,
   conversionReceiptText,
   unreadCount,
+  roomDisplayTitle,
+  filterRoomsByTitle,
 } from "./room";
 
 const U1 = "11111111-1111-4111-8111-111111111111";
@@ -466,5 +468,49 @@ describe("canForwardMessage", () => {
 
   it("system 영수증은 전달할 수 없다 (그 방의 기록이지 내용이 아니다)", () => {
     expect(canForwardMessage({ type: "system", deletedAt: null })).toBe(false);
+  });
+});
+
+// 2026-07-29 : 메신저 - 방 표시 제목·이름 필터 (Phase 55 T1 L-023)
+describe("roomDisplayTitle", () => {
+  it("제목이 있으면 그대로", () => {
+    expect(roomDisplayTitle({ title: "스터디", type: "agent" })).toBe("스터디");
+  });
+
+  it("제목 없는 에이전트 방은 오리와의 대화", () => {
+    expect(roomDisplayTitle({ title: null, type: "agent" })).toBe("오리와의 대화");
+  });
+
+  it("제목 없는 일반 방은 이름 없는 대화", () => {
+    expect(roomDisplayTitle({ title: null, type: "direct" })).toBe("이름 없는 대화");
+  });
+});
+
+describe("filterRoomsByTitle", () => {
+  const rooms = [
+    { title: "개발 방", type: "direct" as const },
+    { title: null, type: "agent" as const },
+    { title: "Duck Talk", type: "direct" as const },
+  ];
+
+  it("표시 제목 기준 부분일치 — 기본 제목도 걸린다", () => {
+    // 사용자 눈에 "오리와의 대화"로 보이는 방은 "오리"로 찾아져야 한다.
+    // raw title(null)로 거르면 보이는 것과 걸리는 것이 어긋난다.
+    const hit = filterRoomsByTitle(rooms, "오리");
+    expect(hit).toHaveLength(1);
+    expect(hit[0]!.type).toBe("agent");
+  });
+
+  it("대소문자를 가리지 않는다", () => {
+    expect(filterRoomsByTitle(rooms, "duck")).toHaveLength(1);
+  });
+
+  it("빈 검색어(공백 포함)는 전체", () => {
+    expect(filterRoomsByTitle(rooms, "")).toHaveLength(3);
+    expect(filterRoomsByTitle(rooms, "  ")).toHaveLength(3);
+  });
+
+  it("없는 말은 빈 목록", () => {
+    expect(filterRoomsByTitle(rooms, "없는말")).toEqual([]);
   });
 });

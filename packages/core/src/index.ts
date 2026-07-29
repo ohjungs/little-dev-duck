@@ -571,6 +571,8 @@ export {
   MUTE_DURATIONS,
   unreadCount,
   sortRooms,
+  roomDisplayTitle,
+  filterRoomsByTitle,
   galleryPaths,
   galleryNav,
   attachmentDeleted,

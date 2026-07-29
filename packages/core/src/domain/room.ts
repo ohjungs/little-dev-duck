@@ -130,6 +130,25 @@ export function sortRooms<T extends { pinnedAt: string | null; lastActivity: num
   });
 }
 
+// 2026-07-29 : 메신저 - 방 표시 제목·이름 필터 (Phase 55 T1 L-023)
+/**
+ * 화면에 보이는 방 제목. 목록·전달 대화상자·이름 필터가 **같은 판정 한 벌**을 쓴다 —
+ * 인라인 폴백이 화면마다 있으면 "보이는 제목"과 "걸리는 제목"이 어긋난다.
+ */
+export function roomDisplayTitle(room: Pick<Room, "title" | "type">): string {
+  return room.title ?? (room.type === "agent" ? "오리와의 대화" : "이름 없는 대화");
+}
+
+/** 표시 제목 기준 부분일치(대소문자 무시). 빈 검색어는 전체 — 필터가 아니라 기본 상태다. */
+export function filterRoomsByTitle<T extends Pick<Room, "title" | "type">>(
+  rooms: readonly T[],
+  query: string,
+): T[] {
+  const q = query.trim().toLowerCase();
+  if (q === "") return [...rooms];
+  return rooms.filter((r) => roomDisplayTitle(r).toLowerCase().includes(q));
+}
+
 /**
  * 이 방이 지금 음소거 상태인가. **"언제까지"를 저장하고 판정은 지금 시각과 비교**한다 —
  * 켜짐/꺼짐 불리언으로 두면 "1시간만 끄기"를 표현할 수 없고, 해제할 주체도 없다
