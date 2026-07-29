@@ -50,6 +50,7 @@ import {
   attachmentDeleted,
   canEditMessage,
   canForwardMessage,
+  codeFenceParts,
   conversionReceiptText,
   dayDivider,
   firstUnreadId,
@@ -976,21 +977,46 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                     </span>
                   )}
                   {/* 평문 렌더 — HTML로 그리지 않는다(에이전트 응답이 섞인다).
-                      URL만 링크로. 스킴은 core가 http(s)로 고정한다(javascript: 차단). */}
-                  {linkifyParts(messageBody(m)).map((p, i) =>
-                    p.href ? (
-                      <a
-                        key={i}
-                        href={p.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline break-all"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {p.text}
-                      </a>
+                      코드 블록은 <pre>+복사(H-013), 글 조각만 링크화(javascript: 차단은 core). */}
+                  {codeFenceParts(messageBody(m)).map((part, pi) =>
+                    part.kind === "code" ? (
+                      <span key={pi} className="block text-left">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] opacity-70">{part.lang ?? "코드"}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleCopy(part.text);
+                            }}
+                            className="rounded border border-current px-1 text-[10px] opacity-70 hover:opacity-100"
+                          >
+                            복사
+                          </button>
+                        </span>
+                        <pre className="mt-0.5 max-w-full overflow-x-auto rounded bg-black/20 p-2 font-mono text-xs whitespace-pre">
+                          {part.text}
+                        </pre>
+                      </span>
                     ) : (
-                      <span key={i}>{p.text}</span>
+                      <span key={pi}>
+                        {linkifyParts(part.text).map((p, i) =>
+                          p.href ? (
+                            <a
+                              key={i}
+                              href={p.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline break-all"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {p.text}
+                            </a>
+                          ) : (
+                            <span key={i}>{p.text}</span>
+                          ),
+                        )}
+                      </span>
                     ),
                   )}
                 </span>
