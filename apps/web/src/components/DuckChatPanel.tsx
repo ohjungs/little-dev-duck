@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Sparkles, Trash2 } from "lucide-react";
 import { describeCall } from "@/lib/approvalLabel";
+import { isComposingEnter } from "@/lib/composition";
 import { timeAgo } from "@/lib/timeAgo";
 import { DUCK_EXAMPLES } from "@/lib/duckExamples";
 import { useDuckChat } from "@ldd/ai";
@@ -184,7 +185,8 @@ export function DuckChatPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
+              // 조합 중 Enter는 글자 확정이지 전송이 아니다(X-018) — 판정은 lib 한 벌.
+              if (e.key === "Enter" && !isComposingEnter(e.nativeEvent)) submit();
             }}
             placeholder="오리에게 물어보거나 시키기"
             disabled={!!pendingApproval}

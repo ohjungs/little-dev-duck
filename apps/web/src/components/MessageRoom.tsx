@@ -71,6 +71,7 @@ import { createClient } from "@/lib/supabase/client";
 import { subscribeRoomMessages } from "@/lib/realtime";
 import { notifyDuck } from "@/lib/notify";
 import { loadDraft, saveDraft } from "@/lib/messageDraft";
+import { isComposingEnter } from "@/lib/composition";
 import { MessageImageViewer } from "@/components/MessageImageViewer";
 
 // "지금부터 ms 뒤"를 ISO로. **컴포넌트 밖에 둔다** — 렌더 중 현재 시각을 읽으면
@@ -673,12 +674,13 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     }
   }
 
-  async function handlePickImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    // 같은 파일을 다시 고를 수 있게 값을 비운다(안 비우면 change가 안 온다).
-    e.target.value = "";
-    if (!file) return;
-
+  /**
+   * 이미지 파일 하나를 줄여 올리고 메시지로 보낸다.
+   * 파일 선택·붙여넣기·드래그가 **전부 이 한 경로**를 쓴다(F-006·F-007) —
+   * 경로가 갈라지면 검사(형식·크기)도 갈라진다.
+   */
+  async function sendImageFile(file: File) {
+    if (uploading) return;
     const check = checkMessageImage({ type: file.type, size: file.size });
     if (!check.ok) {
       setError(check.reason);
@@ -710,6 +712,13 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handlePickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // 같은 파일을 다시 고를 수 있게 값을 비운다(안 비우면 change가 안 온다).
+    e.target.value = "";
+    if (file) await sendImageFile(file);
   }
 
   // 2026-07-29 : 메신저 - 슬래시 커맨드 실행 (Phase 52 T2)
@@ -788,7 +797,20 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   const unreadId = firstUnreadId(messages, unreadAnchor, myUserId);
 
   return (
-    <div className="flex h-[60vh] flex-col rounded-lg border border-border">
+    <div
+      className="flex h-[60vh] flex-col rounded-lg border border-border"
+      // 드래그한 이미지를 놓으면 첨부로(F-007). 기본 동작(브라우저가 파일을 여는 것)을 막는다.
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        const file = e.dataTransfer.files?.[0];
+        if (file && file.type.startsWith("image/")) {
+          e.preventDefault();
+          void sendImageFile(file);
+        }
+      }}
+    >
       {/* 2026-07-27 (Phase 51 T2): 방별 음소거. **"언제까지"를 고르게 한다** —
           켜짐/꺼짐만 두면 "1시간만 조용히"를 표현할 수 없다. */}
       <div className="flex flex-wrap items-center gap-1 border-b border-border p-2 text-xs">
@@ -911,6 +933,8 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                       onChange={(e) => setEditing({ id: m.id, text: e.target.value })}
                       onKeyDown={(e) => {
                         if (e.key === "Escape") setEditing(null);
+                        // 조합 중 Enter로 수정이 저장되면 마지막 글자가 잘린다(X-017).
+                        if (e.key === "Enter" && isComposingEnter(e.nativeEvent)) e.preventDefault();
                       }}
                       maxLength={4000}
                       autoFocus
@@ -1343,6 +1367,18 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
           id="message-draft"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            // 조합 중 Enter는 글자 확정이지 전송이 아니다(X-017) — 판정은 lib 한 벌.
+            if (e.key === "Enter" && isComposingEnter(e.nativeEvent)) e.preventDefault();
+          }}
+          onPaste={(e) => {
+            // 붙여넣은 것이 이미지면 첨부로(F-006). 글이면 평소대로 입력에 들어간다.
+            const file = e.clipboardData.files?.[0];
+            if (file && file.type.startsWith("image/")) {
+              e.preventDefault();
+              void sendImageFile(file);
+            }
+          }}
           placeholder="메시지를 입력하세요"
           maxLength={4000}
           className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm"

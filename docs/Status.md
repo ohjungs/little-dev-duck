@@ -1,5 +1,20 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 54](plans/phase_54.md) T1: IME 전송 방지 + 붙여넣기·드래그 첨부
+> T1 우선순위 "높음" 두 줄을 처리했다. grep 결과 **X-018(Phase 50)도 실제로는 미구현**이었다 —
+> 한국어 조합 중 Enter가 쓰다 만 문장을 전송하는 상태였다(오리 채팅 포함).
+>
+> - `lib/composition.ts` `isComposingEnter`(테스트 3건 + **단일 출처 정적 검사**): isComposing +
+>   keyCode 229 안전망. 계획이 못박은 대로 X-017·X-018을 **한 벌로** — 메시지 입력·수정 입력·
+>   오리 채팅(DuckChatPanel) 세 곳이 같은 판정을 쓴다.
+> - **F-006 붙여넣기 첨부**: 클립보드의 이미지면 첨부로, 글이면 평소대로. **F-007 드래그 첨부**:
+>   대화 영역에 놓으면 첨부로(브라우저가 파일을 여는 기본 동작 차단).
+> - 파일 선택·붙여넣기·드래그가 **한 업로드 경로**(`sendImageFile`)를 쓴다 — 경로가 갈라지면
+>   형식·크기 검사도 갈라진다.
+> - 검증: web 테스트 파일 59(+1) / turbo lint·test·build **18/18 GREEN**.
+> - 실물 확인: [manual-verification.md 60번](loop-eng/manual-verification.md) — IME 동작은
+>   실제 한글 입력기로만 확인된다.
+
 > ## ✅ 2026-07-29 `/loop-eng` — Phase 54: 메시지 URL 링크화
 > 본문 속 URL이 평문으로만 보여 클릭이 안 됐다. **미리보기 카드는 만들지 않았다** —
 > 외부 fetch가 필요해 쿼터·SSRF 표면이 생긴다. 링크화는 fetch 0회의 결정적 가공.
