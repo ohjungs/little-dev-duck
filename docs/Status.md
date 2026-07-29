@@ -1,5 +1,16 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T2: 대화 내보내기 md·json (Q-002)
+> Q-001(.txt) 위에 형식 두 개를 얹었다. **세 형식이 정책 한 벌**(seq 정렬 · KST 날짜 경계 ·
+> 발화자 판정 · 지운 메시지는 안내 문구)을 공유한다 — 형식마다 판정이 갈라지면 어느
+> 파일이 맞는지 모른다. JSON도 원본 행을 통째로 쏟지 않는다(삭제 본문 미포함, deleted 표시).
+>
+> - core `formatTranscriptMarkdown`·`transcriptJson`(테스트 +11) · `transcriptFileName` 확장자 인자.
+> - 방 헤더: "대화 내보내기 .txt · .md · .json" 인라인 버튼(음소거 기간 버튼 관례 — 모달 불필요).
+>   수집은 백업 v5와 같은 `fetchAllRoomMessages` 한 경로.
+> - 검증: core 1275건(transcript 20) / turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 67번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T2: 백업 v5 — 메신저 대화 보관 (Q 잔여의 실체)
 > 계획이 T2의 실체로 못박은 "**메시지를 백업 형식에 추가**"를 처리했다. 대화는 다시 만들
 > 방법이 없는 유일본인데 지금까지 "내 데이터 내보내기"에서 통째로 빠져 있었다.

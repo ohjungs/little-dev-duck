@@ -58,6 +58,8 @@ import {
   extractLinks,
   firstUnreadId,
   formatTranscript,
+  formatTranscriptMarkdown,
+  transcriptJson,
   matchSlashCommands,
   mergeMessages,
   parseSlashCommand,
@@ -70,6 +72,7 @@ import {
   kstDateString,
   linkifyParts,
   type Message,
+  type TranscriptFormat,
   type Reaction,
   type ReadReceiptState,
 } from "@ldd/core";
@@ -265,33 +268,46 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     }
   }
 
-  // 2026-07-29 : 메신저 - 대화 내보내기 (Phase 55 T2 Q-001)
-  const [exporting, setExporting] = useState(false);
+  // 2026-07-29 : 메신저 - 대화 내보내기 (Phase 55 T2 Q-001·Q-002)
+  const [exporting, setExporting] = useState<TranscriptFormat | null>(null);
+
+  // 형식마다 조립·MIME만 다르고 수집·정책(전부 읽기·삭제 문구·KST)은 한 벌이다.
+  const TRANSCRIPT_FORMATS: Record<
+    TranscriptFormat,
+    { render: (all: Message[]) => string; mime: string }
+  > = {
+    txt: { render: (all) => formatTranscript(all, myUserId), mime: "text/plain;charset=utf-8" },
+    md: {
+      render: (all) => formatTranscriptMarkdown(all, myUserId),
+      mime: "text/markdown;charset=utf-8",
+    },
+    json: { render: (all) => transcriptJson(all, myUserId), mime: "application/json" },
+  };
 
   /**
-   * 방 전체를 .txt로 내려받는다. 화면 창(50개) 밖의 과거까지 **전부** 읽는다 —
+   * 방 전체를 고른 형식으로 내려받는다. 화면 창(50개) 밖의 과거까지 **전부** 읽는다 —
    * 일부만 담고 "내보냈다"고 하면 안 된다. 수집은 백업(v5)과 같은 `fetchAllRoomMessages`
    * 한 경로다 — 경로가 갈라지면 "전부"의 기준도 갈라진다.
    */
-  async function handleExport() {
+  async function handleExport(format: TranscriptFormat) {
     if (exporting) return;
-    setExporting(true);
+    setExporting(format);
     setError(null);
     try {
       const { messages: all } = await fetchAllRoomMessages(createClient(), roomId);
-      const text = formatTranscript(all, myUserId);
-      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const { render, mime } = TRANSCRIPT_FORMATS[format];
+      const blob = new Blob([render(all)], { type: mime });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = transcriptFileName(null, kstDateString(new Date()));
+      a.download = transcriptFileName(null, kstDateString(new Date()), format);
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       setError(pendingMigrationMessage(raw) ?? raw);
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   }
 
@@ -914,14 +930,19 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         >
           링크 모아보기
         </button>
-        <button
-          type="button"
-          onClick={() => void handleExport()}
-          disabled={exporting}
-          className="rounded border border-border px-2 py-0.5 hover:bg-accent disabled:opacity-50"
-        >
-          {exporting ? "내보내는 중" : "대화 내보내기(.txt)"}
-        </button>
+        {/* 형식별 버튼 — 음소거 기간 버튼과 같은 인라인 관례. 모달을 만들 만큼의 일이 아니다. */}
+        <span className="text-muted-foreground">대화 내보내기</span>
+        {(Object.keys(TRANSCRIPT_FORMATS) as TranscriptFormat[]).map((fmt) => (
+          <button
+            key={fmt}
+            type="button"
+            onClick={() => void handleExport(fmt)}
+            disabled={exporting !== null}
+            className="rounded border border-border px-2 py-0.5 hover:bg-accent disabled:opacity-50"
+          >
+            {exporting === fmt ? "내보내는 중" : `.${fmt}`}
+          </button>
+        ))}
         {muted ? (
           <>
             <span className="text-muted-foreground">이 방 알림이 꺼져 있어요</span>

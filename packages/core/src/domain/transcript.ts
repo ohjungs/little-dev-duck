@@ -58,9 +58,68 @@ export function formatTranscript(
   return lines.join("\n");
 }
 
-/** 내려받을 파일 이름. OS가 거부하는 문자는 걷어낸다 — 저장 대화상자가 안 뜨面 원인을 모른다. */
-export function transcriptFileName(roomTitle: string | null, dateKey: string): string {
+// 2026-07-29 : 메신저 - 대화 내보내기 md·json (Phase 55 T2 Q-002)
+// 세 형식이 **같은 정책 한 벌**을 쓴다: seq 정렬 · KST 날짜 경계 · 발화자 판정 ·
+// 지운 메시지는 안내 문구(messageBody). 형식마다 판정이 갈라지면 어느 파일이 맞는지 모른다.
+
+export function formatTranscriptMarkdown(
+  messages: readonly TranscriptMessage[],
+  myUserId: string,
+): string {
+  const lines: string[] = [];
+  let lastDay = "";
+
+  for (const m of [...messages].sort((a, b) => a.seq - b.seq)) {
+    const day = dayKey(m.createdAt);
+    if (day !== "" && day !== lastDay) {
+      if (lines.length > 0) lines.push("");
+      lines.push(`## ${day}`, "");
+      lastDay = day;
+    }
+    // 본문은 이스케이프 없이 그대로 담는다 — 파일의 원문 충실이 렌더 모양보다 먼저다.
+    const body = messageBody(m);
+    if (m.type === "system") {
+      lines.push(`**${kstTime(m.createdAt)}** (알림) ${body}`, "");
+    } else {
+      lines.push(`**${kstTime(m.createdAt)} ${senderLabel(m, myUserId)}**: ${body}`, "");
+    }
+  }
+
+  // 마지막 빈 줄은 군더더기다.
+  while (lines[lines.length - 1] === "") lines.pop();
+  return lines.join("\n");
+}
+
+/**
+ * 기계가 읽을 구조화 목록. 원본 행을 통째로 쏟지 않는다 — 지운 메시지의 body가
+ * 그대로 나가면 삭제를 되살리는 셈이다. 라벨·문구 판정은 txt와 같은 함수를 쓴다.
+ */
+export function transcriptJson(
+  messages: readonly TranscriptMessage[],
+  myUserId: string,
+): string {
+  const items = [...messages]
+    .sort((a, b) => a.seq - b.seq)
+    .map((m) => ({
+      seq: m.seq,
+      at: m.createdAt,
+      sender: m.type === "system" ? "알림" : senderLabel(m, myUserId),
+      type: m.type,
+      body: messageBody(m),
+      deleted: m.deletedAt !== null,
+    }));
+  return JSON.stringify(items, null, 2);
+}
+
+export type TranscriptFormat = "txt" | "md" | "json";
+
+/** 내려받을 파일 이름. OS가 거부하는 문자는 걷어낸다 — 저장 대화상자가 안 뜨면 원인을 모른다. */
+export function transcriptFileName(
+  roomTitle: string | null,
+  dateKey: string,
+  ext: TranscriptFormat = "txt",
+): string {
   const safe = (roomTitle ?? "").replace(/[/\\:*?"<>|]/g, "").trim();
-  return safe === "" ? `대화-${dateKey}.txt` : `대화-${safe}-${dateKey}.txt`;
+  return safe === "" ? `대화-${dateKey}.${ext}` : `대화-${safe}-${dateKey}.${ext}`;
 }
 

@@ -604,7 +604,13 @@ export { codeFenceParts, type CodeFencePart } from "./domain/code-fence";
 export { extractLinks, type CollectedLink } from "./domain/link-collection";
 
 // 2026-07-29 : 메신저 - 대화 내보내기 (Phase 55 T2 Q-001)
-export { formatTranscript, transcriptFileName } from "./domain/transcript";
+export {
+  formatTranscript,
+  formatTranscriptMarkdown,
+  transcriptJson,
+  transcriptFileName,
+  type TranscriptFormat,
+} from "./domain/transcript";
 
 // 2026-07-29 : 메신저 - 슬래시 커맨드 (Phase 52 T2)
 export {
