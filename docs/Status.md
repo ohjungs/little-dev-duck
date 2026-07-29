@@ -1,5 +1,11 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — 오리 방 첫 인사 (유휴 개선)
+> 오리 방을 처음 만들면 빈 화면 대신 오리 인사말("무엇이든 물어보세요… /로 명령")이
+> 먼저 와 있다. ensureAgentRoom이 created 여부를 돌려주고 **처음 만들 때만** 인사를
+> 넣는다(중복 방지, 실패해도 입장은 막지 않음). 검증 18/18 GREEN.
+> 실기: [mv 107번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — safeHref 정적 잠금 + 실기검증 톱 5 요약
 > - 리뷰 후속 잠금: `safeHrefLock.test.ts` — ① safeHref 정의는 lib 한 곳뿐 ② 기사 링크를
 >   href에 넣는 파일은 반드시 공용 import. 다음 뉴스 화면이 또 빠뜨리면 테스트가 먼저 잡는다.
