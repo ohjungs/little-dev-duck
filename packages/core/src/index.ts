@@ -575,6 +575,7 @@ export {
   galleryNav,
   attachmentDeleted,
   canEditMessage,
+  canForwardMessage,
   mergeAroundWindow,
   mergeMessages,
   todoTitleFrom,

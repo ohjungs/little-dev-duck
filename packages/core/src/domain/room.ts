@@ -227,6 +227,16 @@ export function mergeAroundWindow<T>(before: readonly T[], after: readonly T[]):
   return [...before].reverse().concat(after);
 }
 
+// 2026-07-29 : 메신저 - 메시지 전달 (Phase 54)
+/**
+ * 다른 방으로 전달할 수 있는 메시지인가. 지운 것(지운 게 다른 방에 살아나면 안 된다)과
+ * system 영수증(그 방의 기록이지 내용이 아니다)은 안 된다.
+ * 남의 메시지는 **전달할 수 있다** — 받은 말을 옮기는 것이 전달의 본래 쓰임이다.
+ */
+export function canForwardMessage(m: Pick<Message, "type" | "deletedAt">): boolean {
+  return m.type === "text" && m.deletedAt === null;
+}
+
 // 2026-07-29 : 메신저 - 과거 로딩·실시간 병합 (Phase 51 T3 후속)
 /**
  * 두 메시지 목록을 seq 순서로 합친다. **겹치면 fresh 쪽이 이긴다** —

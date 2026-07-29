@@ -22,6 +22,7 @@ import {
   listMessagesBefore,
   listReactions,
   listRoomAttachments,
+  listRoomsWithPin,
   getMyMembership,
   markRead,
   messageImageUrl,
@@ -48,6 +49,7 @@ import {
   MUTE_DURATIONS,
   attachmentDeleted,
   canEditMessage,
+  canForwardMessage,
   conversionReceiptText,
   dayDivider,
   firstUnreadId,
@@ -157,6 +159,16 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   const anchorRef = useRef<{ prevHeight: number; prevTop: number } | null>(null);
   // 꼬리(마지막 메시지)가 바뀌었을 때만 "새 메시지" 처리 — 위에 이어 붙인 것은 새 도착이 아니다.
   const tailIdRef = useRef<string | null>(null);
+  // 2026-07-29 : 메신저 - 메시지 전달 (Phase 54)
+  // 전달할 메시지와 대상 방 목록. 사진은 경로가 방 스코프라 재사용할 수 없어
+  // (버킷 정책이 경로 첫 칸으로 멤버를 판정한다) 받아서 대상 방으로 다시 올린다.
+  const [forwarding, setForwarding] = useState<Message | null>(null);
+  const [forwardRooms, setForwardRooms] = useState<
+    Awaited<ReturnType<typeof listRoomsWithPin>> | "loading" | null
+  >(null);
+  const [forwardBusy, setForwardBusy] = useState(false);
+  const [forwardNotice, setForwardNotice] = useState<string | null>(null);
+  const forwardRef = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -232,6 +244,54 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       setError(pendingMigrationMessage(raw) ?? raw);
     } finally {
       setSavingEdit(false);
+    }
+  }
+
+  /** 전달 대상 고르기 열기. 방 목록을 그때 읽는다 — 새 방이 생겼어도 최신이 보이게. */
+  async function openForward(m: Message) {
+    setMenuFor(null);
+    setForwarding(m);
+    setForwardRooms("loading");
+    try {
+      const rooms = await listRoomsWithPin(createClient());
+      // 지금 방은 뺀다. 같은 방으로 전달은 복사-붙여넣기지 전달이 아니다.
+      setForwardRooms(rooms.filter((r) => r.id !== roomId));
+    } catch (err) {
+      setForwarding(null);
+      setForwardRooms(null);
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    }
+  }
+
+  async function handleForward(targetRoomId: string) {
+    if (!forwarding || forwardBusy) return;
+    setForwardBusy(true);
+    try {
+      const client = createClient();
+      let attachmentPath: string | null = null;
+      const srcPath = messageAttachment(forwarding);
+      if (srcPath) {
+        // 경로 재사용은 안 된다(방 스코프) — 원본을 받아 대상 방 몫으로 다시 올린다.
+        const blob = await downloadMessageImage(client, srcPath);
+        const copy = new Blob([blob], { type: blob.type || "image/webp" });
+        attachmentPath = await uploadMessageImage(client, targetRoomId, copy, crypto.randomUUID());
+      }
+      await sendMessage(client, {
+        roomId: targetRoomId,
+        body: forwarding.body,
+        clientMsgId: crypto.randomUUID(),
+        attachmentPath,
+      });
+      setForwarding(null);
+      setForwardRooms(null);
+      setForwardNotice("전달했어요");
+      setTimeout(() => setForwardNotice(null), 2500);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    } finally {
+      setForwardBusy(false);
     }
   }
 
@@ -520,6 +580,12 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   useEffect(() => {
     if (galleryOpen && !viewerPath) galleryRef.current?.focus();
   }, [galleryOpen, viewerPath]);
+
+  // 전달 대상 고르기가 열리면 초점을 준다(같은 규칙).
+  const forwardOpen = forwarding !== null;
+  useEffect(() => {
+    if (forwardOpen) forwardRef.current?.focus();
+  }, [forwardOpen]);
 
   /** 방 전체 사진 모아보기 열기. 실패하면 안내하고 닫는다 — 빈 격자를 성공처럼 두지 않는다. */
   async function openGallery() {
@@ -1005,6 +1071,16 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                         수정
                       </button>
                     )}
+                    {canForwardMessage(m) && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => void openForward(m)}
+                        className="px-3 py-1.5 text-xs hover:bg-accent"
+                      >
+                        전달
+                      </button>
+                    )}
                     {/* 워크스페이스로 변환(Phase 52 T1). 생성은 되돌릴 수 있어 바로 실행한다. */}
                     <button
                       type="button"
@@ -1110,6 +1186,61 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         </div>
       )}
 
+      {/* 전달 대상 고르기(Phase 54). 방을 누르면 그 방으로 보낸다. */}
+      {forwarding && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="전달할 방 고르기"
+          tabIndex={-1}
+          ref={forwardRef}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setForwarding(null);
+              setForwardRooms(null);
+            }
+          }}
+          className="absolute inset-0 z-40 flex flex-col bg-background"
+        >
+          <div className="flex items-center justify-between border-b border-border px-3 py-2 text-sm">
+            <span>어느 방으로 전달할까요?</span>
+            <button
+              type="button"
+              onClick={() => {
+                setForwarding(null);
+                setForwardRooms(null);
+              }}
+              aria-label="전달 취소"
+              className="rounded border border-border px-2 py-0.5 text-xs hover:bg-accent"
+            >
+              취소
+            </button>
+          </div>
+          {forwardRooms === "loading" || forwardRooms === null ? (
+            <p className="p-4 text-sm text-muted-foreground">방 목록을 불러오는 중</p>
+          ) : forwardRooms.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground break-keep">
+              전달할 다른 방이 없어요. 방이 더 생기면 여기서 고를 수 있어요.
+            </p>
+          ) : (
+            <ul className="flex-1 divide-y divide-border overflow-y-auto">
+              {forwardRooms.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    onClick={() => void handleForward(r.id)}
+                    disabled={forwardBusy}
+                    className="w-full p-3 text-left text-sm hover:bg-accent disabled:opacity-50"
+                  >
+                    {r.title ?? (r.type === "agent" ? "오리와의 대화" : "이름 없는 대화")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* 전체화면 뷰어. 열림 상태·순서 판정은 위에서 — 이 컴포넌트는 그리기만 한다. */}
       {viewerPath && (
         <MessageImageViewer
@@ -1137,6 +1268,12 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       {error && (
         <p role="alert" className="border-t border-border px-3 py-2 text-xs text-destructive break-keep">
           {error}
+        </p>
+      )}
+
+      {forwardNotice && (
+        <p role="status" className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+          {forwardNotice}
         </p>
       )}
 

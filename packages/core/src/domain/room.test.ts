@@ -3,6 +3,7 @@ import {
   DELETED_MESSAGE_TEXT,
   attachmentDeleted,
   canEditMessage,
+  canForwardMessage,
   galleryNav,
   galleryPaths,
   messageBody,
@@ -450,5 +451,20 @@ describe("mergeMessages", () => {
   it("빈 쪽이 있어도 동작한다", () => {
     expect(mergeMessages([], [m("a", 1)]).map((x) => x.seq)).toEqual([1]);
     expect(mergeMessages([m("a", 1)], []).map((x) => x.seq)).toEqual([1]);
+  });
+});
+
+// 2026-07-29 : 메신저 - 메시지 전달 (Phase 54)
+describe("canForwardMessage", () => {
+  it("보통 글 메시지는 전달할 수 있다", () => {
+    expect(canForwardMessage({ type: "text", deletedAt: null })).toBe(true);
+  });
+
+  it("지운 메시지는 전달할 수 없다 (지운 것이 다른 방에 살아나면 안 된다)", () => {
+    expect(canForwardMessage({ type: "text", deletedAt: ISO })).toBe(false);
+  });
+
+  it("system 영수증은 전달할 수 없다 (그 방의 기록이지 내용이 아니다)", () => {
+    expect(canForwardMessage({ type: "system", deletedAt: null })).toBe(false);
   });
 });

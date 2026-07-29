@@ -1,5 +1,20 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — Phase 54: 메시지 전달 + **Phase 51 코드 범위 완결 판정**
+> Phase 51 잔여 스윕: 남은 코드 항목은 M-023(오리 표정 반응)뿐인데 **메시지 화면에는 오리가
+> 없다** — 반응을 보여 줄 자리가 없어 보류(YAGNI, DuckChatPanel 흡수 때 재평가).
+> **Phase 51은 코드로 가능한 범위 완결.** 이어 Phase 54의 전달을 만들었다.
+>
+> - core `canForwardMessage`(테스트 3건): 글 메시지만. 지운 것(다른 방에 살아나면 안 된다)·
+>   system 영수증(그 방의 기록이지 내용이 아니다) 불가. **남의 메시지는 전달 가능** —
+>   받은 말을 옮기는 것이 전달의 본래 쓰임.
+> - 메뉴 "전달" → 방 고르기(그때 목록 조회 — 새 방 반영, 지금 방 제외) → 전송 → "전달했어요".
+> - **사진 전달은 재업로드다**: 첨부 경로가 방 스코프(버킷 정책이 경로 첫 칸으로 멤버 판정)라
+>   경로 재사용이 안 된다. `downloadMessageImage` → 새 Blob → `uploadMessageImage` 조합 —
+>   전부 기존 함수, 신규 api 0, 마이그레이션 0.
+> - 검증: core 1228건 / turbo lint·test·build **18/18 GREEN**.
+> - 실물 확인: [manual-verification.md 58번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 51](plans/phase_51.md) T3 후속: 위로 스크롤 과거 로딩 + 실시간 병합
 > 사이클 9가 남긴 두 한계를 함께 닫았다.
 >
