@@ -1,5 +1,14 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 64](plans/phase_64.md) 완료: 오리 멀티턴 대화 맥락
+> 오리가 이제 직전 대화를 알고 답한다 — "그중 마감 제일 빠른 게?" 같은 후속 발화 성립.
+>
+> - core `clampHistory`(6턴·500자 절단)·`historyPromptSection`(테스트 5건) — 상한이 무료
+>   쿼터의 보증. 계약: history 형식 오류는 400 거부, 길이 초과는 절단(계약 vs 예산).
+> - runDuckTurn에 [직전 대화] 절 주입 — rule 라우팅·RAG 검색은 최신 발화만(잡음·쿼터).
+> - 대시보드 패널(useDuckChat)·메신저 오리 방 양쪽 연결. history 없는 기존 호출 하위호환.
+> - 검증 18/18 GREEN. 실기: [mv 108번](loop-eng/manual-verification.md). 버퍼 비었음.
+
 > ## 2026-07-29 `/loop-eng` — 버퍼 충전: [Phase 64 draft](plans/phase_64.md) 오리 멀티턴 맥락
 > [확인됨] /api/ai/agent는 question 하나만 받아 오리가 직전 대화를 모른다 — "아까 그거
 > 등록해줘"가 성립 안 함. 패널·메신저 공통 품질 개선으로 draft 설계(엄격 상한 6턴·500자,
