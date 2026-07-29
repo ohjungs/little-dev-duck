@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 54](plans/phase_54.md) T1: 이모지 피커 공용화 + 메시지 입력 연결
+> 계획이 "재사용, 재구현 금지"라 한 F-011~F-013. 실체는 **PageEditor 내부의 IconPicker**였다
+> (별도 컴포넌트가 아니었다) — 그대로 꺼내 공용 `EmojiPicker`로 만들고 두 곳이 쓴다.
+>
+> - 추출은 **동작 보존**: 카테고리 탭 · "자주 쓰는"(localStorage, 최근 20) · 아이콘 제거 버튼
+>   (onClear 옵션으로 — 메시지엔 지울 대상이 없어 안 보인다) · aria 접두사만 호출부 인자로.
+> - 페이지 아이콘과 메시지 입력이 **같은 "자주 쓰는" 목록을 공유**한다(키 한 곳).
+>   재분열 회귀는 정적 검사로 잠갔다(키 리터럴이 EmojiPicker 밖에 있으면 실패).
+> - 메시지 입력: 🙂 버튼 → 입력창 위 피커 → 선택 시 초안 끝에 붙고 닫힘.
+> - 검증: web 테스트 파일 60(+1) / turbo lint·test·build **18/18 GREEN**
+>   (PageEditor 추출 후에도 전체 green — 동작 보존의 결정적 근거).
+> - 실물 확인: [manual-verification.md 61번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 54](plans/phase_54.md) T1: IME 전송 방지 + 붙여넣기·드래그 첨부
 > T1 우선순위 "높음" 두 줄을 처리했다. grep 결과 **X-018(Phase 50)도 실제로는 미구현**이었다 —
 > 한국어 조합 중 Enter가 쓰다 만 문장을 전송하는 상태였다(오리 채팅 포함).

@@ -73,6 +73,7 @@ import { notifyDuck } from "@/lib/notify";
 import { loadDraft, saveDraft } from "@/lib/messageDraft";
 import { isComposingEnter } from "@/lib/composition";
 import { MessageImageViewer } from "@/components/MessageImageViewer";
+import { EmojiPicker } from "@/components/EmojiPicker";
 
 // "지금부터 ms 뒤"를 ISO로. **컴포넌트 밖에 둔다** — 렌더 중 현재 시각을 읽으면
 // 결과가 다시 그릴 때마다 달라져 예측할 수 없다(React 순수성 규칙, 린트가 잡았다).
@@ -171,6 +172,8 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   const [forwardBusy, setForwardBusy] = useState(false);
   const [forwardNotice, setForwardNotice] = useState<string | null>(null);
   const forwardRef = useRef<HTMLDivElement>(null);
+  // 이모지 피커(F-011). 페이지 아이콘과 같은 공용 컴포넌트 — "자주 쓰는" 목록도 공유된다.
+  const [showEmoji, setShowEmoji] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -1359,7 +1362,27 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         );
       })()}
 
-      <form onSubmit={handleSend} className="flex gap-2 border-t border-border p-2">
+      <form onSubmit={handleSend} className="relative flex gap-2 border-t border-border p-2">
+        {/* 이모지 피커(F-011). 입력창 위로 뜬다 — 위치는 호출부가 정하는 계약. */}
+        {showEmoji && (
+          <EmojiPicker
+            onSelect={(emoji) => {
+              setDraft((d) => d + emoji);
+              setShowEmoji(false);
+            }}
+            onClose={() => setShowEmoji(false)}
+            className="absolute bottom-full left-2 z-20 mb-1"
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setShowEmoji((o) => !o)}
+          aria-expanded={showEmoji}
+          aria-label="이모지 고르기"
+          className="rounded-md border border-border px-2 py-1.5 text-sm"
+        >
+          🙂
+        </button>
         <label htmlFor="message-draft" className="sr-only">
           메시지 입력
         </label>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -741,10 +742,11 @@ export function PageEditor({
           </button>
         )}
         {showIconPicker && (
-          <IconPicker
+          <EmojiPicker
             onSelect={handleSetIcon}
             onClear={() => handleSetIcon(null)}
             onClose={() => setShowIconPicker(false)}
+            ariaPrefix="아이콘"
           />
         )}
       </div>
@@ -935,171 +937,3 @@ function CoverUrlDialog({
   );
 }
 
-// 카테고리별 큐레이션 이모지. 라이브러리 없이 정적 배열(ponytail).
-const RECENT_EMOJIS_KEY = "ldd:recent-emojis";
-const RECENT_MAX = 20;
-
-function getRecentEmojis(): string[] {
-  try {
-    const raw = localStorage.getItem(RECENT_EMOJIS_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((x): x is string => typeof x === "string");
-  } catch {
-    return [];
-  }
-}
-
-function addRecentEmoji(emoji: string): void {
-  try {
-    const prev = getRecentEmojis().filter((e) => e !== emoji);
-    const next = [emoji, ...prev].slice(0, RECENT_MAX);
-    localStorage.setItem(RECENT_EMOJIS_KEY, JSON.stringify(next));
-  } catch {
-    // localStorage 접근 불가 환경에서는 조용히 무시
-  }
-}
-
-type EmojiCategoryKey = "recent" | "objects" | "animals" | "food" | "activities" | "symbols";
-
-const EMOJI_CATEGORY_DEFS: Record<
-  Exclude<EmojiCategoryKey, "recent">,
-  { label: string; emojis: string[] }
-> = {
-  objects: {
-    label: "사물",
-    emojis: ["📝", "📌", "📎", "📁", "📂", "📊", "📈", "💻", "⚙️", "🔧", "🔑", "💡", "📞", "✉️", "📦", "🏷️", "🗂️", "📋", "✏️", "🖊️"],
-  },
-  animals: {
-    label: "동물",
-    emojis: ["🦆", "🐤", "🐣", "🐥", "🐔", "🦅", "🐧", "🐱", "🐶", "🐰", "🦊", "🐻", "🐼", "🐸", "🐢", "🐝", "🦋", "🐟", "🐙", "🌸"],
-  },
-  food: {
-    label: "음식",
-    emojis: ["☕", "🍵", "🍰", "🍪", "🍩", "🍕", "🍔", "🍟", "🍜", "🍱", "🍣", "🍎", "🍊", "🍋", "🍇", "🍓", "🥑", "🥕", "🌽", "🍞"],
-  },
-  activities: {
-    label: "활동",
-    emojis: ["🎯", "🎮", "🎨", "🎵", "🎬", "📸", "🏃", "⚽", "🏀", "🎾", "🎲", "🧩", "🎪", "🎭", "🏆", "🎖️", "🌟", "⭐", "🔥", "💪"],
-  },
-  symbols: {
-    label: "기호",
-    emojis: ["❤️", "💚", "💙", "💜", "🧡", "💛", "🤍", "🖤", "✅", "❌", "⚠️", "💬", "🔔", "🔒", "🔓", "♻️", "🚀", "💎", "🎁", "🌈"],
-  },
-};
-
-const EMOJI_CATEGORY_ORDER: EmojiCategoryKey[] = [
-  "recent",
-  "objects",
-  "animals",
-  "food",
-  "activities",
-  "symbols",
-];
-
-const EMOJI_CATEGORY_LABELS: Record<EmojiCategoryKey, string> = {
-  recent: "자주 쓰는",
-  objects: "사물",
-  animals: "동물",
-  food: "음식",
-  activities: "활동",
-  symbols: "기호",
-};
-
-function IconPicker({
-  onSelect,
-  onClear,
-  onClose,
-}: {
-  onSelect: (emoji: string) => void;
-  onClear: () => void;
-  onClose: () => void;
-}) {
-  const [activeCategory, setActiveCategory] = useState<EmojiCategoryKey>("objects");
-  // 지연 초기화: typeof window 가드로 SSR에서도 안전. 마운트 시점에만 1회 실행된다.
-  const [recentEmojis, setRecentEmojis] = useState<string[]>(() =>
-    typeof window !== "undefined" ? getRecentEmojis() : [],
-  );
-
-  const handleSelect = (emoji: string) => {
-    addRecentEmoji(emoji);
-    // 선택 직후 picker 내부의 최근 목록도 즉시 반영한다(localStorage 재읽기 불필요).
-    setRecentEmojis((prev) => {
-      const next = [emoji, ...prev.filter((e) => e !== emoji)].slice(0, RECENT_MAX);
-      return next;
-    });
-    onSelect(emoji);
-  };
-
-  const currentEmojis: string[] =
-    activeCategory === "recent"
-      ? recentEmojis
-      : EMOJI_CATEGORY_DEFS[activeCategory].emojis;
-
-  const visibleCategories = EMOJI_CATEGORY_ORDER.filter(
-    (key) => key !== "recent" || recentEmojis.length > 0,
-  );
-
-  return (
-    <>
-      <div
-        role="presentation"
-        className="fixed inset-0 z-10"
-        onClick={onClose}
-      />
-      <div className="absolute left-4 top-full z-20 mt-1 flex w-72 flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-lg">
-        {/* 카테고리 탭 */}
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="이모지 카테고리">
-          {visibleCategories.map((key) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={activeCategory === key}
-              onClick={() => setActiveCategory(key)}
-              className={`rounded px-2 py-0.5 text-xs transition-colors ${
-                activeCategory === key
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              {EMOJI_CATEGORY_LABELS[key]}
-            </button>
-          ))}
-        </div>
-        {/* 이모지 그리드 */}
-        <div
-          role="tabpanel"
-          aria-label={EMOJI_CATEGORY_LABELS[activeCategory]}
-          className="grid grid-cols-8 gap-1"
-        >
-          {currentEmojis.length === 0 ? (
-            <p className="col-span-8 py-2 text-center text-xs text-muted-foreground">
-              아직 없습니다
-            </p>
-          ) : (
-            currentEmojis.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => handleSelect(e)}
-                aria-label={`아이콘 ${e}`}
-                className="rounded p-1 text-xl leading-none transition-colors hover:bg-muted"
-              >
-                {e}
-              </button>
-            ))
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={onClear}
-          className="self-start text-xs text-muted-foreground transition-colors hover:text-destructive"
-        >
-          아이콘 제거
-        </button>
-      </div>
-    </>
-  );
-}
