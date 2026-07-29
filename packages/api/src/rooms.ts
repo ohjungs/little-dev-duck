@@ -268,6 +268,73 @@ export async function messengerStorageUsage(
   return { totalBytes, fileCount, approximate };
 }
 
+// 2026-07-29 : 운영 - 고아 첨부 검사·정리 (Phase 58 T3 V-022)
+/** 참조 경로 조회 상한. 이걸 넘게 참조가 많으면 **고아 판정을 거부한다** — 아래 참조. */
+export const ORPHAN_REF_LIMIT = 5000;
+
+export type OrphanAttachment = { path: string; size: number | null };
+
+/**
+ * 고아 첨부(업로드는 됐는데 메시지가 안 만들어진 파일) 목록. Phase 50이 "정리 대상으로
+ * 기록"까지만 한 그것이다. **safe=false면 판정을 신뢰하면 안 된다**: 참조 목록 조회가
+ * 상한에 잘렸다는 뜻이고, 못 본 참조가 있는 채 고아를 꼽으면 살아있는 첨부를 지우게 된다 —
+ * 그때는 orphans를 비워서 돌려준다(틀릴 수 있는 목록을 주지 않는다).
+ */
+export async function listOrphanAttachments(
+  supabase: SupabaseClient,
+): Promise<{ orphans: OrphanAttachment[]; safe: boolean }> {
+  const rooms = await listRooms(supabase);
+  const files: OrphanAttachment[] = [];
+  let safe = rooms.length < ROOM_LIST_LIMIT;
+
+  for (const room of rooms) {
+    const { data, error } = await supabase.storage
+      .from(BUCKET)
+      .list(room.id, { limit: STORAGE_LIST_LIMIT });
+    if (error) throw new Error(error.message);
+    const entries = data ?? [];
+    if (entries.length >= STORAGE_LIST_LIMIT) safe = false;
+    for (const entry of entries) {
+      files.push({
+        path: `${room.id}/${entry.name}`,
+        size: (entry.metadata as { size?: number } | null)?.size ?? null,
+      });
+    }
+  }
+
+  // 삭제된 메시지 행도 포함해 조회한다 — 행이 경로를 들고 있으면 고아가 아니다.
+  const { data: rows, error } = await supabase
+    .from("messages")
+    .select("attachment_path")
+    .not("attachment_path", "is", null)
+    .limit(ORPHAN_REF_LIMIT);
+  if (error) throw new Error(error.message);
+  const refRows = (rows ?? []) as { attachment_path: string }[];
+  if (refRows.length >= ORPHAN_REF_LIMIT) safe = false;
+
+  if (!safe) return { orphans: [], safe: false };
+
+  const referenced = new Set(refRows.map((r) => r.attachment_path));
+  return { orphans: files.filter((f) => !referenced.has(f.path)), safe: true };
+}
+
+/** 고아 첨부 삭제. **되돌릴 수 없다** — 호출부(UI)가 개수·용량을 보여주고 확인을 받는다. */
+export async function deleteOrphanAttachments(
+  supabase: SupabaseClient,
+  paths: readonly string[],
+): Promise<number> {
+  if (paths.length === 0) return 0;
+  let removed = 0;
+  // 한 번에 너무 많이 보내면 실패가 통째로 된다 — 100개씩.
+  for (let i = 0; i < paths.length; i += 100) {
+    const chunk = paths.slice(i, i + 100);
+    const { error } = await supabase.storage.from(BUCKET).remove([...chunk]);
+    if (error) throw new Error(error.message);
+    removed += chunk.length;
+  }
+  return removed;
+}
+
 // 2026-07-29 : 메신저 - 표적 주변 로딩 (Phase 51 T3 잔여 L-005)
 /**
  * 표적 메시지 **주변 창**을 불러온다(검색 점프용). 표적이 최근 페이지 밖에 있어도

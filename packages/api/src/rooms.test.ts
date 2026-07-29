@@ -4,6 +4,8 @@ import {
   fetchAllRoomMessages,
   firstMessageOnOrAfter,
   messengerStorageUsage,
+  listOrphanAttachments,
+  deleteOrphanAttachments,
   RECENT_WINDOW,
   deleteMessage,
   listMessages,
@@ -551,5 +553,93 @@ describe("messengerStorageUsage", () => {
         storageSupabase({ rooms: [{ id: R1 }], files: {}, listError: "boom" }),
       ),
     ).rejects.toThrow("boom");
+  });
+});
+
+// 2026-07-29 : 운영 - 고아 첨부 검사·정리 (Phase 58 T3 V-022)
+describe("listOrphanAttachments / deleteOrphanAttachments", () => {
+  const R1 = "11111111-1111-4111-8111-111111111111";
+
+  function orphanSupabase(opts: {
+    files: Array<{ name: string; size: number | null }>;
+    referenced: string[];
+    refCapHit?: boolean;
+    removed?: string[][];
+  }) {
+    const refRows = opts.referenced.map((p) => ({ attachment_path: p }));
+    const selectChain: Record<string, unknown> = {
+      eq: () => selectChain,
+      not: () => selectChain,
+      order: () => selectChain,
+      limit: async () => ({ data: refRows, error: null }),
+    };
+    return {
+      from: (table: string) =>
+        table === "rooms"
+          ? {
+              select: () => {
+                const c: Record<string, unknown> = {
+                  order: () => c,
+                  limit: async () => ({ data: [{ ...ROOM_ROW, id: R1 }], error: null }),
+                };
+                return c;
+              },
+            }
+          : { select: () => selectChain },
+      storage: {
+        from: () => ({
+          list: async () => ({
+            data: opts.files.map((f) => ({
+              name: f.name,
+              metadata: f.size === null ? null : { size: f.size },
+            })),
+            error: null,
+          }),
+          remove: async (paths: string[]) => {
+            opts.removed?.push(paths);
+            return { data: paths.map((p) => ({ name: p })), error: null };
+          },
+        }),
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 테스트용 최소 목
+    } as any;
+  }
+
+  it("메시지가 참조하지 않는 파일만 고아로 꼽는다", async () => {
+    const r = await listOrphanAttachments(
+      orphanSupabase({
+        files: [
+          { name: "a.webp", size: 100 },
+          { name: "b.webp", size: 200 },
+        ],
+        referenced: [`${R1}/a.webp`],
+      }),
+    );
+    expect(r.safe).toBe(true);
+    expect(r.orphans).toEqual([{ path: `${R1}/b.webp`, size: 200 }]);
+  });
+
+  it("참조 목록이 상한에 잘리면 고아 판정을 거부한다 (살아있는 파일을 지울 수 있다)", async () => {
+    // 참조 5000행 = 상한 도달 — 못 본 참조가 있을 수 있으므로 orphans를 비우고 safe=false.
+    const many = Array.from({ length: 5000 }, (_, i) => `${R1}/m${i}.webp`);
+    const r = await listOrphanAttachments(
+      orphanSupabase({ files: [{ name: "b.webp", size: 1 }], referenced: many }),
+    );
+    expect(r.safe).toBe(false);
+    expect(r.orphans).toEqual([]);
+  });
+
+  it("삭제는 준 경로만, 지운 개수를 돌려준다", async () => {
+    const removed: string[][] = [];
+    const n = await deleteOrphanAttachments(
+      orphanSupabase({ files: [], referenced: [], removed }),
+      [`${R1}/b.webp`, `${R1}/c.webp`],
+    );
+    expect(n).toBe(2);
+    expect(removed.flat()).toEqual([`${R1}/b.webp`, `${R1}/c.webp`]);
+  });
+
+  it("빈 목록 삭제는 아무것도 안 하고 0", async () => {
+    expect(await deleteOrphanAttachments(orphanSupabase({ files: [], referenced: [] }), [])).toBe(0);
   });
 });
