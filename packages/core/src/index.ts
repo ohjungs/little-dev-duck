@@ -605,6 +605,7 @@ export {
 // 2026-07-29 : 메신저 - 검색 하이라이트 (Phase 51 T3 잔여)
 export { splitByQuery, type HighlightPart } from "./domain/search-highlight";
 export { kstDayRange, type MessageSearchFilter } from "./domain/search-filter";
+export { detectSensitiveInfo } from "./domain/sensitive-info";
 export {
   STORAGE_FREE_TIER_BYTES,
   formatBytes,

@@ -57,6 +57,7 @@ import {
   canEditMessage,
   canForwardMessage,
   codeFenceParts,
+  detectSensitiveInfo,
   conversionReceiptText,
   dayDivider,
   extractLinks,
@@ -402,6 +403,10 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       setJumping(false);
     }
   }
+
+  // 2026-07-29 (Phase 58 T5 U-016): 민감 정보 경고 — **막지 않는다**(정상 메시지가 막힌다).
+  // 보낸 뒤 알려주고, 지우고 싶으면 기존 삭제 기능을 쓰게 한다.
+  const [sensitiveNote, setSensitiveNote] = useState<string | null>(null);
 
   // 2026-07-29 (Phase 58 T2 V-007): 에러를 표시하면서 로컬 진단 기록에도 남긴다 —
   // 화면에서 사라진 에러는 진단 내보내기(T-027)가 못 본다. 문구만 기록(개인 데이터 없음).
@@ -1013,6 +1018,13 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         prev.some((m) => m.id === saved.id) ? prev : [...prev, saved],
       );
       setDraft("");
+      // 민감 정보 경고(U-016) — 종류 라벨만 판단하고 값은 다루지 않는다(core 계약).
+      const sensitiveHits = detectSensitiveInfo(body);
+      setSensitiveNote(
+        sensitiveHits.length > 0
+          ? `방금 보낸 메시지에 ${sensitiveHits.join("·")}가 있는 것 같아요. 잘못 보냈다면 메시지를 삭제하세요.`
+          : null,
+      );
     } catch (err) {
       setError(describeError(err));
     } finally {
@@ -1631,6 +1643,23 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       )}
       </div>
 
+      {/* 민감 정보 경고(U-016) — 에러가 아니라 상태 알림. 닫기 버튼으로 지운다. */}
+      {sensitiveNote && !error && (
+        <p
+          role="status"
+          className="flex items-start justify-between gap-2 border-t border-border px-3 py-2 text-xs text-amber-600 break-keep dark:text-amber-500"
+        >
+          <span>{sensitiveNote}</span>
+          <button
+            type="button"
+            onClick={() => setSensitiveNote(null)}
+            aria-label="민감 정보 경고 닫기"
+            className="shrink-0 hover:text-foreground"
+          >
+            ×
+          </button>
+        </p>
+      )}
       {error && (
         <p role="alert" className="border-t border-border px-3 py-2 text-xs text-destructive break-keep">
           {error}
