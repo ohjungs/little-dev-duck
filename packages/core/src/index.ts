@@ -577,12 +577,25 @@ export {
   todoTitleFrom,
   conversionReceiptText,
   TODO_TITLE_MAX,
+} from "./domain/room";
+
+export {
   DELETED_MESSAGE_TEXT,
   type Room,
   type RoomType,
   type RoomMember,
   type Message,
 } from "./domain/room";
+
+// 2026-07-29 : 메신저 - 슬래시 커맨드 (Phase 52 T2)
+export {
+  SLASH_COMMANDS,
+  matchSlashCommands,
+  parseSlashCommand,
+  slashReceiptText,
+  type SlashCommand,
+  type SlashParse,
+} from "./domain/slash-command";
 
 // 2026-07-27 : 메신저 - 이미지 첨부 규칙 (Phase 50 T4)
 export {

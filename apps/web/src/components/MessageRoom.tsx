@@ -12,6 +12,8 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  coerceEventStart,
+  createCalendarEvent,
   createMemo,
   createTodo,
   deleteMessage,
@@ -46,6 +48,9 @@ import {
   conversionReceiptText,
   dayDivider,
   firstUnreadId,
+  matchSlashCommands,
+  parseSlashCommand,
+  slashReceiptText,
   todoTitleFrom,
   galleryNav,
   galleryPaths,
@@ -511,10 +516,53 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     }
   }
 
+  // 2026-07-29 : 메신저 - 슬래시 커맨드 실행 (Phase 52 T2)
+  // 파싱은 core(정규식·결정적), 실행은 기존 생성 함수. 성공하면 system 영수증을 남긴다.
+  async function runSlashCommand(parsed: NonNullable<ReturnType<typeof parseSlashCommand>>) {
+    if (!parsed.ok) {
+      setError(parsed.error); // 보내지 않고 알려 준다 — "/할일"이 그냥 전송되면 이유를 모른다
+      return;
+    }
+    setSending(true);
+    setError(null);
+    try {
+      const client = createClient();
+      const cmd = parsed.cmd;
+      if (cmd.kind === "todo") {
+        await createTodo(client, { title: cmd.title });
+      } else {
+        // KST 보정은 api의 기존 함수가 한다(오리 도구와 같은 경로 — 두 입구가 갈라지지 않는다).
+        const startAt = coerceEventStart(cmd.time ? `${cmd.date}T${cmd.time}` : cmd.date);
+        if (!startAt) throw new Error("일정 시각을 이해하지 못했어요.");
+        await createCalendarEvent(client, { title: cmd.title, startAt, endAt: null });
+      }
+      const saved = await sendMessage(client, {
+        roomId,
+        body: slashReceiptText(cmd),
+        clientMsgId: crypto.randomUUID(),
+        type: "system",
+      });
+      setMessages((prev) => (prev.some((x) => x.id === saved.id) ? prev : [...prev, saved]));
+      setDraft("");
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const body = draft.trim();
     if (body === "" || sending) return;
+
+    // 커맨드면 메시지로 보내지 않고 실행한다.
+    const parsed = parseSlashCommand(body);
+    if (parsed !== null) {
+      await runSlashCommand(parsed);
+      return;
+    }
 
     setSending(true);
     setError(null);
@@ -903,6 +951,31 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
           </button>
         </div>
       )}
+
+      {/* 슬래시 커맨드 자동완성(Phase 52 T2 F-021). 커맨드가 있는지 모르면 아무도 안 쓴다. */}
+      {(() => {
+        const matches = matchSlashCommands(draft);
+        if (matches.length === 0) return null;
+        return (
+          <ul
+            aria-label="커맨드 목록"
+            className="border-t border-border px-2 py-1 text-xs"
+          >
+            {matches.map((c) => (
+              <li key={c.name}>
+                <button
+                  type="button"
+                  onClick={() => setDraft(`/${c.name} `)}
+                  className="flex w-full gap-2 rounded px-2 py-1 text-left hover:bg-accent"
+                >
+                  <span className="font-medium whitespace-nowrap">{c.usage}</span>
+                  <span className="text-muted-foreground">{c.desc}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        );
+      })()}
 
       <form onSubmit={handleSend} className="flex gap-2 border-t border-border p-2">
         <label htmlFor="message-draft" className="sr-only">
