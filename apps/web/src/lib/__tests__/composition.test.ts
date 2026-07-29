@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { isComposingEnter } from "../composition";
+import { isComposingEnter, shouldSendOnKey } from "../composition";
 
 // 2026-07-29 : 입력 - IME 조합 중 전송 방지 (Phase 54 T1)
 
@@ -34,5 +34,34 @@ describe("IME 가드 단일 출처", () => {
       // 각자 keyCode 229를 다시 적으면 두 벌이다.
       expect(src).not.toMatch(/keyCode\s*===\s*229/);
     }
+  });
+});
+
+describe("shouldSendOnKey (전송 키 판정, F-003)", () => {
+  it("enter 모드: Enter는 전송", () => {
+    expect(shouldSendOnKey("enter", { key: "Enter" })).toBe(true);
+  });
+
+  it("enter 모드: Shift+Enter는 줄바꿈", () => {
+    expect(shouldSendOnKey("enter", { key: "Enter", shiftKey: true })).toBe(false);
+  });
+
+  it("ctrl-enter 모드: Enter는 줄바꿈", () => {
+    expect(shouldSendOnKey("ctrl-enter", { key: "Enter" })).toBe(false);
+  });
+
+  it("ctrl-enter 모드: Ctrl+Enter·Cmd+Enter는 전송", () => {
+    expect(shouldSendOnKey("ctrl-enter", { key: "Enter", ctrlKey: true })).toBe(true);
+    expect(shouldSendOnKey("ctrl-enter", { key: "Enter", metaKey: true })).toBe(true);
+  });
+
+  it("조합 중이면 어느 모드든 전송하지 않는다 (X-017 통합)", () => {
+    expect(shouldSendOnKey("enter", { key: "Enter", isComposing: true })).toBe(false);
+    expect(shouldSendOnKey("ctrl-enter", { key: "Enter", ctrlKey: true, keyCode: 229 })).toBe(false);
+  });
+
+  it("Enter가 아니면 아무 모드도 전송하지 않는다", () => {
+    expect(shouldSendOnKey("enter", { key: "a" })).toBe(false);
+    expect(shouldSendOnKey("ctrl-enter", { key: "s", ctrlKey: true })).toBe(false);
   });
 });

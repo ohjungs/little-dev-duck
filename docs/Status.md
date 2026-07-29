@@ -1,5 +1,21 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — Phase 54 T1 + 56 선행: 여러 줄 입력(textarea) + 전송 키 설정
+> **스레드(T2)는 착수하지 않았다** — `last_read_message_id` 모델 재설계가 낀 계약 변경이라
+> 무인 루프의 임의 판단 범위 밖(계획 스스로 "착수 전에 판단한다" 게이트). 대신 F-003이
+> 실은 **여러 줄 입력과 세트**임을 확인했다: 입력이 `<input>`이라 줄바꿈 자체가 불가능했다.
+>
+> - 입력창 input → **textarea**(F-001): 최대 4줄 자동 확장, Shift+Enter 줄바꿈.
+>   말풍선에 whitespace-pre-wrap — 줄바꿈이 이제 보인다.
+> - `shouldSendOnKey`(테스트 +7, **IME 가드와 같은 파일** — 전송 판정과 조합 판정이 갈라지면
+>   한쪽만 고쳐진다): enter 모드(Enter 전송·Shift+Enter 줄바꿈) / ctrl-enter 모드(Enter 줄바꿈).
+>   조합 중이면 어느 모드든 전송 안 함.
+> - 설정 → **"메시지 전송 키"** 카드(`SendKeySetting`, NotifySetting 관례): 한글이 잘리는
+>   일이 잦으면 Ctrl+Enter 모드. 기기별 localStorage(`sendKeyPref`), 방 진입 시 1회 적용.
+> - 폼 버튼과 키 판정이 같은 `submitDraft` 경로를 쓴다(추출) — 슬래시 커맨드 포함.
+> - 검증: web 테스트 파일 60 / turbo lint·test·build **18/18 GREEN**.
+> - 실물 확인: [manual-verification.md 63번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 54](plans/phase_54.md) T3: 코드 블록 렌더 + 복사 (H-013)
 > T4를 먼저 읽었는데 대부분 DEFER 등급이거나 계획 스스로 "정직하게 안 만든다"고 정한
 > 항목(전송 취소)이었다. 실가치 조각은 T3의 코드 블록 — **오리 응답과 코드 스니펫 보관**

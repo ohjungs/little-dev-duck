@@ -72,7 +72,8 @@ import { createClient } from "@/lib/supabase/client";
 import { subscribeRoomMessages } from "@/lib/realtime";
 import { notifyDuck } from "@/lib/notify";
 import { loadDraft, saveDraft } from "@/lib/messageDraft";
-import { isComposingEnter } from "@/lib/composition";
+import { isComposingEnter, shouldSendOnKey, type SendKeyMode } from "@/lib/composition";
+import { getSendKeyMode } from "@/lib/sendKeyPref";
 import { MessageImageViewer } from "@/components/MessageImageViewer";
 import { EmojiPicker } from "@/components/EmojiPicker";
 
@@ -175,6 +176,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   const forwardRef = useRef<HTMLDivElement>(null);
   // 이모지 피커(F-011). 페이지 아이콘과 같은 공용 컴포넌트 — "자주 쓰는" 목록도 공유된다.
   const [showEmoji, setShowEmoji] = useState(false);
+  // 전송 키 설정(F-003). 방 진입 시 1회 읽는다 — 설정을 바꾸면 새로 연 화면부터 적용
+  // (설정 화면에도 그렇게 안내한다).
+  const sendKeyModeRef = useRef<SendKeyMode>("enter");
 
   const reload = useCallback(async () => {
     try {
@@ -466,6 +470,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     const t = setTimeout(() => setFlashId(null), 2500);
     return () => clearTimeout(t);
   }, [focusId]);
+
+  // 전송 키 설정 읽기(1회). ref라 렌더에 영향 없다.
+  useEffect(() => {
+    sendKeyModeRef.current = getSendKeyMode();
+  }, []);
 
   // 쓰다 만 초안 복원. 서버 렌더에는 localStorage가 없어 마운트 후에 읽는다 —
   // 초기값으로 읽으면 서버와 첫 화면이 달라진다(hydration 불일치).
@@ -761,8 +770,8 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     }
   }
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
+  /** 초안 전송. 폼 제출(버튼)과 키 판정(Enter/Ctrl+Enter)이 같은 경로를 쓴다. */
+  async function submitDraft() {
     const body = draft.trim();
     if (body === "" || sending) return;
 
@@ -795,6 +804,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     } finally {
       setSending(false);
     }
+  }
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    await submitDraft();
   }
 
   // 목록 전체에 한 번만 계산한다 — 메시지마다 부르면 목록 길이의 제곱만큼 훑는다.
@@ -966,7 +980,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                     e.preventDefault();
                     setMenuFor(m.id);
                   }}
-                  className={`inline-block max-w-[80%] rounded-lg px-3 py-1.5 text-sm break-keep ${
+                  className={`inline-block max-w-[80%] rounded-lg px-3 py-1.5 text-sm break-keep whitespace-pre-wrap ${
                     mine ? "bg-primary text-primary-foreground" : "bg-muted"
                   } ${m.deletedAt ? "italic opacity-60" : ""}`}
                 >
@@ -1412,13 +1426,26 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         <label htmlFor="message-draft" className="sr-only">
           메시지 입력
         </label>
-        <input
+        {/* textarea(F-001): 여러 줄 입력. 전송/줄바꿈 판정은 shouldSendOnKey 한 벌
+            (설정 F-003 + IME 가드 X-017 포함) — 폼 암시 제출이 없어져 이 판정이 유일한 키 경로다. */}
+        <textarea
           id="message-draft"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            // 조합 중 Enter는 글자 확정이지 전송이 아니다(X-017) — 판정은 lib 한 벌.
-            if (e.key === "Enter" && isComposingEnter(e.nativeEvent)) e.preventDefault();
+            if (
+              shouldSendOnKey(sendKeyModeRef.current, {
+                key: e.key,
+                ctrlKey: e.ctrlKey,
+                metaKey: e.metaKey,
+                shiftKey: e.shiftKey,
+                isComposing: e.nativeEvent.isComposing,
+                keyCode: e.nativeEvent.keyCode,
+              })
+            ) {
+              e.preventDefault();
+              void submitDraft();
+            }
           }}
           onPaste={(e) => {
             // 붙여넣은 것이 이미지면 첨부로(F-006). 글이면 평소대로 입력에 들어간다.
@@ -1430,7 +1457,8 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
           }}
           placeholder="메시지를 입력하세요"
           maxLength={4000}
-          className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          rows={Math.min(4, draft.split("\n").length)}
+          className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-1.5 text-sm"
         />
         <label className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-sm">
           {uploading ? "올리는 중" : "사진"}

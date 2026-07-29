@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { AppearanceSetting } from "@/components/AppearanceSetting";
 import { QuietHoursSetting } from "@/components/QuietHoursSetting";
 import { NotifySetting } from "@/components/NotifySetting";
+import { SendKeySetting } from "@/components/SendKeySetting";
 import { HealthStatus } from "@/components/HealthStatus";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
@@ -111,6 +112,21 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <NotifySetting />
+          </CardContent>
+        </Card>
+        {/* 2026-07-29 (F-003): 전송 키. IME 문제를 겪은 한국어 사용자는 Ctrl+Enter를 원한다. */}
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Keyboard className="size-4 text-primary-accent" />
+              메시지 전송 키
+            </CardTitle>
+            <CardDescription>
+              메신저 입력창에서 Enter를 전송으로 쓸지, 줄바꿈으로 쓸지 정합니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SendKeySetting />
           </CardContent>
         </Card>
         {/* 2026-07-26 (피드백 6-1·1-2·1-5): 대시보드 구성도 "내 것"이라 설정에 둔다.
