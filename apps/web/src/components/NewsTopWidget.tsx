@@ -1,25 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Newspaper } from "lucide-react";
-import { listArticles } from "@ldd/api";
+import { listArticles, listFeeds } from "@ldd/api";
 import {
-  topArticles,
+  briefingRange,
+  dailyIssues,
+  kstDateString,
+  topicForUrl,
   type Article,
-  type RankedArticle,
-  type TopArticlesResult,
+  type DailyIssuesResult,
+  type Feed,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { timeAgo } from "@/lib/timeAgo";
-import { markArticleRead } from "@/lib/readArticles";
+import { getReadArticles, markArticleRead, subscribeReadArticles } from "@/lib/readArticles";
 
-// 2026-07-26 : 대시보드 - 뉴스TOP3 - 인기기준
-// 사용자 피드백 4-5. 순위 기준은 core `topArticles` 한 곳에 있고 여기서는 그리기만 한다.
-// **조회수는 우리에게 없는 데이터라 쓰지 않는다** — 대신 "몇 개 매체가 다뤘는가"를 그대로
-// 화면에 밝힌다. 숨기고 '인기'라고만 쓰면 근거 없는 순위처럼 보인다.
+// 2026-07-29 : 대시보드 - 오늘의 브리핑 10 (사용자 지시: "top 3를 cherrypick처럼 매일
+// 10개의 이슈만 보이도록"). 선정·창(오늘 KST)·카테고리는 뉴스 화면의 브리핑과 **같은
+// core 한 벌**(dailyIssues·briefingRange) — 위젯과 뉴스 화면의 10개가 다르면 어느 쪽이
+// 맞는지 모른다. 읽음도 read-articles 한 벌이라 진행 n/10이 뉴스 화면과 같이 움직인다.
 
-// 순위 계산에 넣을 만큼만 가져온다. 창(72시간) 밖은 어차피 걸러지므로 과하게 받을 이유가 없다.
+// 순위 계산에 넣을 만큼만 가져온다. 창(오늘) 밖은 어차피 걸러진다.
 const FETCH_LIMIT = 60;
 
 // RSS가 준 외부 링크는 http(s)만 허용(NewsReader와 같은 규칙 — zod .url()이 javascript:를 통과시킨다).
@@ -28,17 +31,29 @@ function safeHref(url: string): string {
 }
 
 export function NewsTopWidget() {
-  const [result, setResult] = useState<TopArticlesResult<Article> | null>(null);
+  const [result, setResult] = useState<DailyIssuesResult<Article> | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [readIds, setReadIds] = useState<string[]>([]);
 
   useEffect(() => {
     let alive = true;
     void (async () => {
       try {
-        const articles = await listArticles(createClient(), FETCH_LIMIT);
+        const client = createClient();
+        const [articles, feeds] = await Promise.all([
+          listArticles(client, FETCH_LIMIT),
+          listFeeds(client),
+        ]);
         if (!alive) return;
-        // 기준 시각은 렌더 시점. 서버가 아니라 클라이언트에서 계산하므로 사용자의 실제 '지금'이다.
-        setResult(topArticles(articles, { now: new Date().toISOString() }));
+        const topicByFeedId: Record<string, string> = {};
+        for (const f of feeds as Feed[]) {
+          const topic = topicForUrl(f.url);
+          if (topic) topicByFeedId[f.id] = topic;
+        }
+        // 기준은 사용자의 '오늘'(KST) — 뉴스 화면 브리핑의 오늘 탭과 같은 창.
+        const range = briefingRange("today", kstDateString(new Date()));
+        if (range === null) throw new Error("날짜 계산 실패");
+        setResult(dailyIssues(articles, { ...range, topicByFeedId }));
         setState("ready");
       } catch {
         if (alive) setState("error");
@@ -49,9 +64,16 @@ export function NewsTopWidget() {
     };
   }, []);
 
-  const top: RankedArticle<Article>[] = result?.items ?? [];
-  // 창 길이를 여기서 "3일"이라고 다시 쓰지 않는다 — core가 실제로 적용한 값에서 만든다.
-  // 상수를 두 벌로 두면 창을 바꾸는 날 화면 문구만 거짓으로 남는다.
+  // 읽음 동기화 — 뉴스 화면에서 읽고 돌아와도 진행이 맞는다.
+  useEffect(() => {
+    const sync = () => setReadIds(getReadArticles());
+    sync();
+    return subscribeReadArticles(sync);
+  }, []);
+  const readSet = useMemo(() => new Set(readIds), [readIds]);
+
+  const items = result?.items ?? [];
+  const done = items.filter((i) => readSet.has(i.article.id)).length;
   const windowDays = result ? Math.round(result.windowHours / 24) : 0;
 
   return (
@@ -62,14 +84,18 @@ export function NewsTopWidget() {
           className="flex items-center gap-2 text-sm font-semibold tracking-tight"
         >
           <Newspaper className="size-4 text-primary-accent" />
-          오늘의 뉴스 TOP 3
+          오늘의 브리핑
         </h2>
-        <Link
-          href="/news"
-          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          전체 보기
-        </Link>
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
+          {items.length > 0 && (
+            <span role="status">
+              {done === items.length ? "다 읽었어요!" : `${done}/${items.length}`}
+            </span>
+          )}
+          <Link href="/news" className="transition-colors hover:text-foreground">
+            전체 보기
+          </Link>
+        </span>
       </div>
 
       {state === "loading" && (
@@ -78,11 +104,8 @@ export function NewsTopWidget() {
       {state === "error" && (
         <p className="text-sm text-muted-foreground">뉴스를 불러오지 못했어요.</p>
       )}
-      {/* 2026-07-27 (2차 피드백 1-8): 전에는 어느 경우든 "최근 3일 안에 수집된 기사가
-          없어요"였다. **기사를 방금 수집한 사용자에게 그건 거짓말이다** — 걸린 건 수집이
-          아니라 발행일이었다. 이제 core가 이유를 함께 돌려주므로 사실대로 나눠 말한다.
-          판정은 core에 있고 여기서는 문구만 고른다(조건을 다시 쓰면 두 벌이 된다). */}
-      {state === "ready" && top.length === 0 && result?.reason === "no-articles" && (
+      {/* 판정은 core에 있고 여기서는 문구만 고른다(조건을 다시 쓰면 두 벌이 된다). */}
+      {state === "ready" && items.length === 0 && result?.reason === "no-articles" && (
         <p className="text-sm text-muted-foreground">
           아직 수집된 기사가 없어요.{" "}
           <Link href="/news" className="text-primary-accent hover:underline">
@@ -90,52 +113,56 @@ export function NewsTopWidget() {
           </Link>
         </p>
       )}
-      {state === "ready" && top.length === 0 && result?.reason === "none-recent" && (
+      {state === "ready" && items.length === 0 && result?.reason === "none-recent" && (
         <p className="text-sm text-muted-foreground">
-          최근 기사가 없어요. 수집된 기사 {result.totalConsidered}건은 발행일이{" "}
-          {windowDays}일보다 오래됐어요.{" "}
+          오늘 발행·수집된 기사가 아직 없어요(창 {windowDays}일).{" "}
           <Link href="/news" className="text-primary-accent hover:underline">
-            전체 보기
+            뉴스에서 수집하기
           </Link>
         </p>
       )}
 
-      {top.length > 0 && (
-        <ol className="flex flex-col gap-2">
-          {top.map((ranked, index) => (
-            <li key={ranked.article.id}>
-              <a
-                href={safeHref(ranked.article.link)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => markArticleRead(ranked.article.id)}
-                className="group flex gap-2.5 rounded-lg p-2 transition-colors hover:bg-muted"
-              >
-                <span className="mt-0.5 shrink-0 text-sm font-semibold tabular-nums text-primary-accent">
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-start gap-1.5">
-                    <span className="line-clamp-2 text-sm font-medium leading-snug">
-                      {ranked.article.title}
-                    </span>
-                    <ExternalLink className="mt-0.5 size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      {items.length > 0 && (
+        <ol className="flex flex-col gap-1">
+          {items.map(({ rank, category, article: a, feedCount }) => {
+            const read = readSet.has(a.id);
+            return (
+              <li key={a.id}>
+                <a
+                  href={safeHref(a.link)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => markArticleRead(a.id)}
+                  className={
+                    "group flex gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-muted" +
+                    (read ? " opacity-60" : "")
+                  }
+                >
+                  <span className="mt-0.5 shrink-0 font-mono text-xs font-semibold tabular-nums text-primary-accent">
+                    {String(rank).padStart(2, "0")}
                   </span>
-                  <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    {/* 단독 보도에 "1개 매체"라고 붙이면 정보가 없다 — 여럿일 때만 근거를 밝힌다. */}
-                    {ranked.feedCount > 1 && (
-                      <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary-accent">
-                        {ranked.feedCount}개 매체
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-start gap-1.5">
+                      <span className="line-clamp-1 text-sm font-medium leading-snug">
+                        {a.title}
                       </span>
-                    )}
-                    {ranked.article.publishedAt && (
-                      <span>{timeAgo(ranked.article.publishedAt)}</span>
-                    )}
+                      <ExternalLink className="mt-0.5 size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="rounded border border-border px-1">{category}</span>
+                      {/* 단독 보도에 "1개 매체"는 정보가 없다 — 여럿일 때만 근거를 밝힌다. */}
+                      {feedCount > 1 && (
+                        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary-accent">
+                          {feedCount}개 매체
+                        </span>
+                      )}
+                      {a.publishedAt && <span>{timeAgo(a.publishedAt)}</span>}
+                    </span>
                   </span>
-                </span>
-              </a>
-            </li>
-          ))}
+                </a>
+              </li>
+            );
+          })}
         </ol>
       )}
     </section>

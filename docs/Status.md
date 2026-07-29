@@ -1,5 +1,15 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — 대시보드 TOP 3 → 브리핑 10 전환 (Phase 61 후속)
+> 사용자 지시 원문("top 3를 매일 10개 이슈로")의 마지막 남은 자리 — 대시보드 위젯.
+>
+> - NewsTopWidget 개편: 선정·오늘 창(KST)·카테고리를 뉴스 화면 브리핑과 **같은 core 한 벌**
+>   (dailyIssues·briefingRange)로. 읽음·진행 n/10도 read-articles 한 벌이라 화면 간 동기.
+> - 콤팩트 줄 형태(번호·카테고리 칩·제목 한 줄·매체 수·시각). 완주 시 "다 읽었어요!".
+> - XP는 위젯에서 안 준다 — 주는 곳은 뉴스 화면 하나(두 곳이면 이중 지급 경로).
+> - 검증: turbo lint·test·build **18/18 GREEN**. 실기: [mv 102번](loop-eng/manual-verification.md)
+>   (위젯 높이가 과하면 다음 사이클에서 접기 보완).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 61](plans/phase_61.md) T4: 한 장씩 보기·글자 크기
 > cherrypick 보기 옵션 두 가지. **T4의 코드-완결 조각은 이것으로 끝** — 남은 RSS 이미지는
 > articles 컬럼 추가(DDL)가 필요해 [PENDING 12번](loop-eng/PENDING.md)으로 사용자 결정 대기.
