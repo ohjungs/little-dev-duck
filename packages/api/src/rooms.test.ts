@@ -9,6 +9,7 @@ import {
   listMessagesBefore,
   listRoomAttachments,
   listRooms,
+  searchMessages,
   markRead,
   sendMessage,
   updateMessage,
@@ -380,5 +381,52 @@ describe("fetchAllRoomMessages", () => {
     const r = await fetchAllRoomMessages(pagingSupabase(5100), ROOM_ROW.id);
     expect(r.hitGuard).toBe(true);
     expect(r.messages.length).toBeLessThan(5100);
+  });
+});
+
+// 2026-07-29 : 메신저 - 검색 필터 (Phase 55 T1)
+describe("searchMessages 필터", () => {
+  // 어떤 조건이 실제 쿼리에 얹혔는지 붙잡는 목 — 필터가 조용히 무시되면 사용자는
+  // "필터가 걸렸다"고 믿은 채 전체 결과를 본다.
+  function capturingSupabase() {
+    const calls: Array<[string, ...unknown[]]> = [];
+    const chain: Record<string, unknown> = {};
+    for (const name of ["eq", "is", "ilike", "gte", "lt", "not", "order"]) {
+      chain[name] = (...a: unknown[]) => {
+        calls.push([name, ...a]);
+        return chain;
+      };
+    }
+    chain.limit = async () => ({ data: [], error: null });
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 테스트용 최소 목
+      supabase: { from: () => ({ select: () => chain }) } as any,
+      calls,
+    };
+  }
+
+  it("보낸 사람 필터가 sender_type 조건으로 얹힌다", async () => {
+    const { supabase, calls } = capturingSupabase();
+    await searchMessages(supabase, "안녕", { sender: "agent" });
+    expect(calls).toContainEqual(["eq", "sender_type", "agent"]);
+  });
+
+  it("기간 필터가 KST 경계(gte·lt)로 얹힌다", async () => {
+    const { supabase, calls } = capturingSupabase();
+    await searchMessages(supabase, "안녕", { from: "2026-07-29", to: "2026-07-29" });
+    expect(calls).toContainEqual(["gte", "created_at", "2026-07-28T15:00:00.000Z"]);
+    expect(calls).toContainEqual(["lt", "created_at", "2026-07-29T15:00:00.000Z"]);
+  });
+
+  it("사진만 필터가 attachment_path 조건으로 얹힌다", async () => {
+    const { supabase, calls } = capturingSupabase();
+    await searchMessages(supabase, "안녕", { withImage: true });
+    expect(calls).toContainEqual(["not", "attachment_path", "is", null]);
+  });
+
+  it("필터를 안 주면 아무 조건도 늘지 않는다 (기존 동작 보존)", async () => {
+    const { supabase, calls } = capturingSupabase();
+    await searchMessages(supabase, "안녕");
+    expect(calls.filter(([n]) => n === "eq" || n === "gte" || n === "lt" || n === "not")).toEqual([]);
   });
 });

@@ -8,7 +8,13 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { searchMessages } from "@ldd/api";
-import { messageBody, pendingMigrationMessage, splitByQuery, type Message } from "@ldd/core";
+import {
+  messageBody,
+  pendingMigrationMessage,
+  splitByQuery,
+  type Message,
+  type MessageSearchFilter,
+} from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 
 export function MessageSearch() {
@@ -16,6 +22,12 @@ export function MessageSearch() {
   const [results, setResults] = useState<Message[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 2026-07-29 : 메신저 - 검색 필터 (Phase 55 T1 L-006~L-008)
+  // 필터는 "찾기"를 누를 때 적용된다 — 바꿀 때마다 검색하면 날짜를 고르는 중간에도 쿼리가 나간다.
+  const [sender, setSender] = useState<"" | "user" | "agent">("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [withImage, setWithImage] = useState(false);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -23,7 +35,13 @@ export function MessageSearch() {
     setBusy(true);
     setError(null);
     try {
-      setResults(await searchMessages(createClient(), q));
+      const filter: MessageSearchFilter = {
+        sender: sender === "" ? undefined : sender,
+        from: from === "" ? undefined : from,
+        to: to === "" ? undefined : to,
+        withImage: withImage || undefined,
+      };
+      setResults(await searchMessages(createClient(), q, filter));
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       setError(pendingMigrationMessage(raw) ?? raw);
@@ -53,6 +71,49 @@ export function MessageSearch() {
           {busy ? "찾는 중" : "찾기"}
         </button>
       </form>
+
+      {/* 필터 줄 — 좁은 화면에서는 줄바꿈된다. 값은 "찾기"에서 함께 적용된다. */}
+      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <label className="flex items-center gap-1">
+          보낸 사람
+          <select
+            value={sender}
+            onChange={(e) => setSender(e.target.value as "" | "user" | "agent")}
+            className="rounded border border-border bg-background px-1 py-0.5"
+          >
+            <option value="">전체</option>
+            <option value="user">나</option>
+            <option value="agent">오리</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-1">
+          기간
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            aria-label="검색 시작 날짜"
+            className="rounded border border-border bg-background px-1 py-0.5"
+          />
+          ~
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            aria-label="검색 끝 날짜"
+            className="rounded border border-border bg-background px-1 py-0.5"
+          />
+        </label>
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={withImage}
+            onChange={(e) => setWithImage(e.target.checked)}
+            aria-label="사진 있는 메시지만"
+          />
+          사진만
+        </label>
+      </div>
 
       {error && (
         <p role="alert" className="mt-2 text-xs text-destructive break-keep">

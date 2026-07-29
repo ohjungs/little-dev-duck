@@ -14,6 +14,7 @@ import {
   likePattern,
   mergeAroundWindow,
   mergeMessages,
+  kstDayRange,
   sortRooms,
   unreadCount,
   checkMessageImage,
@@ -21,6 +22,7 @@ import {
   messageSchema,
   roomSchema,
   type Message,
+  type MessageSearchFilter,
   type Reaction,
   type Room,
   type RoomType,
@@ -691,19 +693,29 @@ export async function setRoomPin(
 export async function searchMessages(
   supabase: SupabaseClient,
   query: string,
+  // 2026-07-29 : 메신저 - 검색 필터 (Phase 55 T1 L-006~L-008)
+  // 판단(KST 경계·필터 모양)은 core가, 여기는 조건을 쿼리에 얹기만 한다.
+  filter: MessageSearchFilter = {},
   limit: number = MESSAGE_PAGE_SIZE,
 ): Promise<Message[]> {
   const pattern = likePattern(query);
   // 빈 검색어로 전부 긁어오지 않는다.
   if (pattern === null) return [];
 
-  const { data, error } = await supabase
+  let q = supabase
     .from("messages")
     .select("*")
     .is("deleted_at", null)
-    .ilike("body", pattern)
-    .order("seq", { ascending: false })
-    .limit(limit);
+    .ilike("body", pattern);
+
+  if (filter.sender) q = q.eq("sender_type", filter.sender);
+  const { fromIso, toIso } = kstDayRange(filter.from, filter.to);
+  if (fromIso) q = q.gte("created_at", fromIso);
+  // 배타 상한 — "그 날까지"가 그 날 23:59:59.999까지 포함된다.
+  if (toIso) q = q.lt("created_at", toIso);
+  if (filter.withImage) q = q.not("attachment_path", "is", null);
+
+  const { data, error } = await q.order("seq", { ascending: false }).limit(limit);
 
   if (error) throw new Error(error.message);
   return (data as MessageRow[]).map(messageFromRow);

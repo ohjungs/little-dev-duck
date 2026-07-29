@@ -1,5 +1,19 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T1: 검색 필터 (L-006~L-008)
+> 검색 심화의 첫 조각 — 기존 부분일치 검색(Phase 51 방식) 위에 얹었고 마이그레이션 0건.
+>
+> - core `kstDayRange`(테스트 5건): 기간 필터의 **KST 날짜 경계**가 계약 —
+>   상한은 다음날 시작(배타)이라 "그 날까지"가 23:59:59.999까지 포함된다.
+>   틀린 날짜 형식은 그 경계만 무시(검색 전체가 죽으면 안 된다).
+> - api `searchMessages`에 filter 인자(sender_type · created_at gte/lt · attachment_path) —
+>   **캡처 목 테스트 4건**: 필터가 조용히 무시되면 사용자는 "걸렸다"고 믿은 채 전체 결과를
+>   보게 되므로, 조건이 실제 쿼리에 얹혔는지를 잠갔다. 미지정 시 기존 동작 보존.
+> - UI: 검색창 아래 필터 줄(보낸 사람 전체/나/오리 · 기간 date × 2 · 사진만 체크박스).
+>   "찾기"를 누를 때 적용. a11y 정적 검사에 걸린 체크박스 aria-label 수정.
+> - 검증: core 1280건 / api 34건 / turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 68번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T2: 대화 내보내기 md·json (Q-002)
 > Q-001(.txt) 위에 형식 두 개를 얹었다. **세 형식이 정책 한 벌**(seq 정렬 · KST 날짜 경계 ·
 > 발화자 판정 · 지운 메시지는 안내 문구)을 공유한다 — 형식마다 판정이 갈라지면 어느
