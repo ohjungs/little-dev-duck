@@ -83,6 +83,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getMsgNotifyMode, getNotifyKeywords } from "@/lib/msgNotifyPref";
 import { getDataSaver } from "@/lib/dataSaverPref";
+import { isOffline, OFFLINE_SEND_MESSAGE } from "@/lib/offlineGuard";
 import { prefersReducedMotionNow } from "@ldd/mascot";
 import { notifyBlockReason } from "@/lib/notify";
 import { describeMessageNotifyStatus } from "@/lib/notifyStatus";
@@ -842,6 +843,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
    */
   async function sendImageFile(file: File) {
     if (uploading) return;
+    // 글 전송과 같은 오프라인 게이트(W-013) — 업로드는 실패 모양이 더 사납다.
+    if (isOffline()) {
+      setError(OFFLINE_SEND_MESSAGE);
+      return;
+    }
     const check = checkMessageImage({ type: file.type, size: file.size });
     if (!check.ok) {
       setError(check.reason);
@@ -922,6 +928,12 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   async function submitDraft() {
     const body = draft.trim();
     if (body === "" || sending) return;
+
+    // 오프라인이면 정체 모를 fetch 에러 대신 이유를 말한다(W-013). 초안은 그대로 둔다.
+    if (isOffline()) {
+      setError(OFFLINE_SEND_MESSAGE);
+      return;
+    }
 
     // 커맨드면 메시지로 보내지 않고 실행한다.
     const parsed = parseSlashCommand(body);

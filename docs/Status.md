@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) T2: 오프라인 전송 차단 안내 (W-013)
+> 계획 원문 그대로: "`OfflineIndicator`가 **이미 있다**. 재구현 금지 — 메신저 전송 차단
+> 안내만 연결한다." 오프라인에서 전송하면 fetch가 정체 모를 에러로 죽던 것을,
+> 이유를 말하는 안내로 바꿨다.
+>
+> - lib `offlineGuard`(테스트 3건): 판정(`isOffline`, navigator 주입으로 테스트 가능 ·
+>   SSR/node에선 막지 않음)과 문구 한 벌. **문구가 "쓴 내용은 남아 있어요"를 말한다** —
+>   지워진 줄 알면 사용자는 다시 쓴다.
+> - MessageRoom 전송 2경로(글 submitDraft · 사진 sendImageFile)에 같은 게이트.
+>   초안·파일 선택은 보존.
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 86번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) T1: KST 계산 core 승격 (X-013)
 > 계획이 "이 Task에서 가장 값이 크다"고 지목한 항목 — 하루 밀림을 여러 번 겪어 eslint
 > 규칙까지 만든 저장소인데, UTC→KST 표시 계산이 **네 곳에 따로** 있었다: 홈 인사
