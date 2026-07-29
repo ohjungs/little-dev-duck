@@ -16,6 +16,8 @@ const empty: BackupCollections = {
   duckState: [],
   pomodoroSessions: [],
   activityDaily: [],
+  messageRooms: [],
+  messages: [],
 };
 
 const fill = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `${i}` }));
@@ -41,6 +43,8 @@ describe("buildBackup", () => {
         duckState: fill(1),
         pomodoroSessions: [],
         activityDaily: [],
+        messageRooms: [],
+        messages: [],
       },
       "2026-07-26T00:00:00.000Z",
       {},
@@ -98,5 +102,34 @@ describe("buildBackup", () => {
     const b = buildBackup({ ...empty, todos }, "t", {});
     expect(todos).toHaveLength(2);
     expect(b.todos).not.toBe(todos);
+  });
+});
+
+// 2026-07-29 : 백업 - v5 - 메신저 보관 (Phase 55 T2)
+describe("buildBackup — v5 메신저", () => {
+  it("대화방과 메시지를 담는다 (잃으면 되살릴 수 없는 유일본)", () => {
+    const b = buildBackup(
+      { ...empty, messageRooms: fill(2), messages: fill(3) },
+      "t",
+      {},
+    );
+    expect(b.messageRooms).toHaveLength(2);
+    expect(b.messages).toHaveLength(3);
+  });
+
+  it("호출부가 이미 아는 잘림(knownTruncated)을 truncated에 합친다", () => {
+    // 메시지는 방마다 왕복 가드가 있어 개수-상한 비교로는 잘림을 알 수 없다 —
+    // 호출부가 "가드에 닿았다"는 사실 자체를 넘겨 준다.
+    const b = buildBackup({ ...empty, todos: fill(500) }, "t", { todos: 500 }, {}, [
+      "messages",
+    ]);
+    expect(b.truncated).toEqual(["messages", "todos"]);
+  });
+
+  it("knownTruncated가 상한 판정과 겹쳐도 한 번만 알린다", () => {
+    const b = buildBackup({ ...empty, todos: fill(500) }, "t", { todos: 500 }, {}, [
+      "todos",
+    ]);
+    expect(b.truncated).toEqual(["todos"]);
   });
 });

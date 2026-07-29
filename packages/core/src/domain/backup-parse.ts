@@ -35,6 +35,9 @@ const OPTIONAL_KEYS: BackupCollectionKey[] = [
   "duckState",
   "pomodoroSessions",
   "activityDaily",
+  // v5 추가. 보관 전용(자동 복원 없음) — backup.ts 버전 주석 참조.
+  "messageRooms",
+  "messages",
 ];
 
 const KEYS: BackupCollectionKey[] = [...REQUIRED_KEYS, ...OPTIONAL_KEYS];
@@ -113,6 +116,8 @@ export function parseBackup(raw: unknown): BackupParseResult {
       duckState: collections.get("duckState") ?? [],
       pomodoroSessions: collections.get("pomodoroSessions") ?? [],
       activityDaily: collections.get("activityDaily") ?? [],
+      messageRooms: collections.get("messageRooms") ?? [],
+      messages: collections.get("messages") ?? [],
     },
   };
 }

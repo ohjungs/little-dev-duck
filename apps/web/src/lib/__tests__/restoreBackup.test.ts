@@ -87,6 +87,8 @@ const bundle = (over: Partial<Backup>): Backup =>
       duckState: [],
       pomodoroSessions: [],
       activityDaily: [],
+      messageRooms: [],
+      messages: [],
       ...over,
     },
     ts,
@@ -203,6 +205,21 @@ describe("previewBackup", () => {
     if (r.ok) {
       expect(r.total).toBe(2);
       expect(r.invalid).toBe(0);
+    }
+  });
+
+  // 2026-07-29 : 백업 - v5 - 메신저 보관 (Phase 55 T2)
+  it("메신저 보관분은 복원 개수와 따로 센다 (화면이 '복원 안 됨'을 말할 근거)", () => {
+    const raw = JSON.parse(
+      JSON.stringify(
+        bundle({ habits: [habit(U(1))], messageRooms: [{ id: U(2) }], messages: [{ id: U(3) }] }),
+      ),
+    );
+    const r = previewBackup(raw);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.total).toBe(1);
+      expect(r.archived).toBe(2);
     }
   });
 

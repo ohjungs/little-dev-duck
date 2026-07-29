@@ -45,6 +45,10 @@ export type RestorePlan = {
   // 몇 개를 못 넣었는지는 사용자에게 반드시 알린다.
   invalid: number;
   total: number;
+  // v5 메신저 보관 컬렉션(대화방+메시지) 항목 수. **복원하지 않는다** — 메시지에는
+  // 상대방·오리가 보낸 행이 섞여 있고 RLS는 내 행만 insert를 허용한다. 파일에 담겨
+  // 있다는 사실만 사용자에게 알린다(total에 섞으면 "가져온다"고 보여준 개수와 어긋난다).
+  archived: number;
 };
 
 // 부모가 자식보다 먼저 오도록 정렬한다. 자식을 먼저 insert하면 parent_id 외래키에 걸려
@@ -142,6 +146,7 @@ export function planRestore(backup: Backup): RestorePlan {
     activityDaily,
     order: RESTORE_ORDER,
     invalid: counter.invalid,
+    archived: backup.messageRooms.length + backup.messages.length,
     total:
       todos.length +
       memos.length +

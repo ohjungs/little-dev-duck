@@ -135,6 +135,9 @@ const FULL: BackupCollections = {
     },
   ],
   activityDaily: [{ date: "2026-07-20", source: "claude_code", count: 12 }],
+  // v5 보관 전용 — 복원 계획에는 안 들어가지만 파일에는 그대로 살아 돌아와야 한다.
+  messageRooms: [{ id: U(8), type: "agent", title: "오리와의 대화" }],
+  messages: [{ id: U(9), roomId: U(8), body: "안녕 🦆", senderType: "user" }],
 };
 
 // 내보내기 → 파일 → 가져오기 판정 → 복원 계획. 실제 사용자 경로 그대로.
@@ -211,6 +214,20 @@ describe("백업 라운드트립", () => {
     }
   });
 
+  // 2026-07-29 : 백업 - v5 - 메신저 보관 (Phase 55 T2)
+  it("대화방·메시지가 파일을 거쳐 그대로 살아 돌아온다 (보관 전용)", () => {
+    const exported = buildBackup(FULL, ts, {});
+    const raw: unknown = JSON.parse(JSON.stringify(exported));
+    const parsed = parseBackup(raw);
+    if (!parsed.ok) throw new Error(parsed.reason);
+    expect(parsed.backup.messages).toEqual(FULL.messages);
+    expect(parsed.backup.messageRooms).toEqual(FULL.messageRooms);
+    // 복원 개수(total)에는 안 섞이고 archived로만 센다.
+    const plan = planRestore(parsed.backup);
+    expect(plan.total).toBe(11);
+    expect(plan.archived).toBe(2);
+  });
+
   it("두 번 돌려도 같다 (안정적)", () => {
     const once = roundTrip(FULL);
     const twice = roundTrip({
@@ -224,6 +241,8 @@ describe("백업 라운드트립", () => {
       duckState: once.duckState,
       pomodoroSessions: once.pomodoroSessions,
       activityDaily: once.activityDaily,
+      messageRooms: [],
+      messages: [],
     });
     expect(twice.pages).toEqual(once.pages);
     expect(twice.todos).toEqual(once.todos);
@@ -242,6 +261,8 @@ describe("백업 라운드트립", () => {
       duckState: [],
       pomodoroSessions: [],
       activityDaily: [],
+      messageRooms: [],
+      messages: [],
     });
     expect(plan.total).toBe(0);
     expect(plan.invalid).toBe(0);

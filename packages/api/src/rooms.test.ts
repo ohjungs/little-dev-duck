@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MESSAGE_PAGE_SIZE,
+  fetchAllRoomMessages,
   RECENT_WINDOW,
   deleteMessage,
   listMessages,
@@ -321,5 +322,63 @@ describe("listMessagesBefore", () => {
 
   it("더 없으면 빈 배열 (호출부가 '처음까지 왔다'로 안다)", async () => {
     expect(await listMessagesBefore(fakeSupabase({ messages: [] }), ROOM_ROW.id, 1)).toEqual([]);
+  });
+});
+
+// 2026-07-29 : 메신저 - 방 전체 메시지 수집 (Phase 55 T2)
+describe("fetchAllRoomMessages", () => {
+  // 페이지 경계를 실제로 검증하려면 lt(seq)와 limit을 존중하는 목이 필요하다 —
+  // 공용 fakeSupabase는 필터를 무시하고 같은 행을 돌려줘 루프 검사에 못 쓴다.
+  function pagingSupabase(total: number) {
+    const rows = Array.from({ length: total }, (_, i) =>
+      messageRow({
+        id: `aaaaaaaa-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
+        seq: i + 1,
+        client_msg_id: `c${i + 1}`,
+      }),
+    );
+    const query = (table: string) => {
+      let beforeSeq = Infinity;
+      const chain: Record<string, unknown> = {
+        eq: () => chain,
+        is: () => chain,
+        ilike: () => chain,
+        order: () => chain,
+        lt: (_col: string, v: number) => {
+          beforeSeq = v;
+          return chain;
+        },
+        limit: async (n: number) => {
+          if (table !== "messages") return { data: [], error: null };
+          const hit = rows.filter((r) => r.seq < beforeSeq).sort((a, b) => b.seq - a.seq);
+          return { data: hit.slice(0, n), error: null };
+        },
+      };
+      return { select: () => chain };
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 테스트용 최소 목
+    return { from: (t: string) => query(t) } as any;
+  }
+
+  it("화면 창(50개) 밖 과거까지 전부 읽는다", async () => {
+    const { messages, hitGuard } = await fetchAllRoomMessages(pagingSupabase(120), ROOM_ROW.id);
+    expect(messages).toHaveLength(120);
+    expect(messages.map((m) => m.seq)).toEqual(
+      Array.from({ length: 120 }, (_, i) => i + 1),
+    );
+    expect(hitGuard).toBe(false);
+  });
+
+  it("빈 방은 빈 배열, 가드 미작동", async () => {
+    const r = await fetchAllRoomMessages(pagingSupabase(0), ROOM_ROW.id);
+    expect(r.messages).toEqual([]);
+    expect(r.hitGuard).toBe(false);
+  });
+
+  it("왕복 가드에 닿으면 조용히 자르지 않고 hitGuard로 알린다", async () => {
+    // 가드(100회) × 50개 + 첫 페이지 50개 = 5,050개 초과분이 있으면 잘린다.
+    const r = await fetchAllRoomMessages(pagingSupabase(5100), ROOM_ROW.id);
+    expect(r.hitGuard).toBe(true);
+    expect(r.messages.length).toBeLessThan(5100);
   });
 });

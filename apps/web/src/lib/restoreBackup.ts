@@ -38,12 +38,19 @@ const MAX_REPORTED_ERRORS = 5;
 
 // 파일 내용(JSON.parse 결과)을 검사만 한다. 쓰기 전에 "무엇이 들어갈지" 보여주기 위함.
 export function previewBackup(raw: unknown):
-  | { ok: true; backup: Backup; total: number; invalid: number }
+  | { ok: true; backup: Backup; total: number; invalid: number; archived: number }
   | { ok: false; reason: string } {
   const parsed = parseBackup(raw);
   if (!parsed.ok) return parsed;
   const plan = planRestore(parsed.backup);
-  return { ok: true, backup: parsed.backup, total: plan.total, invalid: plan.invalid };
+  return {
+    ok: true,
+    backup: parsed.backup,
+    total: plan.total,
+    invalid: plan.invalid,
+    // v5 메신저 보관분(대화방+메시지). 복원되지 않는다 — 화면이 그 사실을 말해야 한다.
+    archived: plan.archived,
+  };
 }
 
 export async function restoreBackup(

@@ -16,7 +16,11 @@ import type { LocalPrefs } from "./local-prefs";
 // v4(2026-07-26): localPrefs 추가 — 브라우저에만 있던 값(할 일 순서·즐겨찾기·방해금지 등).
 // 컬렉션이 아니라 **키→값 맵**이라 BackupCollections에 넣지 않는다(상한·복원계획 로직이 전부
 // 배열 전제다). v1~v3 파일에는 없을 뿐이고 나머지는 그대로 복원된다.
-export const BACKUP_FORMAT_VERSION = 4;
+// v5(2026-07-29): messageRooms·messages 추가 — 메신저 대화는 다시 만들 방법이 없는 유일본이다.
+// **보관 전용 컬렉션**: 메시지에는 상대방·오리가 보낸 행이 섞여 있고 RLS는 내 행만 insert를
+// 허용하므로 자동 복원은 성립하지 않는다(복원 계획이 order에 넣지 않고 archived로만 센다).
+// 첨부 이미지는 스토리지 파일이라 JSON 백업에 들어가지 않는다 — 행의 경로만 남는다.
+export const BACKUP_FORMAT_VERSION = 5;
 
 export type BackupCollections = {
   todos: unknown[];
@@ -34,6 +38,9 @@ export type BackupCollections = {
   pomodoroSessions: unknown[];
   // v3 추가. github는 재수집되지만 **claude_code는 로컬 수집기라 재수집이 어렵다** — 유일본이다.
   activityDaily: unknown[];
+  // v5 추가. 보관 전용(자동 복원 없음) — 위 버전 주석 참조.
+  messageRooms: unknown[];
+  messages: unknown[];
 };
 
 export type BackupCollectionKey = keyof BackupCollections;
@@ -55,6 +62,8 @@ const KEYS: BackupCollectionKey[] = [
   "habitChecks",
   "habits",
   "memos",
+  "messageRooms",
+  "messages",
   "pages",
   "pomodoroSessions",
   "todos",
@@ -69,8 +78,11 @@ export function buildBackup(
   caps: Partial<Record<BackupCollectionKey, number>>,
   // 브라우저에서만 읽을 수 있는 값이라 호출부가 넣어 준다. 서버·테스트에서는 없는 게 정상이다.
   localPrefs: LocalPrefs = {},
+  // 개수-상한 비교로는 알 수 없는 잘림(예: 메시지의 방별 왕복 가드)을 호출부가 직접 알린다.
+  knownTruncated: BackupCollectionKey[] = [],
 ): Backup {
   const truncated = KEYS.filter((key) => {
+    if (knownTruncated.includes(key)) return true;
     const cap = caps[key];
     // 상한 0은 "상한 없음"이 아니라 잘못된 입력이다. 0건인 빈 컬렉션을 잘렸다고 하지 않는다.
     if (cap === undefined || cap <= 0) return false;
@@ -92,5 +104,7 @@ export function buildBackup(
     duckState: [...collections.duckState],
     pomodoroSessions: [...collections.pomodoroSessions],
     activityDaily: [...collections.activityDaily],
+    messageRooms: [...collections.messageRooms],
+    messages: [...collections.messages],
   };
 }

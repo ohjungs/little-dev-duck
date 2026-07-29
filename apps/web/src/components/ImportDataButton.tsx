@@ -13,7 +13,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 // 되돌리기 어려운 작업이라 **실행 전에 무엇이 들어가는지 보여주고 확인을 받는다**(CLAUDE.md 5절).
 // 덮어쓰기는 하지 않는다 — 같은 id가 이미 있으면 건너뛰므로 기존 데이터는 그대로다.
 
-type Pending = { backup: Backup; total: number; invalid: number };
+type Pending = { backup: Backup; total: number; invalid: number; archived: number };
 
 export function ImportDataButton() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,7 +40,12 @@ export function ImportDataButton() {
         setError(preview.reason);
         return;
       }
-      setPending({ backup: preview.backup, total: preview.total, invalid: preview.invalid });
+      setPending({
+        backup: preview.backup,
+        total: preview.total,
+        invalid: preview.invalid,
+        archived: preview.archived,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "파일을 읽지 못했습니다.");
     }
@@ -66,6 +71,11 @@ export function ImportDataButton() {
         "이미 있는 항목은 건너뛰므로 지금 데이터가 지워지거나 바뀌지 않습니다.",
         pending.invalid > 0
           ? `모양이 맞지 않는 ${pending.invalid}개는 넣지 않습니다.`
+          : "",
+        // 메시지에는 상대방·오리가 보낸 행이 섞여 있어 자동 복원이 성립하지 않는다(보관 전용).
+        // 말하지 않으면 사용자는 대화까지 복원됐다고 믿는다.
+        pending.archived > 0
+          ? `메신저 대화 ${pending.archived}개(방·메시지)는 보관용으로만 담겨 있어 복원되지 않습니다.`
           : "",
         pending.backup.truncated.length > 0
           ? "이 백업은 내보낼 때 일부가 잘렸을 수 있습니다."

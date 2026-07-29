@@ -22,6 +22,8 @@ const bundle = (over: Partial<Backup>): Backup => ({
   duckState: [],
   pomodoroSessions: [],
   activityDaily: [],
+  messageRooms: [],
+  messages: [],
   ...over,
 });
 
@@ -140,5 +142,28 @@ describe("planRestore", () => {
     // 여기서 조용히 버리면 사용자는 넣었다고 믿은 문서를 잃는다.
     const trashed = { ...page(U(1)), isTrashed: true, trashedAt: "2026-07-20T00:00:00.000Z" };
     expect(planRestore(bundle({ pages: [trashed] })).pages).toHaveLength(1);
+  });
+});
+
+// 2026-07-29 : 백업 - v5 - 메신저 보관 (Phase 55 T2)
+describe("planRestore — 메신저 보관 컬렉션", () => {
+  it("대화방·메시지는 세되 복원 순서에 넣지 않는다 (보관 전용)", () => {
+    // 메시지에는 상대방·오리가 보낸 행이 섞여 있고 RLS는 내 행만 insert를 허용한다 —
+    // 자동 복원은 성립하지 않는다. 대신 파일에 담겨 있다는 사실을 사용자에게 알린다.
+    const plan = planRestore(
+      bundle({
+        messageRooms: [{ id: U(1) }],
+        messages: [{ id: U(2) }, { id: U(3) }],
+      }),
+    );
+    expect(plan.archived).toBe(3);
+    expect(plan.order).not.toContain("messages");
+    expect(plan.order).not.toContain("messageRooms");
+  });
+
+  it("메신저 항목은 total(복원 개수)에 넣지 않는다", () => {
+    const plan = planRestore(bundle({ todos: [todo(U(1))], messages: [{ id: U(2) }] }));
+    expect(plan.total).toBe(1);
+    expect(plan.archived).toBe(1);
   });
 });

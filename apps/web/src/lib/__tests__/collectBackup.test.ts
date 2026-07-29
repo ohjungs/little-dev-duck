@@ -16,6 +16,8 @@ const listFeeds = vi.fn();
 const getDuckState = vi.fn();
 const listPomodoroSessions = vi.fn();
 const listActivityDaily = vi.fn();
+const listRooms = vi.fn();
+const fetchAllRoomMessages = vi.fn();
 
 vi.mock("@ldd/api", () => ({
   listTodos: (...a: unknown[]) => listTodos(...a),
@@ -29,6 +31,9 @@ vi.mock("@ldd/api", () => ({
   getDuckState: (...a: unknown[]) => getDuckState(...a),
   listPomodoroSessions: (...a: unknown[]) => listPomodoroSessions(...a),
   listActivityDaily: (...a: unknown[]) => listActivityDaily(...a),
+  listRooms: (...a: unknown[]) => listRooms(...a),
+  fetchAllRoomMessages: (...a: unknown[]) => fetchAllRoomMessages(...a),
+  ROOM_LIST_LIMIT: 200,
   ACTIVITY_EXPORT_LIMIT: 3000,
   PAGE_EXPORT_LIMIT: 500,
   HABIT_CHECK_EXPORT_LIMIT: 5000,
@@ -52,6 +57,8 @@ beforeEach(() => {
   getDuckState.mockResolvedValue({ userId: "u", xp: 0, level: 1, feed: 100, costume: "default", updatedAt: "t" });
   listPomodoroSessions.mockResolvedValue([]);
   listActivityDaily.mockResolvedValue([]);
+  listRooms.mockResolvedValue([]);
+  fetchAllRoomMessages.mockResolvedValue({ messages: [], hitGuard: false });
 });
 
 describe("collectBackup", () => {
@@ -103,7 +110,7 @@ describe("collectBackup", () => {
   it("컬렉션과 버전을 담는다", async () => {
     const backup = await collectBackup(fakeClient);
     // 값을 못박아 둔다 — 형식을 바꾸면 이 테스트가 먼저 울어 "무엇이 늘었는지" 적게 만든다.
-    expect(backup.formatVersion).toBe(4);
+    expect(backup.formatVersion).toBe(5);
     for (const key of [
       "todos",
       "memos",
@@ -114,6 +121,8 @@ describe("collectBackup", () => {
       "feeds",
       "pomodoroSessions",
       "activityDaily",
+      "messageRooms",
+      "messages",
     ] as const) {
       expect(backup[key], key).toEqual([]);
     }
@@ -135,6 +144,28 @@ describe("collectBackup", () => {
     listTodos.mockResolvedValue([{ id: 1 }]);
     const backup = await collectBackup(fakeClient);
     expect(backup.truncated).toEqual([]);
+  });
+
+  // v5: 메신저 대화 — 다시 만들 방법이 없는 유일본이라 백업에 담는다(보관 전용).
+  it("대화방과 방별 전체 메시지를 부른다", async () => {
+    listRooms.mockResolvedValue([{ id: "r1" }, { id: "r2" }]);
+    fetchAllRoomMessages
+      .mockResolvedValueOnce({ messages: [{ id: "m1" }], hitGuard: false })
+      .mockResolvedValueOnce({ messages: [{ id: "m2" }, { id: "m3" }], hitGuard: false });
+    const backup = await collectBackup(fakeClient);
+    expect(fetchAllRoomMessages).toHaveBeenCalledTimes(2);
+    expect(fetchAllRoomMessages).toHaveBeenCalledWith(fakeClient, "r1");
+    expect(backup.messageRooms).toHaveLength(2);
+    expect(backup.messages.map((m) => (m as { id: string }).id)).toEqual(["m1", "m2", "m3"]);
+  });
+
+  it("방 하나라도 왕복 가드에 닿으면 메시지를 잘림으로 알린다", async () => {
+    listRooms.mockResolvedValue([{ id: "r1" }, { id: "r2" }]);
+    fetchAllRoomMessages
+      .mockResolvedValueOnce({ messages: [{ id: "m1" }], hitGuard: true })
+      .mockResolvedValueOnce({ messages: [], hitGuard: false });
+    const backup = await collectBackup(fakeClient);
+    expect(backup.truncated).toContain("messages");
   });
 
   it("조회 하나가 실패하면 반쪽 백업을 만들지 않고 실패시킨다", async () => {

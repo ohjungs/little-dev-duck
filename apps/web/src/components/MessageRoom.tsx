@@ -18,6 +18,7 @@ import {
   createTodo,
   deleteMessage,
   downloadMessageImage,
+  fetchAllRoomMessages,
   listMessages,
   listMessagesBefore,
   listReactions,
@@ -269,22 +270,15 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
 
   /**
    * 방 전체를 .txt로 내려받는다. 화면 창(50개) 밖의 과거까지 **전부** 읽는다 —
-   * 일부만 담고 "내보냈다"고 하면 안 된다. 상한(100회 왕복)은 무한 루프 방지 가드다.
+   * 일부만 담고 "내보냈다"고 하면 안 된다. 수집은 백업(v5)과 같은 `fetchAllRoomMessages`
+   * 한 경로다 — 경로가 갈라지면 "전부"의 기준도 갈라진다.
    */
   async function handleExport() {
     if (exporting) return;
     setExporting(true);
     setError(null);
     try {
-      const client = createClient();
-      let all = await listMessages(client, roomId);
-      for (let i = 0; i < 100; i++) {
-        const first = all[0];
-        if (!first) break;
-        const older = await listMessagesBefore(client, roomId, first.seq);
-        if (older.length === 0) break;
-        all = mergeMessages(older, all);
-      }
+      const { messages: all } = await fetchAllRoomMessages(createClient(), roomId);
       const text = formatTranscript(all, myUserId);
       const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);

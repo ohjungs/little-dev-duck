@@ -1,5 +1,20 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T2: 백업 v5 — 메신저 대화 보관 (Q 잔여의 실체)
+> 계획이 T2의 실체로 못박은 "**메시지를 백업 형식에 추가**"를 처리했다. 대화는 다시 만들
+> 방법이 없는 유일본인데 지금까지 "내 데이터 내보내기"에서 통째로 빠져 있었다.
+>
+> - core 백업 **v4 → v5**: `messageRooms`·`messages` 추가. **보관 전용** — 메시지에는
+>   상대방·오리가 보낸 행이 섞여 있고 RLS는 내 행만 insert를 허용하므로 자동 복원은
+>   성립하지 않는다. 복원 계획이 `archived`로 따로 세고(가져오기 개수에 안 섞음),
+>   가져오기 대화상자가 "보관용이라 복원 안 됨"을 명시한다(말 안 하면 복원됐다고 믿는다).
+> - `buildBackup`에 `knownTruncated` 추가 — 메시지는 방별 왕복 가드라 개수-상한 비교로는
+>   잘림을 알 수 없어, 가드에 닿은 사실 자체를 호출부가 전달한다. v1~v4 파일은 그대로 읽힌다.
+> - api `fetchAllRoomMessages` 추출: 대화 내보내기(.txt)의 인라인 루프와 백업이 **같은
+>   수집 경로 한 벌** — 경로가 갈라지면 "전부"의 기준도 갈라진다. MessageRoom도 이걸 쓰도록 교체.
+> - 검증: core 1264건 / api 30건(rooms) / web 27건(backup) / turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 66번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 12:2x — **마이그레이션 11건 전부 적용 완료** (사용자 지시, MCP 경로)
 > CLI 자격 증명 없이 **claude.ai Supabase 커넥터(MCP)** 로 적용했다. 이력·테이블·어드바이저 검증 완료.
 > - 적용: todo_recurrence · **harden_security_definer(보안 구멍 패치)** · rls_initplan_rest ·

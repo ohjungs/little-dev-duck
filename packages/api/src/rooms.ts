@@ -13,6 +13,7 @@ import {
   shouldRemoveReaction,
   likePattern,
   mergeAroundWindow,
+  mergeMessages,
   sortRooms,
   unreadCount,
   checkMessageImage,
@@ -89,12 +90,15 @@ export const MESSAGE_PAGE_SIZE = 50;
 // 창을 넘길 만큼 안 읽었으면 어차피 "많다"만 알면 된다(화면이 99+로 줄여 보여 준다).
 export const RECENT_WINDOW = 500;
 
+// 방 목록 조회 상한. 백업이 이 값으로 "잘렸을 수 있음"을 판정하므로 숫자를 한 곳에 둔다.
+export const ROOM_LIST_LIMIT = 200;
+
 export async function listRooms(supabase: SupabaseClient): Promise<Room[]> {
   const { data, error } = await supabase
     .from("rooms")
     .select("*")
     .order("updated_at", { ascending: false })
-    .limit(200);
+    .limit(ROOM_LIST_LIMIT);
 
   if (error) throw new Error(error.message);
   return (data as RoomRow[]).map(roomFromRow);
@@ -163,6 +167,30 @@ export async function listMessagesBefore(
     .limit(limit);
   if (error) throw new Error(error.message);
   return ((data ?? []) as MessageRow[]).map(messageFromRow).reverse();
+}
+
+// 2026-07-29 : 메신저 - 방 전체 메시지 수집 (Phase 55 T2 — 내보내기·백업 공용)
+/** 방당 왕복 가드. 50개씩 100회 = 방당 5,000개. 닿으면 hitGuard로 알린다. */
+export const FETCH_ALL_MAX_ROUNDS = 100;
+
+/**
+ * 방의 메시지를 처음까지 **전부** 읽는다. 대화 내보내기(.txt)와 백업이 같은 경로를 쓴다 —
+ * 경로가 갈라지면 "전부"의 기준도 갈라진다. 상한은 무한 루프 방지 가드고, 닿으면
+ * hitGuard=true로 돌려 호출부가 "잘렸을 수 있음"을 사용자에게 전하게 한다(조용히 자르지 않는다).
+ */
+export async function fetchAllRoomMessages(
+  supabase: SupabaseClient,
+  roomId: string,
+): Promise<{ messages: Message[]; hitGuard: boolean }> {
+  let all = await listMessages(supabase, roomId);
+  for (let i = 0; i < FETCH_ALL_MAX_ROUNDS; i++) {
+    const first = all[0];
+    if (!first) return { messages: all, hitGuard: false };
+    const older = await listMessagesBefore(supabase, roomId, first.seq);
+    if (older.length === 0) return { messages: all, hitGuard: false };
+    all = mergeMessages(older, all);
+  }
+  return { messages: all, hitGuard: true };
 }
 
 // 2026-07-29 : 메신저 - 표적 주변 로딩 (Phase 51 T3 잔여 L-005)

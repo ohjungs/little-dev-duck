@@ -17,6 +17,8 @@ const validFile = () =>
           duckState: [],
           pomodoroSessions: [],
           activityDaily: [],
+          messageRooms: [],
+          messages: [],
         },
         "2026-07-26T00:00:00.000Z",
         {},
@@ -84,7 +86,7 @@ describe("parseBackup", () => {
 
   it("빈 백업도 유효하다 (아무것도 없는 계정)", () => {
     const empty = buildBackup(
-      { todos: [], memos: [], habits: [], habitChecks: [], calendarEvents: [], pages: [], feeds: [], duckState: [], pomodoroSessions: [], activityDaily: [] },
+      { todos: [], memos: [], habits: [], habitChecks: [], calendarEvents: [], pages: [], feeds: [], duckState: [], pomodoroSessions: [], activityDaily: [], messageRooms: [], messages: [] },
       "t",
       {},
     );
@@ -224,6 +226,8 @@ describe("parseBackup - 브라우저 로컬 설정(v4)", () => {
             duckState: [],
             pomodoroSessions: [],
             activityDaily: [],
+            messageRooms: [],
+            messages: [],
           },
           "2026-07-26T00:00:00.000Z",
           {},
@@ -240,5 +244,39 @@ describe("parseBackup - 브라우저 로컬 설정(v4)", () => {
         "ldd-pomodoro-tags": ["공부"],
       });
     }
+  });
+});
+
+// 2026-07-29 : 백업 - v5 - 메신저 보관 (Phase 55 T2)
+describe("parseBackup — v5 메신저", () => {
+  it("v5 파일의 대화방·메시지를 살린다", () => {
+    const file = validFile();
+    file.messageRooms = [{ id: "r1" }];
+    file.messages = [{ id: "m1" }, { id: "m2" }];
+    const r = parseBackup(file);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.backup.messageRooms).toHaveLength(1);
+      expect(r.backup.messages).toHaveLength(2);
+    }
+  });
+
+  it("v4 이전 파일(메신저 없음)은 빈 배열로 채운다", () => {
+    const file = validFile();
+    delete file.messageRooms;
+    delete file.messages;
+    file.formatVersion = 4;
+    const r = parseBackup(file);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.backup.messageRooms).toEqual([]);
+      expect(r.backup.messages).toEqual([]);
+    }
+  });
+
+  it("메시지가 '없음'이 아니라 '깨짐'이면 거부한다", () => {
+    const file = validFile();
+    file.messages = "깨짐";
+    expect(parseBackup(file).ok).toBe(false);
   });
 });
