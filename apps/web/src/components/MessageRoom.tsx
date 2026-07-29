@@ -22,6 +22,7 @@ import {
   listMessagesBefore,
   listReactions,
   listRoomAttachments,
+  listRoomLinkMessages,
   listRoomsWithPin,
   getMyMembership,
   markRead,
@@ -53,6 +54,7 @@ import {
   codeFenceParts,
   conversionReceiptText,
   dayDivider,
+  extractLinks,
   firstUnreadId,
   formatTranscript,
   matchSlashCommands,
@@ -178,6 +180,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   const forwardRef = useRef<HTMLDivElement>(null);
   // 이모지 피커(F-011). 페이지 아이콘과 같은 공용 컴포넌트 — "자주 쓰는" 목록도 공유된다.
   const [showEmoji, setShowEmoji] = useState(false);
+  // 링크 모아보기(K-016). 감지는 말풍선과 같은 linkifyParts 한 벌(core extractLinks).
+  const [links, setLinks] = useState<{ url: string; seq: number }[] | "loading" | null>(null);
+  const linksRef = useRef<HTMLDivElement>(null);
   // 전송 키 설정(F-003). 방 진입 시 1회 읽는다 — 설정을 바꾸면 새로 연 화면부터 적용
   // (설정 화면에도 그렇게 안내한다).
   const sendKeyModeRef = useRef<SendKeyMode>("enter");
@@ -641,6 +646,25 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     if (forwardOpen) forwardRef.current?.focus();
   }, [forwardOpen]);
 
+  // 링크 모아보기가 열리면 초점을 준다(같은 규칙).
+  const linksOpen = links !== null;
+  useEffect(() => {
+    if (linksOpen) linksRef.current?.focus();
+  }, [linksOpen]);
+
+  /** 링크 모아보기 열기. 서버는 넓게(%http%) 거르고 실제 추출은 core가 한다. */
+  async function openLinks() {
+    setLinks("loading");
+    try {
+      const rows = await listRoomLinkMessages(createClient(), roomId);
+      setLinks(extractLinks(rows));
+    } catch (err) {
+      setLinks(null);
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    }
+  }
+
   /** 방 전체 사진 모아보기 열기. 실패하면 안내하고 닫는다 — 빈 격자를 성공처럼 두지 않는다. */
   async function openGallery() {
     setGallery("loading");
@@ -888,6 +912,13 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
           className="rounded border border-border px-2 py-0.5 hover:bg-accent"
         >
           사진 모아보기
+        </button>
+        <button
+          type="button"
+          onClick={() => void openLinks()}
+          className="rounded border border-border px-2 py-0.5 hover:bg-accent"
+        >
+          링크 모아보기
         </button>
         <button
           type="button"
@@ -1313,6 +1344,53 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                       </span>
                     )}
                   </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* 링크 모아보기(K-016). 방에서 오간 URL을 최근 것부터, 같은 건 하나만. */}
+      {links !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="링크 모아보기"
+          tabIndex={-1}
+          ref={linksRef}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setLinks(null);
+          }}
+          className="absolute inset-0 z-40 flex flex-col bg-background"
+        >
+          <div className="flex items-center justify-between border-b border-border px-3 py-2 text-sm">
+            <span>링크 모아보기</span>
+            <button
+              type="button"
+              onClick={() => setLinks(null)}
+              aria-label="링크 모아보기 닫기"
+              className="rounded border border-border px-2 py-0.5 text-xs hover:bg-accent"
+            >
+              닫기
+            </button>
+          </div>
+          {links === "loading" ? (
+            <p className="p-4 text-sm text-muted-foreground">링크를 모으는 중</p>
+          ) : links.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">주고받은 링크가 없어요.</p>
+          ) : (
+            <ul className="flex-1 divide-y divide-border overflow-y-auto">
+              {links.map((l) => (
+                <li key={l.url}>
+                  <a
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block p-3 text-sm underline break-all hover:bg-accent"
+                  >
+                    {l.url}
+                  </a>
                 </li>
               ))}
             </ul>

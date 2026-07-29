@@ -194,6 +194,7 @@ export {
   listRoomAttachments,
   listMessagesAround,
   listMessagesBefore,
+  listRoomLinkMessages,
   updateMessage,
   SIGNED_URL_SECONDS,
   getMyMembership,

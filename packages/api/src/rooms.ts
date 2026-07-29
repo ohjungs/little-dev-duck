@@ -120,6 +120,29 @@ export async function listMessages(
   return (data as MessageRow[]).map(messageFromRow).reverse();
 }
 
+// 2026-07-29 : 메신저 - 링크 모아보기 (Phase 55 T3 K-016)
+/**
+ * 링크가 있을 법한 메시지를 불러온다. 서버 필터는 **고정 패턴** '%http%'라 사용자 입력이
+ * 닿지 않는다(넓게 걸러도 실제 URL 추출은 core `extractLinks`가 한다 — 가짜 히트는
+ * 링크가 안 나와 자연히 떨어진다). 최신부터 상한까지 — 아주 옛 링크는 안 나온다(정직한 한계).
+ */
+export async function listRoomLinkMessages(
+  supabase: SupabaseClient,
+  roomId: string,
+  limit: number = GALLERY_LIMIT,
+): Promise<Message[]> {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("room_id", roomId)
+    .ilike("body", "%http%")
+    .is("deleted_at", null)
+    .order("seq", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as MessageRow[]).map(messageFromRow);
+}
+
 // 2026-07-29 : 메신저 - 위로 스크롤 과거 로딩 (Phase 51 T3 후속)
 /**
  * 이 seq **이전** 조각을 불러온다(위로 스크롤). 최신순으로 잘라 받아 오래된 순으로 돌려준다 —

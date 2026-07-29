@@ -67,6 +67,7 @@ function fakeSupabase(opts: {
       not: () => selectChain,
       is: () => selectChain,
       lt: () => selectChain,
+      ilike: () => selectChain,
       gte: () => selectChain,
       order: () => selectChain,
       limit: result,
