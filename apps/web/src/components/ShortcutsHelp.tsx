@@ -17,6 +17,18 @@ const SHORTCUTS: { group: string; items: { keys: string; desc: string }[] }[] = 
     group: "메모",
     items: [{ keys: "Ctrl/⌘ + Enter", desc: "메모 추가" }],
   },
+  // 2026-07-29 (Phase 57 T2 W-004): 실제로 동작하는 키만 적는다 — 없는 키를 적으면
+  // 도움말이 거짓말이 된다. 전송 키는 설정(메시지 전송 키)에 따라 달라짐을 명시.
+  {
+    group: "메신저",
+    items: [
+      { keys: "Enter 또는 Ctrl+Enter", desc: "메시지 전송 (설정의 '메시지 전송 키'에 따름)" },
+      { keys: "Shift + Enter", desc: "줄바꿈" },
+      { keys: "Enter / Esc", desc: "인라인 수정 저장 / 취소" },
+      { keys: "← →", desc: "사진 크게 보기에서 이전·다음 사진" },
+      { keys: "Esc", desc: "뷰어·모아보기·메뉴 닫기" },
+    ],
+  },
   {
     group: "픽셀 오피스",
     items: [

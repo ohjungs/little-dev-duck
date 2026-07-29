@@ -1,5 +1,16 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) T2: 메신저 키보드 단축키 도움말 (W-004)
+> 계획 원문: "`ShortcutsHelp`가 이미 목록을 그린다 — **거기에 추가한다. 새 도움 화면 금지.**"
+> 그대로 — 데이터 항목 추가만.
+>
+> - "메신저" 그룹 5항목: 전송(Enter/Ctrl+Enter — 설정 모드 명시) · Shift+Enter 줄바꿈 ·
+>   인라인 수정 저장/취소 · 뷰어 ←→ · Esc 닫기.
+> - **실제로 동작하는 키만 적었다** — 문서화 전에 코드로 실존 확인(뷰어 화살표·Esc 등).
+>   없는 키를 적으면 도움말이 거짓말이 된다.
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 87번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) T2: 오프라인 전송 차단 안내 (W-013)
 > 계획 원문 그대로: "`OfflineIndicator`가 **이미 있다**. 재구현 금지 — 메신저 전송 차단
 > 안내만 연결한다." 오프라인에서 전송하면 fetch가 정체 모를 에러로 죽던 것을,
