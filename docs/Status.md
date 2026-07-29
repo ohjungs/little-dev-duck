@@ -1,5 +1,19 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 12:2x — **마이그레이션 11건 전부 적용 완료** (사용자 지시, MCP 경로)
+> CLI 자격 증명 없이 **claude.ai Supabase 커넥터(MCP)** 로 적용했다. 이력·테이블·어드바이저 검증 완료.
+> - 적용: todo_recurrence · **harden_security_definer(보안 구멍 패치)** · rls_initplan_rest ·
+>   user_roles_and_layout · messenger_rooms · message_attachments_bucket ·
+>   message_attachment_column · room_activity_trigger · message_reply · message_reactions ·
+>   message_edit — 원격 이력 40건, 메신저 4테이블 RLS ON 확인.
+> - **관리자 지정 완료**: 두 계정 role='admin' (문서의 SQL은 profiles에 없는 email 컬럼을
+>   참조해 auth.users 조인으로 교정 실행).
+> - 어드바이저(security): **이전의 치명 항목(anon award_xp) 해소 확인.** 남은 WARN은
+>   의도된 설계(공개 페이지 anon RPC · RLS 재귀 차단 함수들) + 사용자 토글(유출 비밀번호
+>   보호) + 기존 항목(vector/pg_trgm in public). 유일한 코드 후속: touch_room_on_message의
+>   authenticated EXECUTE 회수(트리거 전용이라 RPC 호출은 거부되지만 명시 회수가 깔끔).
+> - **이제 메신저가 실제로 동작하는 상태다** — 실물 확인 항목(50~65번)을 사용자가 점검할 수 있다.
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T3: 링크 모아보기 (K-016) — 오늘 루프 종료(사용자 지시)
 > - core `extractLinks`(테스트 6건): 감지는 말풍선과 **같은 linkifyParts 한 벌** — 말풍선에서
 >   링크가 되는 것과 모아보기에 잡히는 것이 다르면 어느 쪽이 고장인지 모른다.
