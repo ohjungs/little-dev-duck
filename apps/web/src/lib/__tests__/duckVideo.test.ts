@@ -88,8 +88,10 @@ describe("getDuckVideoSpec", () => {
     const logo = getDuckVideoSpec("logo");
     const welcome = getDuckVideoSpec("welcome");
     expect(logo.src).not.toBe(welcome.src);
-    expect(logo.source.w).toBeLessThanOrEqual(128);
-    expect(logo.source.h).toBeLessThanOrEqual(128);
+    // 2026-07-29 (사용자 피드백 "로고 해상도 깨짐"): 96 → 192로 재인코딩. 잠그는 것은
+    // "720p 원본 금지"이지 특정 픽셀이 아니다 — 상한만 256으로 올려 원본 회귀를 계속 막는다.
+    expect(logo.source.w).toBeLessThanOrEqual(256);
+    expect(logo.source.h).toBeLessThanOrEqual(256);
   });
 
   it("로고 영상은 정사각이고 반복 재생한다", () => {

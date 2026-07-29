@@ -1,5 +1,5 @@
-import { listMessages, listMessagesAround } from "@ldd/api";
-import { pendingMigrationMessage, type Message } from "@ldd/core";
+import { getRoom, listMessages, listMessagesAround } from "@ldd/api";
+import { pendingMigrationMessage, type Message, type Room } from "@ldd/core";
 import { MessageRoom } from "@/components/MessageRoom";
 import { createClient } from "@/lib/supabase/server";
 
@@ -33,8 +33,11 @@ export default async function MessageRoomPage({
   }
 
   let initial: Message[] = [];
+  let room: Room | null = null;
   let notice: string | null = null;
   try {
+    // 방 타입을 함께 싣는다 — 오리(agent) 방에서만 오리가 응답한다.
+    room = await getRoom(supabase, id);
     // 표적이 있으면 그 주변 창을 싣는다(L-005) — 최근 페이지 밖의 옛 메시지도 맥락째 보인다.
     // 표적을 못 찾으면(삭제·권한 밖) 평소 목록으로 폴백하고, 화면이 안내를 띄운다.
     initial = focus
@@ -62,6 +65,7 @@ export default async function MessageRoomPage({
           // 상태(초기 목록·focus 1회 가드)가 새로 서도록 표적을 key로 건다.
           key={focus ?? "latest"}
           roomId={id}
+          roomType={room?.type ?? null}
           initialMessages={initial}
           myUserId={user.id}
           focusId={focus ?? null}

@@ -405,7 +405,9 @@ export function PomodoroWidget() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">집중 길이</span>
-              <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
+              {/* 2026-07-29 (사용자 피드백: 뽀모도로 UI 깨짐): flex-wrap이 좁은 카드에서
+                  "직접" 칸만 둘째 줄로 밀어 깨져 보였다. 4칸 고정 그리드 — 폭과 무관하게 정렬. */}
+              <div className="grid w-full grid-cols-4 gap-1 rounded-lg bg-muted p-1">
                 {DURATION_OPTIONS.map((min) => (
                   <button
                     key={min}
@@ -416,7 +418,7 @@ export function PomodoroWidget() {
                     }}
                     aria-pressed={durationMinutes === min && customInput === ""}
                     className={cn(
-                      "rounded-md px-3 py-1 text-sm font-medium transition-colors",
+                      "rounded-md px-2 py-1 text-center text-sm font-medium transition-colors",
                       durationMinutes === min && customInput === ""
                         ? "bg-card text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground",
@@ -428,7 +430,7 @@ export function PomodoroWidget() {
                 {/* 직접 입력(1~180분) — 프리셋 외 값 선택 */}
                 <span
                   className={cn(
-                    "flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition-colors",
+                    "flex items-center justify-center gap-0.5 rounded-md px-1 py-1 text-sm font-medium transition-colors",
                     customInput !== "" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
                   )}
                 >
@@ -450,7 +452,7 @@ export function PomodoroWidget() {
                         );
                       }
                     }}
-                    className="w-12 bg-transparent text-center outline-none placeholder:text-muted-foreground"
+                    className="w-8 min-w-0 bg-transparent text-center outline-none placeholder:text-muted-foreground"
                   />
                   <span className="text-muted-foreground">분</span>
                 </span>

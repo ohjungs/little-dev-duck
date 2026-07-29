@@ -18,6 +18,7 @@ import {
   createMemo,
   createPage,
   createTodo,
+  sendAgentMessage,
   deleteMessage,
   downloadMessageImage,
   applyXpAward,
@@ -72,6 +73,7 @@ import {
   matchSlashCommands,
   mergeMessages,
   parseSlashCommand,
+  ruleReply,
   slashReceiptText,
   todoTitleFrom,
   transcriptFileName,
@@ -86,6 +88,7 @@ import {
   type Reaction,
   type ReadReceiptState,
 } from "@ldd/core";
+import { resolveDuckMessage, type DuckChatResponse } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { getMsgNotifyMode, getNotifyKeywords } from "@/lib/msgNotifyPref";
 import { getDataSaver } from "@/lib/dataSaverPref";
@@ -113,6 +116,8 @@ function muteUntilIso(ms: number): string {
 
 type Props = {
   roomId: string;
+  /** 방 타입. agent(오리 방)일 때만 전송 후 오리가 응답한다. 못 읽었으면 null. */
+  roomType?: string | null;
   initialMessages: Message[];
   myUserId: string;
   /** 검색에서 넘어온 "이 메시지로" 표적. 있으면 바닥 대신 그 메시지에서 시작한다. */
@@ -182,10 +187,12 @@ const MessageBodyParts = memo(function MessageBodyParts({
   );
 });
 
-export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null }: Props) {
+export function MessageRoom({ roomId, roomType = null, initialMessages, myUserId, focusId = null }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  // 오리 응답 대기 표시(agent 방). 없으면 오리가 느릴 때 "고장났다"로 보인다.
+  const [duckThinking, setDuckThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   // 2026-07-27 : 메신저 - 메시지 메뉴 (Phase 50 T5)
@@ -1039,6 +1046,41 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   }
 
   /** 초안 전송. 폼 제출(버튼)과 키 판정(Enter/Ctrl+Enter)이 같은 경로를 쓴다. */
+  // 2026-07-29 : 메신저 - 오리 응답 (사용자 피드백: "아무것도 못 한다" — 오리 방인데 오리가
+  // 침묵했다). 대시보드 오리 패널과 **같은 서버 라우트 한 벌**(/api/ai/agent — RAG·룰·쿼터
+  // 처리 전부 재사용). 승인 카드 UI는 여기 없으므로 승인이 필요한 작업은 안내로 답한다.
+  async function requestDuckReply(question: string) {
+    setDuckThinking(true);
+    try {
+      const res = await fetch("/api/ai/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+      if (!res.ok) throw new Error(`오리 응답 실패 (${res.status})`);
+      const data = (await res.json()) as DuckChatResponse;
+      const text =
+        data.status === "approval_pending"
+          ? `${data.text ? `${data.text}\n` : ""}이 작업은 승인이 필요해요. 대시보드의 오리 패널에서 실행해 주세요.`
+          : data.status === "rule"
+            ? (ruleReply(question) ?? resolveDuckMessage(data))
+            : resolveDuckMessage(data);
+      if (!text) return;
+      const saved = await sendAgentMessage(createClient(), {
+        roomId,
+        body: text,
+        clientMsgId: crypto.randomUUID(),
+      });
+      setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
+    } catch (err) {
+      // 오리가 침묵한 이유를 남긴다 — 전송 자체는 성공했으므로 전송 에러처럼 보이면 안 된다.
+      recordClientError(err instanceof Error ? err.message : String(err));
+      setError("오리가 지금 답하지 못했어요. 잠시 후 다시 말을 걸어 주세요.");
+    } finally {
+      setDuckThinking(false);
+    }
+  }
+
   async function submitDraft() {
     const body = draft.trim();
     if (body === "" || sending) return;
@@ -1072,6 +1114,8 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         prev.some((m) => m.id === saved.id) ? prev : [...prev, saved],
       );
       setDraft("");
+      // 오리 방이면 오리가 답한다 — 전송 성공 뒤 비동기(응답 실패가 전송을 막으면 안 된다).
+      if (roomType === "agent") void requestDuckReply(body);
       // 2026-07-29 (Phase 59 T3 Y-007): 대화 XP — 오리를 키우는 접촉. **전송 성공 뒤**
       // 비동기로, 실패는 조용히(전송은 성공했는데 XP 에러를 보이면 전송이 실패한 줄 안다).
       // 소액(1XP) + 하루 상한 — 선행 조건이던 harden_security_definer는 오늘 적용 확인됨.
@@ -1786,6 +1830,12 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
           </ul>
         );
       })()}
+
+      {duckThinking && (
+        <p role="status" className="px-3 py-1 text-xs text-muted-foreground">
+          오리가 생각하는 중…
+        </p>
+      )}
 
       <form onSubmit={handleSend} className="relative flex gap-2 border-t border-border p-2">
         {/* 이모지 피커(F-011). 입력창 위로 뜬다 — 위치는 호출부가 정하는 계약. */}

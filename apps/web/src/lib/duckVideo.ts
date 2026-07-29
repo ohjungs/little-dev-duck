@@ -57,10 +57,13 @@ const SPECS: Record<DuckVideoSurface, DuckVideoSpec> = {
   // 24px짜리를 그리려고 720p 프레임을 계속 디코딩하게 된다 — 그것도 **모든 앱 화면에서 상시로**.
   // 같은 영상에서 가운데를 정사각으로 잘라 96px로 줄인 파일을 따로 만들었다(311KB → 24.8KB).
   // 외형은 원본 그대로다. 이미 정사각이라 여기서 크롭이 더 일어나지 않는다.
+  // 2026-07-29 (사용자 피드백: "로고 해상도가 떨어져 깨져 보여"): 96px는 32px 표시 기준
+  // 3배였지만 고배율(150~200%) 화면에선 유효 픽셀이 부족했고 저해상도 인코딩 특유의
+  // 뭉개짐도 있었다. 원본(720p)에서 192px로 다시 뽑았다(65KB — 상시 재생 부담은 그대로 작다).
   logo: {
-    src: "/duck-logo-96.mp4",
-    poster: "/duck-logo-96-poster.jpg",
-    source: { w: 96, h: 96 },
+    src: "/duck-logo-192.mp4",
+    poster: "/duck-logo-192-poster.jpg",
+    source: { w: 192, h: 192 },
     loop: true,
     aspectRatio: 1,
     objectPosition: { x: 0.5, y: 0.5 },

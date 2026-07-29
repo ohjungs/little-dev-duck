@@ -134,7 +134,13 @@ export function TodoWidget() {
     setNewTitle("");
     setActionError(null);
     try {
-      const created = await createTodo(supabase, { title });
+      // 2026-07-29 (사용자 피드백: "오늘 마감에서 등록해도 안 나옴"): 오늘 마감 필터를 켠
+      // 채로 추가하면 마감일 없이 만들어져 **방금 추가한 것이 그 자리에서 안 보였다.**
+      // 필터가 켜져 있으면 오늘을 마감일로 넣는다 — 보이는 목록과 추가 결과가 일치해야 한다.
+      const created = await createTodo(supabase, {
+        title,
+        dueDate: onlyToday ? coerceTodoDueDate(todayIso()) : null,
+      });
       setTodos((prev) => [created, ...prev]);
       // RAG 인덱싱(fire-and-forget). 실패해도 저장 흐름을 막지 않는다. 신규는 미완료 상태.
       void reindexSource({
@@ -452,7 +458,7 @@ export function TodoWidget() {
         {state === "ready" && visibleTodos.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
             {onlyToday
-              ? "오늘 마감인 할 일이 없어요. ‘전체 보기’로 모두 볼 수 있어요."
+              ? "마감일이 오늘로 설정된 할 일이 없어요. 여기서 추가하면 오늘 마감으로 만들어지고, 기존 항목은 연필(수정)에서 마감일을 정할 수 있어요."
               : hideDone
                 ? "미완료 할 일이 없어요. 다 끝냈네요!"
                 : "아직 할 일이 없어요. 위에서 추가해보세요!"}

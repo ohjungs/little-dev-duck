@@ -7,19 +7,52 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-import type { RoomListItem } from "@ldd/api";
+import { ensureAgentRoom, type RoomListItem } from "@ldd/api";
 import { filterRoomsByTitle, roomDisplayTitle } from "@ldd/core";
+import { createClient } from "@/lib/supabase/client";
 
 // 이 개수 미만이면 필터 입력을 숨긴다 — 방 두 개에 검색창은 소음이다.
 const FILTER_MIN_ROOMS = 6;
 
 export function RoomList({ rooms }: { rooms: RoomListItem[] }) {
   const [q, setQ] = useState("");
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const visible = filterRoomsByTitle(rooms, q);
+
+  // 2026-07-29 : 메신저 - 오리 방 입구 (사용자 피드백 — 방 생성 경로가 없어 목록이 늘 비었다).
+  // 있으면 열고 없으면 만든다(ensureAgentRoom). 중복 클릭은 opening으로 막는다.
+  async function openDuckRoom() {
+    if (opening) return;
+    setOpening(true);
+    setError(null);
+    try {
+      const room = await ensureAgentRoom(createClient());
+      router.push(`/messages/${room.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setOpening(false);
+    }
+  }
 
   return (
     <div>
+      <button
+        type="button"
+        onClick={() => void openDuckRoom()}
+        disabled={opening}
+        className="mb-3 w-full rounded-lg border border-border bg-primary/10 p-3 text-left text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
+      >
+        {opening ? "오리 방 여는 중…" : "오리와 대화하기"}
+      </button>
+      {error && (
+        <p role="alert" className="mb-2 text-xs text-destructive break-keep">
+          {error}
+        </p>
+      )}
       {rooms.length >= FILTER_MIN_ROOMS && (
         <div className="mb-2">
           <label htmlFor="room-filter" className="sr-only">
@@ -37,7 +70,9 @@ export function RoomList({ rooms }: { rooms: RoomListItem[] }) {
 
       {visible.length === 0 ? (
         <p className="rounded-lg border border-border p-4 text-sm text-muted-foreground break-keep">
-          그런 이름의 방이 없어요.
+          {rooms.length === 0
+            ? "아직 대화가 없어요. 위의 \"오리와 대화하기\"로 시작해 보세요."
+            : "그런 이름의 방이 없어요."}
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border">

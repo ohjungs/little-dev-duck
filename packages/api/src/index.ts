@@ -215,6 +215,9 @@ export {
   listReactions,
   toggleReaction,
   setRoomPin,
+  getRoom,
+  ensureAgentRoom,
+  sendAgentMessage,
   type RoomListItem,
   type SendMessageInput,
 } from "./rooms";

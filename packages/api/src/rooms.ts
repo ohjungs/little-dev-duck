@@ -923,3 +923,82 @@ export async function toggleReaction(
     .insert({ message_id: messageId, user_id: user.id, emoji });
   if (error) throw new Error(error.message);
 }
+
+// 2026-07-29 : 메신저 - 오리 방 보장·오리 메시지 (사용자 피드백: "조회만 가능하고 아무것도
+// 못 한다" — 방을 만드는 코드가 저장소 어디에도 없었고, 오리도 응답하지 않았다.)
+
+/** 방 하나 조회. 멤버가 아니면 RLS가 걸러 null. */
+export async function getRoom(supabase: SupabaseClient, roomId: string): Promise<Room | null> {
+  const { data, error } = await supabase.from("rooms").select("*").eq("id", roomId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? roomFromRow(data as RoomRow) : null;
+}
+
+/**
+ * 오리와의 대화방을 보장한다 — 있으면 그 방, 없으면 만든다(본인 + 오리 멤버).
+ * 멤버 삽입이 실패하면 방이 껍데기로 남으므로 그 오류를 그대로 던진다(조용히 성공 금지).
+ */
+export async function ensureAgentRoom(supabase: SupabaseClient): Promise<Room> {
+  const { data: existing, error: findError } = await supabase
+    .from("rooms")
+    .select("*")
+    .eq("type", "agent")
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (findError) throw new Error(findError.message);
+  if (existing && existing.length > 0) return roomFromRow(existing[0] as RoomRow);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { data: created, error: roomError } = await supabase
+    .from("rooms")
+    .insert({ type: "agent", created_by: user.id })
+    .select()
+    .single();
+  if (roomError) throw new Error(roomError.message);
+  const room = roomFromRow(created as RoomRow);
+
+  const { error: memberError } = await supabase.from("room_members").insert([
+    { room_id: room.id, member_type: "user", user_id: user.id },
+    { room_id: room.id, member_type: "agent", user_id: null },
+  ]);
+  if (memberError) throw new Error(memberError.message);
+  return room;
+}
+
+/**
+ * 오리(agent) 메시지 저장. RLS가 "방 멤버 + sender null"을 요구한다 — 자기 방에만 넣을 수
+ * 있다. 중복 방어는 사용자 전송과 같은 한 벌(client_msg_id 유니크 + 재조회).
+ */
+export async function sendAgentMessage(
+  supabase: SupabaseClient,
+  input: { roomId: string; body: string; clientMsgId: string },
+): Promise<Message> {
+  const body = input.body.trim();
+  if (body === "") throw new Error("빈 메시지는 보낼 수 없습니다.");
+
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({
+      room_id: input.roomId,
+      sender_user_id: null,
+      sender_type: "agent",
+      type: "text",
+      body,
+      client_msg_id: input.clientMsgId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) {
+      const existing = await findByClientMsgId(supabase, input.roomId, input.clientMsgId);
+      if (existing) return existing;
+    }
+    throw new Error(error.message);
+  }
+  return messageFromRow(data as MessageRow);
+}
