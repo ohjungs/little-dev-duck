@@ -21,6 +21,7 @@ import {
   downloadMessageImage,
   applyXpAward,
   fetchAllRoomMessages,
+  getPage,
   firstMessageOnOrAfter,
   listMessages,
   listMessagesBefore,
@@ -58,6 +59,7 @@ import {
   canEditMessage,
   canForwardMessage,
   codeFenceParts,
+  collectPageIds,
   detectSensitiveInfo,
   conversionReceiptText,
   dayDivider,
@@ -77,6 +79,7 @@ import {
   isNearBottom,
   kstDateString,
   linkifyParts,
+  pageIdFromHref,
   type Message,
   type TranscriptFormat,
   type Reaction,
@@ -121,9 +124,12 @@ type Props = {
 const MessageBodyParts = memo(function MessageBodyParts({
   body,
   onCopy,
+  pageTitles,
 }: {
   body: string;
   onCopy: (text: string) => void;
+  /** 내부 페이지 id → 제목(S-006). 조회 전·실패면 항목이 없고, 그때는 평문 링크로 남는다. */
+  pageTitles?: Record<string, string>;
 }) {
   return (
     <>
@@ -149,8 +155,12 @@ const MessageBodyParts = memo(function MessageBodyParts({
           </span>
         ) : (
           <span key={pi}>
-            {linkifyParts(part.text).map((p, i) =>
-              p.href ? (
+            {linkifyParts(part.text).map((p, i) => {
+              if (!p.href) return <span key={i}>{p.text}</span>;
+              // 내 페이지 링크(S-006)면 맨 주소 대신 제목으로 — 감지는 linkify 한 벌 위.
+              const pageId = pageIdFromHref(p.href);
+              const title = pageId ? pageTitles?.[pageId] : undefined;
+              return (
                 <a
                   key={i}
                   href={p.href}
@@ -159,12 +169,10 @@ const MessageBodyParts = memo(function MessageBodyParts({
                   className="underline break-all"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {p.text}
+                  {title !== undefined ? `노트: ${title}` : p.text}
                 </a>
-              ) : (
-                <span key={i}>{p.text}</span>
-              ),
-            )}
+              );
+            })}
           </span>
         ),
       )}
@@ -551,6 +559,40 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       alive = false;
     };
   }, [messages, imageUrls, dataSaver, requestedPaths]);
+
+  // 2026-07-29 (Phase 59 T1 S-006): 메시지 속 내 페이지 링크의 제목. 이미 받은 것은 다시
+  // 조회하지 않는다(imageUrls와 같은 패턴). 못 찾으면(남의 URL·삭제됨) 평문 링크로 남는다.
+  const [pageTitles, setPageTitles] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const missing = [
+      ...new Set(messages.flatMap((m) => (m.deletedAt ? [] : collectPageIds(m.body)))),
+    ].filter((id) => !(id in pageTitles));
+    if (missing.length === 0) return;
+
+    let alive = true;
+    void (async () => {
+      const client = createClient();
+      const pairs = await Promise.all(
+        missing.map(async (id) => {
+          try {
+            const page = await getPage(client, id);
+            return [id, page?.title ?? null] as const;
+          } catch {
+            return [id, null] as const;
+          }
+        }),
+      );
+      if (!alive) return;
+      setPageTitles((prev) => {
+        const next = { ...prev };
+        for (const [id, title] of pairs) if (title !== null) next[id] = title;
+        return next;
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [messages, pageTitles]);
 
   useEffect(() => {
     const now = Date.now();
@@ -1274,7 +1316,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                   {/* 평문 렌더 — HTML로 그리지 않는다(에이전트 응답이 섞인다).
                       코드 블록은 <pre>+복사(H-013), 글 조각만 링크화(javascript: 차단은 core).
                       파싱·조각 렌더는 memo 컴포넌트(W-026) — 타이핑 재렌더에 다시 안 돈다. */}
-                  <MessageBodyParts body={messageBody(m)} onCopy={handleCopy} />
+                  <MessageBodyParts body={messageBody(m)} onCopy={handleCopy} pageTitles={pageTitles} />
                 </span>
                 )}
                 {/* 수정 흔적. 없으면 읽은 사람이 본 것과 다른 말이 소리 없이 남는다(I-011). */}

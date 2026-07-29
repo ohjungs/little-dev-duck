@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 59](plans/phase_59.md) T1: 메시지 속 노트 링크 (S-006)
+> 메시지에 붙여넣은 내 페이지 URL이 맨 주소 대신 **"노트: 제목"**으로 보인다 —
+> 메신저와 워크스페이스(노트)가 이어지는 T1 방향의 세 번째 조각.
+>
+> - core `pageIdFromHref`·`collectPageIds`(테스트 4건): **감지는 linkifyParts 한 벌 위**
+>   (K-016과 같은 원칙 — 말풍선 링크와 노트 인식이 갈라지면 어느 쪽 고장인지 모른다).
+>   호스트는 안 본다(도메인 변경 무관) — 남의 /pages/ URL은 제목 조회가 null이라
+>   평문 링크로 남을 뿐. core에 URL 전역이 없어 순수 정규식(빌드가 잡아줌).
+> - MessageRoom: 제목 일괄 조회(imageUrls와 같은 패턴 — 이미 받은 것 재조회 없음,
+>   getPage 재사용·RLS가 범위), MessageBodyParts에 pageTitles prop. 조회 전·실패는 평문 링크.
+> - 검증: core 1347건 / turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 96번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 59](plans/phase_59.md) T1: 습관 체크 → 오리 방 기록 (S-009 완결)
 > 직전 사이클의 `recordToDuckRoom` 한 벌을 그대로 재사용 — 새 코드 최소(배선 한 줄).
 > 이로써 S-009(습관·뽀모도로 신호 → 메신저)가 완결됐다.

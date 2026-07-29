@@ -53,3 +53,32 @@ export function linkifyParts(body: string): LinkPart[] {
   if (pos < body.length) parts.push({ text: body.slice(pos), href: null });
   return parts;
 }
+
+// 2026-07-29 : 메신저 - 노트 링크 감지 (Phase 59 T1 S-006)
+// 메시지에 붙여넣은 내 페이지 URL을 감지해 화면이 제목으로 바꿔 그릴 수 있게 한다.
+// **감지는 linkifyParts 한 벌 위에서만** — 말풍선에서 링크가 되는 것과 노트로 인식되는
+// 것이 갈라지면 어느 쪽이 고장인지 모른다(K-016 링크 모아보기와 같은 원칙).
+// 호스트는 보지 않는다: 배포 도메인이 바뀌어도 동작해야 하고, 남의 사이트 /pages/ URL이
+// 걸려도 제목 조회(getPage)가 null이라 평문 링크로 남을 뿐 해가 없다.
+
+// core는 DOM 전역(URL)이 없는 환경이라 정규식으로 판정한다: 경로가 정확히
+// /pages/<uuid>로 끝나야 하고(뒤가 ?·#·끝), /pages/<uuid>/edit 같은 하위 경로는 아니다.
+const PAGE_HREF_RE =
+  /^https?:\/\/[^/]+\/pages\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[?#]|$)/i;
+
+export function pageIdFromHref(href: string): string | null {
+  const m = PAGE_HREF_RE.exec(href);
+  return m ? m[1]! : null;
+}
+
+/** 본문 속 내부 페이지 id를 중복 없이. 조회(제목)는 호출부가 한다 — 여기는 순수 판정만. */
+export function collectPageIds(body: string): string[] {
+  const ids = new Set<string>();
+  for (const part of linkifyParts(body)) {
+    if (part.href) {
+      const id = pageIdFromHref(part.href);
+      if (id) ids.add(id);
+    }
+  }
+  return [...ids];
+}

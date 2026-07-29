@@ -613,7 +613,10 @@ export {
 } from "./domain/storage-usage";
 
 // 2026-07-29 : 메신저 - URL 링크화 (Phase 54)
-export { linkifyParts, type LinkPart } from "./domain/linkify";
+export { linkifyParts, type LinkPart,
+  pageIdFromHref,
+  collectPageIds,
+} from "./domain/linkify";
 
 // 2026-07-29 : 메신저 - 코드 블록 분리 (Phase 54 T3)
 export { codeFenceParts, type CodeFencePart } from "./domain/code-fence";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkifyParts } from "./linkify";
+import { linkifyParts, pageIdFromHref, collectPageIds } from "./linkify";
 
 describe("linkifyParts (메시지 URL 링크화)", () => {
   it("URL이 없으면 전체가 글", () => {
@@ -67,5 +67,32 @@ describe("linkifyParts (메시지 URL 링크화)", () => {
 
   it("빈 문자열은 빈 배열", () => {
     expect(linkifyParts("")).toEqual([]);
+  });
+});
+
+// 2026-07-29 : 메신저 - 노트 링크 감지 (Phase 59 T1 S-006)
+describe("pageIdFromHref / collectPageIds", () => {
+  const ID = "12345678-1234-4123-8123-123456789abc";
+
+  it("/pages/<uuid> 경로에서 id를 꺼낸다 — 호스트는 안 본다(도메인이 바뀌어도 동작)", () => {
+    expect(pageIdFromHref(`https://web-sepia-one-88.vercel.app/pages/${ID}`)).toBe(ID);
+    expect(pageIdFromHref(`https://다른도메인.example/pages/${ID}`)).toBe(ID);
+  });
+
+  it("페이지 경로가 아니면 null", () => {
+    expect(pageIdFromHref("https://a.com/pages/")).toBeNull();
+    expect(pageIdFromHref(`https://a.com/pages/${ID}/edit`)).toBeNull();
+    expect(pageIdFromHref("https://a.com/posts/123")).toBeNull();
+    expect(pageIdFromHref("깨진url")).toBeNull();
+  });
+
+  it("본문에서 페이지 id를 중복 없이 모은다 (감지는 linkifyParts 한 벌 위)", () => {
+    const other = "87654321-4321-4321-8321-cba987654321";
+    const body = `이것 봐 https://a.com/pages/${ID} 그리고 https://b.com/pages/${ID} 또 https://a.com/pages/${other}`;
+    expect(collectPageIds(body).sort()).toEqual([ID, other].sort());
+  });
+
+  it("링크 없는 본문은 빈 목록", () => {
+    expect(collectPageIds("그냥 글")).toEqual([]);
   });
 });
