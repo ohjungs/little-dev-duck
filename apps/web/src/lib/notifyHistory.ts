@@ -5,6 +5,7 @@
 // 기록은 어떤 경우에도 알림 자체를 막으면 안 된다 — 실패는 전부 조용히 삼킨다.
 
 import type { NotifyBlockReason } from "./notify";
+import { readRing, pushRing, clearRing } from "./localRing";
 
 const HISTORY_KEY = "ldd:notify-history";
 export const NOTIFY_HISTORY_CAP = 50;
@@ -28,14 +29,6 @@ export const NOTIFY_OUTCOME_LABELS: Record<NotifyOutcome, string> = {
 
 type MinimalStorage = Pick<Storage, "getItem" | "setItem">;
 
-function defaultStorage(): MinimalStorage | null {
-  try {
-    return typeof localStorage === "undefined" ? null : localStorage;
-  } catch {
-    return null;
-  }
-}
-
 function isEntry(v: unknown): v is NotifyHistoryEntry {
   return (
     typeof v === "object" &&
@@ -47,39 +40,24 @@ function isEntry(v: unknown): v is NotifyHistoryEntry {
   );
 }
 
+// 저장은 공용 localRing 한 벌(Phase 58 T2에서 승격) — 에러 기록(V-007)과 같은 계약을 쓴다.
 export function readNotifyHistory(
-  storage: MinimalStorage | null = defaultStorage(),
+  storage?: MinimalStorage | null,
 ): NotifyHistoryEntry[] {
-  try {
-    const raw = storage?.getItem(HISTORY_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isEntry);
-  } catch {
-    return [];
-  }
+  return storage === undefined
+    ? readRing(HISTORY_KEY, isEntry)
+    : readRing(HISTORY_KEY, isEntry, storage);
 }
 
-/** 맨 앞에 넣고 상한으로 자른다(최신 먼저). 실패해도 던지지 않는다. */
 export function recordNotifyHistory(
   entry: NotifyHistoryEntry,
-  storage: MinimalStorage | null = defaultStorage(),
+  storage?: MinimalStorage | null,
 ): void {
-  try {
-    const next = [entry, ...readNotifyHistory(storage)].slice(0, NOTIFY_HISTORY_CAP);
-    storage?.setItem(HISTORY_KEY, JSON.stringify(next));
-  } catch {
-    // 기록 실패가 알림을 막으면 안 된다.
-  }
+  if (storage === undefined) pushRing(HISTORY_KEY, entry, NOTIFY_HISTORY_CAP, isEntry);
+  else pushRing(HISTORY_KEY, entry, NOTIFY_HISTORY_CAP, isEntry, storage);
 }
 
-export function clearNotifyHistory(
-  storage: MinimalStorage | null = defaultStorage(),
-): void {
-  try {
-    storage?.setItem(HISTORY_KEY, "[]");
-  } catch {
-    // 위와 같다.
-  }
+export function clearNotifyHistory(storage?: MinimalStorage | null): void {
+  if (storage === undefined) clearRing(HISTORY_KEY);
+  else clearRing(HISTORY_KEY, storage);
 }

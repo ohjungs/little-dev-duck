@@ -5,12 +5,15 @@
 // 이미 200자로 자른다(summarizeForLog).
 
 import type { NotifyHistoryEntry } from "./notifyHistory";
+import type { ClientErrorEntry } from "./clientErrorLog";
 
 export type DiagnosticsInput = {
   exportedAt: string;
   userAgent: string;
   lddKeys: string[];
   notifyHistory: NotifyHistoryEntry[];
+  // V-007: 화면에 떴던 에러 문구 기록 — "무슨 에러였는지"에 답한다.
+  clientErrors: ClientErrorEntry[];
   actionLog: unknown[];
 };
 
@@ -21,6 +24,7 @@ export function buildDiagnostics(input: DiagnosticsInput) {
     userAgent: input.userAgent,
     localStorageKeys: [...input.lddKeys],
     notifyHistory: [...input.notifyHistory],
+    clientErrors: [...input.clientErrors],
     actionLog: [...input.actionLog],
   };
 }

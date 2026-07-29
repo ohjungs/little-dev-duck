@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { buildDiagnostics } from "@/lib/diagnostics";
 import { listLddKeys } from "@/lib/resetLocalSettings";
 import { readNotifyHistory } from "@/lib/notifyHistory";
+import { readClientErrors } from "@/lib/clientErrorLog";
 import { Button } from "@/components/ui/button";
 
 export function DiagnosticsExportButton() {
@@ -28,6 +29,7 @@ export function DiagnosticsExportButton() {
         userAgent: navigator.userAgent,
         lddKeys: listLddKeys(),
         notifyHistory: readNotifyHistory(),
+        clientErrors: readClientErrors(),
         actionLog,
       });
       const blob = new Blob([JSON.stringify(data, null, 2)], {

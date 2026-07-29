@@ -1,5 +1,19 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 58](plans/phase_58.md) T2: 클라이언트 에러 기록 (V-007)
+> 계획: "Sentry(외부 반출) 전에 **자체 수집 먼저**." 화면에 잠깐 떴다 사라지는 에러는
+> 진단 내보내기(T-027)가 못 봤다 — 그 공백을 메웠다.
+>
+> - **링 저장 로직이 세 번째로 필요해져 공용 승격**: `localRing`(generic, 테스트 4건) —
+>   알림 히스토리(M-028)를 **동작 보존 리팩터링**으로 그 위에 얹고(기존 7건 green이 근거),
+>   에러 기록이 같은 한 벌을 쓴다. recentList(중복 제거 목록)와는 계약이 달라 별도.
+> - `clientErrorLog`: 에러 **문구만** 기록(개인 데이터 없음), 50건 링, `ldd:` 접두어라
+>   기기 설정 초기화(T-031)에 함께 지워짐.
+> - MessageRoom의 동일 2줄 패턴 **16곳**을 `describeError` 헬퍼로 교체(표시+기록 동시),
+>   MessageSearch 1곳 동일. 진단 꾸러미(T-027)에 clientErrors 포함.
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 91번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 58](plans/phase_58.md) T3: 고아 첨부 검사·정리 (V-022)
 > Phase 50이 "정리 대상으로 기록"까지만 해둔 고아 첨부(업로드는 됐는데 메시지가 안
 > 만들어진 파일)를 검사·정리하는 도구. 계획 지시: "되돌릴 수 없으므로 **먼저 목록을

@@ -11,6 +11,7 @@ describe("buildDiagnostics", () => {
     userAgent: "TestBrowser/1.0",
     lddKeys: ["ldd-send-key", "ldd:favorites"],
     notifyHistory: [{ at: "t", title: "새 메시지", outcome: "quiet" as const }],
+    clientErrors: [{ at: "t", message: "전송 실패" }],
     actionLog: [{ id: "a1", kind: "todo.create", summary: "{}" }],
   };
 
@@ -25,6 +26,7 @@ describe("buildDiagnostics", () => {
     expect(d.userAgent).toBe("TestBrowser/1.0");
     expect(d.notifyHistory).toHaveLength(1);
     expect(d.actionLog).toHaveLength(1);
+    expect(d.clientErrors).toHaveLength(1);
     expect(d.exportedAt).toBe(input.exportedAt);
   });
 

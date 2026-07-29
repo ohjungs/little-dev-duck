@@ -84,6 +84,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getMsgNotifyMode, getNotifyKeywords } from "@/lib/msgNotifyPref";
 import { getDataSaver } from "@/lib/dataSaverPref";
 import { isOffline, OFFLINE_SEND_MESSAGE } from "@/lib/offlineGuard";
+import { recordClientError } from "@/lib/clientErrorLog";
 import { prefersReducedMotionNow } from "@ldd/mascot";
 import { notifyBlockReason } from "@/lib/notify";
 import { describeMessageNotifyStatus } from "@/lib/notifyStatus";
@@ -315,8 +316,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       });
       setMessages((prev) => (prev.some((x) => x.id === saved.id) ? prev : [...prev, saved]));
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     }
   }
 
@@ -331,8 +331,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       setMessages((prev) => prev.map((m) => (m.id === saved.id ? saved : m)));
       setEditing(null);
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     } finally {
       setSavingEdit(false);
     }
@@ -374,8 +373,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     } finally {
       setExporting(null);
     }
@@ -399,11 +397,19 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       }
       router.push(`/messages/${roomId}?focus=${target.id}`);
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     } finally {
       setJumping(false);
     }
+  }
+
+  // 2026-07-29 (Phase 58 T2 V-007): 에러를 표시하면서 로컬 진단 기록에도 남긴다 —
+  // 화면에서 사라진 에러는 진단 내보내기(T-027)가 못 본다. 문구만 기록(개인 데이터 없음).
+  function describeError(err: unknown): string {
+    const raw = err instanceof Error ? err.message : String(err);
+    const msg = pendingMigrationMessage(raw) ?? raw;
+    recordClientError(msg);
+    return msg;
   }
 
   // 2026-07-29 (Phase 56 T2 T-009): 데이터 절약 모드 — 켜면 사진 서명 URL을 자동으로
@@ -441,8 +447,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     } catch (err) {
       setForwarding(null);
       setForwardRooms(null);
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     }
   }
 
@@ -470,8 +475,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       setForwardNotice("전달했어요");
       setTimeout(() => setForwardNotice(null), 2500);
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     } finally {
       setForwardBusy(false);
     }
@@ -486,8 +490,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         prev.map((m) => (m.id === id ? { ...m, deletedAt: new Date().toISOString() } : m)),
       );
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     }
   }
 
@@ -508,8 +511,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       await toggleReaction(createClient(), reactions, messageId, emoji);
       setReactions(await listReactions(createClient(), messages.map((m) => m.id)));
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     }
   }
 
@@ -803,8 +805,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       setLinks(extractLinks(rows));
     } catch (err) {
       setLinks(null);
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     }
   }
 
@@ -817,8 +818,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       void fillUrls(paths);
     } catch (err) {
       setGallery(null);
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     }
   }
 
@@ -837,8 +837,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     } catch (err) {
       // 오류 안내는 뷰어 뒤에 가려진다 — 닫아서 보이게 한다. 조용한 실패보다 낫다.
       setViewerPath(null);
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     } finally {
       setDownloading(false);
     }
@@ -878,8 +877,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       await setRoomMute(createClient(), roomId, until);
     } catch (err) {
       setMutedUntil(prev); // 실패하면 되돌린다. 껐다고 생각했는데 알림이 오면 더 나쁘다
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     }
   }
 
@@ -891,8 +889,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       await setRoomPin(createClient(), roomId, next);
     } catch (err) {
       setPinnedAt(prev);
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     }
   }
 
@@ -934,8 +931,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       });
       setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     } finally {
       setUploading(false);
     }
@@ -977,8 +973,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       setMessages((prev) => (prev.some((x) => x.id === saved.id) ? prev : [...prev, saved]));
       setDraft("");
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     } finally {
       setSending(false);
     }
@@ -1019,8 +1014,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       );
       setDraft("");
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      setError(describeError(err));
     } finally {
       setSending(false);
     }

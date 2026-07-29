@@ -22,6 +22,7 @@ import {
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { clearRecentList, pushRecentList, readRecentList } from "@/lib/recentList";
+import { recordClientError } from "@/lib/clientErrorLog";
 
 // 2026-07-29 : 메신저 - 최근 검색어 (Phase 55 T1 L-017)
 // 백업(localPrefs)에는 담지 않는다 — 파생값이라 쓰면 다시 쌓인다(local-prefs.ts의 판단).
@@ -60,7 +61,9 @@ export function MessageSearch() {
       setRecent(pushRecentList(RECENT_SEARCHES_KEY, term.trim(), RECENT_SEARCHES_MAX));
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      setError(pendingMigrationMessage(raw) ?? raw);
+      const msg = pendingMigrationMessage(raw) ?? raw;
+      recordClientError(msg); // 진단 기록(V-007)
+      setError(msg);
     } finally {
       setBusy(false);
     }
