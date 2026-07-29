@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
   BookmarkCheck,
@@ -38,6 +38,7 @@ import {
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { todayIso } from "@/lib/today";
+import { recordCollectDone, shouldAutoCollect } from "@/lib/newsAutoCollect";
 import { timeAgo } from "@/lib/timeAgo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -346,6 +347,7 @@ export function NewsReader() {
     void load();
   }, [load]);
 
+
   const onAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = url.trim();
@@ -432,7 +434,7 @@ export function NewsReader() {
   const onToggleRead = (a: Article) => { toggleArticleRead(a.id); };
   const onBookmark = (a: Article) => { toggleBookmark(a.id); };
 
-  const onCollect = async () => {
+  const onCollect = useCallback(async () => {
     setCollecting(true);
     setNote(null);
     try {
@@ -446,6 +448,8 @@ export function NewsReader() {
           `새 기사 ${data.collected}건 · 요약 ${data.summarized}건` +
             (paused ? ` · 자동 일시정지 ${paused}` : ""),
         );
+        // 성공했을 때만 기록 — 실패를 기록하면 6시간 동안 자동 재시도가 막힌다.
+        recordCollectDone(Date.now());
         await load();
       }
     } catch {
@@ -453,7 +457,21 @@ export function NewsReader() {
     } finally {
       setCollecting(false);
     }
-  };
+  }, [load]);
+
+  // 2026-07-29 : 방문 시 자동 수집 (Phase 61 후속). 마지막 수집이 6시간 넘게 오래됐으면
+  // 들어올 때 한 번 돈다 — "매일 10개"가 수동 버튼에만 매달리지 않게. 판정은
+  // newsAutoCollect 순수 함수, 실행은 위 onCollect 그대로(재구현 금지). 피드가 없으면
+  // 수집할 것도 없다. 서버 예약 실행은 CRON_SECRET(PENDING 6번) 승인 후 별도.
+  const autoCollectTried = useRef(false);
+  useEffect(() => {
+    if (state !== "ready" || feeds.length === 0 || autoCollectTried.current) return;
+    autoCollectTried.current = true;
+    if (!shouldAutoCollect(Date.now())) return;
+    // 렌더 커밋 직후 동기 setState(캐스케이드)를 피해 한 틱 미룬다 — 목록이 먼저 그려진다.
+    const timer = setTimeout(() => void onCollect(), 0);
+    return () => clearTimeout(timer);
+  }, [state, feeds.length, onCollect]);
 
   return (
     <div className="flex flex-col gap-6">
