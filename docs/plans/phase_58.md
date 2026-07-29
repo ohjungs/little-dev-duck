@@ -1,6 +1,6 @@
 # Phase 58 — 메신저 Group 3f: 운영·보안·인증 강화 (54항목)
 
-> 상태: **draft(예약·미착수)** — [Phase 41](phase_41.md)·[50](phase_50.md) 선행
+> 상태: **진행 중** (2026-07-29 착수 — stale 가드: 마이그레이션 미적용 0건·audit high 전부 기존 무시 목록 관리(moderate 1 잔존)·CRON_SECRET은 여전히 사용자 대기(PENDING 6). 첫 조각 T1 V-010 스크립트+런북 완료, 리허설은 사용자 대기)
 >
 > 항목 목록: [배정표의 Phase 58 절](../catalog/messenger-assignment.md) (A 19 · U 13 · V 20 · B 1 · K 1)
 >

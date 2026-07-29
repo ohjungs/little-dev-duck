@@ -1,5 +1,21 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 58](plans/phase_58.md) **착수** — T1: DB 백업 스크립트 + 복구 런북 (V-010~V-012)
+> 계획이 "가장 조용하고 위험한 사실"로 지목한 것: **무료 플랜에 자동 백업이 없고, 이
+> 저장소에 덤프 스크립트도 없었다** — 메신저에 지우면 복구 불가한 개인 대화가 쌓이는 중.
+> stale 가드 통과(마이그레이션 0건 · audit high 전부 기존 무시 목록 관리·moderate 1 잔존 ·
+> CRON_SECRET은 여전히 PENDING 6 사용자 대기).
+>
+> - `scripts/db-backup.sh`(bash -n 통과): supabase CLI 우선·pg_dump 폴백, **DB URL은
+>   환경변수로만**(어디에도 안 적음), 빈 덤프는 실패 처리(빈 파일을 백업이라 부르면 최악).
+> - `docs/runbooks/backup-restore.md`: 복구 4단계(복구 전 현재 백업 먼저) · 리허설
+>   체크리스트 · **자동화 한계 정직 기술**(서버 스케줄러 없음 — Windows 작업 스케줄러
+>   권장·GitHub Actions는 개인 대화라 비권장) · **스토리지(사진) 미포함 한계 명시**.
+> - `backup/` gitignore — 개인 대화 덤프가 저장소에 커밋되면 안 된다(SEC 렌즈).
+> - **리허설은 사용자 대기**(DB URL 시크릿 — 루프가 만지지 않음): [manual-verification.md
+>   89번](loop-eng/manual-verification.md). "복구해 본 적 없는 백업은 문서다."
+> - 검증: turbo 18/18 GREEN(FULL TURBO — 코드 무변경, 문서·스크립트만).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) T3: 말풍선 렌더 메모이제이션 (W-026)
 > **W-024(content-visibility 가상 스크롤)는 이번에 안 했다** — 계획이 "실측하고 결정한다"를
 > 요구하는데 무인 환경에선 스크롤 실측이 불가하고, 채팅의 바닥 고정·과거 로딩과의 상호작용은
