@@ -40,6 +40,7 @@ import { createClient } from "@/lib/supabase/client";
 import { todayIso } from "@/lib/today";
 import { recordCollectDone, shouldAutoCollect } from "@/lib/newsAutoCollect";
 import { safeHref } from "@/lib/safeHref";
+import { textToBlocks } from "@/lib/pageTemplates";
 import { timeAgo } from "@/lib/timeAgo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -60,18 +61,12 @@ import {
 
 // 외부 링크 스킴 화이트리스트는 공용 safeHref 한 벌(lib/safeHref — 2026-07-29 리뷰에서 승격).
 
-// 기사를 노트(페이지) 본문으로. BlockNote는 최소 PartialBlock을 받아 id/props를 채운다.
-// 요약(없으면 스니펫) 문단 + 원문 링크 문단. 서버가 content에서 plain_text를 파생한다.
+// 기사를 노트(페이지) 본문으로 — 요약(없으면 스니펫) 문단 + 원문 링크 문단.
+// 블록 리터럴을 여기서 다시 만들지 않는다(리뷰 REF-LOW 해소) — 템플릿·메시지 변환과
+// 같은 textToBlocks 한 벌. 서버가 content에서 plain_text를 파생한다.
 function scrapContent(a: Article): unknown[] {
-  const para = (text: string) => ({
-    type: "paragraph",
-    content: [{ type: "text", text, styles: {} }],
-  });
-  const blocks: unknown[] = [];
   const body = a.summary ?? a.snippet;
-  if (body) blocks.push(para(body));
-  blocks.push(para(`원문: ${a.link}`));
-  return blocks;
+  return textToBlocks(`${body ? `${body}\n` : ""}원문: ${a.link}`);
 }
 
 // 기사 1건 카드. 목록/군집 양쪽에서 재사용(마크업 중복 제거). onScrap이 있으면 스크랩 버튼 노출.
