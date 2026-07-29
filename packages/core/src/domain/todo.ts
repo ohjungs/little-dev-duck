@@ -15,3 +15,18 @@ export const todoSchema = z.object({
 });
 
 export type Todo = z.infer<typeof todoSchema>;
+
+// 2026-07-29 : 할 일 - 마감일순 보기 (Phase 62 T2)
+// **보기 전용 정렬** — 저장된 사용자 지정 순서(todoOrder)는 건드리지 않는다. 마감일이
+// 없는 항목은 뒤로(마감이 있는 것부터 처리하는 보기이므로). Array.prototype.sort는
+// ES2019부터 안정 정렬이라 같은 값끼리 원래 순서가 유지된다.
+export function sortTodosByDue<T extends { dueDate: string | null }>(
+  todos: readonly T[],
+): T[] {
+  return [...todos].sort((a, b) => {
+    if (a.dueDate === null && b.dueDate === null) return 0;
+    if (a.dueDate === null) return 1;
+    if (b.dueDate === null) return -1;
+    return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0;
+  });
+}

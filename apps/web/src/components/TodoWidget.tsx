@@ -11,7 +11,7 @@ import {
   restoreTodo,
   updateTodo,
 } from "@ldd/api";
-import { describeRecurrence, type Todo,
+import { describeRecurrence, sortTodosByDue, type Todo,
   todoEmbedText,
 } from "@ldd/core";
 import { reindexSource } from "@ldd/ai";
@@ -61,6 +61,8 @@ export function TodoWidget() {
   const [deleted, setDeleted] = useState<Todo | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [onlyToday, setOnlyToday] = useState(false);
+  // 2026-07-29 : 마감일순 보기 (Phase 62 T2). 보기 전용 — 저장 순서(todoOrder)는 그대로.
+  const [byDue, setByDue] = useState(false);
   const [hideDone, setHideDone] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -319,6 +321,8 @@ export function TodoWidget() {
   const doneCount = baseTodos.length - remaining;
   // 현재 필터 기준으로 미완료 항목 — 전체 완료 버튼의 대상이다.
   const incompleteVisible = visibleTodos.filter((t) => !t.isDone);
+  // 마감일순은 core 한 벌(sortTodosByDue) — 켜면 이동 버튼을 숨긴다(수동 순서와 충돌).
+  const viewTodos = byDue ? sortTodosByDue(visibleTodos) : visibleTodos;
 
   const handleCompleteAll = async () => {
     if (incompleteVisible.length === 0) return;
@@ -361,6 +365,16 @@ export function TodoWidget() {
               </span>
             )}
           </CardTitle>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setByDue((v) => !v)}
+            aria-pressed={byDue}
+          >
+            {byDue ? "직접 순서" : "마감일순"}
+          </Button>
           <Button
             type="button"
             variant="ghost"
@@ -466,7 +480,7 @@ export function TodoWidget() {
         )}
         {state === "ready" && visibleTodos.length > 0 && (
           <ul className="flex flex-col gap-1">
-            {visibleTodos.map((todo, idx) =>
+            {viewTodos.map((todo, idx) =>
               editingId === todo.id ? (
                 <li
                   key={todo.id}
@@ -507,7 +521,11 @@ export function TodoWidget() {
                   data-testid={`todo-${todo.id}`}
                   className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60"
                 >
-                  <div className="flex flex-col opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                  <div className={
+                    "flex flex-col transition-opacity focus-within:opacity-100 " +
+                    // 마감일순 보기에선 수동 이동이 의미 없다(정렬이 이긴다) — 버튼을 숨긴다.
+                    (byDue ? "pointer-events-none opacity-0" : "opacity-0 group-hover:opacity-100")
+                  }>
                     <button
                       type="button"
                       onClick={() => moveTodo(todo.id, "up")}
@@ -521,7 +539,7 @@ export function TodoWidget() {
                       type="button"
                       onClick={() => moveTodo(todo.id, "down")}
                       aria-label="아래로 이동"
-                      disabled={idx === visibleTodos.length - 1}
+                      disabled={idx === viewTodos.length - 1}
                       className="text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
                     >
                       <ChevronDown className="size-3" />
@@ -570,7 +588,7 @@ export function TodoWidget() {
                   <span
                     className={
                       "relative inline-flex size-4 shrink-0 items-center justify-center rounded transition-opacity focus-within:opacity-100 focus-within:ring-2 focus-within:ring-ring group-hover:opacity-100 " +
-                      (todo.dueDate ? "opacity-100" : "opacity-0")
+                      (todo.dueDate ? "opacity-100" : "opacity-40")
                     }
                   >
                     <CalendarDays
