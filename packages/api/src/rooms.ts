@@ -319,6 +319,20 @@ export async function messageImageUrl(
   return data.signedUrl;
 }
 
+/**
+ * 이미지 원본을 Blob으로 내려받는다(전체화면 뷰어의 저장 버튼).
+ * **서명 URL에 `download` 속성을 붙이는 방식은 안 된다** — 다른 출처라 브라우저가
+ * 속성을 무시하고 이미지로 이동해 버린다. SDK로 받아 Blob URL(같은 출처)로 저장한다.
+ */
+export async function downloadMessageImage(
+  supabase: SupabaseClient,
+  path: string,
+): Promise<Blob> {
+  const { data, error } = await supabase.storage.from(BUCKET).download(path);
+  if (error || !data) throw new Error(error?.message ?? "이미지를 내려받지 못했어요.");
+  return data;
+}
+
 // ---------------------------------------------------------------------------
 // 방 음소거
 // ---------------------------------------------------------------------------

@@ -169,6 +169,39 @@ export function likePattern(raw: string): string | null {
   return `%${escaped}%`;
 }
 
+// 2026-07-29 : 메신저 - 전체화면 뷰어 (Phase 51 T5)
+// 뷰어의 순서·이동 판정을 화면 밖에 둔다. DOM 없이 검증할 수 있어야
+// "지우면 뷰어에서도 빠진다" 같은 규칙이 테스트로 잠긴다.
+
+/** 갤러리에 넣을 사진 경로를 seq 순서로. 지운 메시지의 사진은 뷰어에도 없어야 한다. */
+export function galleryPaths(
+  messages: readonly Pick<Message, "seq" | "attachmentPath" | "deletedAt">[],
+): string[] {
+  return [...messages]
+    .sort((a, b) => a.seq - b.seq)
+    .map((m) => messageAttachment(m))
+    .filter((p): p is string => p !== null);
+}
+
+/**
+ * 지금 보는 사진의 위치와 양옆. **끝에서 반대편으로 감지 않는다** —
+ * 순환하면 "몇 장 중 몇 장째"라는 감을 잃고 같은 사진을 두 번 보게 된다.
+ * 보는 중에 그 사진이 지워져 목록에서 빠지면 index -1 — 뷰어가 닫을 신호다.
+ */
+export function galleryNav(
+  paths: readonly string[],
+  current: string,
+): { prev: string | null; next: string | null; index: number; total: number } {
+  const index = paths.indexOf(current);
+  if (index < 0) return { prev: null, next: null, index: -1, total: paths.length };
+  return {
+    prev: index > 0 ? paths[index - 1] : null,
+    next: index < paths.length - 1 ? paths[index + 1] : null,
+    index,
+    total: paths.length,
+  };
+}
+
 /**
  * 답장 미리보기 문구. **원본을 목록에서 찾지 못하면 "찾을 수 없다"고 말한다** —
  * 빈칸으로 두면 답장인지 아닌지도 알 수 없다(오래돼 창 밖으로 나간 원본이 흔하다).

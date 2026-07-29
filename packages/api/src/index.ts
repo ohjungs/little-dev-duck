@@ -190,6 +190,7 @@ export {
   RECENT_WINDOW,
   uploadMessageImage,
   messageImageUrl,
+  downloadMessageImage,
   SIGNED_URL_SECONDS,
   getMyMembership,
   setRoomMute,

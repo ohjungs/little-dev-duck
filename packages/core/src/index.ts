@@ -571,6 +571,8 @@ export {
   MUTE_DURATIONS,
   unreadCount,
   sortRooms,
+  galleryPaths,
+  galleryNav,
   DELETED_MESSAGE_TEXT,
   type Room,
   type RoomType,

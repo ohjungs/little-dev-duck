@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 51](plans/phase_51.md) T5: 전체화면 이미지 뷰어
+> 인라인 max-h-60로만 보이던 사진에 **전체화면 뷰어**(이전/다음 · 위치 표시 · 원본 저장)를 달았다.
+>
+> - core `galleryPaths`·`galleryNav`(room.ts, 테스트 +9): seq 순서 · **지운 메시지의 사진은
+>   뷰어에도 없다** · 끝에서 순환하지 않음(몇 장째인지 감을 잃는다) · 보는 중 삭제되면
+>   index -1 → 뷰어가 닫는다.
+> - api `downloadMessageImage`: **서명 URL에 download 속성은 안 된다**(다른 출처라 브라우저가
+>   무시) — SDK로 Blob을 받아 같은 출처 Blob URL로 저장.
+> - `MessageImageViewer`(dumb component, ConfirmDialog 패턴): Esc·화살표 키 · 배경 클릭 닫기 ·
+>   저장 중 버튼 잠금. 판정은 전부 core.
+> - 검증: core **1162건** / turbo lint·test **17/17 GREEN** / build 성공.
+> - 실물 확인은 [manual-verification.md 50번](loop-eng/manual-verification.md)에 합산(e2e 세션 부재).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 51](plans/phase_51.md) T6: 날짜·미읽음 구분선 + 스크롤 보호
 > 대화 화면에 남아 있던 T6 세 조각을 마저 했다. **날짜 경계는 KST 기준 core 순수 함수**로 —
 > 이 저장소가 날짜 경계로 여러 번 데인 그 함정을 화면 코드에 다시 만들지 않았다

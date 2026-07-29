@@ -13,6 +13,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   deleteMessage,
+  downloadMessageImage,
   listMessages,
   listReactions,
   getMyMembership,
@@ -40,6 +41,8 @@ import {
   MUTE_DURATIONS,
   dayDivider,
   firstUnreadId,
+  galleryNav,
+  galleryPaths,
   isNearBottom,
   kstDateString,
   type Message,
@@ -49,6 +52,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { subscribeRoomMessages } from "@/lib/realtime";
 import { notifyDuck } from "@/lib/notify";
+import { MessageImageViewer } from "@/components/MessageImageViewer";
 
 // "지금부터 ms 뒤"를 ISO로. **컴포넌트 밖에 둔다** — 렌더 중 현재 시각을 읽으면
 // 결과가 다시 그릴 때마다 달라져 예측할 수 없다(React 순수성 규칙, 린트가 잡았다).
@@ -102,6 +106,10 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 바닥 근처인지. 상태로 두면 스크롤할 때마다 다시 그린다 — 이 값은 아래 효과에서만 읽는다.
   const atBottomRef = useRef(true);
   const [showJump, setShowJump] = useState(false);
+  // 2026-07-29 : 메신저 - 전체화면 뷰어 (Phase 51 T5)
+  // 열려 있는 사진의 경로. null이면 닫힘. 순서·양옆 판정은 core가 한다.
+  const [viewerPath, setViewerPath] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -306,6 +314,38 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     atBottomRef.current = true;
     setShowJump(false);
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }
+
+  // 보는 중에 그 사진이 지워지면(실시간 삭제) 뷰어를 닫는다 — 지운 사진이 계속 떠 있으면
+  // 지운 사람에게 안 지워진 것이다. 신호는 core가 준다(index -1).
+  useEffect(() => {
+    if (viewerPath === null) return;
+    if (galleryNav(galleryPaths(messages), viewerPath).index === -1) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 삭제는 실시간 구독으로 도착한다. 이벤트 핸들러에서 알 수 있는 일이 아니다
+      setViewerPath(null);
+    }
+  }, [viewerPath, messages]);
+
+  /** 원본 저장. Blob URL(같은 출처)로 받아야 저장이 된다 — api 주석 참조. */
+  async function handleDownload() {
+    if (!viewerPath || downloading) return;
+    setDownloading(true);
+    try {
+      const blob = await downloadMessageImage(createClient(), viewerPath);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = viewerPath.split("/").pop() ?? "image.webp";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      // 오류 안내는 뷰어 뒤에 가려진다 — 닫아서 보이게 한다. 조용한 실패보다 낫다.
+      setViewerPath(null);
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    } finally {
+      setDownloading(false);
+    }
   }
 
   /**
@@ -555,12 +595,20 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                   // 사진 한 장 때문에 대화가 안 보이면 안 된다.
                   return url ? (
                     <div className="mt-1">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- 서명 URL은 만료되는 임시 주소라 next/image 최적화 대상이 아니다(Phase 39의 sharp 면제 전제도 지킨다). */}
-                      <img
-                        src={url}
-                        alt="첨부 이미지"
-                        className="inline-block max-h-60 max-w-[80%] rounded-lg border border-border"
-                      />
+                      {/* 누르면 전체화면. 링크 아닌 버튼 — 페이지 이동이 아니라 화면 상태다. */}
+                      <button
+                        type="button"
+                        onClick={() => setViewerPath(path)}
+                        aria-label="사진 크게 보기"
+                        className="cursor-zoom-in"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- 서명 URL은 만료되는 임시 주소라 next/image 최적화 대상이 아니다(Phase 39의 sharp 면제 전제도 지킨다). */}
+                        <img
+                          src={url}
+                          alt="첨부 이미지"
+                          className="inline-block max-h-60 max-w-full rounded-lg border border-border"
+                        />
+                      </button>
                     </div>
                   ) : (
                     <div className="mt-1 text-xs text-muted-foreground">사진을 불러오는 중</div>
@@ -641,6 +689,18 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
         )}
         <div ref={bottomRef} />
       </ul>
+
+      {/* 전체화면 뷰어. 열림 상태·순서 판정은 위에서 — 이 컴포넌트는 그리기만 한다. */}
+      {viewerPath && (
+        <MessageImageViewer
+          url={imageUrls[viewerPath] ?? null}
+          nav={galleryNav(galleryPaths(messages), viewerPath)}
+          onNavigate={setViewerPath}
+          onClose={() => setViewerPath(null)}
+          onDownload={() => void handleDownload()}
+          downloading={downloading}
+        />
+      )}
 
       {/* 위쪽을 읽는 중에 새 말이 오면 여기로 알린다. 안 알리면 아래에 뭐가 온 줄 모른다. */}
       {showJump && (

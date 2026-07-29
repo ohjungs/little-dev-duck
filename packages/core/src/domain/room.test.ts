@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DELETED_MESSAGE_TEXT,
+  galleryNav,
+  galleryPaths,
   messageBody,
   messageAttachment,
   messageSchema,
@@ -249,5 +251,50 @@ describe("답장 미리보기", () => {
     const out = replyPreview("m3", [...pool, long])!;
     expect([...out].length).toBeLessThanOrEqual(40);
     expect(out.endsWith("…")).toBe(true);
+  });
+});
+
+describe("galleryPaths / galleryNav (Phase 51 T5 전체화면 뷰어)", () => {
+  const gm = (id: string, seq: number, path: string | null, deletedAt: string | null = null) => ({
+    id, seq, attachmentPath: path, deletedAt,
+  });
+
+  it("첨부가 있는 메시지만 seq 순서로 뽑는다", () => {
+    const list = [gm("a", 3, "p3"), gm("b", 1, "p1"), gm("c", 2, null)];
+    expect(galleryPaths(list)).toEqual(["p1", "p3"]);
+  });
+
+  it("지운 메시지의 사진은 갤러리에도 없다 (지웠는데 뷰어에 남으면 안 지워진 것)", () => {
+    const list = [gm("a", 1, "p1", "2026-07-27T00:00:00.000Z"), gm("b", 2, "p2")];
+    expect(galleryPaths(list)).toEqual(["p2"]);
+  });
+
+  it("첨부가 하나도 없으면 빈 배열", () => {
+    expect(galleryPaths([gm("a", 1, null)])).toEqual([]);
+  });
+
+  it("가운데에서는 양쪽 다 있다", () => {
+    const nav = galleryNav(["p1", "p2", "p3"], "p2");
+    expect(nav).toEqual({ prev: "p1", next: "p3", index: 1, total: 3 });
+  });
+
+  it("첫 장에서 이전은 없다 (끝에서 반대편으로 감지 않는다 — 몇 장인지 감을 잃는다)", () => {
+    expect(galleryNav(["p1", "p2"], "p1").prev).toBeNull();
+  });
+
+  it("마지막 장에서 다음은 없다", () => {
+    expect(galleryNav(["p1", "p2"], "p2").next).toBeNull();
+  });
+
+  it("한 장뿐이면 양쪽 다 없다", () => {
+    expect(galleryNav(["p1"], "p1")).toEqual({ prev: null, next: null, index: 0, total: 1 });
+  });
+
+  it("보는 중에 그 메시지가 지워져 목록에서 빠지면 null 내비 (뷰어가 닫을 신호)", () => {
+    expect(galleryNav(["p1", "p2"], "없는것")).toEqual({ prev: null, next: null, index: -1, total: 2 });
+  });
+
+  it("빈 갤러리에서는 전부 null", () => {
+    expect(galleryNav([], "p1")).toEqual({ prev: null, next: null, index: -1, total: 0 });
   });
 });
