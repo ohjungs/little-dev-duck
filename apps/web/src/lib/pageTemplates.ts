@@ -329,6 +329,37 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
       views: tableAndBoard("status"),
     },
   },
+  // 2026-07-29 : 템플릿 - 지원 현황 (Phase 63 T1)
+  // 사용자의 실제 할 일 목록(면접·지원서·자격증)이 전부 취업 준비였다 — 지원 건을
+  // 제목에 날짜까지 써 가며 할 일로 관리하는 중. 단계·마감이 있는 목록은 데이터베이스가
+  // 맞는 도구다(프로젝트 트래커와 같은 결). 행 하나 = 지원 한 건, 행을 열면 준비 메모.
+  {
+    key: "job-tracker",
+    label: "지원 현황",
+    description: "회사별 지원 단계·마감일을 표와 보드로",
+    icon: "🎯",
+    title: "지원 현황",
+    content: [
+      para("각 행이 지원 한 건입니다. 행을 열면 자소서 메모·면접 준비를 쓸 수 있어요."),
+    ],
+    dbSchema: {
+      properties: [
+        selectProp("stage", "단계", [
+          { id: "interest", name: "관심", color: "gray" },
+          { id: "preparing", name: "서류 준비", color: "yellow" },
+          { id: "applied", name: "지원 완료", color: "blue" },
+          { id: "docs-pass", name: "서류 합격", color: "green" },
+          { id: "interview", name: "면접", color: "purple" },
+          { id: "offer", name: "최종 합격", color: "green" },
+          { id: "rejected", name: "불합격", color: "red" },
+        ]),
+        { id: "role", name: "직무", type: "text", options: [] },
+        { id: "deadline", name: "마감일", type: "date", options: [] },
+        { id: "link", name: "공고 링크", type: "text", options: [] },
+      ],
+      views: tableAndBoard("stage"),
+    },
+  },
   {
     key: "reading-list",
     label: "독서 목록",
