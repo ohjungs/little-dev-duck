@@ -1,5 +1,14 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 63](plans/phase_63.md) T2: 데이터베이스 행을 오리 지식에
+> [확인됨] 표에서만 관리하는 행은 RAG에 아무것도 안 남았다(재인덱싱 미호출 + 속성은
+> plain_text에 없음) — "SK 지원 단계 뭐야?"에 답할 재료가 없었다.
+>
+> - core `dbRowEmbedText`(테스트 3건): 제목+속성을 사람이 읽는 평문으로. select는 옵션
+>   **이름**으로 풀고, 모르는 옵션·빈 값은 지어내지 않고 건너뜀(todoEmbedText와 같은 결).
+> - DatabaseView: 행 생성·제목·속성 변경 **저장 성공 뒤** reindexSource(page) fire-and-forget.
+> - 검증 18/18 GREEN. 실기: [mv 106번](loop-eng/manual-verification.md). 잔여 T3은 후순위.
+
 > ## ✅ 2026-07-29 `/loop-eng` — SCOPE 발굴: [Phase 63](plans/phase_63.md) 취업 준비 지원, T1 완료
 > 발굴 근거는 사용자의 실제 할 일 데이터(전부 취업 준비 — 면접·지원서·자격증). 단계·마감이
 > 있는 목록엔 데이터베이스가 맞는 도구이고 도구는 이미 있다 — 새 인프라 0.
