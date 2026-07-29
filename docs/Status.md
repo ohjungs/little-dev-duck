@@ -1,5 +1,21 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — Phase 54 선행: 메시지 입력 임시저장
+> 쓰다 만 메시지가 방을 나갔다 오면 사라졌다 — 다시 쓰게 만드는 확실한 이탈 지점.
+> [Phase 54](plans/phase_54.md)의 임시저장을 선행 슬라이스로 당겨 왔다(마이그레이션 0건).
+>
+> - `lib/messageDraft.ts`: localStorage(`ldd-msg-draft:<roomId>`), local-prefs.ts와 같은 결 —
+>   기기별 초안은 DB로 옮길 값이 아니다. **빈 값은 키를 지운다**(방마다 죽은 키가 쌓이지 않게).
+>   저장 실패(프라이빗 모드)에도 입력을 막지 않는다.
+> - MessageRoom: 방 진입 시 복원(마운트 후 — hydration 불일치 방지) · 입력마다 저장 ·
+>   **복원 전 저장 금지 ref**(순서가 뒤집히면 빈 값이 초안을 덮는다) · 보내면 자동 삭제.
+> - 검사(node 환경이라 localStorage 실동작 불가): 키 규칙 + **단일 출처 정적 검사**
+>   (MessageRoom이 키 문자열을 재작성하지 않는다 — focusMode 관례).
+> - **보류 판단**: pg_trgm 검색 인덱스는 테이블 미적용이라 실측 불가 + 개인 규모에서
+>   시기상조(YAGNI). 실측 가능해지는 시점(마이그레이션 적용 후)에 재평가.
+> - 검증: turbo lint·test·build **18/18 GREEN** (web 테스트 파일 58, +1).
+> - 실물 확인: [manual-verification.md 56번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 51](plans/phase_51.md) T4 잔여: 메시지 수정 + "수정됨"
 > Phase 52 T3(승인 카드 인입)를 검토하다 **선행이 잘못된 순서**임을 확인했다 — 승인 카드는
 > DuckChatPanel의 방 흡수(마이그레이션 적용 후) 뒤에나 의미가 있고, /요약류도 같은 이유로

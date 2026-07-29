@@ -65,6 +65,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { subscribeRoomMessages } from "@/lib/realtime";
 import { notifyDuck } from "@/lib/notify";
+import { loadDraft, saveDraft } from "@/lib/messageDraft";
 import { MessageImageViewer } from "@/components/MessageImageViewer";
 
 // "지금부터 ms 뒤"를 ISO로. **컴포넌트 밖에 둔다** — 렌더 중 현재 시각을 읽으면
@@ -134,6 +135,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 섞으면 수정 중에 새 말을 못 쓰고, 취소가 둘 중 무엇을 비울지 모호해진다.
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  // 2026-07-29 : 메신저 - 입력 임시저장 (Phase 54 선행)
+  // 초안을 불러오기 전에 저장 효과가 빈 값으로 덮어쓰지 않도록 순서를 잠근다.
+  const draftLoadedRef = useRef(false);
 
   const reload = useCallback(async () => {
     try {
@@ -356,6 +360,25 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 현재 시각은 렌더 중에 읽을 수 없다(순수성). 마운트 시 1회
     setTodayKey(kstDateString(new Date()));
   }, []);
+
+  // 쓰다 만 초안 복원. 서버 렌더에는 localStorage가 없어 마운트 후에 읽는다 —
+  // 초기값으로 읽으면 서버와 첫 화면이 달라진다(hydration 불일치).
+  useEffect(() => {
+    draftLoadedRef.current = false;
+    const stored = loadDraft(roomId);
+    if (stored !== "") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 렌더 중에 읽을 수 없다. 방 진입 시 1회 복원
+      setDraft(stored);
+    }
+    draftLoadedRef.current = true;
+  }, [roomId]);
+
+  // 입력할 때마다 저장한다(작은 문자열 동기 쓰기라 디바운스가 필요할 무게가 아니다).
+  // 보내고 비우면 빈 값 저장 → lib이 키를 지운다. 복원 전에는 쓰지 않는다(위 ref).
+  useEffect(() => {
+    if (!draftLoadedRef.current) return;
+    saveDraft(roomId, draft);
+  }, [draft, roomId]);
 
   // 2026-07-29 : 메신저 - 스크롤 - 읽는 중 보호 (Phase 51 T6)
   // **새 메시지가 왔다고 무조건 끌어내리지 않는다.** 위쪽 대화를 읽는 중에 화면이 튀면
