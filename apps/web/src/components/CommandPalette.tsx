@@ -8,6 +8,7 @@ import {
   Clock,
   FileText,
   Loader2,
+  MessagesSquare,
   Newspaper,
   Plus,
   Search,
@@ -227,6 +228,14 @@ export function CommandPalette() {
       label: "뉴스 브리핑 열기",
       icon: <Newspaper className="size-3.5 shrink-0 opacity-70" />,
       run: () => go("/news"),
+    },
+    // 2026-07-29 : 메신저 입구 등록 — 사이드바에 이어 팔레트에서도. 오리 방 바로 열기는
+    // ensureAgentRoom(비동기 생성)이 필요해 메신저 목록의 "오리와 대화하기" 버튼에 맡긴다.
+    {
+      id: "go-messages",
+      label: "메신저 열기",
+      icon: <MessagesSquare className="size-3.5 shrink-0 opacity-70" />,
+      run: () => go("/messages"),
     },
     {
       id: "go-office",
