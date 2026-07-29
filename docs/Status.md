@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) T3: 말풍선 렌더 메모이제이션 (W-026)
+> **W-024(content-visibility 가상 스크롤)는 이번에 안 했다** — 계획이 "실측하고 결정한다"를
+> 요구하는데 무인 환경에선 스크롤 실측이 불가하고, 채팅의 바닥 고정·과거 로딩과의 상호작용은
+> 눈 없이 적용하면 위험하다(실기 확인 가능해지면 재개). 대신 실측 없이도 확실한 결함을 잡았다:
+>
+> - **타이핑마다 전체 메시지 파싱이 재실행되고 있었다** — draft 상태 변경 → MessageRoom
+>   전체 재렌더 → 메시지마다 codeFenceParts+linkifyParts 재파싱(본문은 안 바뀌었는데).
+> - 본문 조각 렌더를 모듈 스코프 `MessageBodyParts`(React.memo)로 추출 — **인라인이던
+>   JSX를 그대로 옮겼다**(동작 보존, 전체 green이 근거). body 같으면 파싱 스킵.
+> - `handleCopy`를 useCallback으로 참조 고정 — 렌더마다 새 함수면 memo가 무력화된다.
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 88번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) T2: 메신저 키보드 단축키 도움말 (W-004)
 > 계획 원문: "`ShortcutsHelp`가 이미 목록을 그린다 — **거기에 추가한다. 새 도움 화면 금지.**"
 > 그대로 — 데이터 항목 추가만.

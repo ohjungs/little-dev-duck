@@ -9,7 +9,7 @@
 // **낙관적 UI**: 보내면 즉시 목록에 붙인다. 그래서 중복이 생길 수 있고, 그 방어가
 // `clientMsgId`다(같은 값으로 재시도하면 서버가 이미 저장한 것을 돌려준다).
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -108,6 +108,64 @@ type Props = {
   /** 검색에서 넘어온 "이 메시지로" 표적. 있으면 바닥 대신 그 메시지에서 시작한다. */
   focusId?: string | null;
 };
+
+// 2026-07-29 : 메신저 - 말풍선 본문 렌더 메모이제이션 (Phase 57 T3 W-026)
+// 입력창 타이핑(draft 상태)마다 MessageRoom 전체가 재렌더되고, 그때마다 모든 메시지의
+// codeFenceParts+linkifyParts 파싱이 다시 돌았다 — 본문은 바뀌지 않았는데. body가 같으면
+// 건너뛰도록 memo로 감싼다. **렌더 내용은 인라인이던 것을 그대로 옮겼다**(동작 보존).
+const MessageBodyParts = memo(function MessageBodyParts({
+  body,
+  onCopy,
+}: {
+  body: string;
+  onCopy: (text: string) => void;
+}) {
+  return (
+    <>
+      {codeFenceParts(body).map((part, pi) =>
+        part.kind === "code" ? (
+          <span key={pi} className="block text-left">
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-[10px] opacity-70">{part.lang ?? "코드"}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void onCopy(part.text);
+                }}
+                className="rounded border border-current px-1 text-[10px] opacity-70 hover:opacity-100"
+              >
+                복사
+              </button>
+            </span>
+            <pre className="mt-0.5 max-w-full overflow-x-auto rounded bg-black/20 p-2 font-mono text-xs whitespace-pre">
+              {part.text}
+            </pre>
+          </span>
+        ) : (
+          <span key={pi}>
+            {linkifyParts(part.text).map((p, i) =>
+              p.href ? (
+                <a
+                  key={i}
+                  href={p.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline break-all"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {p.text}
+                </a>
+              ) : (
+                <span key={i}>{p.text}</span>
+              ),
+            )}
+          </span>
+        ),
+      )}
+    </>
+  );
+});
 
 export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -224,7 +282,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     return () => window.removeEventListener("keydown", onKey);
   }, [menuFor]);
 
-  async function handleCopy(text: string) {
+  // useCallback으로 참조를 고정한다 — 아래 MessageBodyParts(memo)의 prop이라
+  // 렌더마다 새 함수면 memo가 무력화된다. setter만 쓰므로 의존성이 없다.
+  const handleCopy = useCallback(async (text: string) => {
     setMenuFor(null);
     try {
       await navigator.clipboard.writeText(text);
@@ -232,7 +292,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       // 클립보드는 권한·보안 컨텍스트에 따라 막힌다. 조용히 실패했다고 하지 않는다.
       setError("복사하지 못했어요. 직접 선택해 복사해 주세요.");
     }
-  }
+  }, []);
 
   // 2026-07-29 : 메신저 - 메시지를 워크스페이스로 (Phase 52 T1)
   // **생성 로직을 재구현하지 않는다** — 할 일·메모를 만드는 그 함수(createTodo·createMemo)를
@@ -1191,48 +1251,9 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                     </span>
                   )}
                   {/* 평문 렌더 — HTML로 그리지 않는다(에이전트 응답이 섞인다).
-                      코드 블록은 <pre>+복사(H-013), 글 조각만 링크화(javascript: 차단은 core). */}
-                  {codeFenceParts(messageBody(m)).map((part, pi) =>
-                    part.kind === "code" ? (
-                      <span key={pi} className="block text-left">
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] opacity-70">{part.lang ?? "코드"}</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleCopy(part.text);
-                            }}
-                            className="rounded border border-current px-1 text-[10px] opacity-70 hover:opacity-100"
-                          >
-                            복사
-                          </button>
-                        </span>
-                        <pre className="mt-0.5 max-w-full overflow-x-auto rounded bg-black/20 p-2 font-mono text-xs whitespace-pre">
-                          {part.text}
-                        </pre>
-                      </span>
-                    ) : (
-                      <span key={pi}>
-                        {linkifyParts(part.text).map((p, i) =>
-                          p.href ? (
-                            <a
-                              key={i}
-                              href={p.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline break-all"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {p.text}
-                            </a>
-                          ) : (
-                            <span key={i}>{p.text}</span>
-                          ),
-                        )}
-                      </span>
-                    ),
-                  )}
+                      코드 블록은 <pre>+복사(H-013), 글 조각만 링크화(javascript: 차단은 core).
+                      파싱·조각 렌더는 memo 컴포넌트(W-026) — 타이핑 재렌더에 다시 안 돈다. */}
+                  <MessageBodyParts body={messageBody(m)} onCopy={handleCopy} />
                 </span>
                 )}
                 {/* 수정 흔적. 없으면 읽은 사람이 본 것과 다른 말이 소리 없이 남는다(I-011). */}
