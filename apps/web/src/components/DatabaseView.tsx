@@ -23,7 +23,9 @@ import {
   type RowPropValue,
   type SortSpec,
   type ViewType,
+  dbRowEmbedText,
 } from "@ldd/core";
+import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { DbTableView } from "@/components/db/DbTableView";
@@ -95,6 +97,19 @@ export function DatabaseView({
 
   const openRow = (id: string) => router.push(`/pages/${id}`);
 
+  // 2026-07-29 : 행 RAG 인덱싱 (Phase 63 T2). 표에서만 관리하는 행은 본문이 없어
+  // 오리 지식에 아무것도 남지 않았다 — 제목+속성을 core 한 벌(dbRowEmbedText)로 평문화해
+  // 저장 성공 뒤 fire-and-forget(위젯들의 todoEmbedText와 같은 결). 실패는 검색만 늦어진다.
+  const reindexRow = (rowId: string, title: string, props: RowProps) => {
+    const text = dbRowEmbedText(
+      title,
+      props as Record<string, string | number | boolean>,
+      dbSchema,
+    );
+    if (text.trim() === "") return; // 빈 행은 인덱싱할 재료가 없다
+    void reindexSource({ sourceType: "page", sourceId: rowId, text });
+  };
+
   // 낙관적 반영 후 저장. 실패 시 이전 값으로 롤백 + 에러 표시(코드 리뷰 HIGH — 조용한 유실 방지).
   // 롤백은 그 행의 값이 아직 내가 낙관적으로 설정한 next일 때만(그 사이 성공한 최신 편집을 덮지 않게 — 리뷰 HIGH).
   const persistRowProps = (row: Page, next: RowProps) => {
@@ -102,7 +117,9 @@ export function DatabaseView({
     setRows((rs) =>
       (rs ?? []).map((r) => (r.id === row.id ? { ...r, rowProps: next } : r)),
     );
-    updatePage(supabase, row.id, { rowProps: next }).catch(() => {
+    updatePage(supabase, row.id, { rowProps: next })
+      .then(() => reindexRow(row.id, row.title ?? "", next))
+      .catch(() => {
       setRows((rs) =>
         (rs ?? []).map((r) =>
           r.id === row.id && r.rowProps === next ? { ...r, rowProps: prev } : r,
@@ -127,7 +144,12 @@ export function DatabaseView({
     setRows((rs) =>
       (rs ?? []).map((r) => (r.id === rowId ? { ...r, title } : r)),
     );
-    updatePage(supabase, rowId, { title }).catch(() => {
+    updatePage(supabase, rowId, { title })
+      .then(() => {
+        const props = rows?.find((r) => r.id === rowId)?.rowProps ?? {};
+        reindexRow(rowId, title, props);
+      })
+      .catch(() => {
       // 그 행 제목이 아직 내가 설정한 title일 때만 롤백(최신 성공 편집 보존 — 리뷰 HIGH).
       setRows((rs) =>
         (rs ?? []).map((r) =>
@@ -146,6 +168,7 @@ export function DatabaseView({
         rowProps: preset,
       });
       setRows((prev) => [...(prev ?? []), created]);
+      reindexRow(created.id, created.title ?? "", preset);
     } catch {
       showError("행 추가에 실패했습니다. 다시 시도해 주세요.");
     }

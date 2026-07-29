@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calendarEventEmbedText, todoEmbedText } from "./embed-text";
+import { calendarEventEmbedText, todoEmbedText, dbRowEmbedText } from "./embed-text";
 
 // 이 테스트의 요지: **오리에게 가는 자료에 사용자가 물어볼 정보가 들어 있어야 한다.**
 // 2026-07-26에 확인해 보니 할 일은 "제목 (미완료)", 일정은 "제목"뿐이었다. 그 상태로는
@@ -79,5 +79,37 @@ describe("calendarEventEmbedText", () => {
   it("빈 제목이어도 날짜 정보는 남는다", () => {
     const at3pm = new Date(2026, 6, 27, 15, 0, 0);
     expect(calendarEventEmbedText("", at3pm.toISOString())).toContain("2026-07-27");
+  });
+});
+
+// 2026-07-29 : RAG - 데이터베이스 행 임베딩 (Phase 63 T2)
+describe("dbRowEmbedText", () => {
+  const schema = {
+    properties: [
+      {
+        id: "stage", name: "단계", type: "select" as const,
+        options: [
+          { id: "applied", name: "지원 완료", color: "blue" },
+          { id: "interview", name: "면접", color: "purple" },
+        ],
+      },
+      { id: "role", name: "직무", type: "text" as const, options: [] },
+      { id: "deadline", name: "마감일", type: "date" as const, options: [] },
+    ],
+    views: [],
+  };
+
+  it("제목과 속성(라벨: 값)을 한 줄로 — select는 옵션 이름으로 푼다", () => {
+    expect(
+      dbRowEmbedText("SK네트웍스", { stage: "interview", role: "백엔드", deadline: "2026-08-01" }, schema),
+    ).toBe("SK네트웍스 (단계: 면접, 직무: 백엔드, 마감일: 2026-08-01)");
+  });
+
+  it("빈 값·모르는 select 옵션은 지어내지 않고 건너뛴다", () => {
+    expect(dbRowEmbedText("회사", { stage: "없는id", role: "" }, schema)).toBe("회사");
+  });
+
+  it("속성이 하나도 없으면 제목만", () => {
+    expect(dbRowEmbedText("회사", {}, schema)).toBe("회사");
   });
 });

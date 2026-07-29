@@ -98,7 +98,7 @@ export {
   quotaWindowMessage,
   type QuotaWindow,
 } from "./domain/quota";
-export { todoEmbedText, calendarEventEmbedText } from "./domain/embed-text";
+export { todoEmbedText, calendarEventEmbedText, dbRowEmbedText } from "./domain/embed-text";
 export {
   selectTodosForDuck,
   DUCK_TODO_LIMIT,

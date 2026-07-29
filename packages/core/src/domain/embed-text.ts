@@ -61,3 +61,40 @@ export function calendarEventEmbedText(
     : start.date;
   return title ? `${title} (일정 ${when})` : `일정 ${when}`;
 }
+
+// 2026-07-29 : RAG - 데이터베이스 행 임베딩 (Phase 63 T2)
+// 표에서만 관리하는 행(제목+속성)은 본문이 없어 인덱스에 아무것도 남지 않았다 —
+// "SK 면접 언제야?"에 답할 재료가 없다(위 todoEmbedText와 정확히 같은 종류의 구멍).
+// select는 optionId가 아니라 **사람이 읽는 옵션 이름**으로 푼다. 모르는 옵션·빈 값은
+// 지어내지 않고 건너뛴다(틀린 자료가 들어가면 오리가 그걸 근거로 답한다).
+
+type EmbedRowSchema = {
+  properties: readonly {
+    id: string;
+    name: string;
+    type: string;
+    options: readonly { id: string; name: string }[];
+  }[];
+};
+
+export function dbRowEmbedText(
+  title: string,
+  rowProps: Record<string, string | number | boolean>,
+  schema: EmbedRowSchema,
+): string {
+  const pairs: string[] = [];
+  for (const prop of schema.properties) {
+    const raw = rowProps[prop.id];
+    if (raw === undefined || raw === null || raw === "") continue;
+    if (prop.type === "select") {
+      const name = prop.options.find((o) => o.id === raw)?.name;
+      if (!name) continue;
+      pairs.push(`${prop.name}: ${name}`);
+    } else if (typeof raw === "boolean") {
+      pairs.push(`${prop.name}: ${raw ? "예" : "아니오"}`);
+    } else {
+      pairs.push(`${prop.name}: ${raw}`);
+    }
+  }
+  return pairs.length === 0 ? title : `${title} (${pairs.join(", ")})`;
+}
