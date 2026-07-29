@@ -33,6 +33,7 @@ import { NotifySetting } from "@/components/NotifySetting";
 import { SendKeySetting } from "@/components/SendKeySetting";
 import { MessageStorageCard } from "@/components/MessageStorageCard";
 import { MessageNotifySetting } from "@/components/MessageNotifySetting";
+import { DataSaverSetting } from "@/components/DataSaverSetting";
 import { HealthStatus } from "@/components/HealthStatus";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
@@ -145,6 +146,21 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <MessageNotifySetting />
+          </CardContent>
+        </Card>
+        {/* 2026-07-29 (Phase 56 T2 T-009): 대역폭 5GB/월 대책 — 사진을 누를 때만 받는다. */}
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Download className="size-4 text-primary-accent" />
+              데이터 절약 모드
+            </CardTitle>
+            <CardDescription>
+              무료 한도(대역폭 월 5GB)를 아낍니다. 켜면 대화 속 사진을 자동으로 받지 않아요.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DataSaverSetting />
           </CardContent>
         </Card>
         {/* 2026-07-29 (Q-022): 무료 티어 1GB의 계기판. 50% 초과가 정리(Phase 55 T3) 착수 기준이다. */}

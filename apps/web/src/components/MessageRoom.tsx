@@ -82,6 +82,7 @@ import {
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { getMsgNotifyMode, getNotifyKeywords } from "@/lib/msgNotifyPref";
+import { getDataSaver } from "@/lib/dataSaverPref";
 import { notifyBlockReason } from "@/lib/notify";
 import { describeMessageNotifyStatus } from "@/lib/notifyStatus";
 import { subscribeRoomMessages } from "@/lib/realtime";
@@ -343,6 +344,15 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     }
   }
 
+  // 2026-07-29 (Phase 56 T2 T-009): 데이터 절약 모드 — 켜면 사진 서명 URL을 자동으로
+  // 만들지 않고, 누른 사진만 불러온다(무료 티어 대역폭 5GB/월 대책).
+  const [dataSaver, setDataSaver] = useState(false);
+  const [requestedPaths, setRequestedPaths] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 클라이언트 전용: 마운트 후 1회
+    setDataSaver(getDataSaver());
+  }, []);
+
   // 2026-07-29 (Phase 56 T1): "지금 이 방 알림이 오는가" 한 줄. 판정이 다섯 겹이라
   // 사용자가 추적할 수 없다 — 합성 문구는 lib이, 판정은 기존 것들이 한다.
   const [notifyStatusLine, setNotifyStatusLine] = useState<string | null>(null);
@@ -446,7 +456,10 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   useEffect(() => {
     const missing = messages
       .map((m) => messageAttachment(m))
-      .filter((p): p is string => p !== null && !(p in imageUrls));
+      .filter((p): p is string => p !== null && !(p in imageUrls))
+      // 데이터 절약 모드에서는 누른 사진만 불러온다(T-009). 모아보기·뷰어는 사용자가
+      // 연 것이라 별도 효과가 평소대로 채운다.
+      .filter((p) => !dataSaver || requestedPaths.has(p));
     if (missing.length === 0) return;
 
     let alive = true;
@@ -465,7 +478,7 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     return () => {
       alive = false;
     };
-  }, [messages, imageUrls]);
+  }, [messages, imageUrls, dataSaver, requestedPaths]);
 
   useEffect(() => {
     const now = Date.now();
@@ -1259,6 +1272,17 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
                         />
                       </button>
                     </div>
+                  ) : dataSaver && !requestedPaths.has(path) ? (
+                    // 데이터 절약 모드(T-009): 누르기 전에는 받지 않는다 — 대역폭이 남는다.
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRequestedPaths((prev) => new Set(prev).add(path))
+                      }
+                      className="mt-1 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                    >
+                      사진 보기 (데이터 절약 중)
+                    </button>
                   ) : (
                     <div className="mt-1 text-xs text-muted-foreground">사진을 불러오는 중</div>
                   );
