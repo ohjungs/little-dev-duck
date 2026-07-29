@@ -32,6 +32,7 @@ import { QuietHoursSetting } from "@/components/QuietHoursSetting";
 import { NotifySetting } from "@/components/NotifySetting";
 import { SendKeySetting } from "@/components/SendKeySetting";
 import { MessageStorageCard } from "@/components/MessageStorageCard";
+import { MessageNotifySetting } from "@/components/MessageNotifySetting";
 import { HealthStatus } from "@/components/HealthStatus";
 import { GoogleCalendarLink } from "@/components/GoogleCalendarLink";
 import { GitHubIssuesLink } from "@/components/GitHubIssuesLink";
@@ -129,6 +130,21 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <SendKeySetting />
+          </CardContent>
+        </Card>
+        {/* 2026-07-29 (Phase 56 M-007·M-008): 방이 늘면 전부 알림은 곧 전부 끔이 된다 — 키워드만 골라 받는 길. */}
+        <Card>
+          <CardHeader className="flex-col items-start gap-1">
+            <CardTitle>
+              <Bell className="size-4 text-primary-accent" />
+              메시지 알림 방식
+            </CardTitle>
+            <CardDescription>
+              새 메시지 알림을 전부 받을지, 고른 키워드가 들었을 때만 받을지 정합니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MessageNotifySetting />
           </CardContent>
         </Card>
         {/* 2026-07-29 (Q-022): 무료 티어 1GB의 계기판. 50% 초과가 정리(Phase 55 T3) 착수 기준이다. */}

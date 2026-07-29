@@ -25,6 +25,7 @@ describe("LOCAL_PREF_SPECS", () => {
       "ldd-pomodoro-tags",
       "ldd-todo-order",
       "ldd:favorites",
+      "ldd:notify-keywords",
       "ldd:quietHours",
     ]);
   });
@@ -220,6 +221,7 @@ describe("라운드트립", () => {
       "ldd-collapsed-widgets": JSON.stringify(["todo"]),
       "ldd-pomodoro-tags": JSON.stringify(["공부"]),
       "ldd:quietHours": JSON.stringify({ start: 22, end: 7 }),
+      "ldd:notify-keywords": JSON.stringify(["배포"]),
     };
     const collected = collectLocalPrefs(reader(store));
     // 파일로 나갔다 돌아오는 경로를 그대로 태운다.
@@ -227,5 +229,18 @@ describe("라운드트립", () => {
     expect(roundtripped).toEqual(collected);
     // 등록한 8개가 전부 살아 돌아온다 — 하나라도 빠지면 사용자는 담겼다고 믿은 걸 잃는다.
     expect(Object.keys(roundtripped)).toHaveLength(LOCAL_PREF_SPECS.length);
+  });
+});
+
+// 2026-07-29 : 메신저 - 알림 키워드 백업 (Phase 56 T1 M-008)
+describe("알림 키워드 백업", () => {
+  it("허용 목록에 있어 내보내기에 담기고 가져오기에 통과한다", () => {
+    const collected = collectLocalPrefs((k) =>
+      k === "ldd:notify-keywords" ? JSON.stringify(["배포", "긴급"]) : null,
+    );
+    expect(collected["ldd:notify-keywords"]).toEqual(["배포", "긴급"]);
+    expect(parseLocalPrefs({ "ldd:notify-keywords": ["배포"] })).toEqual({
+      "ldd:notify-keywords": ["배포"],
+    });
   });
 });

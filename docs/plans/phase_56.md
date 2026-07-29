@@ -1,6 +1,6 @@
 # Phase 56 — 메신저 Group 3d: 알림·설정 심화 (44항목)
 
-> 상태: **draft(예약·미착수)** — [Phase 49](phase_49.md)·[51](phase_51.md) 선행
+> 상태: **진행 중** (2026-07-29 착수 — stale 가드 통과: 설정 카드 구조·알림 배선(notifyDuck 단일 지점)·localStorage 결(local-prefs) 모두 코드로 확인. 첫 조각 T1 M-007·M-008 완료)
 >
 > 항목 목록: [배정표의 Phase 56 절](../catalog/messenger-assignment.md) (M 19 · T 17 · E 3 · B 5)
 >

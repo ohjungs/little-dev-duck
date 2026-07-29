@@ -50,6 +50,10 @@ export { rolloverDueDate } from "./domain/recurrence-rollover";
 export { isQuietHour } from "./domain/quiet-hours";
 export { nextDailyCount, type DailyCount } from "./domain/notify-budget";
 export {
+  shouldNotifyMessage,
+  type MessageNotifyMode,
+} from "./domain/notify-filter";
+export {
   XP_REWARDS,
   XP_PER_LEVEL_BASE,
   FEED_PER_XP,

@@ -44,6 +44,9 @@ export const LOCAL_PREF_SPECS: readonly LocalPrefSpec[] = [
   { key: "ldd-collapsed-widgets", label: "접어 둔 카드", kind: "idList" },
   { key: "ldd-pomodoro-tags", label: "집중 태그", kind: "idList" },
   { key: "ldd:quietHours", label: "방해금지 시간", kind: "quietHours" },
+  // 2026-07-29 (Phase 56 T1 M-008): 알림 키워드 — 사용자가 고른 낱말 목록이라 파생값이 아니다.
+  // (알림 방식 모드는 담지 않는다 — 한 번 클릭으로 되돌리는 값이다.)
+  { key: "ldd:notify-keywords", label: "알림 키워드", kind: "idList" },
 ];
 
 const SPEC_BY_KEY = new Map(LOCAL_PREF_SPECS.map((s) => [s.key, s]));

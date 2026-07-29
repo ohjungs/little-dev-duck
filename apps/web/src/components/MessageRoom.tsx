@@ -43,6 +43,7 @@ import {
   messageBody,
   replyPreview,
   roomDisplayTitle,
+  shouldNotifyMessage,
   summarizeReactions,
   REACTION_EMOJIS,
   pendingMigrationMessage,
@@ -80,6 +81,7 @@ import {
   type ReadReceiptState,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
+import { getMsgNotifyMode, getNotifyKeywords } from "@/lib/msgNotifyPref";
 import { subscribeRoomMessages } from "@/lib/realtime";
 import { notifyDuck } from "@/lib/notify";
 import { loadDraft, saveDraft } from "@/lib/messageDraft";
@@ -498,6 +500,10 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     if (last.senderUserId === myUserId) return; // 내가 쓴 걸 나에게 알리지 않는다
     if (typeof document !== "undefined" && !document.hidden) return;
     if (muted) return; // 이 방만 조용히
+
+    // 2026-07-29 (Phase 56 T1 M-007·M-008): 알림 방식(전부/키워드만/끔) 게이트.
+    // 이벤트 시점에 읽는다 — 설정을 바꾼 직후의 메시지부터 바로 반영된다.
+    if (!shouldNotifyMessage(getMsgNotifyMode(), getNotifyKeywords(), messageBody(last))) return;
 
     notifyDuck("새 메시지", messageBody(last));
   }, [messages, myUserId, muted]);
