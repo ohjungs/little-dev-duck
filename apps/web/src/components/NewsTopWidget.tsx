@@ -16,6 +16,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { timeAgo } from "@/lib/timeAgo";
 import { getReadArticles, markArticleRead, subscribeReadArticles } from "@/lib/readArticles";
+import { safeHref } from "@/lib/safeHref";
 
 // 2026-07-29 : 대시보드 - 오늘의 브리핑 10 (사용자 지시: "top 3를 cherrypick처럼 매일
 // 10개의 이슈만 보이도록"). 선정·창(오늘 KST)·카테고리는 뉴스 화면의 브리핑과 **같은
@@ -25,10 +26,7 @@ import { getReadArticles, markArticleRead, subscribeReadArticles } from "@/lib/r
 // 순위 계산에 넣을 만큼만 가져온다. 창(오늘) 밖은 어차피 걸러진다.
 const FETCH_LIMIT = 60;
 
-// RSS가 준 외부 링크는 http(s)만 허용(NewsReader와 같은 규칙 — zod .url()이 javascript:를 통과시킨다).
-function safeHref(url: string): string {
-  return /^https?:\/\//i.test(url) ? url : "#";
-}
+
 
 export function NewsTopWidget() {
   const [result, setResult] = useState<DailyIssuesResult<Article> | null>(null);

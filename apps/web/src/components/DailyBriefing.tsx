@@ -21,6 +21,7 @@ import {
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { markArticleRead } from "@/lib/readArticles";
+import { safeHref } from "@/lib/safeHref";
 import {
   getBriefingFont,
   getBriefingView,
@@ -263,7 +264,7 @@ export function DailyBriefing({ articles, feeds, readSet }: Props) {
     const read = readSet.has(a.id);
     return (
       <a
-        href={a.link}
+        href={safeHref(a.link)}
         target="_blank"
         rel="noreferrer"
         onClick={() => markArticleRead(a.id)}
