@@ -283,6 +283,7 @@ export {
   COMMON_FEED_PATHS,
   RECOMMENDED_FEEDS,
   feedTopics,
+  topicForUrl,
   resolveFeedUrl,
   unregisteredFeeds,
   rotateRecommended,
@@ -304,6 +305,16 @@ export {
   type RankedArticle,
   type TopArticlesOptions,
 } from "./domain/news-top";
+export {
+  dailyIssues,
+  DAILY_ISSUE_LIMIT,
+  DAILY_ISSUE_WINDOW_HOURS,
+  DAILY_ISSUE_PER_FEED_CAP,
+  DAILY_ISSUE_FALLBACK_CATEGORY,
+  type DailyIssue,
+  type DailyIssuesOptions,
+  type DailyIssuesResult,
+} from "./domain/news-daily";
 export {
   officeEventSchema,
   eventToState,

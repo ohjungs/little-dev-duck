@@ -49,6 +49,14 @@ function key(url: string): string {
   return url.trim().toLowerCase().replace(/\/+$/, "");
 }
 
+// 2026-07-29 : 뉴스 - 피드 URL → 주제 (Phase 61 T1 데일리 브리핑)
+// 사용자가 등록한 피드가 추천 목록의 것이면 그 주제를 카테고리로 쓴다.
+// 모르는 URL은 null — 지어내지 않는다(호출부가 "종합"으로 처리).
+export function topicForUrl(url: string): string | null {
+  const k = key(url);
+  return RECOMMENDED_FEEDS.find((f) => key(f.url) === k)?.topic ?? null;
+}
+
 // 2026-07-27 : 추천 피드 - 회전 (2차 피드백 4-3, Phase 47 T2-1)
 // 사용자가 "추천이 갱신되지 않는다"고 했다. 실체는 `unregisteredFeeds`가 이미 등록한 것을
 // 걸러 내기 때문에 **다 등록하면 추천 섹션이 통째로 사라진다**는 것이다.

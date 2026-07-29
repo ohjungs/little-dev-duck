@@ -1,5 +1,13 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 61](plans/phase_61.md) T1: 데일리 이슈 선정 core
+> 하루 10개 이슈 선정 로직(cherrypick 벤치마킹의 심장). **topArticles 한 벌 재사용** —
+> 이 층이 더한 것은 24시간 창·피드별 상한(3)·카테고리 라벨(topicForUrl → 없으면 종합)뿐.
+>
+> - core `news-daily.ts` `dailyIssues`(테스트 6건) + `news-feeds.ts` `topicForUrl`(테스트 2건).
+> - 10개 미만이면 있는 만큼(부족을 숨기지 않음), 빈 이유(no-articles/none-recent) 그대로 전달.
+> - 검증: turbo lint·test·build **18/18 GREEN**. 다음: T2 — 뉴스 화면 이슈 카드 + 진행 n/10.
+
 > ## ⚠ 2026-07-29 사용자 피드백 5건 — 방향 전환 (커밋 0ae6af1·7e0bf99)
 > 사용자가 실사용 중 보고: ① 메신저 메뉴 입구 자체가 없었음(수정·배포) ② **메신저가
 > "조회만 되고 아무것도 못 하는" 상태** — 방 생성 코드가 저장소에 없었고 오리도 응답하지
