@@ -15,6 +15,7 @@ import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeTable } from "@/lib/realtime";
 import { emitXpChanged } from "@/lib/xpSignal";
+import { recordToDuckRoom } from "@/lib/duckRoomLog";
 import { todayIso } from "@/lib/today";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
@@ -153,6 +154,10 @@ export function HabitWidget() {
       setChecks((prev) => [created, ...prev]);
       // checkHabit이 서버에서 XP를 적립하므로 오리 표시 갱신 신호를 보낸다.
       emitXpChanged();
+      // 2026-07-29 (Phase 59 T1 S-009): 오리 방에 기록 — 방 없으면 스킵·실패 조용(lib 계약).
+      // 체크 해제는 기록하지 않는다: 해제 알림은 소음이고, 남은 기록이 거짓이 되지도 않는다
+      // (그날 체크했다가 무른 사실 자체는 참이다).
+      void recordToDuckRoom(supabase, `습관 "${habit.title}"을(를) 체크했어요.`);
     } catch {
       setActionError("변경하지 못했습니다.");
     }

@@ -1,5 +1,15 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 59](plans/phase_59.md) T1: 습관 체크 → 오리 방 기록 (S-009 완결)
+> 직전 사이클의 `recordToDuckRoom` 한 벌을 그대로 재사용 — 새 코드 최소(배선 한 줄).
+> 이로써 S-009(습관·뽀모도로 신호 → 메신저)가 완결됐다.
+>
+> - HabitWidget 체크 성공 경로에 기록 연결. **체크 해제는 기록하지 않는다** —
+>   해제 알림은 소음이고, 남은 기록이 거짓이 되지도 않는다(체크했다가 무른 사실은 참).
+> - 중간에 타입체크가 필드 오기(name→title)를 잡음 — 검증 게이트가 제 역할.
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 95번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 59](plans/phase_59.md) T1: 뽀모도로 → 오리 방 기록 (S-009 일부)
 > 계획이 "값이 가장 확실"이라 한 T1(연동 심화)의 첫 조각 — 뽀모도로를 마치면 오리 방에
 > system 안내줄이 남는다. **오리 방이 하루의 기록이 되기 시작한다**(제품 정체성 방향).
