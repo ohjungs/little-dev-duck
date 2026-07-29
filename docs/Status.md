@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T4: 날짜로 이동 (E-039)
+> 새 배관 없이 기존 것 두 벌의 조합: **kstDayRange**(검색 필터의 KST 경계)로 그 날 시작을
+> 구하고, 점프는 검색의 **`?focus=` 경로**(주변 로딩 L-005 · 스크롤 · 강조)에 그대로 맡겼다.
+>
+> - api `firstMessageOnOrAfter`(테스트 3건): 그 날 시작 이후 첫 메시지(seq 오름차순 1건).
+>   날짜 형식이 틀리면 **조회 없이 null** — 경계를 버리고 조회하면 방의 맨 첫 메시지로
+>   점프해 "그 날로 갔다"고 오인하게 된다.
+> - 방 헤더: 날짜 선택 + "날짜로 이동". 없으면 "그 날 이후 메시지가 없어요".
+> - **소프트 내비게이션 함정 수정**: 방 안에서 focus만 바뀌면 React가 컴포넌트를 재사용해
+>   초기 목록·focus 1회 가드가 남는다 — 페이지에서 `key={focus}`로 재마운트를 강제.
+> - 검증: api 37건 / turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 70번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 55](plans/phase_55.md) T1: 최근 검색어 (L-017) + recentList 공용화
 > "localStorage 최근 목록"의 **두 번째 소비자**가 생겨(이모지 피커에 이어 검색) 피커 추출 때와
 > 같은 원칙으로 공용 lib로 꺼냈다 — 두 곳이 정책(중복 하나·최신 앞·상한·조용한 실패) 한 벌을 쓴다.

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MESSAGE_PAGE_SIZE,
   fetchAllRoomMessages,
+  firstMessageOnOrAfter,
   RECENT_WINDOW,
   deleteMessage,
   listMessages,
@@ -428,5 +429,45 @@ describe("searchMessages 필터", () => {
     const { supabase, calls } = capturingSupabase();
     await searchMessages(supabase, "안녕");
     expect(calls.filter(([n]) => n === "eq" || n === "gte" || n === "lt" || n === "not")).toEqual([]);
+  });
+});
+
+// 2026-07-29 : 메신저 - 날짜로 이동 (Phase 55 T4 E-039)
+describe("firstMessageOnOrAfter", () => {
+  function capturing(rows: unknown[] = []) {
+    const calls: Array<[string, ...unknown[]]> = [];
+    const chain: Record<string, unknown> = {};
+    for (const name of ["eq", "gte", "order"]) {
+      chain[name] = (...a: unknown[]) => {
+        calls.push([name, ...a]);
+        return chain;
+      };
+    }
+    chain.limit = async () => ({ data: rows, error: null });
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 테스트용 최소 목
+      supabase: { from: () => ({ select: () => chain }) } as any,
+      calls,
+    };
+  }
+
+  it("KST 그 날 시작 이후의 첫 메시지를 찾는다 (seq 오름차순)", async () => {
+    const { supabase, calls } = capturing([messageRow({ seq: 7 })]);
+    const m = await firstMessageOnOrAfter(supabase, ROOM_ROW.id, "2026-07-29");
+    expect(m?.seq).toBe(7);
+    expect(calls).toContainEqual(["eq", "room_id", ROOM_ROW.id]);
+    expect(calls).toContainEqual(["gte", "created_at", "2026-07-28T15:00:00.000Z"]);
+    expect(calls).toContainEqual(["order", "seq", { ascending: true }]);
+  });
+
+  it("그 날 이후 메시지가 없으면 null", async () => {
+    const { supabase } = capturing([]);
+    expect(await firstMessageOnOrAfter(supabase, ROOM_ROW.id, "2026-07-29")).toBeNull();
+  });
+
+  it("날짜 형식이 아니면 조회 없이 null (전체 첫 메시지로 점프하면 안 된다)", async () => {
+    const { supabase, calls } = capturing([messageRow({ seq: 1 })]);
+    expect(await firstMessageOnOrAfter(supabase, ROOM_ROW.id, "29-07-2026")).toBeNull();
+    expect(calls).toEqual([]);
   });
 });

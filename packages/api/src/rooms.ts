@@ -195,6 +195,32 @@ export async function fetchAllRoomMessages(
   return { messages: all, hitGuard: true };
 }
 
+// 2026-07-29 : 메신저 - 날짜로 이동 (Phase 55 T4 E-039)
+/**
+ * KST 기준 그 날 시작 **이후의 첫 메시지**를 찾는다(없으면 null). 점프 자체는 기존
+ * `?focus=` 경로가 한다 — 여기는 표적 id만 구한다. 날짜가 형식이 아니면 조회 없이 null:
+ * 경계를 버리고 조회하면 방의 맨 첫 메시지로 점프해 "그 날로 갔다"고 오인하게 된다.
+ */
+export async function firstMessageOnOrAfter(
+  supabase: SupabaseClient,
+  roomId: string,
+  dateKey: string,
+): Promise<Message | null> {
+  const { fromIso } = kstDayRange(dateKey, undefined);
+  if (fromIso === null) return null;
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("room_id", roomId)
+    .gte("created_at", fromIso)
+    .order("seq", { ascending: true })
+    .limit(1);
+  if (error) throw new Error(error.message);
+  const row = ((data ?? []) as MessageRow[])[0];
+  return row ? messageFromRow(row) : null;
+}
+
 // 2026-07-29 : 메신저 - 표적 주변 로딩 (Phase 51 T3 잔여 L-005)
 /**
  * 표적 메시지 **주변 창**을 불러온다(검색 점프용). 표적이 최근 페이지 밖에 있어도

@@ -58,6 +58,9 @@ export default async function MessageRoomPage({
         </p>
       ) : (
         <MessageRoom
+          // 방 안에서 날짜 점프(E-039)로 focus만 바뀌는 소프트 내비게이션에서도
+          // 상태(초기 목록·focus 1회 가드)가 새로 서도록 표적을 key로 건다.
+          key={focus ?? "latest"}
           roomId={id}
           initialMessages={initial}
           myUserId={user.id}

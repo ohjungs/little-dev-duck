@@ -196,6 +196,7 @@ export {
   listMessagesBefore,
   listRoomLinkMessages,
   fetchAllRoomMessages,
+  firstMessageOnOrAfter,
   FETCH_ALL_MAX_ROUNDS,
   ROOM_LIST_LIMIT,
   updateMessage,

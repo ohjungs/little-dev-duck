@@ -10,6 +10,7 @@
 // `clientMsgId`다(같은 값으로 재시도하면 서버가 이미 저장한 것을 돌려준다).
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   coerceEventStart,
@@ -19,6 +20,7 @@ import {
   deleteMessage,
   downloadMessageImage,
   fetchAllRoomMessages,
+  firstMessageOnOrAfter,
   listMessages,
   listMessagesBefore,
   listReactions,
@@ -308,6 +310,31 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
       setError(pendingMigrationMessage(raw) ?? raw);
     } finally {
       setExporting(null);
+    }
+  }
+
+  // 2026-07-29 : 메신저 - 날짜로 이동 (Phase 55 T4 E-039)
+  // 표적 id만 찾고 점프는 기존 `?focus=` 경로에 맡긴다 — 주변 로딩·스크롤·강조가 이미 있다.
+  const router = useRouter();
+  const [jumpDate, setJumpDate] = useState("");
+  const [jumping, setJumping] = useState(false);
+
+  async function handleJumpToDate() {
+    if (jumping || jumpDate === "") return;
+    setJumping(true);
+    setError(null);
+    try {
+      const target = await firstMessageOnOrAfter(createClient(), roomId, jumpDate);
+      if (!target) {
+        setError("그 날 이후 메시지가 없어요.");
+        return;
+      }
+      router.push(`/messages/${roomId}?focus=${target.id}`);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    } finally {
+      setJumping(false);
     }
   }
 
@@ -943,6 +970,22 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
             {exporting === fmt ? "내보내는 중" : `.${fmt}`}
           </button>
         ))}
+        {/* 날짜로 이동 — 그 날(없으면 그 이후) 첫 메시지로 점프한다. */}
+        <input
+          type="date"
+          value={jumpDate}
+          onChange={(e) => setJumpDate(e.target.value)}
+          aria-label="이동할 날짜"
+          className="rounded border border-border bg-background px-1 py-0.5"
+        />
+        <button
+          type="button"
+          onClick={() => void handleJumpToDate()}
+          disabled={jumping || jumpDate === ""}
+          className="rounded border border-border px-2 py-0.5 hover:bg-accent disabled:opacity-50"
+        >
+          {jumping ? "찾는 중" : "날짜로 이동"}
+        </button>
         {muted ? (
           <>
             <span className="text-muted-foreground">이 방 알림이 꺼져 있어요</span>
