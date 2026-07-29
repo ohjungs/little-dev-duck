@@ -4,6 +4,7 @@ import {
   formatTranscriptMarkdown,
   transcriptJson,
   transcriptFileName,
+  quoteSourceLabel,
 } from "./transcript";
 
 const ME = "me-user";
@@ -194,5 +195,24 @@ describe("transcriptFileName — 확장자", () => {
   it("md·json 확장자를 받는다", () => {
     expect(transcriptFileName(null, "2026-07-29", "md")).toBe("대화-2026-07-29.md");
     expect(transcriptFileName("방", "2026-07-29", "json")).toBe("대화-방-2026-07-29.json");
+  });
+});
+
+// 2026-07-29 : 메신저 - 노트에서 채팅 인용 (Phase 59 T1 S-008)
+describe("quoteSourceLabel (인용 출처 라벨)", () => {
+  it("발화자·KST 날짜·시각을 적는다 — transcript와 같은 판정 한 벌", () => {
+    expect(quoteSourceLabel(m({ seq: 1, body: "안녕" }), ME)).toBe("나 · 2026-07-29 10:00");
+  });
+
+  it("오리(agent)는 오리로 적는다", () => {
+    expect(
+      quoteSourceLabel(m({ seq: 1, body: "꽥", senderType: "agent", senderUserId: null }), ME),
+    ).toBe("오리 · 2026-07-29 10:00");
+  });
+
+  it("시스템 메시지는 알림으로 적는다 (transcriptJson과 같은 라벨)", () => {
+    expect(quoteSourceLabel(m({ seq: 1, body: "변환했어요", type: "system" }), ME)).toBe(
+      "알림 · 2026-07-29 10:00",
+    );
   });
 });

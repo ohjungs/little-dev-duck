@@ -630,6 +630,7 @@ export {
   formatTranscriptMarkdown,
   transcriptJson,
   transcriptFileName,
+  quoteSourceLabel,
   type TranscriptFormat,
 } from "./domain/transcript";
 

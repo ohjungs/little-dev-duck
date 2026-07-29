@@ -100,6 +100,17 @@ export function transcriptJson(
   return JSON.stringify(items, null, 2);
 }
 
+// 2026-07-29 : 메신저 - 노트에서 채팅 인용 (Phase 59 T1 S-008)
+/**
+ * 인용 블록 밑에 붙는 출처 한 줄("나 · 2026-07-29 10:00").
+ * 발화자·KST 판정은 내보내기와 **같은 한 벌**(senderLabel·dayKey·kstTimeString) —
+ * 인용과 내보내기 파일의 발화자가 다르면 어느 쪽이 맞는지 모른다.
+ */
+export function quoteSourceLabel(m: TranscriptMessage, myUserId: string): string {
+  const who = m.type === "system" ? "알림" : senderLabel(m, myUserId);
+  return `${who} · ${dayKey(m.createdAt)} ${kstTimeString(m.createdAt)}`;
+}
+
 export type TranscriptFormat = "txt" | "md" | "json";
 
 /** 내려받을 파일 이름. OS가 거부하는 문자는 걷어낸다 — 저장 대화상자가 안 뜨면 원인을 모른다. */

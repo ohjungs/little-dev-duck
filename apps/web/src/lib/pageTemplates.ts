@@ -89,6 +89,14 @@ export function textToBlocks(text: string): TemplateBlock[] {
   return text.split("\n").map((line) => para(line.trim() === "" ? "" : line));
 }
 
+// 2026-07-29 : 메신저 - 노트에서 채팅 인용 (Phase 59 T1 S-008)
+// 채팅 메시지 한 개 → quote 블록(들) + 출처 문단. 여러 줄은 줄마다 quote 블록 —
+// BlockNote quote는 한 줄 인라인이라 줄바꿈을 안에 담을 수 없다.
+export function chatQuoteBlocks(body: string, source: string): TemplateBlock[] {
+  const quotes = body.split("\n").map((line) => quote(line));
+  return [...quotes, para(`— ${source}`)];
+}
+
 function bullet(t: string): TemplateBlock {
   return { type: "bulletListItem", content: text(t) };
 }

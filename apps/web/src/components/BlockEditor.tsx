@@ -47,6 +47,7 @@ export function BlockEditor({
   onChange,
   onExportReady,
   onImportReady,
+  onInsertReady,
   editable = true,
 }: {
   initialContent: unknown;
@@ -54,6 +55,8 @@ export function BlockEditor({
   onExportReady?: (toMarkdown: () => string) => void;
   // Markdown을 파싱해 현재 문서를 대체하는 함수를 상위에 넘긴다(가져오기 — 에디터 인스턴스가 여기 있으므로).
   onImportReady?: (importMarkdown: (md: string) => Promise<void>) => void;
+  // 커서 위치 뒤에 블록을 삽입하는 함수를 상위에 넘긴다(채팅 인용 S-008 — 같은 노출 관례).
+  onInsertReady?: (insertBlocks: (blocks: PartialBlock[]) => void) => void;
   // 공개 페이지(/p/[slug])는 읽기 전용으로 같은 렌더러를 재사용(ponytail).
   editable?: boolean;
 }) {
@@ -98,6 +101,13 @@ export function BlockEditor({
       editor.replaceBlocks(editor.document, blocks);
     });
   }, [editor, onImportReady]);
+
+  useEffect(() => {
+    onInsertReady?.((blocks: PartialBlock[]) => {
+      // 커서가 있는 블록 뒤에 넣는다 — 문서 끝에 몰래 붙이면 사용자가 찾아야 한다.
+      editor.insertBlocks(blocks, editor.getTextCursorPosition().block, "after");
+    });
+  }, [editor, onInsertReady]);
 
   return (
     <BlockNoteView
