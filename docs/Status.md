@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 56](plans/phase_56.md) T1: 테스트 알림 + 차단 사유 진단 (M-031)
+> `notifyDuck`은 권한·집중 모드·방해금지·상한에 막히면 **조용히** 돌아간다 — 사용자는
+> "왜 안 오지?"에 답을 얻을 길이 없었다. 게이트 판정을 `notifyBlockReason` 한 곳으로
+> 모아 발송과 진단이 **같은 순서 한 벌**을 보게 했다(동작 보존 리팩터링, 전체 green이 근거).
+>
+> - `notifyBlockReason`: 차단 사유(unsupported/permission/focus/quiet/cap) 또는 null.
+>   **진단은 상한을 소모하지 않는다**(peek와 consume 분리) — 사유를 반복 확인해도
+>   오늘 몫이 줄지 않는다. 사유별 한국어 문구(`NOTIFY_BLOCK_MESSAGES`) 완비를 테스트로 잠금.
+> - 설정 → 브라우저 알림에 "테스트 알림 보내기": 나가면 실제 알림, 막히면 그 사유를 화면에.
+> - 선행 버퍼 점검: phase_57~59 draft 존재 — 버퍼 충분, 추가 기획 안 함(상한 2 준수).
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 76번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 56](plans/phase_56.md) **착수** — T1: 알림 방식·키워드 알림 (M-007·M-008)
 > Phase 55의 무-마이그레이션 조각이 얇아져 **선행 버퍼(phase_56 draft)를 stale 가드
 > 재검증 후 꺼냈다**: 설정 카드 구조·알림 배선(notifyDuck 단일 지점)·localStorage 결

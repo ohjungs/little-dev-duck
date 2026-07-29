@@ -38,16 +38,46 @@ function consumeDailyBudget(today: string): boolean {
   }
 }
 
-// 오리 알림 발송. 권한·방해금지·일일 상한을 모두 통과할 때만 브라우저 알림을 띄운다.
-export function notifyDuck(title: string, body: string): void {
-  if (notifyPermission() !== "granted") return;
-  // 2026-07-27 (Phase 51 T2): 집중 모드 억제를 **여기서** 한다.
-  // 호출부마다 확인하게 두면 새 알림이 생길 때마다 한 곳씩 빠지고,
-  // 실제로 그래서 집중 모드가 아무것도 막지 못하는 상태였다(읽는 곳 0곳).
-  if (isFocusMode()) return;
-  const now = new Date();
+// 여유가 있는지 **보기만** 한다(카운트를 올리지 않는다) — 진단이 상한을 소모하면 안 된다.
+function peekDailyBudget(today: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(CAP_KEY);
+    const stored = raw ? (JSON.parse(raw) as DailyCount) : null;
+    return nextDailyCount(stored, today, DAILY_CAP).allowed;
+  } catch {
+    return true;
+  }
+}
+
+// 2026-07-29 : 알림 - 차단 사유 진단 (Phase 56 T1 M-031)
+// notifyDuck이 조용히 반환하면 사용자는 "왜 안 오지?"에 답을 못 얻는다.
+// 게이트 판정을 여기 한 곳으로 모아 발송(notifyDuck)과 진단(테스트 버튼)이 같은 순서를 본다.
+export type NotifyBlockReason = "unsupported" | "permission" | "focus" | "quiet" | "cap";
+
+export const NOTIFY_BLOCK_MESSAGES: Record<NotifyBlockReason, string> = {
+  unsupported: "이 브라우저는 알림을 지원하지 않아요.",
+  permission: "알림 권한이 허용돼 있지 않아요. 위에서 켜 주세요.",
+  focus: "집중 모드가 켜져 있어 알림을 쉬고 있어요.",
+  quiet: "지금은 방해금지 시간대라 조용히 있어요.",
+  cap: "오늘 알림 상한(10건)을 다 썼어요. 내일 다시 열려요.",
+};
+
+/** 지금 알림이 막혀 있으면 그 사유, 나갈 수 있으면 null. 상한을 소모하지 않는다. */
+export function notifyBlockReason(now: Date = new Date()): NotifyBlockReason | null {
+  if (!notifySupported()) return "unsupported";
+  if (notifyPermission() !== "granted") return "permission";
+  if (isFocusMode()) return "focus";
   const q = readQuietHours();
-  if (q && isQuietHour(now.getHours(), q.start, q.end)) return; // 밤엔 조용
+  if (q && isQuietHour(now.getHours(), q.start, q.end)) return "quiet";
+  if (!peekDailyBudget(localDate(now))) return "cap";
+  return null;
+}
+
+// 오리 알림 발송. 권한·집중 모드·방해금지·일일 상한을 모두 통과할 때만 브라우저 알림을 띄운다.
+// (집중 모드 억제를 **여기서** 한다 — 호출부마다 확인하게 두면 한 곳씩 빠진다. Phase 51 T2의 교훈.)
+export function notifyDuck(title: string, body: string): void {
+  const now = new Date();
+  if (notifyBlockReason(now) !== null) return;
   if (!consumeDailyBudget(localDate(now))) return;
   try {
     new Notification(title, { body, icon: "/duck-logo.png" });
