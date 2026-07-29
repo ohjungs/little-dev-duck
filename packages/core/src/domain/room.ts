@@ -217,6 +217,16 @@ export function galleryNav(
   };
 }
 
+// 2026-07-29 : 메신저 - 표적 주변 창 병합 (Phase 51 T3 잔여 L-005)
+/**
+ * 표적 주변 두 조회를 화면 순서(오래된순) 하나로 합친다.
+ * **계약: before는 DB가 준 최신순(표적에서 위로), after는 오래된순(표적부터 아래로).**
+ * 이 뒤집기를 화면마다 하게 두면 한 곳은 순서를 틀린다 — 여기 한 곳에 잠근다.
+ */
+export function mergeAroundWindow<T>(before: readonly T[], after: readonly T[]): T[] {
+  return [...before].reverse().concat(after);
+}
+
 // 2026-07-29 : 메신저 - 메시지 수정 (Phase 51 T4 잔여 I-010)
 /**
  * 이 메시지를 수정할 수 있는가. 내가 보낸 **글(text)** 메시지만 —

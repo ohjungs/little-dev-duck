@@ -12,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   shouldRemoveReaction,
   likePattern,
+  mergeAroundWindow,
   sortRooms,
   unreadCount,
   checkMessageImage,
@@ -117,6 +118,53 @@ export async function listMessages(
 
   if (error) throw new Error(error.message);
   return (data as MessageRow[]).map(messageFromRow).reverse();
+}
+
+// 2026-07-29 : 메신저 - 표적 주변 로딩 (Phase 51 T3 잔여 L-005)
+/**
+ * 표적 메시지 **주변 창**을 불러온다(검색 점프용). 표적이 최근 페이지 밖에 있어도
+ * 그 자리의 대화 맥락이 보이게 한다. 표적을 찾지 못하면(삭제·권한 밖) null —
+ * 호출부가 평소 목록으로 폴백한다. 병합·순서는 core `mergeAroundWindow` 계약을 따른다.
+ */
+export async function listMessagesAround(
+  supabase: SupabaseClient,
+  roomId: string,
+  messageId: string,
+  half: number = Math.floor(MESSAGE_PAGE_SIZE / 2),
+): Promise<Message[] | null> {
+  const { data: targetRows, error: targetError } = await supabase
+    .from("messages")
+    .select("seq")
+    .eq("room_id", roomId)
+    .eq("id", messageId)
+    .limit(1);
+  if (targetError) throw new Error(targetError.message);
+  const target = (targetRows as { seq: number }[] | null)?.[0];
+  if (!target) return null;
+
+  const [beforeRes, afterRes] = await Promise.all([
+    supabase
+      .from("messages")
+      .select("*")
+      .eq("room_id", roomId)
+      .lt("seq", target.seq)
+      .order("seq", { ascending: false })
+      .limit(half),
+    supabase
+      .from("messages")
+      .select("*")
+      .eq("room_id", roomId)
+      .gte("seq", target.seq)
+      .order("seq", { ascending: true })
+      .limit(half),
+  ]);
+  if (beforeRes.error) throw new Error(beforeRes.error.message);
+  if (afterRes.error) throw new Error(afterRes.error.message);
+
+  return mergeAroundWindow(
+    ((beforeRes.data ?? []) as MessageRow[]).map(messageFromRow),
+    ((afterRes.data ?? []) as MessageRow[]).map(messageFromRow),
+  );
 }
 
 export type SendMessageInput = {

@@ -1,4 +1,4 @@
-import { listMessages } from "@ldd/api";
+import { listMessages, listMessagesAround } from "@ldd/api";
 import { pendingMigrationMessage, type Message } from "@ldd/core";
 import { MessageRoom } from "@/components/MessageRoom";
 import { createClient } from "@/lib/supabase/server";
@@ -35,7 +35,11 @@ export default async function MessageRoomPage({
   let initial: Message[] = [];
   let notice: string | null = null;
   try {
-    initial = await listMessages(supabase, id);
+    // 표적이 있으면 그 주변 창을 싣는다(L-005) — 최근 페이지 밖의 옛 메시지도 맥락째 보인다.
+    // 표적을 못 찾으면(삭제·권한 밖) 평소 목록으로 폴백하고, 화면이 안내를 띄운다.
+    initial = focus
+      ? ((await listMessagesAround(supabase, id, focus)) ?? (await listMessages(supabase, id)))
+      : await listMessages(supabase, id);
   } catch (e) {
     const raw = e instanceof Error ? e.message : String(e);
     // 모르는 오류는 삼키지 않는다 — 원문을 보여주는 편이 낫다(저장소 관례).

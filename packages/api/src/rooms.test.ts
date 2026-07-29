@@ -4,6 +4,7 @@ import {
   RECENT_WINDOW,
   deleteMessage,
   listMessages,
+  listMessagesAround,
   listRoomAttachments,
   listRooms,
   markRead,
@@ -64,6 +65,8 @@ function fakeSupabase(opts: {
       eq: () => selectChain,
       not: () => selectChain,
       is: () => selectChain,
+      lt: () => selectChain,
+      gte: () => selectChain,
       order: () => selectChain,
       limit: result,
       then: undefined,
@@ -295,5 +298,13 @@ describe("updateMessage", () => {
     const s = fakeSupabase({ messages: [messageRow()], onUpdate: (_t, p) => patches.push(p) });
     await updateMessage(s, "m1", "  고친 말  ");
     expect(patches[0]).toMatchObject({ body: "고친 말" });
+  });
+});
+
+// 2026-07-29 : 메신저 - 표적 주변 로딩 (Phase 51 T3 잔여)
+describe("listMessagesAround", () => {
+  it("표적을 찾지 못하면 null (호출부가 평소 목록으로 폴백한다)", async () => {
+    const list = await listMessagesAround(fakeSupabase({ messages: [] }), ROOM_ROW.id, "없는-id");
+    expect(list).toBeNull();
   });
 });

@@ -721,10 +721,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
         className="h-full space-y-2 overflow-y-auto p-3"
         aria-label="대화 내용"
       >
-        {/* 검색 표적이 로드 창 밖일 때. 조용히 바닥으로 가면 점프가 고장 난 것처럼 보인다. */}
+        {/* 서버가 표적 주변을 실어 주므로(L-005) 여기 걸리는 건 그 사이 지워졌거나
+            열 수 없게 된 경우다. 조용히 바닥으로 가면 점프가 고장 난 것처럼 보인다. */}
         {focusMissing && (
           <li role="status" className="rounded border border-border bg-muted/40 p-2 text-center text-xs text-muted-foreground break-keep">
-            찾은 메시지가 최근 50개보다 오래돼 여기에 보이지 않아요.
+            찾은 메시지를 열 수 없어요. 그 사이 지워졌을 수 있어요.
           </li>
         )}
         {messages.length === 0 ? (

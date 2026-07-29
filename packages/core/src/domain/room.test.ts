@@ -13,6 +13,7 @@ import {
   replyPreview,
   REPLY_MISSING_TEXT,
   MUTE_DURATIONS,
+  mergeAroundWindow,
   roomMemberSchema,
   sortRooms,
   todoTitleFrom,
@@ -393,5 +394,29 @@ describe("canEditMessage", () => {
 
   it("로그인 정보가 없으면 수정할 수 없다", () => {
     expect(canEditMessage(base, null)).toBe(false);
+  });
+});
+
+// 2026-07-29 : 메신저 - 표적 주변 창 병합 (Phase 51 T3 잔여 L-005)
+describe("mergeAroundWindow", () => {
+  const m = (id: string, seq: number) => msg({ id, seq });
+
+  it("이전(최신순)과 이후(오래된순)를 오래된순 하나로 합친다", () => {
+    // DB가 주는 그대로: before는 desc(표적에서 위로), after는 asc(표적부터 아래로).
+    const before = [m("b2", 4), m("b1", 3)];
+    const after = [m("t", 5), m("a1", 6)];
+    expect(mergeAroundWindow(before, after).map((x) => x.seq)).toEqual([3, 4, 5, 6]);
+  });
+
+  it("이전이 없어도(방 첫 메시지 근처) 동작한다", () => {
+    expect(mergeAroundWindow([], [m("t", 1)]).map((x) => x.seq)).toEqual([1]);
+  });
+
+  it("이후가 없어도(마지막 메시지가 표적) 동작한다", () => {
+    expect(mergeAroundWindow([m("b1", 1)], []).map((x) => x.seq)).toEqual([1]);
+  });
+
+  it("둘 다 비면 빈 배열", () => {
+    expect(mergeAroundWindow([], [])).toEqual([]);
   });
 });

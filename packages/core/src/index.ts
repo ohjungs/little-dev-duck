@@ -575,6 +575,7 @@ export {
   galleryNav,
   attachmentDeleted,
   canEditMessage,
+  mergeAroundWindow,
   todoTitleFrom,
   conversionReceiptText,
   TODO_TITLE_MAX,
