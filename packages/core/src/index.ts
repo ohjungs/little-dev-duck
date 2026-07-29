@@ -594,6 +594,9 @@ export {
 // 2026-07-29 : 메신저 - 검색 하이라이트 (Phase 51 T3 잔여)
 export { splitByQuery, type HighlightPart } from "./domain/search-highlight";
 
+// 2026-07-29 : 메신저 - URL 링크화 (Phase 54)
+export { linkifyParts, type LinkPart } from "./domain/linkify";
+
 // 2026-07-29 : 메신저 - 슬래시 커맨드 (Phase 52 T2)
 export {
   SLASH_COMMANDS,

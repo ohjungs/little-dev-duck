@@ -1,5 +1,17 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — Phase 54: 메시지 URL 링크화
+> 본문 속 URL이 평문으로만 보여 클릭이 안 됐다. **미리보기 카드는 만들지 않았다** —
+> 외부 fetch가 필요해 쿼터·SSRF 표면이 생긴다. 링크화는 fetch 0회의 결정적 가공.
+>
+> - core `linkifyParts`(테스트 10건): URL 문자 집합을 명시해 **한글이 안 딸려 들어간다**
+>   ("https://a.com입니다" → 링크는 a.com까지). 끝 문장부호 제거 · 위키식 괄호 짝 보존 ·
+>   **`javascript:` 스킴 원천 차단**(허용 목록 방식 — 이 경로로 에이전트 응답도 렌더된다).
+> - 말풍선: 링크만 `<a target=_blank rel="noopener noreferrer">`, HTML 문자열 생성 없음
+>   (평문 렌더 원칙 유지). 긴 URL은 break-all로 말풍선을 안 넘친다.
+> - 검증: core 1238건(파일 89) / turbo lint·test·build **18/18 GREEN**.
+> - 실물 확인: [manual-verification.md 59번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — Phase 54: 메시지 전달 + **Phase 51 코드 범위 완결 판정**
 > Phase 51 잔여 스윕: 남은 코드 항목은 M-023(오리 표정 반응)뿐인데 **메시지 화면에는 오리가
 > 없다** — 반응을 보여 줄 자리가 없어 보류(YAGNI, DuckChatPanel 흡수 때 재평가).
