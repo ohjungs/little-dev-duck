@@ -192,6 +192,7 @@ export {
   messageImageUrl,
   downloadMessageImage,
   listRoomAttachments,
+  updateMessage,
   SIGNED_URL_SECONDS,
   getMyMembership,
   setRoomMute,

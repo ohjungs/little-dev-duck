@@ -8,6 +8,7 @@ import {
   listRooms,
   markRead,
   sendMessage,
+  updateMessage,
 } from "./rooms";
 
 const USER = "22222222-2222-4222-8222-222222222222";
@@ -33,6 +34,7 @@ function messageRow(o: Partial<{ id: string; seq: number; body: string; client_m
     seq: o.seq ?? 1,
     attachment_path: null,
     reply_to_id: null,
+    edited_at: null,
     deleted_at: null,
     created_at: "2026-07-27T00:00:00.000Z",
   };
@@ -81,7 +83,18 @@ function fakeSupabase(opts: {
       },
       update: (patch: Record<string, unknown>) => {
         opts.onUpdate?.(table, patch);
-        return { eq: () => ({ eq: async () => ({ error: null }), error: null, then: undefined }) };
+        // eq/is는 자기 자신을 돌려주는 체인. 끝을 await하면 { error: null }처럼 읽히고,
+        // select().single()은 첫 메시지 행을 준다 — updateMessage가 갱신 행을 돌려받는 경로.
+        const chain: Record<string, unknown> = {
+          eq: () => chain,
+          is: () => chain,
+          select: () => ({
+            single: async () => ({ data: messages[0] ?? messageRow(), error: null }),
+          }),
+          error: null,
+          then: undefined,
+        };
+        return chain;
       },
     };
   };
@@ -253,5 +266,34 @@ describe("sendMessage 종류", () => {
     const s = fakeSupabase({ onInsert: (_t, row) => inserted.push(row) });
     await sendMessage(s, { roomId: ROOM_ROW.id, body: "안녕", clientMsgId: "c10" });
     expect(inserted[0]?.type).toBe("text");
+  });
+});
+
+// 2026-07-29 : 메신저 - 메시지 수정 (Phase 51 T4 잔여)
+describe("updateMessage", () => {
+  it("본문과 수정 시각을 함께 남긴다 (흔적 없이 바꾸지 않는다)", async () => {
+    const patches: Record<string, unknown>[] = [];
+    const s = fakeSupabase({ messages: [messageRow()], onUpdate: (_t, p) => patches.push(p) });
+    await updateMessage(s, "m1", "고친 말");
+    expect(patches).toHaveLength(1);
+    expect(patches[0]).toMatchObject({ body: "고친 말" });
+    expect(patches[0]).toHaveProperty("edited_at");
+  });
+
+  it("빈 내용으로 고칠 수 없다 (삭제와 수정을 섞지 않는다)", async () => {
+    const s = fakeSupabase({ messages: [messageRow()] });
+    await expect(updateMessage(s, "m1", "   ")).rejects.toThrow("삭제");
+  });
+
+  it("4000자를 넘길 수 없다 (보낼 때와 같은 상한)", async () => {
+    const s = fakeSupabase({ messages: [messageRow()] });
+    await expect(updateMessage(s, "m1", "x".repeat(4001))).rejects.toThrow("4000");
+  });
+
+  it("앞뒤 공백을 정리해 저장한다", async () => {
+    const patches: Record<string, unknown>[] = [];
+    const s = fakeSupabase({ messages: [messageRow()], onUpdate: (_t, p) => patches.push(p) });
+    await updateMessage(s, "m1", "  고친 말  ");
+    expect(patches[0]).toMatchObject({ body: "고친 말" });
   });
 });

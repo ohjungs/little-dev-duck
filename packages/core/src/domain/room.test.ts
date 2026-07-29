@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DELETED_MESSAGE_TEXT,
   attachmentDeleted,
+  canEditMessage,
   galleryNav,
   galleryPaths,
   messageBody,
@@ -36,7 +37,7 @@ describe("메시지 계약", () => {
   it("사람이 보낸 메시지는 보낸 사람이 있어야 한다", () => {
     const base = {
       id: U1, roomId: U2, senderType: "user" as const, type: "text" as const,
-      body: "안녕", clientMsgId: "c1", seq: 1, attachmentPath: null, replyToId: null, deletedAt: null, createdAt: ISO,
+      body: "안녕", clientMsgId: "c1", seq: 1, attachmentPath: null, replyToId: null, editedAt: null, deletedAt: null, createdAt: ISO,
     };
     expect(messageSchema.safeParse({ ...base, senderUserId: U1 }).success).toBe(true);
     // 보낸 사람 없이 "사람이 보냈다"고 하면 화면이 누가 썼는지 못 그린다.
@@ -46,7 +47,7 @@ describe("메시지 계약", () => {
   it("에이전트 메시지는 보낸 사람이 없어야 한다", () => {
     const base = {
       id: U1, roomId: U2, senderType: "agent" as const, type: "text" as const,
-      body: "꽥", clientMsgId: "c2", seq: 2, attachmentPath: null, replyToId: null, deletedAt: null, createdAt: ISO,
+      body: "꽥", clientMsgId: "c2", seq: 2, attachmentPath: null, replyToId: null, editedAt: null, deletedAt: null, createdAt: ISO,
     };
     expect(messageSchema.safeParse({ ...base, senderUserId: null }).success).toBe(true);
     expect(messageSchema.safeParse({ ...base, senderUserId: U1 }).success).toBe(false);
@@ -55,7 +56,7 @@ describe("메시지 계약", () => {
   it("빈 본문과 4000자 초과는 거부한다", () => {
     const base = {
       id: U1, roomId: U2, senderUserId: null, senderType: "agent" as const,
-      type: "text" as const, clientMsgId: "c3", seq: 3, attachmentPath: null, replyToId: null, deletedAt: null, createdAt: ISO,
+      type: "text" as const, clientMsgId: "c3", seq: 3, attachmentPath: null, replyToId: null, editedAt: null, deletedAt: null, createdAt: ISO,
     };
     expect(messageSchema.safeParse({ ...base, body: "" }).success).toBe(false);
     expect(messageSchema.safeParse({ ...base, body: "x".repeat(4001) }).success).toBe(false);
@@ -367,5 +368,30 @@ describe("conversionReceiptText (변환 영수증 문구)", () => {
     const text = conversionReceiptText("todo", "가".repeat(100));
     expect(text).toContain("…");
     expect([...text].length).toBeLessThan(70);
+  });
+});
+
+// 2026-07-29 : 메신저 - 메시지 수정 (Phase 51 T4 잔여)
+describe("canEditMessage", () => {
+  const base = { senderUserId: U1, type: "text" as const, deletedAt: null };
+
+  it("내가 보낸 글 메시지는 수정할 수 있다", () => {
+    expect(canEditMessage(base, U1)).toBe(true);
+  });
+
+  it("남의 메시지는 수정할 수 없다", () => {
+    expect(canEditMessage(base, U2)).toBe(false);
+  });
+
+  it("지운 메시지는 수정할 수 없다 (지웠는데 고칠 수 있으면 삭제가 삭제가 아니다)", () => {
+    expect(canEditMessage({ ...base, deletedAt: ISO }, U1)).toBe(false);
+  });
+
+  it("system 메시지(영수증)는 수정할 수 없다 (기록을 고치면 기록이 아니다)", () => {
+    expect(canEditMessage({ ...base, type: "system" as const }, U1)).toBe(false);
+  });
+
+  it("로그인 정보가 없으면 수정할 수 없다", () => {
+    expect(canEditMessage(base, null)).toBe(false);
   });
 });

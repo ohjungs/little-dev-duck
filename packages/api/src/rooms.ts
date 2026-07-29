@@ -44,6 +44,7 @@ type MessageRow = {
   seq: number;
   attachment_path: string | null;
   reply_to_id: string | null;
+  edited_at?: string | null;
   deleted_at: string | null;
   created_at: string;
 };
@@ -71,6 +72,8 @@ function messageFromRow(row: MessageRow): Message {
     seq: Number(row.seq),
     attachmentPath: row.attachment_path,
     replyToId: row.reply_to_id,
+    // 마이그레이션 적용 전 행에는 컬럼이 없다 — 그때는 "수정된 적 없음"이 맞다.
+    editedAt: row.edited_at ?? null,
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
   });
@@ -211,6 +214,33 @@ export async function deleteMessage(
     .eq("id", id);
 
   if (error) throw new Error(error.message);
+}
+
+// 2026-07-29 : 메신저 - 메시지 수정 (Phase 51 T4 잔여 I-010·I-011)
+/**
+ * 본문을 고치고 수정 시각을 남긴다. **흔적 없이 바꾸지 않는다** — "수정됨" 표시의 근거.
+ * 소유 검사는 RLS가 하고, 지운 메시지는 조건으로 막는다(0행이면 single()이 오류를 내
+ * **조용히 성공한 척하지 않는다**). 갱신된 행을 돌려줘 화면이 그대로 갈아끼운다.
+ */
+export async function updateMessage(
+  supabase: SupabaseClient,
+  id: string,
+  body: string,
+): Promise<Message> {
+  const trimmed = body.trim();
+  if (trimmed === "") throw new Error("빈 내용으로 고칠 수 없습니다. 삭제를 쓰세요.");
+  if ([...trimmed].length > 4000) throw new Error("메시지는 4000자까지예요.");
+
+  const { data, error } = await supabase
+    .from("messages")
+    .update({ body: trimmed, edited_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select()
+    .single();
+
+  if (error || !data) throw new Error(error?.message ?? "메시지를 고치지 못했어요.");
+  return messageFromRow(data as MessageRow);
 }
 
 /**

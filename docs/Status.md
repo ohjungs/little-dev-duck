@@ -1,5 +1,23 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 51](plans/phase_51.md) T4 잔여: 메시지 수정 + "수정됨"
+> Phase 52 T3(승인 카드 인입)를 검토하다 **선행이 잘못된 순서**임을 확인했다 — 승인 카드는
+> DuckChatPanel의 방 흡수(마이그레이션 적용 후) 뒤에나 의미가 있고, /요약류도 같은 이유로
+> 대기다. 대신 Phase 51 T4에 **미구현으로 남아 있던 수정(I-010·I-011)**을 찾아 완성했다
+> (반응·답장·삭제만 되어 있었다 — grep으로 확인).
+>
+> - **마이그레이션 1건 신규**(`20260729010000_message_edit`, down 동반): `messages.edited_at`.
+>   수정 이력 테이블은 안 만들었다 — 무료 500MB에서 상시 이력은 과잉(파일 주석에 근거).
+>   **적용 대기 마이그레이션이 1건 늘었다** — 기존 대기 배치와 함께 `db push`로 적용된다.
+> - core `canEditMessage`(테스트 5건): 내 것 + text + 미삭제만. **system 영수증은 수정 불가**
+>   (기록을 고치면 기록이 아니다) · 지운 것 불가(삭제가 삭제여야 한다).
+> - api `updateMessage`(테스트 4건): trim · 1~4000자 · `deleted_at is null` 조건 + `.single()`로
+>   **0행이면 조용히 성공한 척하지 않는다.** 갱신 행을 돌려줘 화면이 그대로 갈아끼운다.
+> - UI: 메뉴 "수정"(판정은 core — 눌러도 실패할 버튼은 안 보여 준다) → 인라인 입력(Enter 저장 ·
+>   Escape 취소) → 말풍선 옆 "수정됨". 마이그레이션 적용 전엔 `pendingMigrationMessage`가 안내.
+> - 검증: core 1200건 / api 475건 / turbo lint·test·build **18/18 GREEN**.
+> - 실물 확인 보류: [manual-verification.md 55번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 52](plans/phase_52.md) T2: 슬래시 커맨드 (/할일 · /일정)
 > 계획이 못박은 두 가지를 지켰다: **파싱은 정규식(코드)** — LLM에 맡기면 쿼터를 태우고
 > 불안정하다(HD-003). **CommandPalette와 동작 공유** — 같은 api 생성 함수를 부르므로

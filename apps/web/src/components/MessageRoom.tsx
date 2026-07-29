@@ -28,6 +28,7 @@ import {
   setRoomPin,
   toggleReaction,
   sendMessage,
+  updateMessage,
   uploadMessageImage,
 } from "@ldd/api";
 import {
@@ -45,6 +46,7 @@ import {
   isRoomMuted,
   MUTE_DURATIONS,
   attachmentDeleted,
+  canEditMessage,
   conversionReceiptText,
   dayDivider,
   firstUnreadId,
@@ -127,6 +129,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
   // 방 전체 사진 모아보기. null이면 닫힘, 로딩 중엔 빈 배열과 구분해야 해서 "loading".
   const [gallery, setGallery] = useState<string[] | "loading" | null>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
+  // 2026-07-29 : 메신저 - 메시지 수정 (Phase 51 T4 잔여)
+  // 편집 중인 메시지와 그 임시 본문. 보내기 입력창(draft)과 섞지 않는다 —
+  // 섞으면 수정 중에 새 말을 못 쓰고, 취소가 둘 중 무엇을 비울지 모호해진다.
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -181,6 +188,24 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       setError(pendingMigrationMessage(raw) ?? raw);
+    }
+  }
+
+  /** 수정 저장. 갱신 행을 서버가 돌려주므로 그걸로 갈아끼운다("수정됨" 시각 포함). */
+  async function handleEditSave() {
+    if (!editing || savingEdit) return;
+    const text = editing.text.trim();
+    if (text === "") return; // 빈 수정은 저장하지 않는다 — 지우려면 삭제를 쓴다
+    setSavingEdit(true);
+    try {
+      const saved = await updateMessage(createClient(), editing.id, text);
+      setMessages((prev) => prev.map((m) => (m.id === saved.id ? saved : m)));
+      setEditing(null);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setError(pendingMigrationMessage(raw) ?? raw);
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -680,6 +705,45 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                 </li>
               ) : (
               <li className={`relative ${mine ? "text-right" : "text-left"}`}>
+                {editing?.id === m.id ? (
+                  /* 인라인 수정. Enter 저장 · Escape 취소 — 대화 흐름에서 벗어나지 않는다. */
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void handleEditSave();
+                    }}
+                    className="inline-flex max-w-[80%] items-center gap-1"
+                  >
+                    <label htmlFor={`edit-${m.id}`} className="sr-only">
+                      메시지 수정
+                    </label>
+                    <input
+                      id={`edit-${m.id}`}
+                      value={editing.text}
+                      onChange={(e) => setEditing({ id: m.id, text: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") setEditing(null);
+                      }}
+                      maxLength={4000}
+                      autoFocus
+                      className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    />
+                    <button
+                      type="submit"
+                      disabled={savingEdit || editing.text.trim() === ""}
+                      className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                    >
+                      {savingEdit ? "저장 중" : "저장"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(null)}
+                      className="rounded border border-border px-2 py-1 text-xs"
+                    >
+                      취소
+                    </button>
+                  </form>
+                ) : (
                 <span
                   onContextMenu={(e) => {
                     if (m.deletedAt) return;
@@ -699,6 +763,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                   {/* 평문 렌더 — HTML로 그리지 않는다(에이전트 응답이 섞인다). */}
                   {messageBody(m)}
                 </span>
+                )}
+                {/* 수정 흔적. 없으면 읽은 사람이 본 것과 다른 말이 소리 없이 남는다(I-011). */}
+                {m.editedAt && !m.deletedAt && editing?.id !== m.id && (
+                  <span className="ml-1 text-[10px] text-muted-foreground">수정됨</span>
+                )}
 
                 {/* 달린 반응 — 다시 누르면 해제된다는 걸 테두리로 보여 준다. */}
                 {(() => {
@@ -801,6 +870,20 @@ export function MessageRoom({ roomId, initialMessages, myUserId }: Props) {
                     >
                       답장
                     </button>
+                    {/* 수정은 내 글 메시지만(판정은 core) — 눌러도 실패할 버튼은 애초에 안 보여 준다. */}
+                    {canEditMessage(m, myUserId) && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setEditing({ id: m.id, text: m.body });
+                          setMenuFor(null);
+                        }}
+                        className="px-3 py-1.5 text-xs hover:bg-accent"
+                      >
+                        수정
+                      </button>
+                    )}
                     {/* 워크스페이스로 변환(Phase 52 T1). 생성은 되돌릴 수 있어 바로 실행한다. */}
                     <button
                       type="button"

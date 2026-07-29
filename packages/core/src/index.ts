@@ -574,6 +574,7 @@ export {
   galleryPaths,
   galleryNav,
   attachmentDeleted,
+  canEditMessage,
   todoTitleFrom,
   conversionReceiptText,
   TODO_TITLE_MAX,

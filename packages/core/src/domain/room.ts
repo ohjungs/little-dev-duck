@@ -57,6 +57,9 @@ export const messageSchema = z
     // 답장 대상 메시지 id. 원본이 하드 삭제되면 null이 된다 —
     // **답장이 함께 사라지면 안 되기 때문**이다(평소 삭제는 소프트 삭제라 원본 행은 남는다).
     replyToId: z.string().uuid().nullable(),
+    // 마지막 수정 시각. null = 수정된 적 없음. 화면은 이 값으로 "수정됨"을 표시한다 —
+    // 흔적 없이 본문이 바뀌면 읽은 사람이 본 것과 다른 말이 소리 없이 남는다.
+    editedAt: z.string().datetime({ offset: true }).nullable(),
     deletedAt: z.string().datetime({ offset: true }).nullable(),
     createdAt: z.string().datetime({ offset: true }),
   })
@@ -212,6 +215,25 @@ export function galleryNav(
     index,
     total: paths.length,
   };
+}
+
+// 2026-07-29 : 메신저 - 메시지 수정 (Phase 51 T4 잔여 I-010)
+/**
+ * 이 메시지를 수정할 수 있는가. 내가 보낸 **글(text)** 메시지만 —
+ * 지운 것은 안 된다(지웠는데 고칠 수 있으면 삭제가 삭제가 아니다),
+ * system 영수증도 안 된다(기록을 고치면 기록이 아니다). RLS도 같은 방향으로 막지만,
+ * 화면에서 판정해야 눌러도 실패할 버튼을 애초에 보여 주지 않는다.
+ */
+export function canEditMessage(
+  m: Pick<Message, "senderUserId" | "type" | "deletedAt">,
+  myUserId: string | null,
+): boolean {
+  return (
+    myUserId !== null &&
+    m.senderUserId === myUserId &&
+    m.type === "text" &&
+    m.deletedAt === null
+  );
 }
 
 // 2026-07-29 : 메신저 - 메시지를 워크스페이스로 (Phase 52 T1)
