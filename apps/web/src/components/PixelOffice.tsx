@@ -5,6 +5,7 @@
 // NPC는 DEPT_REGISTRY에서 자동 생성 (총 35명)
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { prefersReducedMotionNow } from "@ldd/mascot";
 import {
   isAdjacent,
   movePlayer,
@@ -602,7 +603,8 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
     let raf = 0;
     let lastDraw = 0;
     let frame = 0;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // 모션 축소 판정은 mascot 한 벌(X-006) — 리터럴이 흩어지면 한 곳만 고쳐진다.
+    const reduce = prefersReducedMotionNow();
     const canvas = canvasRef.current;
     if (!canvas) return;
 

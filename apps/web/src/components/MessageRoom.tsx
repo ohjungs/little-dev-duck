@@ -83,6 +83,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getMsgNotifyMode, getNotifyKeywords } from "@/lib/msgNotifyPref";
 import { getDataSaver } from "@/lib/dataSaverPref";
+import { prefersReducedMotionNow } from "@ldd/mascot";
 import { notifyBlockReason } from "@/lib/notify";
 import { describeMessageNotifyStatus } from "@/lib/notifyStatus";
 import { subscribeRoomMessages } from "@/lib/realtime";
@@ -622,7 +623,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
     if (tail === tailIdRef.current) return;
     tailIdRef.current = tail;
     if (atBottomRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      bottomRef.current?.scrollIntoView({
+      // 모션 축소 사용자는 스르륵 대신 즉시 이동(X-006).
+      behavior: prefersReducedMotionNow() ? "auto" : "smooth",
+      block: "end",
+    });
       return;
     }
     setShowJump(true);
@@ -677,7 +682,11 @@ export function MessageRoom({ roomId, initialMessages, myUserId, focusId = null 
   function jumpToBottom() {
     atBottomRef.current = true;
     setShowJump(false);
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    bottomRef.current?.scrollIntoView({
+      // 모션 축소 사용자는 스르륵 대신 즉시 이동(X-006).
+      behavior: prefersReducedMotionNow() ? "auto" : "smooth",
+      block: "end",
+    });
   }
 
   // 보는 중에 그 사진이 지워지면(실시간 삭제) 뷰어를 닫는다 — 지운 사진이 계속 떠 있으면

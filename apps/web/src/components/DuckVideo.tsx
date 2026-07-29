@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { usePrefersReducedMotion } from "@ldd/mascot";
+import { usePrefersReducedMotion, prefersReducedMotionNow } from "@ldd/mascot";
 import {
   getDuckVideoSpec,
   objectPositionCss,
@@ -37,7 +37,7 @@ export function DuckVideo({ surface, className, fallback }: DuckVideoProps) {
     // 훅의 첫 렌더 값은 아직 false다(서버 렌더와 맞추기 위해). 그 값을 믿고 여기서 play()를
     // 부르면 움직임 줄이기 사용자도 576KB를 내려받게 된다 - 효과 안에서는 설정을 직접 읽는다.
     // 훅은 사용자가 설정을 바꿨을 때 이 효과를 다시 돌리는 역할만 한다.
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (prefersReducedMotionNow()) {
       video.pause();
       return;
     }

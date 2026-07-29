@@ -1,6 +1,6 @@
 # Phase 57 — 메신저 Group 3e: 접근성·국제화·플랫폼 표면 (36항목)
 
-> 상태: **draft(예약·미착수)** — [Phase 50](phase_50.md)~[52](phase_52.md) 선행
+> 상태: **진행 중** (2026-07-29 착수 — stale 가드 통과: Tauri 옵션 A 구조 유지·a11y 기반 유지. 첫 조각 T1 X-006 완료)
 >
 > 항목 목록: [배정표의 Phase 57 절](../catalog/messenger-assignment.md) (W 24 · X 12)
 >

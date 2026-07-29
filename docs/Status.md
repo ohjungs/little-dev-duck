@@ -1,5 +1,20 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 57](plans/phase_57.md) **착수** — T1: 모션 축소 판정 한 벌 (X-006)
+> phase_56의 무-마이그레이션 조각 소진 → phase_57 draft를 stale 가드(Tauri 옵션 A 유지 ·
+> a11y 기반 유지) 통과 후 꺼냈다. 계획이 core 승격 대상으로 못박은 X-006부터:
+> "모션 축소 판정을 세 곳에서 따로 — 금지. 한 벌로."
+>
+> - 실태: 판정이 **세 벌**이었다 — mascot 훅(정본) · DuckVideo 효과 안 원시 matchMedia ·
+>   PixelOffice 게임 루프 원시 matchMedia. 리터럴이 흩어지면 한 곳만 고쳐진다.
+> - mascot에 `prefersReducedMotionNow()`(비-훅, 효과·루프용 즉시 읽기) 추가 — 훅의 첫 렌더
+>   false 함정(DuckVideo가 겪은 그것)을 주석으로 못박고, 두 원시 사용처를 교체.
+> - **메신저에도 적용**: "맨 아래로" smooth 스크롤 2곳이 모션 축소 시 즉시 이동.
+> - **정적 잠금**: "matchMedia + prefers-reduced-motion 같은 줄" 금지 스캔(CSS @media는
+>   정당하므로 파일 단위가 아니라 줄 단위 판정 — 검사 파일 자신은 제외).
+> - 검증: turbo lint·test·build **18/18 GREEN**.
+> - 실기 확인: [manual-verification.md 84번](loop-eng/manual-verification.md).
+
 > ## ✅ 2026-07-29 `/loop-eng` — [Phase 56](plans/phase_56.md) T2: 진단 로그 내보내기 (T-027)
 > "왜 안 되지"를 물을 때 첨부할 꾸러미(.json) — 활동 로그(200건, 요약은 core가 이미
 > 200자 캡)·알림 기록·설정 키 **이름**·userAgent.
