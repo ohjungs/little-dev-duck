@@ -465,8 +465,15 @@
 - [ ] quality: knip을 lint/CI 파이프라인에 배선 — apps/web/src/lib/clientErrorLog.ts
 - [ ] stack: 미사용 framer-motion 의존성 제거 — apps/web/package.json
 - [ ] stack: Dependabot 또는 Renovate 도입 — .github/workflows/ci.yml
-- [ ] ux: AI 응답 대기 중 진행 단계 안내 문구 추가 — apps/web/src/components/DuckChatPanel.tsx
-- [ ] test: safeHref() 함수 자체 입출력 단위 테스트 추가 — apps/web/src/lib/safeHref.ts
+- [기각] ux: AI 응답 대기 중 진행 단계 안내 문구 추가 — 2026-07-30. **만들지 않기로 이미 결정된
+  항목이 백로그에 남아 계속 재선택됐다.** 근거(커밋 532718d): agent 라우트가 스트리밍이 아니라
+  서버가 실제 단계를 알려주지 않는다 — 모르는 단계를 지어내 표시하는 것은 거짓 정보다.
+  스트리밍을 도입하면 그때 다시 후보가 된다.
+- [x] test: safeHref() 함수 자체 입출력 단위 테스트 추가 — 2026-07-30 완료.
+  `lib/__tests__/safeHref.test.ts` 31건. 옆의 `safeHrefLock.test.ts`는 구조(정의 단일화·import)만
+  봐서 "이 함수가 실제로 막는가"는 검사되지 않고 있었다 — 한 줄 정규식이라 `startsWith("http")`로
+  '단순화'해도 잠금 테스트는 그대로 통과한다. 실제로 그렇게 약화시켜 새 테스트가 잡는 것을 확인했다
+  (대소문자 스킴 + `httpx://` 통과 2건 실패). 함수 자체의 결함은 없었다.
 - [ ] test: Tauri Rust 테스트를 CI 파이프라인에 연결 — .github/workflows/ci.yml
 - [ ] test: CI에 커버리지 실행 및 threshold 게이트 추가 — vitest.coverage.config.ts
 - [ ] test: useModalA11y 포커스 트랩/복원 동작 단위 테스트 추가 — apps/web/src/hooks/useModalA11y.ts
