@@ -1,0 +1,109 @@
+{"id":1,"title":"OAuth 어댑터 기기 실기검증","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L28"}
+{"id":2,"title":"Sentry 계정 (Phase 13 T5 — PII 스크러빙)","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L37"}
+{"id":3,"title":"i18n 착수 승인 (Phase 13 T6)","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L43"}
+{"id":4,"title":"Tauri sidecar / hooks · React Native 기기 (Phase 16/17 이월분)","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L49"}
+{"id":5,"title":"픽셀 오피스 시각 폴리시 육안 검증","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L55"}
+{"id":8,"title":"공개 페이지 실기 검증 — Supabase 자격증명 필요 (Phase 18 T1)","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L108"}
+{"id":9,"title":"OG 카드에 한글 제목 넣기 — 한글 폰트 자산 도입 결정 필요 (Phase 18 T1 축소분)","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L120"}
+{"id":10,"title":"시작 템플릿 갤러리 실기 검증 (Phase 18 T2) — 로그인 필요","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L136"}
+{"id":11,"title":"오리 주간 다이제스트 실기 검증 (Phase 18 T4) — 로그인 + 시간 경과 필요","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L151"}
+{"id":12,"title":"오리 대화 습관 체크 · 뉴스 추천 피드 실기 검증 (Phase 19) — 로그인 필요","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L169"}
+{"id":14,"title":"반복 할 일 (Phase 20) — 마이그레이션 적용 + 로그인 필요","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L200"}
+{"id":15,"title":"삭제 되돌리기·습관 삭제 확인 (Phase 21) — 로그인 필요","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L219"}
+{"id":16,"title":"오리에게 마감일·반복 말하기 (Phase 23) — 로그인 + 마이그레이션 필요","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L234"}
+{"id":17,"title":"보안 수정 마이그레이션 적용 — 사용자 확인 필요 (Phase 24) · 우선순위 높음","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L251"}
+{"id":18,"title":"할 일 마감일 설정 (Phase 26) — 로그인 필요","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L274"}
+{"id":19,"title":"캘린더 시각 입력 (Phase 27) — 로그인 필요","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L288"}
+{"id":20,"title":"오리 코스튬 — 그림이 필요해 사용자 결정 (설계는 확정돼 있으나 미구현)","date":"","status":"open","ref":"docs/loop-eng/manual-verification.md#L303"}
+{"id":21,"title":"데이터베이스 행 속성이 오리 답변에 반영되는지 — 로그인 필요","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L318"}
+{"id":22,"title":"기존 데이터는 재인덱싱해야 날짜가 반영된다","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L342"}
+{"id":24,"title":"캘린더 위젯이 일정 500개를 넘으면 다가올 일정을 못 보여준다","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L373"}
+{"id":25,"title":"내보낸 백업 파일을 실제로 열어봐 주세요","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L391"}
+{"id":26,"title":"백업 가져오기를 한 번 돌려봐 주세요","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L406"}
+{"id":27,"title":"e2e를 이 환경에서 돌리지 못했습니다","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L420"}
+{"id":28,"title":"좌상단 오리 로고가 움직이는지 봐주세요","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L432"}
+{"id":29,"title":"설정 화면이 묶음으로 정리됐는지 봐주세요","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L447"}
+{"id":30,"title":"오리가 먼저 말을 거는지 봐주세요","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L461"}
+{"id":31,"title":"오리에게 고치고 지워달라고 해보세요","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L479"}
+{"id":32,"title":"뽀모도로 이어받기 — 새로고침해도 살아있는지","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L497"}
+{"id":33,"title":"오리에게 집중 타이머를 시켜보세요","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L508"}
+{"id":34,"title":"예약이 때가 되면 알려주는지","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L521"}
+{"id":35,"title":"템플릿 파일 주고받기","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L536"}
+{"id":36,"title":"페이지 인쇄 미리보기를 봐주세요","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L551"}
+{"id":37,"title":"브라우저 설정이 백업에 담기는지","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L565"}
+{"id":38,"title":"표에 합계가 보이는지","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L588"}
+{"id":39,"title":"발표 모드가 실제로 넘어가는지","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L612"}
+{"id":40,"title":"계정 삭제 — 켠 뒤에 확인","date":"2026-07-26","status":"open","ref":"docs/loop-eng/manual-verification.md#L638"}
+{"id":41,"title":"비밀번호 재설정 — 메일이 실제로 오는지","date":"2026-07-27","status":"open","ref":"docs/loop-eng/manual-verification.md#L664"}
+{"id":42,"title":"로그인 뒤 화면 3곳 — 눈으로 봐주세요","date":"2026-07-27","status":"open","ref":"docs/loop-eng/manual-verification.md#L695"}
+{"id":22,"title":"오피스 말풍선이 실제로 잘 읽히는지 — 로그인 + 육안 필요","date":"2026-07-27","status":"open","ref":"docs/loop-eng/manual-verification.md#L860"}
+{"id":23,"title":"직원 상세 패널의 원천 배지 — 로그인 + 육안 필요","date":"2026-07-27","status":"open","ref":"docs/loop-eng/manual-verification.md#L872"}
+{"id":24,"title":"오피스 확대 배율 — 로그인 + 육안 필요","date":"2026-07-27","status":"open","ref":"docs/loop-eng/manual-verification.md#L886"}
+{"id":25,"title":"메신저 화면 — **마이그레이션 적용이 선행 조건**","date":"2026-07-27","status":"open","ref":"docs/loop-eng/manual-verification.md#L901"}
+{"id":26,"title":"알림 하루 상한 10건을 메신저와 나눠 쓸지 — **사용자 결정**","date":"2026-07-27","status":"open","ref":"docs/loop-eng/manual-verification.md#L914"}
+{"id":27,"title":"방별 알림 끄기(음소거)가 아직 없다","date":"2026-07-27","status":"open","ref":"docs/loop-eng/manual-verification.md#L926"}
+{"id":50,"title":"대화 화면 구분선·스크롤 보호의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L937"}
+{"id":51,"title":"전체화면 이미지 뷰어의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L952"}
+{"id":52,"title":"방별 사진 모아보기의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L963"}
+{"id":53,"title":"메시지 → 할 일·메모 변환의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L973"}
+{"id":54,"title":"슬래시 커맨드의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L984"}
+{"id":55,"title":"메시지 수정의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L996"}
+{"id":56,"title":"메시지 입력 임시저장의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1007"}
+{"id":57,"title":"검색 하이라이트·원문 점프의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1018"}
+{"id":58,"title":"메시지 전달의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1028"}
+{"id":59,"title":"메시지 URL 링크화의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1039"}
+{"id":60,"title":"IME 전송 방지·붙여넣기·드래그 첨부의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1048"}
+{"id":61,"title":"이모지 피커의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1060"}
+{"id":62,"title":"코드 블록 렌더·복사의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1070"}
+{"id":63,"title":"여러 줄 입력·전송 키 설정의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1083"}
+{"id":64,"title":"EXIF 제거·대화 내보내기의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1094"}
+{"id":65,"title":"링크 모아보기의 육안 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1105"}
+{"id":66,"title":"백업 v5 메신저 보관의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1114"}
+{"id":67,"title":"대화 내보내기 md·json의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1127"}
+{"id":68,"title":"검색 필터의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1136"}
+{"id":69,"title":"최근 검색어의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1147"}
+{"id":70,"title":"날짜로 이동의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1157"}
+{"id":71,"title":"첨부 이미지 지연 로딩의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1168"}
+{"id":72,"title":"방 이름 필터의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1178"}
+{"id":73,"title":"검색 결과 내보내기의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1188"}
+{"id":74,"title":"메신저 저장 공간 계기판의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1197"}
+{"id":75,"title":"메시지 알림 방식·키워드 알림의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1207"}
+{"id":76,"title":"테스트 알림 보내기의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1218"}
+{"id":77,"title":"알림 히스토리의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1228"}
+{"id":78,"title":"요일별 방해금지의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1238"}
+{"id":79,"title":"방 알림 상태 한 줄의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1249"}
+{"id":80,"title":"데이터 절약 모드의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1258"}
+{"id":81,"title":"버전 정보의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1269"}
+{"id":82,"title":"기기 설정 초기화의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1277"}
+{"id":83,"title":"진단 로그 내보내기의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1287"}
+{"id":84,"title":"모션 축소 한 벌 적용의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1297"}
+{"id":85,"title":"KST 계산 승격의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1306"}
+{"id":86,"title":"오프라인 전송 차단 안내의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1316"}
+{"id":87,"title":"메신저 단축키 도움말의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1326"}
+{"id":88,"title":"말풍선 렌더 메모이제이션의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1334"}
+{"id":89,"title":"DB 백업·복구 리허설 — 사용자 실행 필수","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1344"}
+{"id":90,"title":"고아 첨부 검사·정리의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1354"}
+{"id":91,"title":"클라이언트 에러 기록의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1365"}
+{"id":92,"title":"민감 정보 경고의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1375"}
+{"id":93,"title":"대화 XP의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1384"}
+{"id":94,"title":"뽀모도로→오리 방 기록의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1393"}
+{"id":95,"title":"습관 체크→오리 방 기록의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1402"}
+{"id":96,"title":"메시지 속 노트 링크의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1410"}
+{"id":97,"title":"메시지 → 노트 변환의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1420"}
+{"id":98,"title":"메신저 실사용화·피드백 4건의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1431"}
+{"id":99,"title":"오늘의 브리핑 카드의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1460"}
+{"id":100,"title":"브리핑 날짜·카테고리 필터의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1478"}
+{"id":101,"title":"브리핑 한 장씩 보기·글자 크기의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1487"}
+{"id":102,"title":"대시보드 브리핑 10 위젯의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1496"}
+{"id":103,"title":"뉴스 방문 시 자동 수집의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1512"}
+{"id":104,"title":"할 일 마감일순 보기·아이콘 발견성의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1521"}
+{"id":105,"title":"지원 현황 템플릿의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1530"}
+{"id":106,"title":"오리가 지원 현황을 아는지 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1546"}
+{"id":107,"title":"오리 방 첫 인사의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1554"}
+{"id":108,"title":"오리 멀티턴 맥락의 실기 확인","date":"2026-07-29","status":"open","ref":"docs/loop-eng/manual-verification.md#L1562"}
+{"id":109,"title":"e2e 인증 세션이 다시 만료됨 — 세션 파일 재생성 필요","date":"2026-07-30","status":"open","ref":"docs/loop-eng/manual-verification.md#L1580"}
+{"id":110,"title":"보안 마이그레이션 2건 적용 승인 필요 — RLS 권한상승·멤버십 위조 차단","date":"2026-07-30","status":"open","ref":"docs/loop-eng/manual-verification.md#L1621"}
+{"id":111,"title":"오리 응답 대기 알림의 스크린리더 실기 확인","date":"2026-07-30","status":"open","ref":"docs/loop-eng/manual-verification.md#L1647"}
+{"id":112,"title":"오리 캘린더 일정 수정의 실기 확인","date":"2026-07-30","status":"open","ref":"docs/loop-eng/manual-verification.md#L1660"}
+{"id":113,"title":"오리 GitHub 이슈 닫기의 실기 확인","date":"2026-07-30","status":"open","ref":"docs/loop-eng/manual-verification.md#L1679"}
+{"id":114,"title":"기능 토글 서버 강제 — 남은 라우트 매핑 판단 필요","date":"2026-07-30","status":"open","ref":"docs/loop-eng/manual-verification.md#L1698"}
