@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getGoogleTokens, saveGoogleTokens, saveGithubTokens, getGmailTokens, saveGmailTokens } from "@ldd/api";
 import { createClient } from "@/lib/supabase/server";
+import { OAUTH_SCOPES } from "@/lib/oauthScopes";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -47,7 +48,9 @@ export async function GET(request: Request) {
             userId: session.user.id,
             accessToken: providerToken,
             refreshToken,
-            scope: "https://www.googleapis.com/auth/calendar.events",
+            // 요청 쪽(LoginForm·GoogleCalendarLink)과 같은 출처를 써야 한다 — 갈라지면
+            // 저장된 scope가 실제 승인 권한과 다른 거짓 기록이 된다.
+            scope: OAUTH_SCOPES.calendar,
             // Supabase가 만료 시각을 주지 않아 access_token 표준 수명(1시간)으로 보수적 추정.
             expiresAt: new Date(Date.now() + 3600_000).toISOString(),
           });
@@ -72,7 +75,7 @@ export async function GET(request: Request) {
               typeof session.provider_refresh_token === "string"
                 ? session.provider_refresh_token
                 : null,
-            scope: "repo",
+            scope: OAUTH_SCOPES.githubIssues,
             expiresAt: null,
           });
         } catch (tokenError) {
@@ -98,7 +101,7 @@ export async function GET(request: Request) {
             userId: session.user.id,
             accessToken: providerToken,
             refreshToken,
-            scope: "https://www.googleapis.com/auth/gmail.modify",
+            scope: OAUTH_SCOPES.gmail,
             expiresAt: new Date(Date.now() + 3600_000).toISOString(),
           });
         } catch (tokenError) {

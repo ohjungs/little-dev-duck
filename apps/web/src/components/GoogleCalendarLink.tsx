@@ -2,6 +2,7 @@
 
 import { CalendarClock, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { OAUTH_SCOPES } from "@/lib/oauthScopes";
 import { Button } from "@/components/ui/button";
 
 // GitHub 등 Google이 아닌 계정으로 로그인한 사용자도 Google Calendar만 별도로 연동할 수 있게 한다.
@@ -14,7 +15,7 @@ export function GoogleCalendarLink({ linked }: { linked: boolean }) {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=/settings&link=google`,
-        scopes: "https://www.googleapis.com/auth/calendar.events",
+        scopes: OAUTH_SCOPES.calendar,
         queryParams: { access_type: "offline", prompt: "consent" },
       },
     });

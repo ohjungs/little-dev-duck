@@ -2,6 +2,7 @@
 
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { OAUTH_SCOPES } from "@/lib/oauthScopes";
 import { Button } from "@/components/ui/button";
 import { GitHubMark } from "@/components/ui/github-mark";
 
@@ -25,7 +26,7 @@ export function GitHubIssuesLink({
     const supabase = createClient();
     const options = {
       redirectTo: `${window.location.origin}/auth/callback?next=/settings&link=github`,
-      scopes: "repo",
+      scopes: OAUTH_SCOPES.githubIssues,
     };
     if (isPrimaryGithub) {
       await supabase.auth.signInWithOAuth({ provider: "github", options });

@@ -5,6 +5,7 @@ import { allowRequest } from "@ldd/api";
 import { authErrorMessage } from "@ldd/core";
 import { DuckVideo } from "@/components/DuckVideo";
 import { createClient } from "@/lib/supabase/client";
+import { OAUTH_SCOPES } from "@/lib/oauthScopes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GitHubMark } from "@/components/ui/github-mark";
@@ -168,7 +169,7 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
         // 없으면 access_token만 오고 만료 후 재로그인 필요). GitHub는 Calendar와 무관해 옵션 없음.
         ...(provider === "google"
           ? {
-              scopes: "https://www.googleapis.com/auth/calendar.events",
+              scopes: OAUTH_SCOPES.calendar,
               queryParams: { access_type: "offline", prompt: "consent" },
             }
           : {}),

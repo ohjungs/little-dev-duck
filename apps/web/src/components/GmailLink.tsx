@@ -2,6 +2,7 @@
 
 import { Check, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { OAUTH_SCOPES } from "@/lib/oauthScopes";
 import { Button } from "@/components/ui/button";
 
 // Calendar와 같은 Google 프로바이더를 쓰지만 별개 scope(gmail.modify)라 별도 동의를 받는다
@@ -14,7 +15,7 @@ export function GmailLink({ linked }: { linked: boolean }) {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=/settings&link=gmail`,
-        scopes: "https://www.googleapis.com/auth/gmail.modify",
+        scopes: OAUTH_SCOPES.gmail,
         queryParams: { access_type: "offline", prompt: "consent" },
       },
     });

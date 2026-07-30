@@ -1,5 +1,31 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-30 `/loop-eng` — OAuth scope 단일 출처 + 감사 지적 1건 기각(근거 기록)
+> 감사가 "Gmail OAuth scope 과다 권한"으로 지적한 항목을 코드로 검증한 결과 **지적이 사실이
+> 아니었다**. 대신 조사 중 **더 실질적인 결함**을 찾아 그것을 고쳤다.
+>
+> - **기각 근거(중요)**: Gmail 어댑터는 `listRecentEmails`(읽기)와 `trashEmail`(휴지통 이동)
+>   두 가지만 한다. `messages.trash`는 `gmail.readonly`로 불가하고 **`gmail.modify`가 Google이
+>   제공하는 최소 권한**이다(더 넓은 `https://mail.google.com/`은 영구삭제 포함으로 CLAUDE.md
+>   5절이 금지). 즉 현재 값이 이미 최소값이다. 근거를 `lib/oauthScopes.ts` 주석에 못박아
+>   다음에 같은 지적이 반복되지 않게 했다. (FEATURES.md의 "send/read 분리" MUST는 send 기능이
+>   구현돼 있지 않아 아직 해당 없음.)
+> - **실제로 찾은 결함**: scope 문자열이 **6곳에 복사**돼 있었고, 그중 하나는 요청이 아니라
+>   **기록**이었다 — `auth/callback/route.ts`는 실제 승인 내역을 확인하지 않고 자기가 아는
+>   문자열을 토큰 테이블 `scope` 컬럼에 저장한다. 요청 쪽만 좁히면 **저장된 값이 실제 권한과
+>   다른 거짓 기록**이 되고, "이 토큰으로 무엇을 할 수 있나"를 그 값으로 판단하면 틀린 결론에
+>   이른다(safeHref L-21과 같은 복사-드리프트).
+> - `lib/oauthScopes.ts` 한 벌로 모으고 6곳 연결(값은 한 글자도 안 바꿈 — 순수 리팩터링).
+>   `oauthScopesSingleSource.test.ts`가 ① 다른 파일에 scope 리터럴 재등장 금지(src 전체 순회)
+>   ② 6곳이 공용 상수를 실제로 쓰는지 ③ 상수 값이 필요 최소 권한인지를 잠근다. **리터럴을
+>   되돌려 검사가 위반을 실제로 잡는지 확인**(파일명까지 정확히 지목).
+> - 검증: turbo lint+test **17/17 GREEN**(web 560). `next build` 성공 + `/login` 실측
+>   (버튼 6종 정상, JS 에러 0). 스크린샷:
+>   [oauth-scopes-single-source](loop-eng/screenshots/2026-07-30/oauth-scopes-single-source/index.md).
+>   콘솔 404 1건은 기존 Vercel Analytics 미활성화(PENDING 5번)로 무관함을 재확인.
+> - **절차 개선 적용**: 직전 사이클의 "낡은 서버가 낡은 빌드 서빙" 재발 방지 — 포트 점유 사전
+>   확인 + 서버 로그·BUILD_ID 시각으로 "내 서버 + 신선한 빌드" 확증 후 스크린샷.
+
 > ## ✅ 2026-07-30 `/loop-eng` — 오리 응답 대기를 보조기술에 알림 (접근성)
 > 감사가 지적한 "AI 응답 로딩 UX" 항목을 코드로 확인 — **대시보드 오리 패널의 대기 표시가
 > 점 3개 애니메이션뿐**이고 텍스트도 라이브 리전도 없었다. 스크린리더 사용자는 질문을 보낸 뒤
