@@ -16,6 +16,9 @@ const getGmailTokens = vi.fn();
 
 vi.mock("@ldd/api", () => ({
   allowRequest: () => true,
+  // 2026-07-30: 라우트가 기능 토글을 서버에서 확인하게 되어 이 mock이 필요해졌다.
+  // 기본은 "아무 기능도 꺼지지 않은 사용자" — 게이트 자체의 검사는 apiFeatureGate.test.ts에 있다.
+  getMyAccess: async () => ({ role: "user", disabledFeatures: [] }),
   composeAdapters: (a: unknown[]) => ({ catalog: [], execute: vi.fn(), _count: a.length }),
   createAppActionsAdapter: () => ({ kind: "app" }),
   createGoogleCalendarAdapter: () => ({ kind: "google" }),

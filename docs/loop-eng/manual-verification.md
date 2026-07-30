@@ -1671,3 +1671,21 @@ const a = 1;
   정수 강제 — 0·음수·소수·문자열 거부, owner/repo 경로 구분자 차단, 표시용 title이 요청 본문에
   실리지 않는지, 401 구분). 전 패키지 검증 GREEN(api 525 / web 565).
   **다시 열기(reopen)는 넣지 않았다** — GitHub 화면에서 바로 되므로 수요 확인 후 추가(YAGNI).
+
+## 114. 기능 토글 서버 강제 — 남은 라우트 매핑 판단 필요 (2026-07-30, `/loop-eng`)
+
+- **무엇을**: `duck-chat` 외 나머지 AI·기능 라우트가 어느 기능 key에 속하는지 정해야 한다.
+  이번 사이클에 `/api/ai/agent`와 `/api/ai/agent/approve`만 `duck-chat`으로 막았다.
+- **왜 사용자 판단 필요**: 매핑이 제품 의도에 달렸다 — 코드로는 정할 수 없다. 예를 들어
+  `/api/ai/write`(페이지 안 AI 글쓰기 도우미)는 `pages`인가 `duck-chat`인가? `/api/ai/standup`
+  (오리 스탠드업 페이지 생성)은 `duck-chat`인가 `insights`인가? 잘못 매핑하면 **기능을 끄지도
+  않았는데 막히거나, 껐는데 열려 있다.** 임의로 정하지 않았다.
+- **현재 상태(정확히)**: `canUseFeature`를 서버에서 쓰는 라우트는 이제 위 2개다. 나머지
+  (`/api/ai/write`·`/api/ai/standup`·`/api/ai/duck-line`·`/api/news/collect`·
+  `/api/github/contributions` 등)는 **여전히 인증만 확인하고 기능 토글은 보지 않는다.**
+- **지금 위험도**: 낮음. 오리 도구는 RLS 범위 안에서 **본인 데이터·본인 토큰**으로만 동작하므로
+  "남의 데이터 접근"은 아니다. 또 지금은 사용자가 1명(본인=관리자)이라 실제로 노출되는 상황이
+  아니다. 다만 `customer` 역할이 이미 정의돼 있고("공개된 것만 본다") 그 계정을 만들면
+  **관리자가 끈 기능을 API로 쓸 수 있다** — 그때 문제가 된다.
+- **결정해 주시면 할 일**: 라우트→기능 매핑을 알려주시면 `apiFeatureGate.test.ts`의
+  `GATED_ROUTES`에 추가하고 각 라우트에 `blockIfFeatureDisabled` 한 줄을 넣는다(패턴 확립됨).

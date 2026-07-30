@@ -59,8 +59,14 @@ async function requireUserId(supabase: SupabaseClient): Promise<string> {
 // 로그인 사용자의 프로필 + 권한. 행이 없으면(트리거 실패 등) null이 아니라 안전한 기본값을 준다 —
 // 여기서 null을 돌려주면 호출부마다 "없으면 어떻게 할지"를 다시 정해야 하고, 한 곳만 빠뜨려도
 // 화면이 죽는다. 기본값은 가장 낮은 권한 + 모든 기능 켜짐(기존 동작과 동일)이다.
-export async function getMyAccess(supabase: SupabaseClient): Promise<AccessProfile> {
-  const userId = await requireUserId(supabase);
+// 2026-07-30 : userId를 이미 아는 호출부(API 라우트는 인증 단계에서 user를 이미 받았다)가
+// auth.getUser()를 한 번 더 타지 않게 선택 인자를 받는다. 안 넘기면 종전과 똑같이 동작한다
+// (하위호환) — 화면 쪽 호출부는 그대로다.
+export async function getMyAccess(
+  supabase: SupabaseClient,
+  knownUserId?: string,
+): Promise<AccessProfile> {
+  const userId = knownUserId ?? (await requireUserId(supabase));
   const { data, error } = await supabase
     .from("profiles")
     .select("*")

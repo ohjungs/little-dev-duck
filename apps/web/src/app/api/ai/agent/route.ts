@@ -15,6 +15,7 @@ import {
 import { historyTurnSchema, isLddError, userMessage, type HistoryTurn } from "@ldd/core";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { blockIfFeatureDisabled } from "@/lib/featureGate";
 import { requireGeminiKey } from "@/lib/apiHelpers";
 
 export const dynamic = "force-dynamic";
@@ -51,12 +52,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
+  // 2026-07-30: 기능 토글을 서버에서 확인한다. 전에는 화면만 숨겨서, 관리자가 오리 대화를 꺼도
+  // 이 라우트에 직접 POST하면 그대로 동작했다(canUseFeature 주석이 약속한 "화면·API 같은 함수"가
+  // 실제로는 화면에만 적용돼 있었다). 레이트리밋보다 뒤에 둔다 — 차단 대상도 쿼터를 소모하지
+  // 않게 먼저 걸러야 한다.
   if (!allowRequest(`ai-agent:${user.id}`, 20, 60_000)) {
     return NextResponse.json(
       { error: "요청이 많습니다. 잠시 후 다시 시도해주세요." },
       { status: 429 },
     );
   }
+
+  const blocked = await blockIfFeatureDisabled(supabase, user.id, "duck-chat");
+  if (blocked) return blocked;
 
   const keyOrError = requireGeminiKey();
   if (keyOrError instanceof NextResponse) return keyOrError;

@@ -16,6 +16,7 @@ import {
 } from "@ldd/api";
 import { summarizeForLog, toolCallSchema } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
+import { blockIfFeatureDisabled } from "@/lib/featureGate";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,10 @@ export async function POST(request: Request) {
       { status: 429 },
     );
   }
+
+  // 2026-07-30: 대화만 막고 실행은 열어 두면 게이트가 반쪽이다 — 승인 실행도 같은 기능으로 막는다.
+  const blocked = await blockIfFeatureDisabled(supabase, user.id, "duck-chat");
+  if (blocked) return blocked;
 
   let body: unknown;
   try {

@@ -61,6 +61,31 @@ function row(over: Row = {}): Row {
 }
 
 describe("getMyAccess", () => {
+  // 2026-07-30 : API 라우트가 인증 단계에서 이미 user를 받았으므로 auth.getUser()를 한 번 더
+  // 타지 않게 선택 인자를 받는다(무료 티어에서 왕복 하나가 아깝다). 하위호환이 핵심이다.
+  it("userId를 넘기면 auth.getUser()를 부르지 않는다", async () => {
+    let authCalls = 0;
+    const { supabase } = fake({ rows: [row({ role: "admin" })] });
+    const spied = {
+      ...supabase,
+      auth: {
+        getUser: async () => {
+          authCalls += 1;
+          return { data: { user: { id: ME } } };
+        },
+      },
+    } as unknown as typeof supabase;
+
+    const a = await getMyAccess(spied, ME);
+    expect(authCalls).toBe(0);
+    expect(a.role).toBe("admin");
+  });
+
+  it("userId를 안 넘기면 종전처럼 세션에서 찾는다 (하위호환)", async () => {
+    const { supabase } = fake({ rows: [row({ role: "admin" })] });
+    expect((await getMyAccess(supabase)).role).toBe("admin");
+  });
+
   it("행이 있으면 그대로 해석한다", async () => {
     const { supabase } = fake({
       rows: [row({ role: "admin", disabled_features: ["news"] })],

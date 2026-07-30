@@ -22,6 +22,10 @@ vi.mock("@ldd/api", async () => {
   return {
     ...actual,
     allowRequest: () => true,
+    // 2026-07-30: 라우트가 기능 토글을 서버에서 확인하게 됐다. `...actual`의 진짜 getMyAccess는
+    // profiles를 조회하는데 이 파일의 supabase mock에는 `.from`이 없다 — 명시적으로 덮어
+    // "아무 기능도 꺼지지 않은 사용자"로 둔다(게이트 자체 검사는 apiFeatureGate.test.ts).
+    getMyAccess: async () => ({ role: "user", disabledFeatures: [] }),
     createAppActionsAdapter: () => ({
       catalog: [
         { name: "createTodo", description: "", parameters: { type: "object", properties: {} }, kind: "mutating" },
