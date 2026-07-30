@@ -417,8 +417,8 @@
 
 ### S1 (priority 1~9) — 최상위
 
-- [ ] security: profiles RLS 권한 상승 차단 (role/disabled_features 컬럼 보호) — supabase/migrations/20260720100000_profiles.sql → 스펙: [docs/specs/2026-07-30-profiles-rls-role-escalation.md](specs/2026-07-30-profiles-rls-role-escalation.md)
-- [ ] security: room_members/messages RLS room_id 불변조건 추가 (멤버십·메시지 위조 차단, P9+P10 병합) — supabase/migrations/20260727030000_messenger_rooms.sql → 스펙: [docs/specs/2026-07-30-room-rls-room-id-immutable.md](specs/2026-07-30-room-rls-room-id-immutable.md)
+- [x] security: profiles RLS 권한 상승 차단 (role/disabled_features 컬럼 보호) — 2026-07-30 실서버 적용·실측 검증 완료(위조 시도 차단 확인). 상세: [migration-applied-2026-07-30.md](loop-eng/migration-applied-2026-07-30.md) — supabase/migrations/20260720100000_profiles.sql → 스펙: [docs/specs/2026-07-30-profiles-rls-role-escalation.md](specs/2026-07-30-profiles-rls-role-escalation.md)
+- [x] security: room_members/messages RLS room_id 불변조건 추가 — 2026-07-30 실서버 적용·실측 검증 완료. 상세: [migration-applied-2026-07-30.md](loop-eng/migration-applied-2026-07-30.md) · 원래 항목: (멤버십·메시지 위조 차단, P9+P10 병합) — supabase/migrations/20260727030000_messenger_rooms.sql → 스펙: [docs/specs/2026-07-30-room-rls-room-id-immutable.md](specs/2026-07-30-room-rls-room-id-immutable.md)
 - [ ] ux: 라이트 테마 --muted-foreground 대비 WCAG AA 미달 수정 — apps/web/src/app/globals.css (**이미 완료 추정** — 위 참고) → 스펙: [docs/specs/2026-07-30-light-theme-contrast-wcag.md](specs/2026-07-30-light-theme-contrast-wcag.md)
 - [ ] test: 컴포넌트 렌더 테스트 인프라 도입 (jsdom+testing-library, 후속 테스트 다수의 선행조건) — apps/web/vitest.config.ts
 - [ ] test: LoginForm 로그인/가입 제출 로직 컴포넌트·E2E 테스트 추가 — apps/web/src/app/login/LoginForm.tsx
@@ -429,7 +429,7 @@
 
 ### S2 (priority 10~33)
 
-- [ ] security: messages UPDATE RLS sender_type 위장(오리 발화 사칭) 차단 — supabase/migrations/20260727030000_messenger_rooms.sql
+- [~] security: messages UPDATE RLS sender_type 불변조건 — 2026-07-30 마이그레이션·정적검사·테스트 완료, **실서버 적용은 사용자 승인 대기**(DDL). 항목명이 "오리 발화 사칭"이라 적혀 있었으나 **사칭은 불가능하다** — UPDATE의 WITH CHECK가 sender_user_id를 auth.uid()로 묶어 NULL로 못 바꾸므로 정상 모양의 agent 행을 만들 수 없다. 실제 결과는 core messageSchema refine을 위반하는 모순된 행이 남아 **그 방의 메시지 적재가 통째로 실패**하는 것(무결성·가용성). rooms.type에 direct·group이 있어 다른 멤버까지 방을 못 열게 된다. 원래 항목: — supabase/migrations/20260727030000_messenger_rooms.sql
 - [ ] ux: DbTableView/DbBoardView hover 버튼 focus-visible + 터치타겟 확대 (P16+P18 병합) — apps/web/src/components/db/DbTableView.tsx
 - [ ] ux: GithubContributionWidget grid/gridcell 접근성 속성 추가 — apps/web/src/components/GithubContributionWidget.tsx
 - [ ] quality: 전역 ErrorBoundary에 componentDidCatch 추가 (렌더 크래시 무기록 방지) — apps/web/src/components/ErrorBoundary.tsx

@@ -431,6 +431,41 @@ export function findTablesMissingRoomIdGuard(files: MigrationFile[]): string[] {
   return ["room_members", "messages"].filter((t) => !guarded.has(t)).sort();
 }
 
+// 2026-07-30 : 보안 - 메신저 - 보낸이 불변가드 검사 (Status backlog)
+// `messages_insert_member`는 보낸이 불변조건을 INSERT에서만 지키고 `messages_update_sender`는
+// sender_type을 전혀 제약하지 않았다. UPDATE로 sender_type='agent'로 바꾸면 core messageSchema의
+// refine을 위반하는 행이 남아 **그 방의 메시지 적재가 통째로 실패한다**(사칭이 아니라 무결성·
+// 가용성 문제 — WITH CHECK가 sender_user_id를 auth.uid()로 묶어 NULL로는 못 바꾸기 때문).
+// BEFORE UPDATE 트리거(20260730180000)가 막는데, 이 검사는 그 가드가 지워지거나 두 컬럼 중
+// 하나만 보게 약해지면 실패해야 한다.
+//
+// 반환값이 true면 위반(가드 없음/불완전). false면 통과.
+export function findMessageSenderGuardMissing(files: MigrationFile[]): boolean {
+  const combined = files.map((f) => f.sql).join("\n");
+
+  // 두 컬럼을 **모두** OLD와 비교해 거부하는 함수 이름들. `create|replace` 앵커는 필수 —
+  // 없으면 `execute function public.X()`(트리거 정의)가 함수 정의로 잡혀 뒤의 진짜 정의를
+  // 삼킨다(findTablesMissingRoomIdGuard·findUnrevokedDefiners와 같은 관례).
+  const guardFns = new Set<string>();
+  for (const m of combined.matchAll(
+    /(?:create|replace)\s+function\s+public\.(\w+)\s*\([\s\S]*?\$\$([\s\S]*?)\$\$/gi,
+  )) {
+    const body = m[2];
+    const guardsType = /new\.sender_type\s+is\s+distinct\s+from\s+old\.sender_type/i.test(body);
+    const guardsUser =
+      /new\.sender_user_id\s+is\s+distinct\s+from\s+old\.sender_user_id/i.test(body);
+    if (guardsType && guardsUser) guardFns.add(m[1]);
+  }
+
+  // 그 함수가 **messages**의 BEFORE UPDATE에 실제로 걸려 있어야 한다(테이블을 잘못 지정하면 무효).
+  for (const m of combined.matchAll(
+    /create\s+trigger\s+\S+\s+before\s+update\s+on\s+public\.(\w+)[\s\S]*?execute\s+function\s+public\.(\w+)/gi,
+  )) {
+    if (m[1] === "messages" && guardFns.has(m[2])) return false;
+  }
+  return true;
+}
+
 // 마이그레이션마다 짝이 되는 롤백 스크립트가 있어야 한다(CLAUDE.md 5절).
 export function findMissingRollbacks(
   migrationNames: string[],

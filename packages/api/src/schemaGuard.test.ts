@@ -7,6 +7,7 @@ import {
   collectFunctionNames,
   collectSchemaFacts,
   findMissingRollbacks,
+  findMessageSenderGuardMissing,
   findTablesMissingRoomIdGuard,
   findUndeclaredWrites,
   findUnknownRpcs,
@@ -132,6 +133,15 @@ describe("스키마 안전 계약 (실제 마이그레이션)", () => {
     // 2026-07-30 감사 발견(S1): 소유자 검사만 하는 UPDATE 정책 때문에 자기 행의 room_id를
     // 바꿔 멤버십을 위조(→ 남의 대화 열람)하거나 메시지를 다른 방으로 옮길 수 있었다.
     expect(findTablesMissingRoomIdGuard(migrations)).toEqual([]);
+  });
+
+  it("messages의 sender_type·sender_user_id가 불변으로 잠겨 있다", () => {
+    // 2026-07-30 : messages_insert_member는 보낸이 불변조건을 INSERT에서만 지키고
+    // messages_update_sender는 sender_type을 전혀 제약하지 않았다. UPDATE로
+    // sender_type='agent'로 바꾸면 core messageSchema의 refine을 위반하는 행이 남아
+    // **그 방의 메시지 적재가 통째로 실패한다**(사칭이 아니라 무결성·가용성 문제다).
+    // 20260730180000의 BEFORE UPDATE 트리거가 막는다.
+    expect(findMessageSenderGuardMissing(migrations)).toBe(false);
   });
 });
 
@@ -437,6 +447,75 @@ describe("profiles 관리자전용 컬럼가드 검사가 위반을 잡는다", 
 // ---------------------------------------------------------------------------
 // room_id 불변가드 검사도 위반을 실제로 잡는지 (메타 검증)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// messages 보낸이 불변가드 검사도 위반을 실제로 잡는지 (메타 검증)
+// ---------------------------------------------------------------------------
+describe("messages 보낸이 불변가드 검사가 위반을 잡는다", () => {
+  const fn = (body: string) => `
+    create or replace function public.guard_message_sender_immutable()
+    returns trigger language plpgsql set search_path = public as $$
+    begin
+      ${body}
+      return new;
+    end;
+    $$;
+  `;
+  const BOTH = `
+    if new.sender_type is distinct from old.sender_type then
+      raise exception 'nope';
+    end if;
+    if new.sender_user_id is distinct from old.sender_user_id then
+      raise exception 'nope';
+    end if;
+  `;
+  const TRIGGER = `
+    create trigger messages_guard_sender
+      before update on public.messages
+      for each row execute function public.guard_message_sender_immutable();
+  `;
+  const files = (sql: string): MigrationFile[] => [{ name: "9999_s.sql", sql }];
+
+  it("가드가 아예 없으면 잡는다", () => {
+    expect(findMessageSenderGuardMissing(files(""))).toBe(true);
+  });
+
+  it("함수만 있고 트리거를 안 걸면 잡는다", () => {
+    // 함수를 만들어 두고 붙이는 걸 잊는 것이 흔한 실패다 — 그때 조용히 통과하면 안 된다.
+    expect(findMessageSenderGuardMissing(files(fn(BOTH)))).toBe(true);
+  });
+
+  it("트리거는 있지만 sender_type을 안 보면 잡는다", () => {
+    const weak = fn(`
+      if new.sender_user_id is distinct from old.sender_user_id then
+        raise exception 'nope';
+      end if;
+    `);
+    expect(findMessageSenderGuardMissing(files(weak + TRIGGER))).toBe(true);
+  });
+
+  it("트리거는 있지만 sender_user_id를 안 보면 잡는다", () => {
+    const weak = fn(`
+      if new.sender_type is distinct from old.sender_type then
+        raise exception 'nope';
+      end if;
+    `);
+    expect(findMessageSenderGuardMissing(files(weak + TRIGGER))).toBe(true);
+  });
+
+  it("room_members에만 걸면 잡는다 (테이블을 잘못 지정한 경우)", () => {
+    const wrongTable = `
+      create trigger messages_guard_sender
+        before update on public.room_members
+        for each row execute function public.guard_message_sender_immutable();
+    `;
+    expect(findMessageSenderGuardMissing(files(fn(BOTH) + wrongTable))).toBe(true);
+  });
+
+  it("둘 다 보고 messages에 걸면 통과한다", () => {
+    expect(findMessageSenderGuardMissing(files(fn(BOTH) + TRIGGER))).toBe(false);
+  });
+});
+
 describe("room_id 불변가드 검사가 위반을 잡는다", () => {
   const GUARD_FN = `
     create or replace function public.guard_room_id_immutable()
