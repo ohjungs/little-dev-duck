@@ -339,6 +339,39 @@ describe("SECURITY DEFINER 검사가 위반을 잡는다", () => {
     ];
     expect(findUnrevokedDefiners(files)).toEqual([]);
   });
+
+  // 2026-07-30 : 보안 - 정적검사 - 함수경계 오귀속
+  // 위 픽스처는 모두 **한 파일에 함수 하나**다. 한 파일에 여러 함수가 있으면
+  // `[\s\S]*?security definer`가 앞 함수 선언부에서 시작해 **뒤 함수의** `security definer`까지
+  // 삼킨다. 그 결과 ①앞 함수가 definer로 오인되고 ②정규식 lastIndex가 뒤 함수 선언을 지나쳐
+  // **진짜 definer가 검사에서 사라진다**. 즉 노출된 함수를 조용히 통과시킨다 —
+  // 이 파일이 findTablesMissingRoomIdGuard 주석에서 경고한 것과 같은 실패 모양이다.
+  // 지금 저장소에는 이 조건을 만족하는 파일이 하나뿐이고 두 함수가 모두 definer라 우연히
+  // 드러나지 않았다(20260727030000_messenger_rooms.sql). 우연에 기대지 않도록 못박는다.
+  it("한 파일에 여러 함수가 있어도 뒤쪽 definer를 놓치지 않는다", () => {
+    const files = [
+      {
+        name: "9999_two_functions.sql",
+        sql: `
+          create or replace function public.harmless_first()
+          returns trigger
+          language plpgsql
+          as $$ begin return new; end $$;
+
+          create or replace function public.exposed_second(p_id uuid)
+          returns void
+          language plpgsql
+          security definer
+          set search_path = public
+          as $$ begin end; $$;
+        `,
+      },
+    ];
+    // 회수가 없으니 exposed_second가 반드시 잡혀야 한다.
+    expect(findUnrevokedDefiners(files)).toContain("exposed_second");
+    // 그리고 definer가 아닌 앞 함수를 끌어들이지 않아야 한다(오탐도 검사를 무력화한다).
+    expect(findUnrevokedDefiners(files)).not.toContain("harmless_first");
+  });
 });
 
 // ---------------------------------------------------------------------------

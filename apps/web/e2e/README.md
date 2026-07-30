@@ -28,9 +28,38 @@ pnpm exec playwright open http://localhost:5100/login \
   --save-storage=e2e/.auth/user.json
 ```
 
-처음 실행하면 playwright.config.ts의 `webServer` 설정대로 5100 포트에 dev 서버가 자동으로
-뜬다(잠시 대기). 브라우저 창이 열리면 Google 또는 GitHub로 실제 로그인을 완료한 뒤 창을
-닫는다. `e2e/.auth/user.json`에 세션이 저장된다. 이 파일은 `.gitignore`에 등록돼 있으니
+**2026-07-30 정정 — 위 명령만으로는 서버가 뜨지 않는다.** 전에는 "처음 실행하면
+playwright.config.ts의 `webServer` 설정대로 5100 포트에 서버가 자동으로 뜬다"고 적어 뒀는데
+**틀렸다**: `webServer`는 `playwright test`만 띄우고 `playwright open`은 아무것도 띄우지 않는다.
+그대로 따라 하면 `ERR_CONNECTION_REFUSED`로 끝난다(2026-07-30에 실제로 그렇게 실패했다).
+서버를 **먼저** 띄워야 한다:
+
+```
+pnpm build && pnpm --filter web exec next start -p 5100
+```
+
+**그리고 Supabase 리다이렉트 허용목록에 localhost가 있어야 한다.** `redirectTo`는
+`window.location.origin`(`src/app/login/LoginForm.tsx`)인데 `http://localhost:5100`이 허용목록에
+없으면 Supabase가 Site URL(프로덕션)로 되돌린다 — 로그인은 되지만 **쿠키가 프로덕션 도메인에
+붙어 세션 파일이 빈 채로 저장된다**(실측: cookies 0). Supabase 대시보드 →
+Authentication → URL Configuration → Redirect URLs에 `http://localhost:5100/**`를 추가한다.
+
+브라우저 창이 열리면 Google 또는 GitHub로 실제 로그인을 완료한 뒤 창을 닫는다
+(**닫을 때** 파일이 쓰인다 — 열어 둔 채로는 저장되지 않는다).
+
+### 허용목록을 못 바꿀 때 — 프로덕션 세션에서 만들기
+
+Supabase 인증 쿠키는 Supabase가 서명한 JWT라 **origin에 묶이지 않는다.** 프로덕션에서 세션을
+받아 쿠키의 domain만 바꿔 주면 로컬에서도 인증된다.
+
+```
+pnpm --filter web exec playwright open <프로덕션 URL>/login --save-storage=e2e/.auth/prod.json
+node e2e/makeLocalAuth.mjs        # prod.json → user.json (domain 치환 + 온보딩 플래그)
+```
+
+**온보딩 플래그를 함께 심어야 한다.** `ldd:onboarded`(localStorage)가 없으면 "시작 안내"
+오버레이가 클릭을 가로채 위젯 스펙이 **전부 실패**한다. `authState.ts`는 인증 쿠키만 보고
+usable을 판정하므로 이 경우를 걸러 주지 못한다 — 세션 파일을 새로 만든 누구에게나 일어난다. `e2e/.auth/user.json`에 세션이 저장된다. 이 파일은 `.gitignore`에 등록돼 있으니
 커밋되지 않는다(OAuth 세션 토큰이 들어있어 저장소에 올리면 안 됨). 이후
 `pnpm exec playwright test`를 실행하면 인증이 필요한 모든 스펙이 자동으로 이 세션을 쓴다.
 

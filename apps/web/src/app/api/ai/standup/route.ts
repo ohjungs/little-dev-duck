@@ -3,6 +3,7 @@ import { allowRequest, createPage, generateStandup } from "@ldd/api";
 import { isLddError, userMessage, kstDateString } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 import { requireGeminiKey } from "@/lib/apiHelpers";
+import { blockIfFeatureDisabled } from "@/lib/featureGate";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,10 @@ export async function POST() {
   if (!user) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
+  // 2026-07-30 : 보안 - 기능토글 - 서버강제 (사용자 결정: AI 여부 기준 → duck-chat)
+  // 결과물이 페이지로 생기지만 매핑은 `pages`가 아니다 — 만드는 주체가 AI라서 duck-chat이다.
+  const blocked = await blockIfFeatureDisabled(supabase, user.id, "duck-chat");
+  if (blocked) return blocked;
   if (!allowRequest(`ai-standup:${user.id}`, 3, 3_600_000)) {
     return NextResponse.json(
       { error: "요청이 많습니다. 잠시 후 다시 시도해주세요." },

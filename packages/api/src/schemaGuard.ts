@@ -147,15 +147,36 @@ export const PUBLIC_BY_DESIGN = new Map<string, string>([
   ],
 ]);
 
+// 2026-07-30 : 보안 - 정적검사 - 함수경계 오귀속
+// 각 함수 정의를 **자기 선언부**로 잘라 낸다. 예전에는 한 정규식으로
+// `create function public.(\w+)\([\s\S]*?security definer`를 썼는데, 한 파일에 함수가 둘 이상이면
+// 앞 함수 선언부에서 시작한 lazy 매치가 **뒤 함수의** `security definer`까지 삼켰다. 결과가 둘 다 나쁘다 —
+// ①앞 함수를 definer로 오탐하고, ②정규식 lastIndex가 뒤 함수 선언을 지나쳐 **진짜 definer가
+// 검사에서 사라진다**(노출된 함수를 조용히 통과시킨다). 저장소에 그 조건인 파일이 하나뿐이고
+// 두 함수가 모두 definer라 우연히 드러나지 않았을 뿐이다.
+// 본문(`as $$ ... $$`)은 선언부가 아니므로 잘라 낸다 — 본문 주석·문자열의 "security definer"에
+// 걸리면 반대 방향 오탐이 된다.
+function functionHeaders(sql: string): { name: string; header: string }[] {
+  const starts: { name: string; at: number }[] = [];
+  for (const m of sql.matchAll(
+    /create\s+(?:or\s+replace\s+)?function\s+public\.(\w+)\s*\(/gi,
+  )) {
+    starts.push({ name: m[1], at: m.index });
+  }
+  return starts.map(({ name, at }, i) => {
+    const region = sql.slice(at, i + 1 < starts.length ? starts[i + 1].at : sql.length);
+    const bodyAt = region.search(/\bas\s+\$\$/i);
+    return { name, header: bodyAt >= 0 ? region.slice(0, bodyAt) : region };
+  });
+}
+
 export function findUnrevokedDefiners(files: MigrationFile[]): string[] {
   const defined = new Set<string>();
   const revoked = new Set<string>();
 
   for (const { sql } of files) {
-    for (const m of sql.matchAll(
-      /(?:create|replace)\s+function\s+public\.(\w+)\s*\([\s\S]*?security\s+definer/gi,
-    )) {
-      defined.add(m[1]);
+    for (const { name, header } of functionHeaders(sql)) {
+      if (/security\s+definer/i.test(header)) defined.add(name);
     }
     // anon을 이름으로 지목해 회수했는가. `FROM public`만으로는 부족하다.
     for (const m of sql.matchAll(

@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { kstDateString } from "@ldd/core";
 
 // 로그인 없이 볼 수 있는 화면의 실제 스크린샷 + 콘솔/네트워크 오류 수집.
 // 대시보드 위젯은 OAuth 뒤라 여기서 못 찍는다(e2e/README.md의 세션 파일이 있어야 한다) —
@@ -12,6 +13,14 @@ import { expect, test } from "@playwright/test";
 // 404 콘솔 메시지를 빼고 나머지는 그대로 실패시킨다(진짜 404를 조용히 삼키지 않기 위해).
 // 프로덕션은 이 스펙이 못 덮는다 — 2026-07-26 확인 결과 Web Analytics가 꺼져 있어
 // 프로덕션에서도 이 스크립트가 404다. docs/loop-eng/PENDING.md 참조.
+// 2026-07-30 : 날짜 폴더를 하드코딩에서 실행일로 바꿨다.
+// 전에는 `"2026-07-26"`이 박혀 있어 **이 스펙을 돌릴 때마다 그날의 기준 스크린샷을 덮어썼다**
+// (실측: 이번 사이클에 07-26 폴더의 4장이 수정됨 — 되돌렸다). 날짜별 폴더는 회귀 비교용
+// 이력이라 덮어쓰면 비교 대상 자체가 사라진다. 실행일 폴더에 쓰면 이력이 쌓인다.
+// KST 기준. 손으로 오프셋을 더하지 않고 공용 `kstDateString`을 쓴다 — 직접 계산하면
+// 시간대 처리가 갈라지고, 실제로 이 저장소의 커스텀 린트 규칙이 그 시도를 잡아냈다.
+const RUN_DATE = kstDateString(new Date());
+
 const OUT = path.join(
   __dirname,
   "..",
@@ -20,7 +29,7 @@ const OUT = path.join(
   "docs",
   "loop-eng",
   "screenshots",
-  "2026-07-26",
+  RUN_DATE,
   "public-surfaces",
 );
 

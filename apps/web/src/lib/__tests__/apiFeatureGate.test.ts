@@ -32,10 +32,15 @@ const GATED_ROUTES: Record<string, string> = {
   // 2026-07-30 2차: 기능 설명이 라우트를 그대로 지목해 **판단이 필요 없는** 둘만 추가했다.
   //  · `news` = "RSS 구독과 요약" → 수집 라우트가 정확히 그 일이다.
   //  · `github` = "커밋 잔디: GitHub 기여도 위젯" → 이 라우트가 그 데이터를 준다.
-  // (`ai/write`·`ai/standup`·`ai/duck-line`은 어느 기능에 속하는지가 제품 의도라 미정 —
-  //  manual-verification 114번에서 사용자 결정 대기.)
   "news/collect/route.ts": "news",
   "github/contributions/route.ts": "github",
+  // 2026-07-30 3차: 남은 AI 라우트 3개의 매핑을 사용자가 결정했다(manual-verification 114 종결) —
+  // **기준은 "쓰이는 화면"이 아니라 "AI 여부"**다. 즉 `duck-chat`이 AI 기능 전체의 스위치다.
+  // 그래서 페이지를 켜 둔 채로도 AI 글 다듬기가 함께 막히는 것이 **의도된 동작**이다
+  // (화면 기준으로 갈랐다면 pages/insights로 흩어졌을 것 — 그 대안은 기각됐다).
+  "ai/write/route.ts": "duck-chat",
+  "ai/standup/route.ts": "duck-chat",
+  "ai/duck-line/route.ts": "duck-chat",
 };
 
 function src(rel: string): string {
@@ -147,5 +152,39 @@ describe("API 기능 토글 강제", () => {
       }),
     );
     expect(res.status).toBe(200);
+  });
+
+  // 2026-07-30 : duck-line은 403이 아니라 200 + null로 막는다 (라우트 통합)
+  // 이 라우트만 규약이 다르다 — 상한 초과·생성 실패도 200 + null이고, 대시보드가 60초 타이머로
+  // 반복 호출하므로 403이면 계속 쌓인다. **차단 자체는 같아야 한다**: LLM 생성 함수에 도달하지
+  // 않는 것을 함께 확인한다. 이게 없으면 "게이트를 지나 생성까지 갔는데 응답만 null"인 상태와
+  // 구별되지 않는다 — 그건 쿼터를 태우면서 막힌 척하는 최악이다.
+  it("duck-line은 기능이 꺼지면 200 + line:null로 조용히 폴백한다", async () => {
+    vi.resetModules();
+    process.env.GEMINI_API_KEY = "test-key";
+    const generateDuckLine = vi.fn(async () => ({ line: "생성됨" }));
+    vi.doMock("@ldd/api", () => ({
+      allowRequest: () => true,
+      getMyAccess: async () => ({ role: "user", disabledFeatures: ["duck-chat"] }),
+      generateDuckLine,
+    }));
+    vi.doMock("@/lib/supabase/server", () => ({
+      createClient: async () => ({
+        auth: { getUser: async () => ({ data: { user: { id: "u1" } } }) },
+      }),
+    }));
+
+    const { POST } = await import("../../app/api/ai/duck-line/route");
+    const res = await POST(
+      new Request("http://localhost/api/ai/duck-line", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ factLine: "할 일이 3개 남았어요", mood: "neutral" }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ line: null });
+    // 막혔다면 생성은 시도조차 하지 않았어야 한다(쿼터를 태우지 않는다).
+    expect(generateDuckLine).not.toHaveBeenCalled();
   });
 });

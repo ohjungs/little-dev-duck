@@ -8,6 +8,7 @@ import {
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 import { requireGeminiKey } from "@/lib/apiHelpers";
+import { blockIfFeatureDisabled } from "@/lib/featureGate";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,10 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
+  // 2026-07-30 : 보안 - 기능토글 - 서버강제 (사용자 결정: AI 여부 기준 → duck-chat)
+  // 레이트리밋보다 **먼저** 본다 — 꺼진 기능의 호출이 상한을 깎으면 안 된다.
+  const blocked = await blockIfFeatureDisabled(supabase, user.id, "duck-chat");
+  if (blocked) return blocked;
   if (!allowRequest(`ai-write:${user.id}`, 20, 60_000)) {
     return NextResponse.json(
       { error: "요청이 많습니다. 잠시 후 다시 시도해주세요." },

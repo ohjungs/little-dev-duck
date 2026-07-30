@@ -99,25 +99,23 @@ test.describe("삭제 되돌리기 (Phase 21)", () => {
     await widget.getByPlaceholder("메모 (Ctrl+Enter로 추가)").fill(content);
     await widget.getByRole("button", { name: "추가" }).click();
 
-    const note = widget.locator("div", { hasText: content }).last();
+    // 2026-07-30 : widgets.spec.ts와 같은 이유로 `.last()` 휴리스틱을 폐기했다 — "가장 안쪽 div가
+    // 실제 카드"라는 가정이 깨져 `getAttribute("data-testid")`가 null을 돌려주고
+    // `getByTestId(null!)`가 던졌다. 카드가 실제로 달고 있는 testid를 내용으로 지목한다.
+    // 되돌리기 후 id가 유지되는지에 의존하지 않는 이점도 있다(내용으로 찾으므로).
+    // `undo-notice`는 접두사가 `memo-`가 아니라 이 선택자에 걸리지 않는다.
+    const note = widget.locator('[data-testid^="memo-"]').filter({ hasText: content });
     await expect(note).toBeVisible();
-    const testId = await note.getAttribute("data-testid");
 
-    await widget
-      .getByTestId(testId!)
-      .getByRole("button", { name: "삭제" })
-      .click();
-    await expect(widget.getByTestId(testId!)).toHaveCount(0);
+    await note.getByRole("button", { name: "삭제" }).click();
+    await expect(note).toHaveCount(0);
 
     await widget
       .getByTestId("undo-notice")
       .getByRole("button", { name: "되돌리기" })
       .click();
-    await expect(widget.getByTestId(testId!)).toBeVisible();
+    await expect(note).toBeVisible();
 
-    await widget
-      .getByTestId(testId!)
-      .getByRole("button", { name: "삭제" })
-      .click();
+    await note.getByRole("button", { name: "삭제" }).click();
   });
 });

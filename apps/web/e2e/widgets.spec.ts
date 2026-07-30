@@ -47,18 +47,25 @@ test.describe("투두/메모 위젯 CRUD", () => {
     await widget.getByPlaceholder("메모 (Ctrl+Enter로 추가)").fill(content);
     await widget.getByRole("button", { name: "추가" }).click();
 
-    const note = widget.locator("div", { hasText: content }).last();
+    // 2026-07-30 : e2e - 메모카드 특정 - div.last() 휴리스틱 폐기
+    // 전에는 `widget.locator("div", { hasText: content }).last()`로 "가장 안쪽 div가 실제 카드"라고
+    // 가정한 뒤 `data-testid`를 읽어 재특정했다. **그 가정이 깨져 `getAttribute`가 null을 돌려주고
+    // `getByTestId(null!)`가 던졌다**("Cannot read properties of null (reading 'unicode')").
+    // 메모 자체는 정상이다 — 바로 위 `toBeVisible()`은 통과했다. DOM 구조에 기대는 위치 추정을
+    // 버리고 카드가 실제로 달고 있는 `data-testid="memo-<id>"`를 직접 지목한다.
+    // 위젯 루트(`memo-widget`)는 자신의 자손이 아니므로 이 선택자에 걸리지 않는다.
+    const note = widget.locator('[data-testid^="memo-"]').filter({ hasText: content });
     await expect(note).toBeVisible();
-    const testId = await note.getAttribute("data-testid");
-    const stableNote = widget.getByTestId(testId!);
 
-    await stableNote.getByRole("button", { name: "수정" }).click();
-    await stableNote.locator("textarea").fill(editedContent);
-    await stableNote.getByRole("button", { name: "저장" }).click();
-    await expect(stableNote).toContainText(editedContent);
+    await note.getByRole("button", { name: "수정" }).click();
+    await note.locator("textarea").fill(editedContent);
+    await note.getByRole("button", { name: "저장" }).click();
+    await expect(note).toContainText(editedContent);
 
-    await stableNote.getByRole("button", { name: "삭제" }).click();
-    await expect(widget.getByTestId(testId!)).toHaveCount(0);
+    // 삭제 후에는 수정된 내용으로 찾아야 한다(원문 content는 편집으로 사라졌다).
+    const edited = widget.locator('[data-testid^="memo-"]').filter({ hasText: editedContent });
+    await edited.getByRole("button", { name: "삭제" }).click();
+    await expect(edited).toHaveCount(0);
   });
 });
 
@@ -84,7 +91,16 @@ test.describe("투두 위젯 빈 상태", () => {
 
     await page.goto("/");
     const widget = page.getByTestId("todo-widget");
-    await expect(widget.getByText("할 일이 없습니다.")).toBeVisible();
+    // 2026-07-30 : 기대 문구가 낡아 있었다. 스펙은 "할 일이 없습니다."를 기대했는데 그 문자열은
+    // 이제 코드베이스에 없다 — 안내 문구가 친절한 쪽으로 바뀌었고(TodoWidget.tsx) 스펙만 남았다.
+    // 인증 세션이 없어 9사이클 동안 스킵돼서 아무도 보지 못했다.
+    // 빈 상태 분기는 필터에 따라 셋으로 갈리므로 어느 것이든 통과하도록 한다 —
+    // 이 스펙의 목적은 "빈 목록에 안내가 뜨는가"이지 필터별 문구 확정이 아니다.
+    await expect(
+      widget.getByText(
+        /아직 할 일이 없어요|미완료 할 일이 없어요|마감일이 오늘로 설정된 할 일이 없어요/,
+      ),
+    ).toBeVisible();
   });
 });
 
@@ -225,13 +241,14 @@ test.describe("여러 항목 리스트 정합성", () => {
     const addMemo = async (content: string) => {
       await widget.getByPlaceholder("메모 (Ctrl+Enter로 추가)").fill(content);
       await widget.getByRole("button", { name: "추가" }).click();
-      // 메모 카드는 div이고 data-testid가 없는 상위 래퍼 div도 같은 텍스트를 포함하지만,
-      // 타임스탬프로 유일한 content 문자열을 포함하는 가장 안쪽 div는 항상 마지막
-      // 매치이므로 .last()로 안전하게 실제 카드(memo-<id>)를 특정할 수 있다.
-      const note = widget.locator("div", { hasText: content }).last();
+      // 2026-07-30 : 위 41행과 같은 이유로 `.last()` 휴리스틱을 폐기했다 — "가장 안쪽 div가
+      // 실제 카드"라는 가정이 깨져 `getAttribute("data-testid")`가 null을 돌려줬다.
+      // 카드가 실제로 달고 있는 `data-testid="memo-<id>"`를 직접 지목한다.
+      // 편집 후에도 이 locator가 유효하다: 수정본이 `${content}-edited`라 content를 여전히 포함하고,
+      // A(`-A`)와 B(`-B`)는 서로의 문자열을 포함하지 않아 교차 매칭되지 않는다.
+      const note = widget.locator('[data-testid^="memo-"]').filter({ hasText: content });
       await expect(note).toBeVisible();
-      const testId = await note.getAttribute("data-testid");
-      return widget.getByTestId(testId!);
+      return note;
     };
 
     const noteA = await addMemo(contentA);

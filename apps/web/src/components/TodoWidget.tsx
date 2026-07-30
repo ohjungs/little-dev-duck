@@ -575,7 +575,14 @@ export function TodoWidget() {
                         </span>
                       )}
                       {describeRecurrence(todo.recurrence) && (
-                        <span className="inline-flex items-center gap-0.5 text-primary-accent">
+                        // 2026-07-30 : testid는 e2e가 "주기 배지"를 지목하기 위한 것이다.
+                        // 행 전체 텍스트로는 판정할 수 없다 — 주기 select가 모든 행에 있고
+                        // 그 option 텍스트("매일·매주 목·매월 30일")가 행 텍스트에 포함돼서,
+                        // 반복 없는 행도 "매주"를 포함한 것으로 읽힌다(실제로 스펙이 그렇게 깨졌다).
+                        <span
+                          data-testid="recurrence-badge"
+                          className="inline-flex items-center gap-0.5 text-primary-accent"
+                        >
                           <Repeat className="size-2.5" aria-hidden />
                           {describeRecurrence(todo.recurrence)}
                         </span>

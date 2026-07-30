@@ -37,7 +37,10 @@ import { useDuckMood } from "./useDuckMood";
 const DUCK_HEIGHT = 220;
 const CELEBRATE_MS = 1500;
 
-// r3f Canvas는 WebGL을 쓰므로 서버 렌더링이 불가능해 클라이언트 전용으로 로드한다.
+// 2026-07-30 : 주석 정정. 전에는 "r3f Canvas는 WebGL을 쓰므로 서버 렌더링이 불가능해"라고
+// 적혀 있었는데 **더 이상 사실이 아니다** — 오리는 CSS 스프라이트이고 r3f Canvas가 없다
+// (packages/mascot/src/Duck.tsx). `ssr: false`를 유지하는 실제 이유는 오리가 마운트 시점의
+// localStorage(방해금지 설정)와 window 크기에 의존해 SSR 결과와 어긋나기 때문이다.
 // 로딩 중에도 같은 높이의 자리를 예약해 청크 로드 후 레이아웃이 밀리지 않게 한다.
 const Duck = dynamic(() => import("@ldd/mascot").then((mod) => mod.Duck), {
   ssr: false,

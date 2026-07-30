@@ -3,6 +3,7 @@ import { allowRequest, generateDuckLine } from "@ldd/api";
 import { DUCK_LINE_MAX_CHARS } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
 import { requireGeminiKey } from "@/lib/apiHelpers";
+import { blockIfFeatureDisabled } from "@/lib/featureGate";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,15 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+  // 2026-07-30 : 보안 - 기능토글 - 서버강제 (사용자 결정: AI 여부 기준 → duck-chat)
+  // **여기만 403이 아니라 200 + null이다.** 다른 라우트와 다른 이유는 이 라우트의 기존 규약이다 —
+  // 아래 상한 초과와 생성 실패가 모두 "실패가 아니라 템플릿을 써라"로 답한다. 기능이 꺼진 것도
+  // 정확히 그 상황이고(템플릿 문장은 규칙이 만들므로 AI가 아니다), 이 호출은 대시보드에서 60초
+  // 타이머로 반복되므로 403을 주면 콘솔·네트워크에 계속 쌓인다. **차단 자체는 동일하다** —
+  // Gemini 호출에 도달하지 않는다. 이 규약은 아래 통합 테스트가 잠근다.
+  if (await blockIfFeatureDisabled(supabase, user.id, "duck-chat")) {
+    return NextResponse.json({ line: null });
   }
   // **공용 `allowRequest`를 쓴다.** 자체 Map으로 다시 만들면 CLAUDE.md 3-5절 최고 심각도
   // 인벤토리 위반이고, 이 저장소가 Phase 36에서 정확히 그걸로 데였다(교훈 L-16).

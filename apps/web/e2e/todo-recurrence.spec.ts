@@ -61,8 +61,14 @@ test.describe("반복 할 일 (Phase 20)", () => {
     await page.goto("/");
     const item = page.getByTestId(`todo-${PLAIN_ID}`);
     await expect(item).toContainText("e2e 일반 할 일");
-    await expect(item).not.toContainText("매주");
-    await expect(item).not.toContainText("매일");
+    // 2026-07-30 : 행 전체 텍스트로 판정하던 것을 배지 지목으로 바꿨다.
+    // 주기 select는 **모든 행에** 있고(아래 "아이콘 크기를 넘지 않는다" 스펙이 그 이유다)
+    // 그 option 텍스트가 행 텍스트에 함께 들어간다 — 실측값이
+    // "e2e 일반 할 일2일 전반복 없음매일매주 목매월 30일"이라 `not.toContainText("매주")`는
+    // 반복이 없어도 실패한다. 즉 이 스펙은 통과할 수 없는 상태였다(세션이 없어 9사이클 스킵됨).
+    await expect(item.getByTestId("recurrence-badge")).toHaveCount(0);
+    // 값도 함께 확인한다 — 배지만 숨고 값이 남는 상태를 배제한다.
+    await expect(item.locator("select")).toHaveValue("");
   });
 
   test("주기 선택은 아이콘 크기를 넘지 않는다 (제목 공간 잠식 금지)", async ({
