@@ -458,7 +458,14 @@
 
 - [ ] security: next.config.ts에 poweredByHeader:false 추가 — apps/web/next.config.ts
 - [ ] security: /api/keepalive CRON_SECRET 미설정 시 fail-closed로 전환 — apps/web/src/app/api/keepalive/route.ts
-- [ ] security: SSRF 사설대역 차단 IPv4 대체표기 커버리지 테스트로 고정 — packages/api/src/news.ts
+- [x] security: SSRF 사설대역 차단 IPv4 대체표기 커버리지 테스트로 고정 — 2026-07-30 완료.
+  **전제를 실측했더니 IPv4 대체표기는 이미 안전했고(파서가 점 표기로 정규화), 대신 IPv6 우회
+  8건을 찾았다.** `::ffff:(127\.|…)` 분기는 파서가 `::ffff:7f00:1`로 압축하므로 절대 매칭되지
+  않는 죽은 코드였다 — 주석이 이름까지 적어 막겠다던 `[::ffff:169.254.169.254]`가 통과했다.
+  덤으로 `\[?fc|\[?fd`에 경계가 없어 `fcc.gov`·`fdny.gov` 같은 정상 도메인을 막고 있었다.
+  정규식을 hostname 정규화 판정(`isPrivateHost`)으로 교체. 테스트 81건(단위 58 + addFeed 경유 23),
+  옛 정규식으로 되돌려 13건이 실패하는 것을 확인했다.
+  → [findings-2026-07-30-ssrf-ipv6-bypass.md](loop-eng/findings-2026-07-30-ssrf-ipv6-bypass.md)
 - [ ] security: 이메일/비밀번호 가입 최소 길이·강도 정책 추가 — supabase/config.toml
 - [ ] security: createGithubIssue title/body 필드 길이 상한 추가 — packages/api/src/githubIssues.ts
 - [ ] quality: 사이트 URL 계산 글루 코드 3중 반복을 getSiteUrl() 래퍼로 통합 — apps/web/src/app/layout.tsx

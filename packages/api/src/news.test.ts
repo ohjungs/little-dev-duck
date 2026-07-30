@@ -270,6 +270,65 @@ describe("addFeed", () => {
     ).rejects.toThrow("내부/사설");
   });
 
+  // 2026-07-30 : 보안 - SSRF - IPv4 대체표기 고정 (Status backlog)
+  // 이 여섯은 **지금 이미 막힌다** — 가드가 `new URL().hostname`을 쓰고 WHATWG 파서가 IPv4를
+  // 점 표기로 정규화한 뒤 정규식에 넘기기 때문이다. 즉 안전이 정규식이 아니라 **호스트 추출
+  // 방식**에 얹혀 있다. 누가 추출을 원문 문자열로 바꾸면 여섯이 한꺼번에 조용히 열린다.
+  // 그 암묵적 의존을 검사로 드러낸다.
+  it.each([
+    ["10진수", "http://2130706433/rss"],
+    ["16진수", "http://0x7f000001/rss"],
+    ["8진수", "http://0177.0.0.1/rss"],
+    ["짧은 표기", "http://127.1/rss"],
+    ["0 하나", "http://0/rss"],
+    ["메타데이터 10진수", "http://2852039166/latest/meta-data/"],
+  ])("IPv4 대체표기(%s)도 거부한다", async (_label, url) => {
+    await expect(addFeed(addFeedSupabase({}), { url })).rejects.toThrow("내부/사설");
+  });
+
+  // 2026-07-30 : 보안 - SSRF - IPv6 표기 우회 (신규 발견, SEC)
+  // 정규식의 `::ffff:(127\.|…)` 분기는 **죽은 코드였다** — 점 표기를 기대하는데 파서가
+  // `::ffff:127.0.0.1`을 `::ffff:7f00:1`로 압축해서 절대 매칭되지 않았다. `::`(미지정,
+  // 연결 시 루프백)와 `fe80::/10`(링크 로컬)은 목록에 아예 없었다.
+  // 특히 메타데이터 주소는 주석이 이름까지 적어 막겠다고 선언한 대상이다 — 선언과 실제가
+  // 갈라져 있었다. 상세: docs/loop-eng/findings-2026-07-30-ssrf-ipv6-bypass.md
+  it.each([
+    ["IPv4 매핑 메타데이터", "http://[::ffff:169.254.169.254]/latest/meta-data/"],
+    ["IPv4 매핑 루프백", "http://[::ffff:127.0.0.1]/rss"],
+    ["IPv4 매핑 10.x", "http://[::ffff:10.0.0.1]/rss"],
+    ["IPv4 매핑 192.168.x", "http://[::ffff:192.168.0.1]/rss"],
+    ["IPv4 매핑 172.16.x", "http://[::ffff:172.16.0.1]/rss"],
+    ["미지정 ::", "http://[::]/rss"],
+    ["링크 로컬 fe80", "http://[fe80::1]/rss"],
+    ["NAT64 매핑", "http://[64:ff9b::127.0.0.1]/rss"],
+  ])("IPv6 표기(%s)도 거부한다", async (_label, url) => {
+    await expect(addFeed(addFeedSupabase({}), { url })).rejects.toThrow("내부/사설");
+  });
+
+  // 막는 쪽만 검사하면 "전부 막는 가드"도 통과한다 — 정상 외부 주소가 살아 있는지 함께 본다.
+  it.each([
+    ["일반 도메인", "https://news.ycombinator.com/rss"],
+    ["공인 IPv4", "http://93.184.216.34/rss"],
+    ["공인 IPv6", "http://[2606:2800:220:1:248:1893:25c8:1946]/rss"],
+    ["172.15는 사설이 아니다", "http://172.15.0.1/rss"],
+    ["172.32도 사설이 아니다", "http://172.32.0.1/rss"],
+  ])("정상 외부 주소(%s)는 통과한다", async (_label, url) => {
+    await expect(addFeed(addFeedSupabase({}), { url })).resolves.toBeTruthy();
+  });
+
+  // 2026-07-30 : 가용성 - fc/fd 접두 도메인 오탐
+  // 옛 정규식의 `\[?fc|\[?fd`는 IPv6 유니크 로컬(fc00::/7)을 노렸지만 **경계가 없어서
+  // "fc"·"fd"로 시작하는 모든 도메인**을 막았다. 즉 사용자가 이 피드들을 등록할 수 없었다.
+  // 차단 쪽만 검사하면 이런 오탐은 영원히 안 보인다 — 통과해야 하는 쪽도 못박는다.
+  it.each([
+    ["fcc.gov", "https://fcc.gov/rss"],
+    ["fdny.gov", "https://fdny.gov/feed"],
+    ["fcbarcelona.com", "https://fcbarcelona.com/rss"],
+    ["fdmagazine.co.kr", "https://fdmagazine.co.kr/rss"],
+  ])("fc/fd로 시작하는 정상 도메인(%s)은 막지 않는다", async (_label, url) => {
+    await expect(addFeed(addFeedSupabase({}), { url })).resolves.toBeTruthy();
+  });
+
   it("URL 형식이 아니면 거부한다", async () => {
     await expect(
       addFeed(addFeedSupabase({}), { url: "그냥 텍스트" }),

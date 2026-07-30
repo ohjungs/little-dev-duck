@@ -18,10 +18,82 @@ import { GEMINI_GEN_MODEL, upstreamError, safeBody } from "./gemini";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 // 서버(수집 라우트)가 사용자 지정 URL을 fetch하므로, 내부/사설 대역으로의 SSRF를 피드 등록 시 차단한다.
-// 개인 단일 사용자 도구라 위험은 자기 자신에 한정되지만(RLS로 본인 피드만 수집), 메타데이터 엔드포인트
-// (169.254.169.254) 등 발등찍기 방지용 최소 방어. DNS 리바인딩까지는 막지 않는다(YAGNI).
-const PRIVATE_HOST =
-  /^(localhost$|127\.|0\.0\.0\.0$|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|\[?fc|\[?fd|::ffff:(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.))/i;
+// 메타데이터 엔드포인트(169.254.169.254) 등 발등찍기 방지. DNS 리바인딩까지는 막지 않는다(YAGNI).
+//
+// 2026-07-30 : 보안 - SSRF - 정규식 한 줄에서 정규화 판정으로 교체 (실측 발견 2건)
+// 옛 구현은 문자열 정규식 한 줄이었고 **두 방향으로 틀렸다.**
+//  ① IPv6로 감싸면 전부 통과했다. `::ffff:(127\.|…)` 분기는 점 표기를 기대했는데 WHATWG
+//     파서가 `::ffff:127.0.0.1`을 `::ffff:7f00:1`로 압축해 넘기므로 **절대 매칭되지 않는
+//     죽은 코드**였다. `::`(연결 시 루프백)와 `fe80::/10`은 목록에 아예 없었다.
+//     주석이 이름까지 적어 막겠다던 `[::ffff:169.254.169.254]`가 실제로 통과했다.
+//  ② `\[?fc|\[?fd`에 경계가 없어 **"fc"·"fd"로 시작하는 모든 도메인**을 막았다
+//     (fcc.gov·fdny.gov·fcbarcelona.com — 사용자가 등록할 수 없었다).
+// 문자열 패턴을 더 얹으면 같은 함정을 반복한다(IPv6 압축 표기 조합이 많다). 그래서
+// **hostname을 8그룹 숫자로 펼쳐 판정**하고, IPv4 매핑·NAT64는 뒤 32비트를 IPv4로 되돌려
+// IPv4 규칙을 재사용한다. 근거·실측표: docs/loop-eng/findings-2026-07-30-ssrf-ipv6-bypass.md
+//
+// IPv4 규칙은 옛 것을 그대로 쓴다 — 실측으로 정상 동작을 확인했다(10진수·16진수·8진수·짧은
+// 표기는 파서가 점 표기로 정규화해 주므로 이 패턴만으로 전부 걸린다).
+const PRIVATE_IPV4 =
+  /^(127\.|0\.0\.0\.0$|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/;
+
+/**
+ * IPv6 hostname을 8그룹(각 0..0xffff) 숫자 배열로 펼친다. IPv6가 아니거나 형식이 잘못되면 null.
+ * `::` 압축과, 끝에 점 표기 IPv4가 붙은 형태(`::ffff:127.0.0.1`)를 함께 받는다 —
+ * 호출부는 항상 정규화된 값을 주지만, 판정 함수가 원문에도 옳게 답하는 편이 안전하다.
+ */
+function ipv6Groups(host: string): number[] | null {
+  if (!host.includes(":")) return null;
+  let s = host;
+  const tail = /:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s);
+  if (tail) {
+    const b = tail.slice(1, 5).map(Number);
+    if (b.some((n) => n > 255)) return null;
+    const hi = ((b[0] << 8) | b[1]).toString(16);
+    const lo = ((b[2] << 8) | b[3]).toString(16);
+    s = `${s.slice(0, tail.index)}:${hi}:${lo}`;
+  }
+  const halves = s.split("::");
+  if (halves.length > 2) return null; // `::`는 최대 한 번
+  const parse = (part: string): number[] =>
+    part === "" ? [] : part.split(":").map((x) => (/^[0-9a-f]{1,4}$/.test(x) ? parseInt(x, 16) : NaN));
+  const left = parse(halves[0]);
+  const right = halves.length === 2 ? parse(halves[1]) : [];
+  const groups =
+    halves.length === 2
+      ? [...left, ...Array<number>(8 - left.length - right.length).fill(0), ...right]
+      : left;
+  if (groups.length !== 8 || groups.some((n) => !Number.isInteger(n) || n < 0 || n > 0xffff)) {
+    return null;
+  }
+  return groups;
+}
+
+/** `new URL(url).hostname` 값을 받아 내부/사설 대역인지 판정한다. */
+export function isPrivateHost(hostname: string): boolean {
+  const h = hostname.replace(/^\[/, "").replace(/\]$/, "").toLowerCase();
+  if (h === "localhost") return true;
+  if (PRIVATE_IPV4.test(h)) return true;
+
+  const g = ipv6Groups(h);
+  if (g === null) return false;
+
+  if (g.every((x) => x === 0)) return true; // `::` 미지정 — 연결하면 루프백으로 간다
+  if (g.slice(0, 7).every((x) => x === 0) && g[7] === 1) return true; // `::1`
+  if ((g[0] & 0xffc0) === 0xfe80) return true; // fe80::/10 링크 로컬
+  if ((g[0] & 0xfe00) === 0xfc00) return true; // fc00::/7 유니크 로컬
+
+  // IPv4를 품은 형태는 그 IPv4로 판정한다 — 안 그러면 사설 IPv4를 IPv6로 감싸 우회할 수 있다.
+  const zeroTo5 = g.slice(0, 6).every((x) => x === 0);
+  const mapped = g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff; // ::ffff:a.b.c.d
+  const deprecatedCompat = zeroTo5 && (g[6] !== 0 || g[7] > 1); // ::a.b.c.d (구형 호환 표기)
+  const nat64 = g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0);
+  if (mapped || nat64 || deprecatedCompat) {
+    const ipv4 = `${g[6] >> 8}.${g[6] & 0xff}.${g[7] >> 8}.${g[7] & 0xff}`;
+    return PRIVATE_IPV4.test(ipv4);
+  }
+  return false;
+}
 
 type FeedRow = {
   id: string;
@@ -153,7 +225,7 @@ export async function addFeed(
   } catch {
     throw new Error("올바른 URL이 아닙니다.");
   }
-  if (PRIVATE_HOST.test(host)) {
+  if (isPrivateHost(host)) {
     throw new Error("내부/사설 주소는 피드로 등록할 수 없어요.");
   }
   const { data, error } = await supabase
@@ -256,12 +328,12 @@ async function fetchFeedItems(
   try {
     const u = new URL(candidate);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    if (PRIVATE_HOST.test(u.hostname)) return null;
+    if (isPrivateHost(u.hostname)) return null;
     const res = await doFetch(candidate, {
       headers: { "user-agent": "LittleDevDuck/1.0 (+rss)" },
     });
     if (!res.ok) return null;
-    if (PRIVATE_HOST.test(new URL(res.url).hostname)) return null;
+    if (isPrivateHost(new URL(res.url).hostname)) return null;
     const items = parseRssItems(await res.text());
     return items.length > 0 ? items : null;
   } catch {
@@ -298,7 +370,7 @@ export async function collectFeed(
     if (declared > MAX_FEED_BYTES) throw new Error(`feed too large: ${declared}`);
     // 2026-07-24: redirect chain SSRF 방어 — 최종 도착지가 사설 대역이면 차단.
     const resolvedHost = new URL(res.url).hostname;
-    if (PRIVATE_HOST.test(resolvedHost)) throw new Error("사설 주소로 리다이렉트됨");
+    if (isPrivateHost(resolvedHost)) throw new Error("사설 주소로 리다이렉트됨");
     xml = await res.text();
   } catch {
     const nextFail = feed.failCount + 1;
