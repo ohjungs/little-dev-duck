@@ -16,6 +16,9 @@ export const TOOL_LABELS: Record<string, string> = {
   // (editTodo와 같은 규약이라 describeCall 변경 없이 그대로 읽힌다).
   updateCalendarEvent: "캘린더 일정 수정",
   createGithubIssue: "GitHub 이슈 만들기",
+  // 2026-07-30: 이슈 닫기는 GitHub에서 다시 열 수 있어 되돌릴 수 있다 — 그래서 "삭제"류처럼
+  // 경고를 덧붙이지 않는다. 어느 저장소·어느 이슈인지는 owner/repo와 표시용 title이 드러낸다.
+  closeGithubIssue: "GitHub 이슈 닫기",
   trashEmail: "이메일 휴지통으로 이동",
   createTodo: "할 일 추가",
   completeTodo: "할 일 완료",

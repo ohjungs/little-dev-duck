@@ -63,4 +63,21 @@ describe("승인 카드 라벨 커버리지", () => {
     expect(text).toContain("주간 회의(연기)");
     expect(text).not.toContain("e1"); // 내부 id는 판단에 도움이 안 되므로 노출하지 않는다
   });
+
+  it("GitHub 이슈 닫기 카드가 저장소와 이슈 제목을 함께 보여준다", () => {
+    // 이슈 번호만으론 어느 이슈인지 알 수 없고, 저장소를 모르면 남의 저장소 이슈를 닫는
+    // 요청이어도 알아챌 수 없다(confused-deputy를 사람이 보고 막는 지점).
+    const text = describeCall({
+      name: "closeGithubIssue",
+      args: {
+        owner: "ohjungs",
+        repo: "little-dev-duck",
+        issueNumber: 7,
+        title: "로그인이 안 됨",
+      },
+    });
+    expect(text).toContain("GitHub 이슈 닫기");
+    expect(text).toContain("ohjungs/little-dev-duck");
+    expect(text).toContain("로그인이 안 됨");
+  });
 });
