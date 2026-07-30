@@ -667,7 +667,10 @@ export function PageEditor({
                 sizes="100vw"
               />
             </div>
-            <div className="absolute inset-0 flex items-end justify-start gap-2 bg-black/0 px-4 pb-3 opacity-0 transition-opacity group-hover:bg-black/20 group-hover:opacity-100">
+            {/* 2026-07-31 : 접근성 - 호버 전용 컨트롤 - 키보드 (SC 2.4.7)
+                안쪽 버튼은 opacity-0인 채로도 탭 순서에 남는다 — 컨테이너째 숨겼으니
+                되살리는 것도 컨테이너 단위(focus-within)여야 한다. */}
+            <div className="absolute inset-0 flex items-end justify-start gap-2 bg-black/0 px-4 pb-3 opacity-0 transition-opacity focus-within:bg-black/20 focus-within:opacity-100 group-hover:bg-black/20 group-hover:opacity-100">
               <button
                 type="button"
                 onClick={() => {
@@ -688,7 +691,7 @@ export function PageEditor({
             </div>
           </>
         ) : (
-          <div className="flex justify-start px-4 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="flex justify-start px-4 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
             <button
               type="button"
               onClick={() => {

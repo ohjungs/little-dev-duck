@@ -50,13 +50,18 @@ function RowTitleCell({
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
-        className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-primary/40 rounded px-1 py-0.5"
+        // 2026-07-31 : 접근성 - 포커스링 - 알파 금지 (SC 1.4.11)
+        // 전에는 --primary에 40% 알파를 씌운 링이었다. --primary는 희석 전에도 흰 카드 위 1.92:1이라 링 색으로
+        // 부적격이다. 저장소 전체가 --ring 하나를 쓰도록 통일한다.
+        className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-sm font-medium placeholder:text-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       <button
         type="button"
         onClick={onOpen}
         aria-label={`${row.title || "제목 없음"} 열기`}
-        className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/title:opacity-100"
+        // 2026-07-31 : 접근성 - 호버 전용 컨트롤 - 키보드 (SC 2.4.7 / 2.5.8)
+        // p-1(22px)은 타깃 최소 24px 미달, opacity-0은 키보드 사용자에게 영영 안 보인다.
+        className="shrink-0 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/title:opacity-100"
       >
         <SquareArrowOutUpRight className="size-3.5" />
       </button>
@@ -64,7 +69,7 @@ function RowTitleCell({
         type="button"
         onClick={onDelete}
         aria-label={`${row.title || "제목 없음"} 행 삭제`}
-        className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/title:opacity-100"
+        className="shrink-0 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover/title:opacity-100"
       >
         <Trash2 className="size-3.5" />
       </button>

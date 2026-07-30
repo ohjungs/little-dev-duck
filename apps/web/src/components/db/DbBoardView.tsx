@@ -98,7 +98,10 @@ export function DbBoardView({
                     type="button"
                     onClick={() => onDeleteRow(row.id)}
                     aria-label={`${row.title || "제목 없음"} 행 삭제`}
-                    className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/card:opacity-100"
+                    // 2026-07-31 : 접근성 - 호버 전용 컨트롤 - 키보드 (SC 2.4.7)
+                    // 탭으로 도달은 되는데 화면에는 안 나타나던 버튼이다. focusVisibilityLock
+                    // 검사가 전역으로 걸리면서 드러났다.
+                    className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover/card:opacity-100"
                   >
                     <Trash2 className="size-3.5" />
                   </button>

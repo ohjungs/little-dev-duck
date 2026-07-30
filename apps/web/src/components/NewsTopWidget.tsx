@@ -146,7 +146,10 @@ export function NewsTopWidget() {
                       <span className="line-clamp-1 text-sm font-medium leading-snug">
                         {a.title}
                       </span>
-                      <ExternalLink className="mt-0.5 size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                      {/* 2026-07-31 : 접근성 - 호버 전용 표시 - 키보드 (SC 2.4.7)
+                          이 아이콘 자체는 포커스를 못 받는다(장식). 포커스를 받는 건 감싼
+                          링크라, 되살리는 것도 group-focus-visible이어야 한다. */}
+                      <ExternalLink className="mt-0.5 size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-focus-visible:opacity-100 group-hover:opacity-100" />
                     </span>
                     <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                       <span className="rounded border border-border px-1">{category}</span>

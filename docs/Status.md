@@ -436,6 +436,7 @@
 - [ ] quality: 401/429 에러 응답 리터럴 중복·문구 불일치 공용 함수로 통합 — apps/web/src/lib/apiHelpers.ts
 - [ ] test: packages/api 20개 fakeSupabase 목 중복을 공유 테스트 팩토리로 통합 — packages/api/src/todos.test.ts
 - [ ] test: coverage 스크립트에 apps/web 포함 — vitest.coverage.config.ts
+- [ ] test: coverage config가 렌더 테스트를 수집하려면 include `.tsx` 확장 + jsdom 환경 결정이 동시에 필요 (`include: ["packages/*/src/**/*.test.ts"]`가 `.test.tsx`에 미매치 + environment 미지정으로 기본 node라 glob만 넓히면 `document is not defined`로 깨진다) — vitest.coverage.config.ts
 - [ ] test: CI에 E2E_AUTH_STATE_B64 시크릿 등록 또는 스킵 현황 가시화 — apps/web/e2e/README.md
 - [ ] test: geminiGenerate 응답 파싱 단위 테스트 추가 — packages/api/src/gemini.ts
 - [ ] test: agent/agent-approve 라우트 401/429 분기 실제 실행 테스트 추가 — apps/web/src/app/api/ai/agent/__tests__/route.test.ts

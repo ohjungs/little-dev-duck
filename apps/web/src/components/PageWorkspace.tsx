@@ -134,7 +134,10 @@ function TreeRow({
           }
           aria-pressed={favorited}
           className={cn(
-            "shrink-0 rounded p-1 transition-opacity hover:text-yellow-500",
+            // 2026-07-31 : 접근성 - 호버 전용 컨트롤 - 키보드 (SC 2.4.7 / 2.5.8)
+            // p-1(22px)은 타깃 최소 24px 미달이고, 인접 간격이 gap-1이라 간격 예외도 못 쓴다.
+            // opacity-0은 마우스가 없으면 영영 안 보인다 — focus-visible로 되살린다.
+            "shrink-0 rounded p-1.5 transition-opacity hover:text-yellow-500 focus-visible:opacity-100",
             favorited
               ? "text-yellow-500 opacity-100"
               : "text-muted-foreground opacity-0 group-hover:opacity-100",
@@ -146,7 +149,7 @@ function TreeRow({
           type="button"
           onClick={() => onDuplicate(node.id)}
           aria-label={`${node.title || "제목 없음"} 복제`}
-          className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+          className="shrink-0 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
         >
           <Copy className="size-3.5" />
         </button>
@@ -154,7 +157,7 @@ function TreeRow({
           type="button"
           onClick={() => onDelete(node.id)}
           aria-label={`${node.title || "제목 없음"} 삭제`}
-          className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+          className="shrink-0 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
         >
           <Trash2 className="size-3.5" />
         </button>
@@ -555,7 +558,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
                     type="button"
                     onClick={() => toggleFavorite(p.id)}
                     aria-label={`${p.title || "제목 없음"} 즐겨찾기 해제`}
-                    className="shrink-0 rounded p-1 text-yellow-500 transition-opacity hover:opacity-70"
+                    className="shrink-0 rounded p-1.5 text-yellow-500 transition-opacity hover:opacity-70"
                   >
                     <Star className="size-3.5 fill-current" />
                   </button>
