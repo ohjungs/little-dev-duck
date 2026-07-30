@@ -22,7 +22,10 @@
   --secondary: #f5f1e8;
   --secondary-foreground: #46402f;
   --muted: #f4f1ea;
-  --muted-foreground: #8a8069;
+  /* 2026-07-30 : 접근성 - 보조 텍스트 대비 (감사 발견: 3.74:1, WCAG AA 4.5:1 미달)
+     같은 카키 색조를 유지한 채 어둡게만 조정 — globalsTextContrast.test.ts가 배경 3종
+     (--background/--card/--muted) 전부에 대해 4.5:1 이상을 잠근다. */
+  --muted-foreground: #6c6452;
   --accent: #f5f1e8;
   --accent-foreground: #262117;
   --destructive: #dc2626;

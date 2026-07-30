@@ -1,5 +1,23 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-30 `/loop-eng` — 라이트 테마 보조 텍스트 대비 수정 (유휴 개선)
+> 버퍼 비어 있고 남은 항목이 전부 사용자-블록이라, 이전 세션 감사 기억(claude-mem)에 남아 있던
+> "라이트 테마 `--muted-foreground` 3.74:1, WCAG AA 4.5:1 미달" 발견을 **코드로 직접 재계산해
+> 확인**(기억은 근거로만, 재검증은 코드로 — 계산이 정확히 일치) 후 착수.
+>
+> - `globalsTextContrast.test.ts` 신설(HabitHeatmap.contrast.test.ts와 같은 결 — globals.css
+>   실물을 파싱해 WCAG 명도 대비를 잰다) → RED(3.74:1) 확인 → `--muted-foreground`를
+>   `#8a8069`→`#6c6452`로 수정(같은 카키 색조 유지, 어둡게만) → GREEN(배경 3종 × 라이트/다크
+>   전부 4.5:1 이상).
+> - **회귀 격리 검증**: CSS 변경을 잠시 stash하고 동일 e2e 실패가 재현되는지 확인 — 재현됨.
+>   즉 이번 변경과 무관한 **기존 문제**임을 확인(아래 참조).
+> - **부수 발견(확대하지 않고 기록만)**: `apps/web/e2e/.auth/user.json` 세션이 다시 만료돼
+>   인증필요 Playwright 스펙이 스킵 대신 타임아웃으로 실패 — `manual-verification.md` 109번에
+>   재현 절차 + `authState.ts` 판정 갭 의심을 기록. 사용자 세션 재생성 필요.
+> - 검증: web 79 test files·551 tests + tsc + eslint(무관 warning 2건만) 전부 GREEN. 스크린샷:
+>   [screenshots/2026-07-30/muted-foreground-contrast-fix](loop-eng/screenshots/2026-07-30/muted-foreground-contrast-fix/index.md)
+>   (공개 화면만 — 인증 화면은 세션 만료로 이월).
+
 > ## ✅ 2026-07-30 사용자 지시 — 실기검증 톱 5(98·99·102·105·108) 근본 원인 조사·수정
 > 사용자가 "톱 5가 전부 안 된다"고 보고 → 5개 병렬 조사 후 프로덕션 DB를 직접 조회해
 > 근본 원인을 확정. **핵심 발견: "코드 완료·테스트 green"과 "실제 프로덕션에서 동작"은
