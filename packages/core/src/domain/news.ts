@@ -39,6 +39,22 @@ export type RssItem = {
 // 자동 일시정지 임계: 연속 수집 실패가 이 횟수에 도달하면 피드를 paused로.
 export const FEED_FAIL_THRESHOLD = 5;
 
+// 2026-07-30 : 뉴스 - 벨로그 전체피드 스팸 필터 (사용자 실사용 피드백)
+// velog.io 전체 피드처럼 아무나 쓸 수 있는 플랫폼은 중국어 성매매 광고·해외 약 판매·도박
+// 스팸이 실제로 섞여 온다. 형태소 분석·언어감지 라이브러리 없이 "한글 글자 비율"만 본다 —
+// 결정적 판정(HD-003, LLM 미사용). 글자가 아예 없으면(숫자·기호뿐) 판단 근거가 없으므로
+// 통과시키지 않는다 — 모르는 걸 통과시키면 스팸이 새는 쪽으로 실수하게 된다.
+const HANGUL_RE = /[가-힣ᄀ-ᇿ㄰-㆏]/gu;
+const LETTER_RE = /\p{L}/gu;
+const KOREAN_MIN_RATIO = 0.3;
+
+export function isKoreanEnough(text: string, minRatio: number = KOREAN_MIN_RATIO): boolean {
+  const letters = text.match(LETTER_RE) ?? [];
+  if (letters.length === 0) return false;
+  const hangul = text.match(HANGUL_RE) ?? [];
+  return hangul.length / letters.length >= minRatio;
+}
+
 // 주의: URL 정규화(normalizeUrl)는 `new URL`(웹/노드 전역 타입)에 의존하는데 core는 플랫폼 중립이라
 // tsconfig lib이 ES2022뿐이고 @types/node도 없어 CI에서 URL 타입이 없다 → api로 옮겼다(packages/api/news.ts).
 

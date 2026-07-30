@@ -7,6 +7,7 @@ import {
   COMMON_FEED_PATHS,
   FEED_FAIL_THRESHOLD,
   buildArticleSummaryPrompt,
+  isKoreanEnough,
   type Feed,
   type Article,
 } from "@ldd/core";
@@ -347,6 +348,10 @@ export async function collectFeed(
   // RSS는 관례상 최신이 앞이므로 **앞에서부터** 자른다 — 뒤에서 자르면 오래된 것만 남는다.
   // 정상 피드 중 가장 많은 게 50건(GeekNews)이라 그 선에서 자르면 잃는 게 없다.
   for (const item of items.slice(0, MAX_ITEMS_PER_COLLECT)) {
+    // 2026-07-30 : 뉴스 - 벨로그 전체피드 스팸 필터 (사용자 실사용 피드백)
+    // velog.io 전체 피드처럼 아무나 쓰는 플랫폼은 중국어 성매매 광고·해외 약 판매·도박 스팸이
+    // 실제로 섞여 온다. 저장 전에 걸러 Gemini 요약 쿼터도 스팸에 낭비되지 않게 한다.
+    if (!isKoreanEnough(`${item.title} ${item.snippet ?? ""}`)) continue;
     // 정규화 URL 자체를 중복 판정 키로 쓴다(같은 기사=같은 정규화 URL → UNIQUE로 차단). 해시 불필요.
     const urlHash = normalizeUrl(item.link);
     const { error } = await supabase.from("articles").insert({

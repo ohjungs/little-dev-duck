@@ -64,8 +64,8 @@ function xmlResponse(xml: string, url = "https://ex.com/rss") {
 }
 
 const TWO_ITEMS = `<rss><channel>
-  <item><title>A</title><link>https://ex.com/a</link></item>
-  <item><title>B</title><link>https://ex.com/b</link></item>
+  <item><title>기사 가</title><link>https://ex.com/a</link></item>
+  <item><title>기사 나</title><link>https://ex.com/b</link></item>
 </channel></rss>`;
 
 describe("discoverFeedUrl", () => {
@@ -202,6 +202,24 @@ describe("collectFeed", () => {
     expect(result.inserted).toBe(0);
     expect(result.paused).toBe(false);
   });
+
+  // 2026-07-30 : 뉴스 - 벨로그 전체피드 스팸 필터 (사용자 실사용 피드백)
+  // 실사용 계정에서 velog.io 전체 피드(v2.velog.io/rss/)에 중국어 성매매 광고·해외 약 판매
+  // 스팸이 실제로 섞여 들어온 걸 확인했다. 한글 비중 낮은 항목은 저장 자체를 건너뛴다.
+  it("한글 비중이 낮은 스팸성 항목은 저장하지 않는다", async () => {
+    const { supabase, state } = fakeSupabase();
+    const spamXml = `<rss><channel>
+      <item><title>厦门市外围(上门服务)优质mm上门</title><link>https://ex.com/spam1</link></item>
+      <item><title>Order Soma Pills Now Fast Delivery</title><link>https://ex.com/spam2</link></item>
+      <item><title>결제 API에 멱등성 키를 적용해 중복 결제 방지하기</title><link>https://ex.com/ok</link></item>
+    </channel></rss>`;
+    const result = await collectFeed(supabase, baseFeed(), {
+      fetchImpl: xmlResponse(spamXml),
+    });
+    expect(result.inserted).toBe(1);
+    expect(state.articleInserts).toHaveLength(1);
+    expect(state.articleInserts[0]).toMatchObject({ link: "https://ex.com/ok" });
+  });
 });
 
 function addFeedSupabase(captured: { url?: string }) {
@@ -312,7 +330,7 @@ describe("한 번에 저장하는 기사 수 상한 (실측으로 발견)", () =
   function manyItems(n: number): string {
     const items = Array.from(
       { length: n },
-      (_, i) => `<item><title>T${i}</title><link>https://ex.com/${i}</link></item>`,
+      (_, i) => `<item><title>기사${i}</title><link>https://ex.com/${i}</link></item>`,
     ).join("");
     return `<rss><channel>${items}</channel></rss>`;
   }
@@ -336,8 +354,8 @@ describe("한 번에 저장하는 기사 수 상한 (실측으로 발견)", () =
     // RSS는 관례상 최신이 앞이다. 뒤에서 자르면 오래된 것만 남는다.
     const { supabase, state } = fakeSupabase();
     await collectFeed(supabase, baseFeed(), { fetchImpl: xmlResponse(manyItems(100)) });
-    expect(state.articleInserts[0].title).toBe("T0");
-    expect(state.articleInserts.at(-1)!.title).toBe("T49");
+    expect(state.articleInserts[0].title).toBe("기사0");
+    expect(state.articleInserts.at(-1)!.title).toBe("기사49");
   });
 
   it("응답이 지나치게 크면 받지 않고 실패로 센다", async () => {

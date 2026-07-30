@@ -281,6 +281,7 @@ export {
   articleSchema,
   parseRssItems,
   FEED_FAIL_THRESHOLD,
+  isKoreanEnough,
   type Feed,
   type Article,
   type RssItem,

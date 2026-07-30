@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRssItems } from "./news";
+import { isKoreanEnough, parseRssItems } from "./news";
 
 // normalizeUrl은 `new URL`(플랫폼 전역) 의존이라 api로 옮김 — 테스트도 api/news.test.ts에 있다.
 
@@ -121,5 +121,42 @@ describe("이중 인코딩된 엔티티가 화면에 그대로 보이던 문제 
       <description>&lt;p&gt;문단 &lt;b&gt;굵게&lt;/b&gt;&lt;/p&gt;</description>
     </item></channel></rss>`;
     expect(parseRssItems(xml)[0].snippet).toBe("문단 굵게");
+  });
+});
+
+// 2026-07-30 : 뉴스 - 벨로그 전체피드 스팸 필터 (사용자 실사용 피드백)
+// velog.io 전체 피드(v2.velog.io/rss/)는 아무나 글을 쓸 수 있는 플랫폼이라, 중국어 성매매 광고·
+// 해외 약 판매·도박 스팸이 실제로 섞여 들어온다(실사용 계정에서 실측). 한글 비중으로 거른다 —
+// 형태소 분석 없이 "한글 글자 비율"만 보는 가장 단순한 결정적 판정(HD-003, LLM 미사용).
+describe("isKoreanEnough (스팸·외국어 글 거르기)", () => {
+  it("한글 위주 제목은 통과한다", () => {
+    expect(isKoreanEnough("결제 API에 멱등성 키를 적용해 중복 결제 방지하기")).toBe(true);
+  });
+
+  it("영문 기술 용어가 섞여도 한글이 충분하면 통과한다", () => {
+    expect(isKoreanEnough("TypeScript와 Storybook을 사용한 리액트 디자인 시스템 구축하기")).toBe(true);
+  });
+
+  it("중국어 스팸(한글 0%)은 거른다", () => {
+    expect(
+      isKoreanEnough("厦门市外围(上门服务)外围女(TEL:134=2784=2351)优质mm上门含工作室"),
+    ).toBe(false);
+  });
+
+  it("영문 스팸(한글 0%)은 거른다", () => {
+    expect(isKoreanEnough("Order Soma Pills Now Fast Overnight Door-To-Door Home Delivery")).toBe(
+      false,
+    );
+    expect(
+      isKoreanEnough("Online Slot: The reason why Electronic Fishing reel Video games"),
+    ).toBe(false);
+  });
+
+  it("글자가 전혀 없으면(숫자·기호만) 거른다 — 판단 근거가 없으면 통과시키지 않는다", () => {
+    expect(isKoreanEnough("2026.07.30 #12345")).toBe(false);
+  });
+
+  it("빈 문자열은 거른다", () => {
+    expect(isKoreanEnough("")).toBe(false);
   });
 });
