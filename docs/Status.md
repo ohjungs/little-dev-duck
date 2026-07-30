@@ -1,5 +1,48 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## 🛑 2026-07-30 `/loop-eng` — RLS 권한상승 2건 수정 코드 완료, **실서버 적용 승인 대기**
+> 백그라운드 감사 워크플로우가 뒤늦게 산출한 스펙 초안 3건을 발견해 전부 코드로 재검증했다.
+> 1건은 이미 고친 것(중복 → superseded 표기), **2건은 실제로 열려 있는 RLS 권한상승 구멍**이었다.
+>
+> - **[S1] profiles 권한상승**: `profiles_update_own`이 행 단위(`id = auth.uid()`)만 봐서, 로그인한
+>   일반 사용자가 REST로 `{"role":"admin"}`을 보내면 **스스로 관리자가 된다**(`disabled_features`도
+>   같은 방법으로 해제 가능). `updateMyProfile`이 그 키를 안 보내는 건 앱 계층 방어일 뿐 —
+>   `access.ts`가 명시한 "권한의 단일 출처는 RLS"가 실제로는 안 지켜지고 있었다.
+>   → `20260730160000_profiles_admin_column_guard`: BEFORE UPDATE 트리거가 `is_admin()` 아닌
+>   세션의 두 컬럼 변경을 거부. RLS 정책으로는 컬럼 단위 제한을 표현할 수 없어 트리거를 쓴다
+>   (`touch_room_on_message` 선례와 같은 이유).
+> - **[S1] room_id 위조**: `room_members_update_self`·`messages_update_sender`도 소유자만 검사해
+>   `room_id`가 열려 있었다 — 자기 멤버십 행의 `room_id`만 바꾸면 초대를 거치지 않고 **남의 방
+>   멤버가 되어 대화가 읽힌다**(메시지를 다른 방으로 옮기는 것도 가능).
+>   → `20260730170000_room_id_immutable`: 양쪽 테이블에 BEFORE UPDATE 트리거.
+> - **정적 잠금**: `schemaGuard`에 검사 2종 추가(`isProfilesAdminColumnGuardMissing`,
+>   `findTablesMissingRoomIdGuard`) + 메타검증 8건. **각 검사가 공짜 통과가 아님을 마이그레이션을
+>   실제로 치워 실패하는지로 확인**했다. 구현 중 정규식 함정 1건 발견·수정 — `create trigger ...
+>   execute function public.X()`가 함수 정의로 오인돼 뒤의 진짜 정의를 삼켰다(`create|replace`
+>   앵커로 해결, 기존 `findUnrevokedDefiners` 관례와 통일).
+> - **기능 손실 0 확인(전수)**: profiles UPDATE 4곳·room 관련 UPDATE 5곳을 전부 확인 —
+>   정상 경로는 잠그는 컬럼을 애초에 갱신하지 않는다. service_role 경로도 profiles를 안 만진다.
+> - 검증: turbo lint+test **17/17 GREEN**(api 509 / web 551). 원격 DB는 로컬 마이그레이션 41건
+>   전건 적용 상태를 MCP로 확인했고, **이 2건은 DDL이라 승인 없이 적용하지 않았다**
+>   (CLAUDE.md 5절 · loop-eng 8-1 예외). 적용 요청: [PENDING 머리말](loop-eng/PENDING.md) ·
+>   [manual-verification 110번](loop-eng/manual-verification.md).
+
+> ## ✅ 2026-07-30 `/loop-eng` — ConfirmDialog 공용 접근성 훅 연결 (유휴 개선)
+> 감사 기억(claude-mem)의 "ConfirmDialog가 useModalA11y 패턴을 안 쓴다"는 발견을 코드로
+> 재확인 — 실제로 자체 Escape 핸들러 + 최초 포커스만 있고 **Tab 포커스 트랩·닫힐 때 포커스
+> 복원이 없었다**(VersionHistory·PageExportDialog·ShortcutsHelp·ChatQuoteDialog·
+> OnboardingOverlay 5곳은 이미 공용 `useModalA11y` 사용 중, ConfirmDialog만 예외).
+>
+> - `ConfirmDialog.tsx`가 자체 구현(useRef+useEffect+onKeyDown) 대신 공용 `useModalA11y`를
+>   쓰도록 교체 — 키보드 사용자가 삭제 확인 등 모달에서 Tab으로 배경 요소로 새지 않고,
+>   닫으면 열기 전 포커스로 복원됨. 이 컴포넌트는 9곳(TodoWidget·HabitWidget·TrashView·
+>   NewsReader·MessageStorageCard·ImportDataButton·DuckChatPanel·MessageImageViewer·
+>   LocalResetButton)에서 공유돼 한 번의 수정이 전부에 적용된다.
+> - 검증: web 79 test files·551 tests + tsc + eslint(무관 warning 2건만) GREEN. 컴포넌트 단위
+>   포커스 트랩 자동 테스트는 `@testing-library/react` 미설치라 이번 스코프에서 의존성을
+>   새로 추가하지 않고(스코프 고정), 다른 5개 사용처와 동일한 신뢰 패턴에 기댐. 실제 화면의
+>   Tab 순환 확인은 e2e 인증 세션 만료([109번](loop-eng/manual-verification.md))로 이월.
+
 > ## ✅ 2026-07-30 `/loop-eng` — 라이트 테마 보조 텍스트 대비 수정 (유휴 개선)
 > 버퍼 비어 있고 남은 항목이 전부 사용자-블록이라, 이전 세션 감사 기억(claude-mem)에 남아 있던
 > "라이트 테마 `--muted-foreground` 3.74:1, WCAG AA 4.5:1 미달" 발견을 **코드로 직접 재계산해
@@ -144,6 +187,87 @@
 사용자 결정(메신저 기대상 · PENDING 6 CRON_SECRET · PENDING 12 기사 이미지)이 열쇠이고,
 그 전까지 유휴 사이클은 소형 개선·정적 잠금·문서 정리로 채운다.
 실기 확인 대기: [manual-verification](loop-eng/manual-verification.md) 머리의 "톱 5" 참조.
+
+## 발굴된 개선점 (2026-07-30 /plan 5인 감사 + 내부 패널 교차검증)
+
+> 5인 감사관(code-reviewer, security-auditor, ui-ux-designer, test-automator, technical-researcher) 병렬 스윕
+> → 내부 회의 패널(증거 검증 debugger + 가치 반박 task-decomposition-expert) 교차검증.
+> 교차검증 모드: internal-panel (gemini/codex CLI 둘 다 미설치). loop-until-dry 4라운드 하드캡 도달로 정지
+> (매 라운드 신규 발굴 계속돼 dry 미도달 — R1 39건→R2 28건→R3 24건→R4 23건, 누적 확정 26→43→44→59).
+> 교차검증 통과 59건 중 중복 병합 3건(P9+P10, P16+P18, P54+P55) 정리 후 **56건 확정**, 55건 탈락(근거불충분·
+> 이미해결·과잉설계·YAGNI 위반 등, 무죄추정 없이 회의적 판정). 영역별 분포: test 22 · security 10 · quality 8 ·
+> ux 8 · feature 5 · stack 3.
+>
+> 상위 3개는 `/spec-loop`용 draft 스펙까지 생성함: [profiles-rls-role-escalation](specs/2026-07-30-profiles-rls-role-escalation.md) ·
+> [room-rls-room-id-immutable](specs/2026-07-30-room-rls-room-id-immutable.md) ·
+> [light-theme-contrast-wcag](specs/2026-07-30-light-theme-contrast-wcag.md)(**주의**: 스펙 작성 중 조사 결과
+> globals.css의 이 대비 수정은 오늘 다른 `/loop-eng` 세션이 이미 배포 완료한 것으로 확인됨 — 착수 전
+> 재검증 먼저, 실질 작업은 불필요할 가능성 높음).
+
+### S1 (priority 1~9) — 최상위
+
+- [ ] security: profiles RLS 권한 상승 차단 (role/disabled_features 컬럼 보호) — supabase/migrations/20260720100000_profiles.sql → 스펙: [docs/specs/2026-07-30-profiles-rls-role-escalation.md](specs/2026-07-30-profiles-rls-role-escalation.md)
+- [ ] security: room_members/messages RLS room_id 불변조건 추가 (멤버십·메시지 위조 차단, P9+P10 병합) — supabase/migrations/20260727030000_messenger_rooms.sql → 스펙: [docs/specs/2026-07-30-room-rls-room-id-immutable.md](specs/2026-07-30-room-rls-room-id-immutable.md)
+- [ ] ux: 라이트 테마 --muted-foreground 대비 WCAG AA 미달 수정 — apps/web/src/app/globals.css (**이미 완료 추정** — 위 참고) → 스펙: [docs/specs/2026-07-30-light-theme-contrast-wcag.md](specs/2026-07-30-light-theme-contrast-wcag.md)
+- [ ] test: 컴포넌트 렌더 테스트 인프라 도입 (jsdom+testing-library, 후속 테스트 다수의 선행조건) — apps/web/vitest.config.ts
+- [ ] test: LoginForm 로그인/가입 제출 로직 컴포넌트·E2E 테스트 추가 — apps/web/src/app/login/LoginForm.tsx
+- [ ] test: AdminUserPanel 역할 변경 권한 테스트 추가 (admin/insights/settings/news 스모크 포함) — apps/web/src/components/AdminUserPanel.tsx
+- [ ] test: 계정 영구 삭제 API 라우트 테스트 추가 — apps/web/src/app/api/account/delete/route.ts
+- [ ] test: 블록 에디터(PageEditor/PageWorkspace/BlockEditor) 핵심 기능 컴포넌트·E2E 테스트 추가 — apps/web/src/components/PageEditor.tsx
+- [ ] test: RLS 정책 통합 테스트 도입 (pgTAP/로컬 Supabase 스택) — supabase/migrations
+
+### S2 (priority 10~33)
+
+- [ ] security: messages UPDATE RLS sender_type 위장(오리 발화 사칭) 차단 — supabase/migrations/20260727030000_messenger_rooms.sql
+- [ ] ux: DbTableView/DbBoardView hover 버튼 focus-visible + 터치타겟 확대 (P16+P18 병합) — apps/web/src/components/db/DbTableView.tsx
+- [ ] ux: GithubContributionWidget grid/gridcell 접근성 속성 추가 — apps/web/src/components/GithubContributionWidget.tsx
+- [ ] quality: 전역 ErrorBoundary에 componentDidCatch 추가 (렌더 크래시 무기록 방지) — apps/web/src/components/ErrorBoundary.tsx
+- [ ] quality: 401/429 에러 응답 리터럴 중복·문구 불일치 공용 함수로 통합 — apps/web/src/lib/apiHelpers.ts
+- [ ] test: packages/api 20개 fakeSupabase 목 중복을 공유 테스트 팩토리로 통합 — packages/api/src/todos.test.ts
+- [ ] test: coverage 스크립트에 apps/web 포함 — vitest.coverage.config.ts
+- [ ] test: CI에 E2E_AUTH_STATE_B64 시크릿 등록 또는 스킵 현황 가시화 — apps/web/e2e/README.md
+- [ ] test: geminiGenerate 응답 파싱 단위 테스트 추가 — packages/api/src/gemini.ts
+- [ ] test: agent/agent-approve 라우트 401/429 분기 실제 실행 테스트 추가 — apps/web/src/app/api/ai/agent/__tests__/route.test.ts
+- [ ] security: OAuth 토큰(Google/GitHub/Gmail) 저장 시 암호화 적용 — packages/api/src/oauthTokens.ts
+- [ ] security: message-attachments 삭제 정책을 업로더 본인으로 제한 — supabase/migrations/20260727040000_message_attachments_bucket.sql
+- [ ] quality: rooms.ts(36개 export)를 도메인별 파일 5개로 분리 — packages/api/src/rooms.ts
+- [ ] quality: PageEditor.tsx(968줄) 관심사별 훅(useVersionHistory 등) 분리 — apps/web/src/components/PageEditor.tsx
+- [ ] ux: 모달 9곳 useModalA11y 적용 + AchievementCard 캔버스 텍스트 대체 (P54+P55 병합) — apps/web/src/components/ConfirmDialog.tsx
+- [ ] ux: 9-10px 임의값 폰트 33곳을 최소 11px 이상으로 통일 — apps/web/src/components/BarChart.tsx
+- [ ] ux: 공용 Button/Input 기본 높이 44px 터치타겟으로 상향 — apps/web/src/components/ui/button.tsx
+- [ ] test: app/api 라우트 7개에 라우트 레벨 테스트 추가 — apps/web/src/app/api/ai/duck-line/route.ts
+- [ ] test: rooms.ts 미테스트 13개 export 커버리지 보강 — packages/api/src/rooms.test.ts
+- [ ] test: 3D 마스코트 Duck.tsx 렌더링/애니메이션 로직 테스트 추가 — packages/mascot/src/Duck.tsx
+- [ ] stack: (app)/layout.tsx force-dynamic 재검토로 인증 이중화·정적 렌더링 무효화 해소 — apps/web/src/app/(app)/layout.tsx
+- [ ] feature: Web Push(백그라운드) 알림 채널 구현 — apps/web/src/lib/notify.ts
+- [ ] feature: Calendar/GitHub 어댑터에 update/delete 도구 추가 — packages/api/src/googleCalendar.ts
+- [ ] test: MessageRoom 핵심 플로우 E2E 시나리오 신규 작성 — apps/web/src/components/MessageRoom.tsx
+
+### S3 (priority 34~56) — 후속
+
+- [ ] security: next.config.ts에 poweredByHeader:false 추가 — apps/web/next.config.ts
+- [ ] security: /api/keepalive CRON_SECRET 미설정 시 fail-closed로 전환 — apps/web/src/app/api/keepalive/route.ts
+- [ ] security: SSRF 사설대역 차단 IPv4 대체표기 커버리지 테스트로 고정 — packages/api/src/news.ts
+- [ ] security: 이메일/비밀번호 가입 최소 길이·강도 정책 추가 — supabase/config.toml
+- [ ] security: createGithubIssue title/body 필드 길이 상한 추가 — packages/api/src/githubIssues.ts
+- [ ] quality: 사이트 URL 계산 글루 코드 3중 반복을 getSiteUrl() 래퍼로 통합 — apps/web/src/app/layout.tsx
+- [ ] quality: knip을 lint/CI 파이프라인에 배선 — apps/web/src/lib/clientErrorLog.ts
+- [ ] stack: 미사용 framer-motion 의존성 제거 — apps/web/package.json
+- [ ] stack: Dependabot 또는 Renovate 도입 — .github/workflows/ci.yml
+- [ ] ux: AI 응답 대기 중 진행 단계 안내 문구 추가 — apps/web/src/components/DuckChatPanel.tsx
+- [ ] test: safeHref() 함수 자체 입출력 단위 테스트 추가 — apps/web/src/lib/safeHref.ts
+- [ ] test: Tauri Rust 테스트를 CI 파이프라인에 연결 — .github/workflows/ci.yml
+- [ ] test: CI에 커버리지 실행 및 threshold 게이트 추가 — vitest.coverage.config.ts
+- [ ] test: useModalA11y 포커스 트랩/복원 동작 단위 테스트 추가 — apps/web/src/hooks/useModalA11y.ts
+- [ ] feature: OAuth 없이 구독 가능한 ICS(webcal) 피드 제공 — packages/api/src/googleCalendar.ts
+- [ ] quality: 위젯 loading/error 보일러플레이트를 useAsyncData 훅으로 추출 — apps/web/src/components/*.tsx
+- [ ] quality: appActions execute() if-else 사슬을 디스패치 테이블로 전환 — packages/api/src/appActions.ts
+- [ ] ux: 오리 채팅 입력창을 자동 높이 textarea로 교체 — apps/web/src/components/DuckChatPanel.tsx
+- [ ] test: apps/web/src/lib 미테스트 유틸 12개에 단위 테스트 추가 — apps/web/src/lib/apiHelpers.ts
+- [ ] test: 칸반/DatabaseView 드래그앤드롭 E2E 추가 — apps/web/e2e
+- [ ] test: Playwright에 WebKit 프로젝트 추가 — apps/web/playwright.config.ts
+- [ ] feature: Cmd+K 명령 팔레트에 pgvector 시맨틱 검색 연동 — apps/web/src/components/CommandPalette.tsx
+- [ ] feature: RAG 검색에 키워드(tsvector) 하이브리드 랭킹 도입 — packages/api/src/embeddings.ts
 
 ## 발굴된 개선점 (2026-07-24 /plan 5인 감사 + 내부 패널 교차검증)
 

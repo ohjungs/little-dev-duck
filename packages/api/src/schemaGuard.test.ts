@@ -7,11 +7,13 @@ import {
   collectFunctionNames,
   collectSchemaFacts,
   findMissingRollbacks,
+  findTablesMissingRoomIdGuard,
   findUndeclaredWrites,
   findUnknownRpcs,
   findUnknownTables,
   findUnrevokedDefiners,
   findViolations,
+  isProfilesAdminColumnGuardMissing,
   purgeReachable,
   stripComments,
   type MigrationFile,
@@ -118,6 +120,18 @@ describe("스키마 안전 계약 (실제 마이그레이션)", () => {
     expect(
       findMissingRollbacks(sqlFiles(MIGRATIONS_DIR), sqlFiles(ROLLBACK_DIR)),
     ).toEqual([]);
+  });
+
+  it("profiles의 role/disabled_features는 관리자만 바꿀 수 있도록 잠겨 있다", () => {
+    // 2026-07-30 감사 발견(S1): profiles_update_own은 행 단위만 봐서 이 두 컬럼도 본인이
+    // 자유롭게 바꿀 수 있었다(권한상승). 20260730160000의 BEFORE UPDATE 트리거가 막는다.
+    expect(isProfilesAdminColumnGuardMissing(migrations)).toBe(false);
+  });
+
+  it("room_members·messages의 room_id가 양쪽 다 불변으로 잠겨 있다", () => {
+    // 2026-07-30 감사 발견(S1): 소유자 검사만 하는 UPDATE 정책 때문에 자기 행의 room_id를
+    // 바꿔 멤버십을 위조(→ 남의 대화 열람)하거나 메시지를 다른 방으로 옮길 수 있었다.
+    expect(findTablesMissingRoomIdGuard(migrations)).toEqual([]);
   });
 });
 
@@ -324,6 +338,127 @@ describe("SECURITY DEFINER 검사가 위반을 잡는다", () => {
       },
     ];
     expect(findUnrevokedDefiners(files)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// profiles 관리자전용 컬럼가드 검사도 위반을 실제로 잡는지 (메타 검증)
+// ---------------------------------------------------------------------------
+describe("profiles 관리자전용 컬럼가드 검사가 위반을 잡는다", () => {
+  const guardMigration = (fnBody: string): MigrationFile[] => [
+    {
+      name: "9999_guard.sql",
+      sql: `
+        create or replace function public.guard_profiles_admin_columns()
+        returns trigger
+        language plpgsql
+        set search_path = public
+        as $$
+        begin
+          ${fnBody}
+          return new;
+        end;
+        $$;
+
+        create trigger profiles_guard_admin_columns
+          before update on public.profiles
+          for each row execute function public.guard_profiles_admin_columns();
+      `,
+    },
+  ];
+
+  it("트리거 자체가 없으면 잡는다", () => {
+    expect(isProfilesAdminColumnGuardMissing([{ name: "0001.sql", sql: "" }])).toBe(true);
+  });
+
+  it("role만 보고 disabled_features는 안 보면 잡는다", () => {
+    const files = guardMigration(`
+      if new.role is distinct from old.role and not public.is_admin() then
+        raise exception 'nope';
+      end if;
+    `);
+    expect(isProfilesAdminColumnGuardMissing(files)).toBe(true);
+  });
+
+  it("is_admin() 체크 없이 그냥 막기만 하면 잡는다", () => {
+    // 관리자 자신의 role 변경(관리자 화면에서 남을 승격)까지 막아버리는 퇴행.
+    const files = guardMigration(`
+      if new.role is distinct from old.role or new.disabled_features is distinct from old.disabled_features then
+        raise exception 'nope';
+      end if;
+    `);
+    expect(isProfilesAdminColumnGuardMissing(files)).toBe(true);
+  });
+
+  it("role·disabled_features 둘 다 is_admin()으로 지키면 통과한다", () => {
+    const files = guardMigration(`
+      if (new.role is distinct from old.role or new.disabled_features is distinct from old.disabled_features)
+         and not public.is_admin() then
+        raise exception 'nope';
+      end if;
+    `);
+    expect(isProfilesAdminColumnGuardMissing(files)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// room_id 불변가드 검사도 위반을 실제로 잡는지 (메타 검증)
+// ---------------------------------------------------------------------------
+describe("room_id 불변가드 검사가 위반을 잡는다", () => {
+  const GUARD_FN = `
+    create or replace function public.guard_room_id_immutable()
+    returns trigger language plpgsql set search_path = public as $$
+    begin
+      if new.room_id is distinct from old.room_id then
+        raise exception 'nope';
+      end if;
+      return new;
+    end;
+    $$;
+  `;
+  const trigger = (table: string) => `
+    create trigger ${table}_guard_room_id
+      before update on public.${table}
+      for each row execute function public.guard_room_id_immutable();
+  `;
+  const files = (sql: string): MigrationFile[] => [{ name: "9999_g.sql", sql }];
+
+  it("가드가 아예 없으면 두 테이블 모두 잡는다", () => {
+    expect(findTablesMissingRoomIdGuard(files(""))).toEqual([
+      "messages",
+      "room_members",
+    ]);
+  });
+
+  it("한쪽만 막으면 다른 쪽을 잡는다", () => {
+    // 한쪽만 막으면 다른 쪽 공격 경로가 그대로 남는다 — 이게 이 검사의 존재 이유다.
+    expect(
+      findTablesMissingRoomIdGuard(files(GUARD_FN + trigger("room_members"))),
+    ).toEqual(["messages"]);
+  });
+
+  it("트리거는 있지만 함수가 room_id를 안 보면 잡는다", () => {
+    const weak = `
+      create or replace function public.guard_room_id_immutable()
+      returns trigger language plpgsql as $$
+      begin
+        return new;
+      end;
+      $$;
+    `;
+    expect(
+      findTablesMissingRoomIdGuard(
+        files(weak + trigger("room_members") + trigger("messages")),
+      ),
+    ).toEqual(["messages", "room_members"]);
+  });
+
+  it("양쪽 다 막으면 통과한다", () => {
+    expect(
+      findTablesMissingRoomIdGuard(
+        files(GUARD_FN + trigger("room_members") + trigger("messages")),
+      ),
+    ).toEqual([]);
   });
 });
 

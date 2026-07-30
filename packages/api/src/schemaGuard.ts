@@ -349,6 +349,67 @@ export function findUndeclaredWrites(
   return found;
 }
 
+// 2026-07-30 : 보안 - profiles - role/disabled_features 관리자전용 컬럼가드 검사
+// profiles_update_own은 행 단위만 봐서 role·disabled_features도 자유롭게 바뀐다 — 로그인한
+// 사용자가 PATCH로 스스로 관리자가 되거나 자기 기능제한을 풀 수 있었다(2026-07-30 감사 발견,
+// S1). BEFORE UPDATE 트리거(20260730160000)가 막는데, 이 검사는 그 가드가 나중에 실수로
+// 지워지거나 조건이 약해지면(예: is_admin() 체크 누락) 실패해야 한다.
+const RE_PROFILES_GUARD_TRIGGER =
+  /create\s+trigger\s+\S+\s+before\s+update\s+on\s+public\.profiles[\s\S]*?execute\s+function\s+public\.(\w+)/i;
+
+// 반환값이 true면 위반(가드 없음/불완전). false면 통과.
+export function isProfilesAdminColumnGuardMissing(files: MigrationFile[]): boolean {
+  const combined = files.map((f) => f.sql).join("\n");
+  const trigger = RE_PROFILES_GUARD_TRIGGER.exec(combined);
+  if (!trigger) return true;
+
+  const fnName = trigger[1];
+  // `create|replace` 앵커 필수 — 없으면 `execute function public.<fnName>()`(트리거 정의)에
+  // 먼저 걸려 엉뚱한 구간을 본문으로 읽는다(findTablesMissingRoomIdGuard와 같은 함정).
+  const fnBody = new RegExp(
+    `(?:create|replace)\\s+function\\s+public\\.${fnName}\\s*\\([\\s\\S]*?\\$\\$([\\s\\S]*?)\\$\\$`,
+    "i",
+  ).exec(combined)?.[1];
+  if (!fnBody) return true;
+
+  const guardsRole = /\brole\b/i.test(fnBody);
+  const guardsDisabledFeatures = /disabled_features/i.test(fnBody);
+  const checksAdmin = /is_admin\s*\(\s*\)/i.test(fnBody);
+  return !(guardsRole && guardsDisabledFeatures && checksAdmin);
+}
+
+// 2026-07-30 : 보안 - 메신저 - room_id 불변가드 검사 (감사 발견 S1)
+// room_members_update_self·messages_update_sender는 행 소유자만 봐서 room_id까지 바꿀 수
+// 있었다 — 멤버십을 위조해 남의 대화를 읽거나 메시지를 다른 방으로 옮길 수 있다.
+// BEFORE UPDATE 트리거(20260730170000)가 막는데, 두 테이블 **양쪽 모두**에 걸려 있어야
+// 한다(한쪽만 막으면 다른 쪽 공격이 그대로 남는다).
+export function findTablesMissingRoomIdGuard(files: MigrationFile[]): string[] {
+  const combined = files.map((f) => f.sql).join("\n");
+
+  // room_id를 OLD와 비교해 거부하는 트리거 함수 이름들을 모은다.
+  // `create|replace`로 앵커한다 — 이걸 빼면 `create trigger ... execute function public.X()`도
+  // 함수 정의로 잡히고, 그 매칭이 lazy하게 다음 `$$`까지 삼켜 **뒤에 오는 진짜 정의를 건너뛴다**
+  // (처음 짤 때 실제로 그래서 실기 검사만 조용히 실패했다). findUnrevokedDefiners와 같은 관례.
+  const guardFns = new Set<string>();
+  for (const m of combined.matchAll(
+    /(?:create|replace)\s+function\s+public\.(\w+)\s*\([\s\S]*?\$\$([\s\S]*?)\$\$/gi,
+  )) {
+    const body = m[2];
+    if (/new\.room_id\s+is\s+distinct\s+from\s+old\.room_id/i.test(body)) {
+      guardFns.add(m[1]);
+    }
+  }
+
+  const guarded = new Set<string>();
+  for (const m of combined.matchAll(
+    /create\s+trigger\s+\S+\s+before\s+update\s+on\s+public\.(\w+)[\s\S]*?execute\s+function\s+public\.(\w+)/gi,
+  )) {
+    if (guardFns.has(m[2])) guarded.add(m[1]);
+  }
+
+  return ["room_members", "messages"].filter((t) => !guarded.has(t)).sort();
+}
+
 // 마이그레이션마다 짝이 되는 롤백 스크립트가 있어야 한다(CLAUDE.md 5절).
 export function findMissingRollbacks(
   migrationNames: string[],

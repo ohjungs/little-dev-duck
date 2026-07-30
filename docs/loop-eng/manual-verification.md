@@ -1596,3 +1596,27 @@ const a = 1;
   다시 통과하는지 확인.
 - **현재 상태**: 사용자 재생성 필요(브라우저 실제 로그인). 코드 쪽 갭 의심은 다음 자율 사이클
   후속 조사 대상으로 남김(이번 사이클은 접근성 대비 수정이 본 작업이라 여기서 확대하지 않음).
+
+## 110. 보안 마이그레이션 2건 적용 승인 필요 — RLS 권한상승·멤버십 위조 차단 (2026-07-30, `/loop-eng`)
+
+- **무엇을**: 아래 두 마이그레이션을 실서버에 적용(`supabase db push` 또는 Supabase 대시보드).
+  DDL은 되돌리기 어려운 작업이라 CLAUDE.md 5절·loop-eng 8-1 예외 규정에 따라 **자율 적용하지
+  않고 승인을 기다린다**. 롤백 스크립트는 `supabase/rollback/`에 짝으로 전건 준비됨.
+
+  | 마이그레이션 | 지금 열려 있는 구멍 |
+  |---|---|
+  | `20260730160000_profiles_admin_column_guard` | 로그인한 일반 사용자가 `PATCH /rest/v1/profiles?id=eq.<자기id>`에 `{"role":"admin"}`을 실어 보내면 **스스로 관리자가 된다**. `disabled_features`도 같은 방법으로 비워 자기 기능제한을 해제할 수 있다. `profiles_update_own` 정책이 행 단위(`id = auth.uid()`)만 보기 때문 — RLS 정책은 컬럼 단위 제한을 표현할 수 없다. |
+  | `20260730170000_room_id_immutable` | 자기 `room_members` 행의 `room_id`만 다른 방 id로 PATCH하면 초대를 전혀 거치지 않고 **그 방 멤버가 되어 남의 대화가 읽힌다**. 자기 메시지의 `room_id`를 바꿔 대화 기록을 다른 방으로 옮기는 것도 가능. |
+
+- **왜 사용자 필요**: DDL(트리거·함수 생성)이라 실행 전 확인 대상. Supabase MCP는 이번 세션에서
+  `list_migrations` 조회는 됐지만(원격 41건 = 로컬 전건 적용 확인) **적용은 승인 없이 하지 않았다.**
+- **적용 안 해도 앱은 그대로 동작한다**: 두 트리거는 정상 경로가 절대 하지 않는 변경만 막는다 —
+  정적 전수 확인 결과 `access.ts`의 profiles UPDATE 4곳은 관리자 경로(`is_admin()` 통과) 또는
+  `display_name`/`avatar_url`/`dashboard_layout`만 갱신하고, `rooms.ts`의 room_members·messages
+  UPDATE 5곳은 `last_read_message_id`·`muted_until`·`pinned_at`·`body`·`deleted_at`·`edited_at`만
+  실어 보낸다. **즉 기능 손실 0이고, 적용 전까지는 위 구멍이 열린 채로 남는다.**
+- **재현 절차(적용 후 검증)**: 로그인 세션 토큰으로 `PATCH .../rest/v1/profiles?id=eq.<본인id>`에
+  `{"role":"admin"}` → 거부되어야 함(적용 전에는 통과). 이어서 표시 이름 변경은 정상 성공해야 함.
+- **현재 상태**: 코드·롤백·정적 검사(schemaGuard 2종 + 메타검증 8건) 완료, 전 패키지 검증
+  GREEN(api 509 tests / web 551 tests / turbo 17-17). **실서버 적용만 대기.**
+  실제 REST PATCH 거부 여부는 적용 후에만 확인 가능(코드로는 정적 판정까지가 한계).
