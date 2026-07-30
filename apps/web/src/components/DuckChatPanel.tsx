@@ -6,6 +6,7 @@ import { describeCall } from "@/lib/approvalLabel";
 import { isComposingEnter } from "@/lib/composition";
 import { timeAgo } from "@/lib/timeAgo";
 import { DUCK_EXAMPLES } from "@/lib/duckExamples";
+import { DUCK_PENDING_LABEL } from "@/lib/duckPending";
 import { useDuckChat } from "@ldd/ai";
 import { emitAppAction } from "@/lib/appActionSignal";
 import { cn } from "@/lib/utils";
@@ -165,10 +166,26 @@ export function DuckChatPanel() {
             </div>
           )}
           {pending && (
-            <div className="flex items-center gap-1.5 self-start rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5">
-              <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+            // 점 애니메이션은 눈으로만 보인다 — role="status"와 sr-only 문구가 없으면
+            // 스크린리더 사용자는 보냈는데 아무 반응이 없는 것으로 느낀다(메신저 오리 방은
+            // 이미 이렇게 알린다). 문구는 lib DUCK_PENDING_LABEL 한 벌.
+            <div
+              role="status"
+              className="flex items-center gap-1.5 self-start rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5"
+            >
+              <span className="sr-only">{DUCK_PENDING_LABEL}</span>
+              <span
+                aria-hidden="true"
+                className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]"
+              />
+              <span
+                aria-hidden="true"
+                className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]"
+              />
+              <span
+                aria-hidden="true"
+                className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60"
+              />
             </div>
           )}
         </div>

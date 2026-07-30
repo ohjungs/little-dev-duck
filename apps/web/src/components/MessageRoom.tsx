@@ -103,6 +103,7 @@ import { subscribeRoomMessages } from "@/lib/realtime";
 import { notifyDuck } from "@/lib/notify";
 import { loadDraft, saveDraft } from "@/lib/messageDraft";
 import { isComposingEnter, shouldSendOnKey, type SendKeyMode } from "@/lib/composition";
+import { DUCK_PENDING_LABEL } from "@/lib/duckPending";
 import { getSendKeyMode } from "@/lib/sendKeyPref";
 import { textToBlocks } from "@/lib/pageTemplates";
 import { MessageImageViewer } from "@/components/MessageImageViewer";
@@ -1842,7 +1843,7 @@ export function MessageRoom({ roomId, roomType = null, initialMessages, myUserId
 
       {duckThinking && (
         <p role="status" className="px-3 py-1 text-xs text-muted-foreground">
-          오리가 생각하는 중…
+          {DUCK_PENDING_LABEL}
         </p>
       )}
 
