@@ -4,6 +4,7 @@ import { z } from "zod";
 import { fetchGithubContributions } from "@ldd/api";
 import type { ContributionSummary } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
+import { blockIfFeatureDisabled } from "@/lib/featureGate";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,15 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
+
+  // 2026-07-30: 기능 토글을 서버에서도 확인한다. `github` 기능이 곧 "커밋 잔디: GitHub 기여도
+  // 위젯"이라 이 라우트가 그 데이터를 준다.
+  // **부수 효과(의도한 것)**: 이 라우트는 잔디 위젯 외에 오리 기분 신호(useDuckMood)도 쓴다.
+  // 기능이 꺼지면 오리 기분은 조용히 중립으로 떨어진다 — useDuckMood가 이미 `!res.ok`를
+  // 무시하도록 만들어져 있어 화면이 깨지지는 않는다. 사용자의 GitHub 데이터를 끄기로 했다면
+  // 오리도 그걸 읽지 않는 게 맞다는 판단.
+  const blocked = await blockIfFeatureDisabled(supabase, user.id, "github");
+  if (blocked) return blocked;
 
   const login = getGithubLogin(user);
   if (!login) {

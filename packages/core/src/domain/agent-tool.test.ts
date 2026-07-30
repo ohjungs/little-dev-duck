@@ -98,6 +98,18 @@ describe("requiresApproval", () => {
     expect(requiresApproval("mutating")).toBe(true);
     expect(requiresApproval("readonly")).toBe(false);
   });
+
+  // 2026-07-30 : 승인 판정을 fail-closed로 (안전 게이트의 기본값 방향)
+  // 전에는 `kind === "mutating"`이었다 — 즉 **"mutating이 아니면 자동 실행"**이다.
+  // 오늘은 enum이 2개라 결과가 같지만, 나중에 종류가 하나 늘면(예: 외부 발송·파괴적 작업)
+  // 그 새 종류가 **승인 없이 자동 실행**된다. 안전 게이트의 기본값은 반대여야 한다:
+  // "명시적으로 안전하다고 아는 것(readonly)만 자동, 나머지는 전부 승인."
+  it("모르는 종류가 들어오면 승인을 요구한다 (fail-closed)", () => {
+    // 타입에 아직 없는 값을 억지로 넣는다 — 실제로는 enum이 막지만, 이 함수가 **혼자서도**
+    // 안전한 방향으로 판정하는지가 요점이다(계약이 바뀌는 순간 이 검사가 먼저 걸린다).
+    const future = "destructive" as unknown as Parameters<typeof requiresApproval>[0];
+    expect(requiresApproval(future)).toBe(true);
+  });
 });
 
 describe("partitionToolCalls", () => {

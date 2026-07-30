@@ -29,6 +29,13 @@ const GATED_ROUTES: Record<string, string> = {
   "ai/agent/route.ts": "duck-chat",
   // 승인 실행도 같은 기능이다 — 여기가 열려 있으면 대화만 막고 실행은 열어 두는 셈이다.
   "ai/agent/approve/route.ts": "duck-chat",
+  // 2026-07-30 2차: 기능 설명이 라우트를 그대로 지목해 **판단이 필요 없는** 둘만 추가했다.
+  //  · `news` = "RSS 구독과 요약" → 수집 라우트가 정확히 그 일이다.
+  //  · `github` = "커밋 잔디: GitHub 기여도 위젯" → 이 라우트가 그 데이터를 준다.
+  // (`ai/write`·`ai/standup`·`ai/duck-line`은 어느 기능에 속하는지가 제품 의도라 미정 —
+  //  manual-verification 114번에서 사용자 결정 대기.)
+  "news/collect/route.ts": "news",
+  "github/contributions/route.ts": "github",
 };
 
 function src(rel: string): string {

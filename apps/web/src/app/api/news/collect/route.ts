@@ -10,6 +10,7 @@ import {
 } from "@ldd/api";
 import { isLddError } from "@ldd/core";
 import { createClient } from "@/lib/supabase/server";
+import { blockIfFeatureDisabled } from "@/lib/featureGate";
 import { requireGeminiKey } from "@/lib/apiHelpers";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,10 @@ export async function POST() {
       { status: 429 },
     );
   }
+  // 2026-07-30: 기능 토글을 서버에서도 확인한다(화면만 숨기면 주소로 직접 부를 수 있다).
+  // `news` 기능이 곧 "RSS 구독과 요약"이라 이 라우트가 정확히 그 일이다.
+  const blocked = await blockIfFeatureDisabled(supabase, user.id, "news");
+  if (blocked) return blocked;
   const keyOrError = requireGeminiKey();
   if (keyOrError instanceof NextResponse) return keyOrError;
   const apiKey = keyOrError;

@@ -78,8 +78,13 @@ export type ToolResult = z.infer<typeof toolResultSchema>;
 export const AGENT_MAX_ITERATIONS = 5;
 
 // mutating 도구만 사용자 승인을 요구한다.
+//
+// 2026-07-30 : **fail-closed로 판정한다** — `kind === "mutating"`이 아니라 `kind !== "readonly"`.
+// 오늘은 enum이 2개라 결과가 같지만, 방향이 다르다. 전자는 "mutating이 아니면 자동 실행"이라
+// 나중에 종류가 하나 늘면(외부 발송·파괴적 작업 등) 그 새 종류가 **승인 없이 실행**된다.
+// 안전 게이트의 기본값은 반대여야 한다: 명시적으로 안전하다고 아는 것만 자동, 나머지는 승인.
 export function requiresApproval(kind: ToolKind): boolean {
-  return kind === "mutating";
+  return kind !== "readonly";
 }
 
 // LLM이 반환한 tool_call들을 카탈로그 분류로 나눈다: readonly=자동 실행, mutating=승인 대기.

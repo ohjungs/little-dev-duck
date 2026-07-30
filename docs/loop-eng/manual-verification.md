@@ -1687,5 +1687,10 @@ const a = 1;
   "남의 데이터 접근"은 아니다. 또 지금은 사용자가 1명(본인=관리자)이라 실제로 노출되는 상황이
   아니다. 다만 `customer` 역할이 이미 정의돼 있고("공개된 것만 본다") 그 계정을 만들면
   **관리자가 끈 기능을 API로 쓸 수 있다** — 그때 문제가 된다.
+- **2026-07-30 2차 갱신**: 판단이 필요 없는 둘은 처리했다 — `/api/news/collect`→`news`,
+  `/api/github/contributions`→`github`(기능 설명이 그 라우트를 그대로 지목해 해석 여지가 없다).
+  **남은 미정은 `/api/ai/write`·`/api/ai/standup`·`/api/ai/duck-line` 세 개다.**
+  참고로 github 라우트를 막으면 오리 기분 신호(useDuckMood)도 함께 중립으로 떨어진다 —
+  같은 데이터를 쓰기 때문이고, 실패를 무시하도록 이미 만들어져 있어 화면은 깨지지 않는다.
 - **결정해 주시면 할 일**: 라우트→기능 매핑을 알려주시면 `apiFeatureGate.test.ts`의
   `GATED_ROUTES`에 추가하고 각 라우트에 `blockIfFeatureDisabled` 한 줄을 넣는다(패턴 확립됨).
