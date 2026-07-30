@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import type { ContributionDay, ContributionSummary } from "@ldd/core";
+import {
+  contributionGridLabel,
+  type ContributionDay,
+  type ContributionSummary,
+} from "@ldd/core";
 import { GitHubMark } from "@/components/ui/github-mark";
 import {
   Card,
@@ -119,7 +123,15 @@ export function GithubContributionWidget() {
         )}
 
         {state === "ready" && data && data.linked && (
-          <div className="flex gap-[3px] overflow-x-auto pb-1">
+          // 격자 전체를 role="img" 한 덩어리로 노출한다 — div 365개의 title은 보조기술이
+          // 안정적으로 읽지 않고, 읽더라도 하나씩 듣는 건 도움이 아니라 방해다. role="img"는
+          // leaf라 내부 셀이 자동으로 감춰지므로 셀마다 aria를 붙일 필요도 없다.
+          // 문구는 core contributionGridLabel(순수함수, 테스트됨). title은 마우스용으로 유지.
+          <div
+            role="img"
+            aria-label={contributionGridLabel(data.summary)}
+            className="flex gap-[3px] overflow-x-auto pb-1"
+          >
             {chunkIntoWeeks(data.summary.days).map((week, weekIndex) => (
               <div key={weekIndex} className="flex flex-col gap-[3px]">
                 {week.map((day) => (

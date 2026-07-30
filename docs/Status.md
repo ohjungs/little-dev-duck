@@ -1,5 +1,26 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-30 `/loop-eng` — 문서 언어(lang=ko) + GitHub 잔디 대체 텍스트 (접근성)
+> 감사 발견 2건을 코드로 재검증해 둘 다 실제 결함임을 확인하고 수정.
+>
+> - **`<html lang="en"` → `"ko"`**: Next 스캐폴드 기본값이 한 번도 안 고쳐진 채 배포돼 있었다.
+>   UI·description·openGraph locale이 전부 한국어인데 문서 언어만 영어라 **스크린리더가 한국어를
+>   영어 발음 규칙으로 읽었다**(WCAG 3.1.1 Language of Page, Level A 위반). 눈으로는 아무 이상이
+>   없어 리뷰로 안 잡히는 부류라 `htmlLang.test.ts`로 잠갔다 — lang 값 + **openGraph locale과의
+>   일치**까지(둘이 갈라져 있던 것이 이 결함의 본질).
+> - **GitHub 잔디 대체 텍스트**: 격자가 순수 div 365개 + 마우스용 `title`뿐이라 스크린리더에
+>   아무것도 전달되지 않았다. 격자를 `role="img"` 한 덩어리로 묶고 core `contributionGridLabel`
+>   (순수함수, 테스트 6건 — 기여 0건·빈 배열·동일 최대치 경계 포함)의 요약 문구를 대체 텍스트로.
+>   가짜 grid/row 역할을 씌우는 대안은 DOM이 열 우선이라 행·열이 뒤바뀐 채 노출돼 기각(ponytail).
+> - **직전 사이클 기록 정정(중요)**: `--muted-foreground` 스크린샷이 **수정 전 색이었다** —
+>   회귀 격리로 stash·재빌드한 뒤 복원 후 재빌드를 빠뜨렸고, 포트 5100에 낡은 서버(PID 31608)가
+>   남아 새 `next start`가 EADDRINUSE로 죽은 채 낡은 빌드가 응답했다. **코드 수정은 정상이었고,
+>   이번에 새 빌드로 브라우저 실측해 5.62:1(AA 통과)을 확정**했다. 교훈: 재빌드 없이 찍은
+>   스크린샷은 증거가 아니다(e2e는 `buildFreshness.ts`가 막지만 직접 띄운 서버엔 그 가드가 없다).
+> - 검증: turbo lint+test **17/17 GREEN**(core 1365 / web 554). 스크린샷·실측:
+>   [lang-ko-and-grass-aria](loop-eng/screenshots/2026-07-30/lang-ko-and-grass-aria/index.md).
+>   잔디 위젯 화면은 로그인 필요 + e2e 세션 만료로 이월(mv 109번).
+
 > ## 🛑 2026-07-30 `/loop-eng` — RLS 권한상승 2건 수정 코드 완료, **실서버 적용 승인 대기**
 > 백그라운드 감사 워크플로우가 뒤늦게 산출한 스펙 초안 3건을 발견해 전부 코드로 재검증했다.
 > 1건은 이미 고친 것(중복 → superseded 표기), **2건은 실제로 열려 있는 RLS 권한상승 구멍**이었다.

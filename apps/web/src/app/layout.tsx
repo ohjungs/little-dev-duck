@@ -62,7 +62,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    // 2026-07-30 : 이 값은 Next 스캐폴드 기본값 `en`이 그대로 남아 있었다. UI·description·
+    // openGraph locale이 전부 한국어인데 문서 언어만 영어라, 스크린리더가 한국어를 영어
+    // 발음 규칙으로 읽었다(WCAG 3.1.1, Level A). htmlLang.test.ts가 openGraph locale과의
+    // 일치까지 잠근다.
+    <html lang="ko" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
         <OfflineIndicator />
         {children}

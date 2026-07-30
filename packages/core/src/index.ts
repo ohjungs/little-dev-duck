@@ -8,6 +8,7 @@ export {
   type ContributionDay,
   type ContributionSummary,
 } from "./domain/github-contribution";
+export { contributionGridLabel } from "./domain/github-contribution-label";
 export {
   activitySourceSchema,
   activityDailyEntrySchema,
