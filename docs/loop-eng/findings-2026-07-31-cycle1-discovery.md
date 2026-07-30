@@ -1,0 +1,435 @@
+# 발굴 결과 — 2026-07-31 사이클 1 (대장 미적재, 중복 정리 대기)
+
+워크플로 loop-eng-cycle이 args를 받지 못해 기존 판단 대장(58건)을 0건으로 보고 백지에서 재발굴했다.
+그래서 아래 확정 124건에는 기존 backlog와 같은 문제를 다른 표현으로 다시 올린 항목이 섞여 있다.
+titleKey 기준 중복은 0건이지만 표현이 달라서일 뿐이므로, 중복 정리 전에는 plan-ledger.jsonl에 적재하지 않는다.
+
+- 탐색 라운드: R1 99건 발굴 → 교차검증 72건 통과 · R2 61건 → 52건 통과 · R3/R4는 세션 한도로 에이전트 10개 실패(0건)
+- 최종 우선순위 집계 에이전트도 세션 한도로 실패 — 우선순위와 스펙 초안은 산출되지 않았다
+- 교차검증 방식: 내부 회의 패널(internal-panel)
+
+## quality (32건)
+
+- quality: MessageRoom.tsx는 1929줄·useState 39개·useEffect 21개짜리 단일 컴포넌트다
+  - 근거: 상태 39개가 서로의 useEffect 의존성에 얽혀 한 기능을 고칠 때 영향 범위를 사람이 추적할 수 없고 렌더 테스트도 없어 회귀를 잡을 장치가 없다.
+  - titleKey: quality messageroom tsx는 1929줄 usestate 39개 useeffect 21개짜리 단일 컴포넌트다
+- quality: React 컴포넌트 렌더 테스트가 0건 — vitest 환경이 node이고 testing-library 의존성 자체가 없다
+  - 근거: 컴포넌트 80개 중 렌더 테스트가 0건이라 UI 회귀 검증이 CI에서 대부분 스킵되는 e2e에만 의존하고 있다.
+  - titleKey: quality react 컴포넌트 렌더 테스트가 0건 vitest 환경이 node이고 testing library 의존성 자체가 없다
+- quality: 공용 UI 패키지가 사실상 죽었고 web이 Button/Card/Input을 재구현했다 (CLAUDE.md 3-5 인벤토리 위반)
+  - 근거: 실사용은 Spinner/Toast 2개뿐인데 죽은 코드와 이중 토큰 체계가 유지비를 늘리고 CLAUDE.md의 인벤토리 원칙(재구현 금지)을 위반한다.
+  - titleKey: quality 공용 ui 패키지가 사실상 죽었고 web이 button card input을 재구현했다 claude md 3 5 인벤토리 위반
+- quality: 에러 계약이 둘로 갈렸다 — LddError가 있는데 throw new Error(error.message)가 100곳
+  - 근거: code 기반 분기가 일부 라우트에만 있어 friendlyError가 영문 DB 원문 오류를 사용자 화면에 그대로 노출한다(Phase 37 재발 위험).
+  - titleKey: quality 에러 계약이 둘로 갈렸다 ldderror가 있는데 throw new error error message 가 100곳
+- quality: 공용 friendlyError를 만들어 놓고 호출부는 4곳 — 인라인 `instanceof Error ?` 삼항이 28곳
+  - 근거: 공용 에러 문구 층을 우회하는 경로가 호출부보다 7배 많아 새 문구 규칙을 넣어도 대부분 화면에 반영되지 않는다.
+  - titleKey: quality 공용 friendlyerror를 만들어 놓고 호출부는 4곳 인라인 instanceof error 삼항이 28곳
+- quality: API 라우트 전처리(인증·레이트리밋·본문파싱)가 6개 라우트에 그대로 복사돼 있다
+  - 근거: 동일 인증 블록이 6곳에 복제돼 있어 새 라우트가 인증을 빠뜨릴 위험이 있고, 현재 apiAuth.test.ts는 텍스트로 auth.getUser() 존재만 확인한다.
+  - titleKey: quality api 라우트 전처리 인증 레이트리밋 본문파싱 가 6개 라우트에 그대로 복사돼 있다
+- quality: 테스트 더블 fakeSupabase가 21벌 손수 구현돼 있고 여러 벌이 `: any`를 반환한다
+  - 근거: 시그니처가 제각각인 21벌(7벌은 any 반환)이 유지비를 늘리고 클라이언트 체이닝이 바뀌면 21곳을 고쳐야 한다.
+  - titleKey: quality 테스트 더블 fakesupabase가 21벌 손수 구현돼 있고 여러 벌이 any 를 반환한다
+- quality: localStorage 마운트 동기화 패턴이 26개 파일에 복제돼 eslint-disable 35개를 만들고 있다
+  - 근거: 동일한 eslint-disable 사유가 35곳에 반복돼 추상화 부재를 드러내고, 탭 간 동기화도 favorites/readArticles 등 일부만 되어 있다.
+  - titleKey: quality localstorage 마운트 동기화 패턴이 26개 파일에 복제돼 eslint disable 35개를 만들고 있다
+- quality: CLAUDE.md가 blocking이라고 못박은 import 방향 규칙이 기계로 강제되지 않는다
+  - 근거: 최고 심각도로 규정된 규칙이 사람 리뷰에만 의존하고 있어 위반이 조용히 들어올 수 있다.
+  - titleKey: quality claude md가 blocking이라고 못박은 import 방향 규칙이 기계로 강제되지 않는다
+- quality: Rust 코드 308줄이 CI에서 한 번도 빌드·테스트되지 않는다
+  - 근거: mtime 집계·심볼릭 링크 필터·KST 오프셋 등 과거 리뷰에서 버그가 나온 로직이 회귀해도 아무도 모른다.
+  - titleKey: quality rust 코드 308줄이 ci에서 한 번도 빌드 테스트되지 않는다
+- quality: PixelOffice.tsx가 순수 오피스 로직과 600줄짜리 렌더 루프를 컴포넌트 안에 가두고 있다
+  - 근거: 컴포넌트 안에 갇힌 순수 로직이 난수 직접 호출 때문에 결정적 테스트가 불가능하고, 다른 오피스 도메인 모듈과 테스트 수준이 크게 어긋난다.
+  - titleKey: quality pixeloffice tsx가 순수 오피스 로직과 600줄짜리 렌더 루프를 컴포넌트 안에 가두고 있다
+- quality: office-draw.ts 776~1043줄이 테스트 0건 — web/lib에서 가장 큰 미검증 모듈
+  - 근거: 외부 의존이 없는 순수 함수라 테스트하기 좋은 형태인데도 미검증 상태라 회귀 위험이 크다.
+  - titleKey: quality office draw ts 776 1043줄이 테스트 0건 web lib에서 가장 큰 미검증 모듈
+- quality: localStorage 목록 저장 헬퍼가 3~5벌 복제됐고 동명이인 toggleInList가 시그니처만 다르다
+  - 근거: 동일 read() 함수가 문자 단위로 복제돼 있고, toggleInList가 2인자/3인자로 같은 이름 다른 계약이라 잘못 import해도 타입 오류 없이 통과할 수 있다.
+  - titleKey: quality localstorage 목록 저장 헬퍼가 3 5벌 복제됐고 동명이인 toggleinlist가 시그니처만 다르다
+- quality: 죽은 export 30여 건 — packages/ui 프리미티브와 상수·타입
+  - 근거: 한 번도 참조되지 않는 export가 코드 탐색 비용과 유지 부담을 키운다.
+  - titleKey: quality 죽은 export 30여 건 packages ui 프리미티브와 상수 타입
+- quality: rooms.ts 1009줄에 메시지·스토리지·반응·멤버십·검색·에이전트방이 한데 있다
+  - 근거: export 함수 26개가 서로 다른 관심사를 다루고 있어 파일당 응집도가 낮고 대응 테스트도 645줄 단일 파일이다.
+  - titleKey: quality rooms ts 1009줄에 메시지 스토리지 반응 멤버십 검색 에이전트방이 한데 있다
+- quality: localStorage 키 규칙이 `ldd-`와 `ldd:` 두 갈래고, 백업 대상 등록이 드리프트할 수 있다
+  - 근거: ldd-briefing-view 등 7개 키가 백업 대상 판단(포함/기각 사유) 없이 목록 밖에 방치돼 있다.
+  - titleKey: quality localstorage 키 규칙이 ldd 와 ldd 두 갈래고 백업 대상 등록이 드리프트할 수 있다
+- quality: 창(window) 커스텀 이벤트 기반 pub/sub이 모듈 8개에 각자 구현돼 있다
+  - 근거: 구현이 미묘하게 달라(detail 유무, storage 동기화 여부) 유지보수 시 혼란을 준다.
+  - titleKey: quality 창 window 커스텀 이벤트 기반 pub sub이 모듈 8개에 각자 구현돼 있다
+- quality: 백업 복원·메신저 용량 계산이 행/방 단위 순차 왕복이라 데이터가 늘면 선형으로 느려진다
+  - 근거: 카테고리 간 순서만 지키면 되는데 카테고리 내부까지 순차 처리해 데이터가 수백 건이면 왕복 수가 선형으로 늘어난다.
+  - titleKey: quality 백업 복원 메신저 용량 계산이 행 방 단위 순차 왕복이라 데이터가 늘면 선형으로 느려진다
+- quality: 커버리지 설정이 apps/web을 통째로 제외하고 임계값도 CI 연결도 없다
+  - 근거: 현재 91%라는 수치가 apps/web 11.96%를 제외한 착시이며 진행 상황을 수치로 확인할 수 없다.
+  - titleKey: quality 커버리지 설정이 apps web을 통째로 제외하고 임계값도 ci 연결도 없다
+- quality: docs가 단일 대형 append 파일로 커지고 있고 검증용 스크린샷 산출물 13건이 여전히 추적된다
+  - 근거: 351KB·1290줄·147KB 파일을 매 사이클 읽어야 해 에이전트 컨텍스트 소모가 크고 최신 상태 파악이 어렵다.
+  - titleKey: quality docs가 단일 대형 append 파일로 커지고 있고 검증용 스크린샷 산출물 13건이 여전히 추적된다
+- quality: 로딩/에러 상태 JSX가 컴포넌트 간에 그대로 복제돼 있다
+  - 근거: role="alert" 등 접근성 속성이 컴포넌트마다 따로 관리돼 새 위젯이 이를 빠뜨려도 아무도 모른다.
+  - titleKey: quality 로딩 에러 상태 jsx가 컴포넌트 간에 그대로 복제돼 있다
+- quality: MessageRoom이 단일 함수 1738줄의 god component (useState 39·useEffect 21·useRef 15)
+  - 근거: 16개 기능이 한 스코프에서 상태 39개를 암묵적으로 공유해 한 기능을 고치면 다른 기능이 조용히 깨지는데, 렌더 테스트 인프라가 없어 회귀를 잡을 수단이 전혀 없다.
+  - titleKey: quality messageroom이 단일 함수 1738줄의 god component usestate 39 useeffect 21 useref 15
+- quality: API 라우트 전처리/후처리 20줄이 6개 라우트에 그대로 복제 — 공용 래퍼 부재
+  - 근거: 동일 20줄 블록이 6개 라우트에 복제돼 있고, 이미 reindex-all이 기능토글 체크를 누락하는 드리프트가 실제로 발생했다.
+  - titleKey: quality api 라우트 전처리 후처리 20줄이 6개 라우트에 그대로 복제 공용 래퍼 부재
+- quality: packages/*에 react-hooks 린트가 없고 저장소 전체에 타입 인지 린트가 없다
+  - 근거: packages 내 React 훅/컴포넌트가 rules-of-hooks·exhaustive-deps 검사를 받지 않고, no-floating-promises 부재로 useEffect 125개 규모의 비동기 코드베이스에서 삼켜진 Promise를 잡을 장치가 없다.
+  - titleKey: quality packages 에 react hooks 린트가 없고 저장소 전체에 타입 인지 린트가 없다
+- quality: PixelOffice가 캔버스 게임 루프 상태를 useRef 30개로 수동 관리하는 1197줄 함수
+  - 근거: ref 사이 초기화 순서 의존을 타입체크·린트가 검증하지 못해 조용한 오작동으로 이어지고(이미 react-hooks/refs 억제가 들어가 있음), DOM 없이는 단위 테스트도 불가능하다.
+  - titleKey: quality pixeloffice가 캔버스 게임 루프 상태를 useref 30개로 수동 관리하는 1197줄 함수
+- quality: rooms.ts가 1008줄·export 39개의 메신저 데이터 접근 god 모듈
+  - 근거: '패키지 경계=에이전트 경계' 규칙 아래서 이 파일이 병렬 작업의 상시 충돌 지점이고, 흩어진 18회의 `if (error) throw`가 에러 정책 변경을 어렵게 한다.
+  - titleKey: quality rooms ts가 1008줄 export 39개의 메신저 데이터 접근 god 모듈
+- quality: 테스트 35개 중 24곳이 chainable Supabase 목을 각자 손으로 만들고 as any로 봉인
+  - 근거: 목마다 지원하는 체인이 달라 실제 쿼리 형태 변경 시 어느 테스트가 거짓 통과 중인지 알 수 없고, as any 55건이 시그니처 변경을 컴파일 단계에서 잡아주지 못한다.
+  - titleKey: quality 테스트 35개 중 24곳이 chainable supabase 목을 각자 손으로 만들고 as any로 봉인
+- quality: localStorage 접근층이 모듈마다 재구현 — defaultStorage 3벌 + 동일 get/set 관용구 10여 벌
+  - 근거: SSR 가드→try→기본값 fallback→catch 무시 12줄이 모듈마다 반복되고, 백업 스펙(core LOCAL_PREF_SPECS)과의 키 동기화가 사람 손에 의존해 어긋날 위험이 이미 주석으로 경고돼 있다.
+  - titleKey: quality localstorage 접근층이 모듈마다 재구현 defaultstorage 3벌 동일 get set 관용구 10여 벌
+- quality: 같은 사유의 react-hooks/set-state-in-effect 억제 32건 — 공용 하이드레이션 훅 부재
+  - 근거: 동일 사유의 억제가 32건 관용구화되면, 진짜 위험한 effect-setState 패턴도 같은 주석을 달고 통과하게 된다.
+  - titleKey: quality 같은 사유의 react hooks set state in effect 억제 32건 공용 하이드레이션 훅 부재
+- quality: 단일 함수 300줄 초과 컴포넌트 13개인데 길이·복잡도 린트 가드가 없다
+  - 근거: 임계선이 아예 없어 '조금만 더'가 계속 통과했고, 이 저장소가 lessons-learned L-13으로 이미 기록한 '규칙을 주석으로만 두면 어긴다'와 같은 패턴이 반복 중이다.
+  - titleKey: quality 단일 함수 300줄 초과 컴포넌트 13개인데 길이 복잡도 린트 가드가 없다
+- quality: CI lint에 --max-warnings 0이 없어 경고가 조용히 쌓인다 (무효 eslint-disable 1건 이미 통과 중)
+  - 근거: 경고가 실패로 이어지지 않아, 의미 없는 eslint-disable(무효 억제)이 이미 조용히 통과하고 있다 — 이 저장소가 스스로 경계한 '통과로 보이지만 안 돌던' 유형이다.
+  - titleKey: quality ci lint에 max warnings 0이 없어 경고가 조용히 쌓인다 무효 eslint disable 1건 이미 통과 중
+- quality: 정의 파일 밖에서 아무도 쓰지 않는 export 29건 — 공개 표면이 실제보다 넓다
+  - 근거: 공개 표면이 부풀면 '깰까 봐 못 건드리는' 항목이 늘어나 리팩터링 비용이 커진다.
+  - titleKey: quality 정의 파일 밖에서 아무도 쓰지 않는 export 29건 공개 표면이 실제보다 넓다
+
+## security (23건)
+
+- security: Google/Gmail/GitHub OAuth 액세스 토큰이 평문 저장 + 브라우저에서 읽히는 SELECT 정책
+  - 근거: 실제 소비자는 서버 라우트뿐인데 브라우저에서 anon 키+세션으로 access_token을 직접 조회할 수 있어 XSS 1건이 곧 외부 서비스 토큰 탈취로 이어진다.
+  - titleKey: security google gmail github oauth 액세스 토큰이 평문 저장 브라우저에서 읽히는 select 정책
+- security: 승인 카드에 표시되는 라벨이 모델이 만든 필드라 프롬프트 인젝션으로 위조된다
+  - 근거: 외부 발신자가 통제하는 subject/from이 모델을 거쳐 승인 카드에 그대로 노출돼 승인 게이트(핵심 안전장치)가 무력화될 수 있다.
+  - titleKey: security 승인 카드에 표시되는 라벨이 모델이 만든 필드라 프롬프트 인젝션으로 위조된다
+- security: 모든 레이트리밋이 인스턴스 메모리라 서버리스에서 실질 방어가 안 된다
+  - 근거: 서버리스 다중 인스턴스에서 동시 요청을 흩뿌리면 상한이 인스턴스 수만큼 곱해져 Gemini 쿼터 고갈과 계정삭제 연타 방어 약화로 이어진다.
+  - titleKey: security 모든 레이트리밋이 인스턴스 메모리라 서버리스에서 실질 방어가 안 된다
+- security: 비밀번호 변경에 재인증이 없고(secure_password_change=false) 강도·유출 정책이 비어 있다
+  - 근거: 세션만 있으면 현재 비밀번호 확인 없이 비밀번호를 바꿀 수 있어 쿠키 탈취 시 원 소유자가 영구 축출될 수 있다.
+  - titleKey: security 비밀번호 변경에 재인증이 없고 secure password change false 강도 유출 정책이 비어 있다
+- security: 인가 전체가 RLS에 걸려 있는데 실제 DB를 대상으로 한 정책 테스트가 하나도 없다
+  - 근거: schemaGuard는 정책 존재 여부만 검사해 `using (true)`도 통과하며, 최근 3건의 실제 권한 구멍이 이 검사를 통과한 채 열려 있었다.
+  - titleKey: security 인가 전체가 rls에 걸려 있는데 실제 db를 대상으로 한 정책 테스트가 하나도 없다
+- security: 보안 마이그레이션 1건이 코드에만 있고 실서버 미적용 — 코드/DB 드리프트
+  - 근거: 코드는 완료·테스트 green이지만 프로덕션 미적용 상태가 반복돼, sender_type 위조 시 방 전체가 파싱 실패로 열리지 않는 무결성·가용성 문제가 실제로 열려 있다.
+  - titleKey: security 보안 마이그레이션 1건이 코드에만 있고 실서버 미적용 코드 db 드리프트
+- security: /api/keepalive가 CRON_SECRET 미설정 시 fail-open — 프로덕션에 값이 없다
+  - 근거: `if (secret && ...)` 구조라 환경변수가 없으면 인증 검사 자체가 사라지며 실측으로 프로덕션에 값이 없어 완전히 열려 있었다.
+  - titleKey: security api keepalive가 cron secret 미설정 시 fail open 프로덕션에 값이 없다
+- security: message-attachments 삭제 권한이 방 멤버 전원 — 업로더 제한이 없다
+  - 근거: 방 멤버 누구나 남이 올린 이미지를 지울 수 있어 대화 증거가 사라질 수 있고, 같은 마이그레이션이 update는 같은 논리로 이미 닫아 두었다.
+  - titleKey: security message attachments 삭제 권한이 방 멤버 전원 업로더 제한이 없다
+- security: 로그인 시도 제한이 브라우저에서 돈다 — 새로고침 한 번으로 초기화
+  - 근거: 현재 카운터가 브라우저 메모리에만 있어 새로고침·시크릿창·curl로 쉽게 우회되는데 주석은 서버 방어처럼 오해를 유발한다.
+  - titleKey: security 로그인 시도 제한이 브라우저에서 돈다 새로고침 한 번으로 초기화
+- security: CSP 완화 지점과 누락 헤더 — unsafe-inline style, img-src https:, supabase 와일드카드, poweredByHeader
+  - 근거: 현재 완화점들은 XSS가 한 번 성사되면 임의 호스트로 데이터를 유출하는 통로가 되고, 위반이 발생해도 아무도 모른다(이미 CSP 관련 사고 3번 경험).
+  - titleKey: security csp 완화 지점과 누락 헤더 unsafe inline style img src https supabase 와일드카드 poweredbyheader
+- security: 계정 삭제의 CSRF 방어가 @supabase/ssr의 SameSite 기본값에만 의존하고 회귀 잠금이 없다
+  - 근거: 되돌릴 수 없는 삭제 라우트의 CSRF 방어가 외부 의존성 구현 세부(캐럿 버전)에만 의존해 마이너 업그레이드로 조용히 깨질 수 있다.
+  - titleKey: security 계정 삭제의 csrf 방어가 supabase ssr의 samesite 기본값에만 의존하고 회귀 잠금이 없다
+- security: /api/ai/reindex-all만 기능 토글 서버 강제에서 빠져 있다
+  - 근거: 관리자가 AI 기능을 꺼도 이 라우트로 직접 POST하면 대량 임베딩이 돌아 무료 쿼터를 소모한다.
+  - titleKey: security api ai reindex all만 기능 토글 서버 강제에서 빠져 있다
+- security: OAuth 연동을 해제할 방법이 없고, 계정 삭제 시에도 provider에 토큰 폐기를 호출하지 않는다
+  - 근거: 계정을 삭제해도 만료 없는 GitHub OAuth App 토큰과 Google refresh_token이 provider 쪽에 살아 있어, 파기 요청 후에도 유효한 자격증명이 남고 유출 시 blast radius를 줄일 수단이 없다.
+  - titleKey: security oauth 연동을 해제할 방법이 없고 계정 삭제 시에도 provider에 토큰 폐기를 호출하지 않는다
+- security: Google 로그인 버튼이 모든 사용자에게 calendar.events 쓰기 + refresh token을 강제 동의시킨다
+  - 근거: 로그인만 원하는 사용자에게도 캘린더 읽기·쓰기 권한과 장기 refresh_token 발급을 강제해 최소권한 원칙을 위반하며, GitHub 버튼은 이미 반대로(옵트인) 설계돼 있어 기능 손실 없이 정정 가능하다.
+  - titleKey: security google 로그인 버튼이 모든 사용자에게 calendar events 쓰기 refresh token을 강제 동의시킨다
+- security: 개인정보처리방침·이용약관 문서가 없는데 restricted OAuth scope와 제3자 AI 전송을 쓴다
+  - 근거: gmail.modify는 Google이 restricted로 분류해 게시된 개인정보처리방침과 연 1회 OAuth 보안 평가를 요구하며, 부재 시 gmail/calendar 연동이 검증 실패로 차단될 실질 리스크가 있고 GDPR 13조 고지 의무도 미이행 상태다.
+  - titleKey: security 개인정보처리방침 이용약관 문서가 없는데 restricted oauth scope와 제3자 ai 전송을 쓴다
+- security: 계정 삭제가 message-attachments 버킷을 비우지 않아 사진이 영구 잔존한다
+  - 근거: 현재는 page-attachments 버킷만 비워 메신저 대화방에 올린 이미지 원본이 '모든 데이터 삭제' 이후에도 스토리지에 무기한 남고, 삭제 순서상 나중에는 본인조차 지울 수 없게 된다.
+  - titleKey: security 계정 삭제가 message attachments 버킷을 비우지 않아 사진이 영구 잔존한다
+- security: 백업 복원(restoreFeed)이 addFeed의 URL 검증을 통째로 우회한다 — SSRF 진입점 이원화
+  - 근거: 백업 JSON을 사용자가 편집해 사설 IP를 feeds.url에 심을 수 있고, collectFeed가 요청을 보낸 뒤에야 호스트를 검사해 blind SSRF로 내부 주소에 실제 GET이 발사된다.
+  - titleKey: security 백업 복원 restorefeed 이 addfeed의 url 검증을 통째로 우회한다 ssrf 진입점 이원화
+- security: 데이터 평면(PostgREST/Storage)에 크기·개수 상한이 전혀 없다 — 앱 레이트리밋이 지나지 않는 경로
+  - 근거: 브라우저가 Supabase에 직결되는 CRUD는 API 라우트의 레이트리밋을 아예 지나지 않아, 개방 가입 + 무료 티어 한도에서 계정 하나가 PATCH 반복만으로 프로젝트 전체(전 사용자)를 정지시킬 수 있다.
+  - titleKey: security 데이터 평면 postgrest storage 에 크기 개수 상한이 전혀 없다 앱 레이트리밋이 지나지 않는 경로
+- security: action_log가 사용자 콘텐츠를 마스킹 없이 저장하고 보존기한·삭제 경로가 없다
+  - 근거: 현재는 200자 절단뿐이라 메일 제목·일정 제목·메모 본문·도구 응답 원문이 그대로 저장되며, 스키마 주석은 이를 방어책인 것처럼 오도하고 삭제 경로도 계정 cascade가 유일하다.
+  - titleKey: security action log가 사용자 콘텐츠를 마스킹 없이 저장하고 보존기한 삭제 경로가 없다
+- security: page-attachments는 공개 버킷인데 고아 객체 정리 경로가 없다
+  - 근거: 페이지나 이미지 블록을 삭제해도 storage 객체를 지우는 코드가 어디에도 없어, '삭제했다'고 믿는 이미지가 공개 URL을 아는 누구에게나 계속 열려 있다.
+  - titleKey: security page attachments는 공개 버킷인데 고아 객체 정리 경로가 없다
+- security: Rust/Cargo 의존성은 취약점 감사 대상 밖이다
+  - 근거: 사용자 머신에서 네이티브 권한으로 도는 코드의 의존성이 유일하게 감사 게이트를 통과하지 않고, devDependencies(공급망 공격 주요 표적)도 npm audit 범위 밖이다.
+  - titleKey: security rust cargo 의존성은 취약점 감사 대상 밖이다
+- security: 시크릿 검사가 현재 스냅샷만 보고 Supabase 신형 키 형식을 모른다
+  - 근거: 현재 검사는 작업트리 현재 내용만 봐서 이미 커밋돼 공개 저장소 히스토리에 박힌 시크릿을 놓치고, 신형 Supabase 키 포맷이 패턴 목록에 없어 JWT 규칙에도 걸리지 않는다.
+  - titleKey: security 시크릿 검사가 현재 스냅샷만 보고 supabase 신형 키 형식을 모른다
+- security: Tauri가 원격 웹 콘텐츠에 전역 IPC 브리지를 노출한다(withGlobalTauri: true)
+  - 근거: 원격 배포 콘텐츠(Vercel URL)를 WebView로 로드하는 구조에서 XSS가 한 번 성립하면 window.__TAURI__ 전역을 통해 로컬 리소스 접근·창 제어로 이어질 수 있다.
+  - titleKey: security tauri가 원격 웹 콘텐츠에 전역 ipc 브리지를 노출한다 withglobaltauri true
+
+## stack (20건)
+
+- stack: @ldd/ai가 transpilePackages 목록에서 빠져 있다 — 워크스페이스 패키지 5개 중 4개만 등록
+  - 근거: @ldd/ai를 11개 파일(9개 'use client')이 import하는데 목록에서만 빠져 있어 번들러 동작이 바뀌는 순간 조용히 깨질 잠재 위험이 있다.
+  - titleKey: stack ldd ai가 transpilepackages 목록에서 빠져 있다 워크스페이스 패키지 5개 중 4개만 등록
+- stack: @types/node가 ^20인데 런타임 계약은 Node 22.13+ — 타입과 실행 환경이 두 메이저 어긋난다
+  - 근거: 타입 시스템이 실제 Node 22 런타임과 두 메이저 어긋나 있어 tsc 통과가 런타임 계약 일치를 보장하지 못한다.
+  - titleKey: stack types node가 20인데 런타임 계약은 node 22 13 타입과 실행 환경이 두 메이저 어긋난다
+- stack: packages/*의 build 스크립트가 실제로는 타입체크(tsc --noEmit)라 배포 가능한 산출물이 없다
+  - 근거: 이름은 build지만 산출물이 없어 CLAUDE.md가 확정한 React Native(core/api/ai 공유) 도입 시 Metro가 원시 TS를 먹지 못해 이 구조로는 붙지 않는다.
+  - titleKey: stack packages 의 build 스크립트가 실제로는 타입체크 tsc noemit 라 배포 가능한 산출물이 없다
+- stack: App Router에 error.tsx/global-error.tsx가 단 하나도 없다 — 세그먼트 에러 경계 미구현
+  - 근거: 26개 라우트가 force-dynamic이라 Supabase 호출 하나가 던지면 페이지가 통째로 죽는 경로가 많은데, ErrorBoundary.tsx는 클라이언트 렌더 에러만 잡을 뿐 서버 컴포넌트 예외는 못 잡는다.
+  - titleKey: stack app router에 error tsx global error tsx가 단 하나도 없다 세그먼트 에러 경계 미구현
+- stack: TypeScript 5.9 / ESLint 9 — 각각 메이저 2단계·1단계 뒤처졌고 typescript-eslint peer가 업그레이드를 막는다
+  - 근거: typescript-eslint 8.65.0의 peer 제약(<6.1.0)이 TS 업그레이드를 막고 있어, 순서를 정하지 않으면 부채가 복리로 쌓여 Next 17 시점에 한꺼번에 터진다.
+  - titleKey: stack typescript 5 9 eslint 9 각각 메이저 2단계 1단계 뒤처졌고 typescript eslint peer가 업그레이드를 막는다
+- stack: apps/web/tsconfig.json이 tsconfig.base.json을 extends하지 않아 컴파일러 옵션이 갈라져 있다
+  - 근거: Windows(대소문자 무시) 개발환경과 ubuntu-latest CI 사이에서 파일명 대소문자 불일치가 로컬은 통과하고 CI만 깨지는 사고를 유발할 수 있다.
+  - titleKey: stack apps web tsconfig json이 tsconfig base json을 extends하지 않아 컴파일러 옵션이 갈라져 있다
+- stack: pnpm catalog 미사용 — react·@types/react·typescript·eslint 버전이 8개 매니페스트에 흩어져 이미 어긋났다
+  - 근거: @types/react 등 이미 매니페스트마다 버전이 갈라져 있어, 업그레이드 시 한 곳만 빠지면 React 이중 인스턴스로 훅 에러가 날 수 있다.
+  - titleKey: stack pnpm catalog 미사용 react types react typescript eslint 버전이 8개 매니페스트에 흩어져 이미 어긋났다
+- stack: prettier가 설치만 돼 있고 어디에서도 강제되지 않는다 — 포맷이 이미 갈라졌다
+  - 근거: 도구는 있지만 강제되지 않아 실행자에 따라 diff가 오염되고 되돌리는 비용이 반복 발생한 실측 사례(phase_40)가 있다.
+  - titleKey: stack prettier가 설치만 돼 있고 어디에서도 강제되지 않는다 포맷이 이미 갈라졌다
+- stack: CI에 turbo 캐시 복원과 concurrency 그룹이 없어 매 실행이 전부 재계산된다
+  - 근거: 매 CI 실행이 캐시 없이 처음부터 돌고, 연속 푸시 시 이전 실행이 취소되지 않아 무료 티어의 러너 분 예산을 낭비한다.
+  - titleKey: stack ci에 turbo 캐시 복원과 concurrency 그룹이 없어 매 실행이 전부 재계산된다
+- stack: Tauri 크레이트 메타데이터가 스캐폴딩 기본값 그대로이고 edition 2021에 머물러 있다
+  - 근거: 배포 바이너리와 크래시 리포트에 스캐폴딩 기본값이 그대로 노출될 예정이며(CLAUDE.md가 예고한 Phase 13 배포 시점), 몰아서 발견하면 릴리스가 밀린다.
+  - titleKey: stack tauri 크레이트 메타데이터가 스캐폴딩 기본값 그대로이고 edition 2021에 머물러 있다
+- stack: pre-commit 훅이 저장소당 수동 opt-in이라 시크릿 검사가 켜졌는지 아무도 모른다
+  - 근거: 시크릿 검사 훅이 수동 설정이라 켜졌는지 확인할 방법이 없고, 훅의 존재 이유(히스토리에 시크릿이 남기 전에 잡는 것)가 통째로 무력화될 수 있다.
+  - titleKey: stack pre commit 훅이 저장소당 수동 opt in이라 시크릿 검사가 켜졌는지 아무도 모른다
+- stack: Supabase 클라이언트에 생성 타입(Database)이 없다 — 44개 마이그레이션과 코드가 컴파일러로 대조되지 않는다
+  - 근거: 마이그레이션 44개가 컬럼을 바꿔도 타입체크가 통과하며, 수기 Row 타입과 as any 캐스팅 50곳, 테스트 목의 as any 억제 55건 전량이 여기서 파생된다.
+  - titleKey: stack supabase 클라이언트에 생성 타입 database 이 없다 44개 마이그레이션과 코드가 컴파일러로 대조되지 않는다
+- stack: 서버 오류 관측 수단이 전무 — instrumentation.ts가 없어 API 라우트·RSC 예외가 아무 데도 남지 않는다
+  - 근거: route.ts 12개와 RSC 페이지의 예외가 Vercel 런타임 로그(무료 티어 보존 짧음) 밖으로 나가지 않아 실패율·에러 종류를 집계할 방법이 전혀 없다.
+  - titleKey: stack 서버 오류 관측 수단이 전무 instrumentation ts가 없어 api 라우트 rsc 예외가 아무 데도 남지 않는다
+- stack: Tauri가 배포 URL을 3곳에 하드코딩하고 원격 문서에 window.__TAURI__를 통째로 노출한다(withGlobalTauri:true)
+  - 근거: URL이 3곳에 하드코딩돼 있어 Vercel 프로젝트명이나 도메인이 바뀌는 순간 배포된 데스크톱 바이너리가 빈 창이 되고, withGlobalTauri:true는 원격 콘텐츠의 모든 스크립트에 전역 IPC를 노출한다.
+  - titleKey: stack tauri가 배포 url을 3곳에 하드코딩하고 원격 문서에 window tauri 를 통째로 노출한다 withglobaltauri true
+- stack: 확정 스택 문서가 코드와 다르다 — react-three-fiber/3D는 의존성 그래프에 존재하지 않는다
+  - 근거: pnpm-lock.yaml에 three/@react-three가 전혀 없는데 문서는 여전히 3D 스택을 확정 스택으로 명시해, 이를 신뢰하는 세션이 존재하지 않는 라이브러리를 전제로 설계하게 된다.
+  - titleKey: stack 확정 스택 문서가 코드와 다르다 react three fiber 3d는 의존성 그래프에 존재하지 않는다
+- stack: 의존성 갱신 자동화가 없다 — CI는 취약점만 막고 노후는 아무도 보지 않는다
+  - 근거: 현재 CI의 유일한 의존성 장치인 pnpm audit --prod는 GHSA 공개 이후에만 반응하고 devDependencies는 대상 밖이라, 8개 매니페스트의 버전을 사람이 기억해서 올려야 한다.
+  - titleKey: stack 의존성 갱신 자동화가 없다 ci는 취약점만 막고 노후는 아무도 보지 않는다
+- stack: Supabase 개발 툴체인이 저장소 밖에 있다 — CLI 미고정, gen types/db diff 스크립트 없음, 적용 현황은 34개 뒤처진 산문
+  - 근거: CLI 버전이 고정돼 있지 않아 각자 다른 버전으로 db push하고, README의 적용 현황(10개 언급)이 실제 44개 마이그레이션 대비 34개만큼 낡아 실서버 상태 판단이 산문에만 의존한다.
+  - titleKey: stack supabase 개발 툴체인이 저장소 밖에 있다 cli 미고정 gen types db diff 스크립트 없음 적용 현황은 34개 뒤처진 산문
+- stack: turbo.json에 env 선언이 하나도 없다 — 빌드가 읽는 VERCEL_URL 계열이 캐시 키에 안 들어가고 strict 모드에서 전달되지 않는다
+  - 근거: turbo strict envMode에서 미선언 VERCEL_* 값은 캐시 키에 포함되지 않고 하위 프로세스에도 전달되지 않아, 사이트맵·robots·OG의 절대 URL이 조용히 잘못된 오리진으로 굳는다 — 이 저장소가 이미 겪은 '조용한 사고' 유형과 같다.
+  - titleKey: stack turbo json에 env 선언이 하나도 없다 빌드가 읽는 vercel url 계열이 캐시 키에 안 들어가고 strict 모드에서 전달되지 않는다
+- stack: tsconfig.base.json의 strict가 기본값에서 멈춰 있다 — 인덱스 접근·선택적 속성·타입 import가 검사되지 않는다
+  - 근거: 배열·Record 인덱싱이 많은 도메인(스프라이트 프레임, 히트맵, 요일 집계)에서 날짜·경계 버그가 하루 8건 발생한 이력이 있는데, noUncheckedIndexedAccess가 꺼져 있어 컴파일러가 이런 경계 실수를 못 잡는다.
+  - titleKey: stack tsconfig base json의 strict가 기본값에서 멈춰 있다 인덱스 접근 선택적 속성 타입 import가 검사되지 않는다
+- stack: Next 16의 typedRoutes를 켜지 않아 Link/router 경로 오타를 컴파일러가 잡지 못한다
+  - 근거: 경로 문자열 하나가 어긋나면 인증 게이트가 조용히 303으로 돌려보내는 구조이고, 이 저장소는 이미 세 번(manifest.json·robots.txt·opengraph-image) 같은 부류의 조용한 리다이렉트 사고를 겪었는데 typedRoutes가 그중 상당수를 빌드 타임에 잡아준다.
+  - titleKey: stack next 16의 typedroutes를 켜지 않아 link router 경로 오타를 컴파일러가 잡지 못한다
+
+## test (24건)
+
+- test: CI e2e는 사실상 비어 있다 — 53건 중 45건이 인증 게이트로 스킵
+  - 근거: CI에 인증 세션이 없어 투두/메모 CRUD·오리 대화·반복 할 일·삭제 되돌리기·발표 모드 등 검증 가치가 큰 스펙 9개 블록이 전부 스킵된다.
+  - titleKey: test ci e2e는 사실상 비어 있다 53건 중 45건이 인증 게이트로 스킵
+- test: 인증 게이트 proxy.ts에 동작 테스트가 없다 (커버리지 6.3%) — 보안 헤더 회귀는 아무도 못 잡는다
+  - 근거: 유일한 인증 경계이자 CSP/HSTS 발행 지점의 커버리지가 6.3%이고, 과거 실제로 헤더가 사라진 사고가 있었는데 회귀 테스트가 0건이다.
+  - titleKey: test 인증 게이트 proxy ts에 동작 테스트가 없다 커버리지 6 3 보안 헤더 회귀는 아무도 못 잡는다
+- test: 되돌릴 수 없는 계정 삭제 라우트가 커버리지 0%
+  - 근거: service_role로 RLS를 우회해 auth.users를 지우는 가장 되돌리기 어려운 코드인데 명시된 계약 4개(키없음/본문미신뢰/쿨다운/삭제순서)가 하나도 테스트되지 않는다.
+  - titleKey: test 되돌릴 수 없는 계정 삭제 라우트가 커버리지 0
+- test: 제품 핵심 2축(메신저·블록 에디터/DB뷰)에 e2e가 0건
+  - 근거: CLAUDE.md가 정의한 제품 두 축이 자동 검증 대상 밖이고, 최근 메신저 보안 마이그레이션 3건이 정적 regex 검사 하나로만 확인된다.
+  - titleKey: test 제품 핵심 2축 메신저 블록 에디터 db뷰 에 e2e가 0건
+- test: e2e가 프로덕션 Supabase/Gemini에 실계정으로 붙는다 — 결정성·비용·데이터 오염
+  - 근거: 실계정+프로덕션 DB에 붙어 돌아 고아 데이터가 생기고, 목킹 누락으로 매 실행마다 Gemini 무료 쿼터를 실제로 소모한다.
+  - titleKey: test e2e가 프로덕션 supabase gemini에 실계정으로 붙는다 결정성 비용 데이터 오염
+- test: 메신저 백엔드 packages/api/src/rooms.ts — export 28개 중 5개만 테스트 (54.7%)
+  - 근거: 스토리지 실삭제를 수행하는 deleteOrphanAttachments 등 파괴적·보안 민감 함수가 미검증 상태로 남아 있다.
+  - titleKey: test 메신저 백엔드 packages api src rooms ts export 28개 중 5개만 테스트 54 7
+- test: localStorage 지속화 계층이 통째로 미테스트 — write() 예외 처리 부재까지 가려진다
+  - 근거: favorites.ts의 write()에 try/catch가 없어 localStorage 용량 초과 시 QuotaExceededError가 그대로 UI로 튀는 등 실제 결함이 테스트 부재로 가려져 있다.
+  - titleKey: test localstorage 지속화 계층이 통째로 미테스트 write 예외 처리 부재까지 가려진다
+- test: AI 채팅/도구 승인 클라이언트 흐름 useDuckChat.ts 26.3%
+  - 근거: 승인 없이 도구가 두 번 실행되거나 승인 대기가 유실될 수 있는 클라이언트 경로가 미검증이며 서버측 route는 이미 테스트가 있어 비대칭이 뚜렷하다.
+  - titleKey: test ai 채팅 도구 승인 클라이언트 흐름 useduckchat ts 26 3
+- test: Playwright 트레이스가 절대 수집되지 않는다 (retries:0 + trace:on-first-retry) + CI 아티팩트 업로드 없음
+  - 근거: retries:0과 trace:on-first-retry 조합으로 트레이스가 한 번도 생성되지 않아, 프로덕션 DB에 붙는 비결정적 테스트가 실패해도 콘솔 한 줄 외에 진단 수단이 없다.
+  - titleKey: test playwright 트레이스가 절대 수집되지 않는다 retries 0 trace on first retry ci 아티팩트 업로드 없음
+- test: SEC-04 open-redirect 가드가 인라인 조건식으로 남아 있고 0% 커버리지
+  - 근거: 같은 저장소의 유사 가드(judgeAuthState, safeHref)는 순수 함수+테스트로 잠겨 있는데 이 가드만 그 원칙 밖에 있고 파일 전체가 0%다.
+  - titleKey: test sec 04 open redirect 가드가 인라인 조건식으로 남아 있고 0 커버리지
+- test: API 라우트 인증 검사가 문자열 존재 grep이라 '호출했지만 결과를 안 본다'를 못 잡는다
+  - 근거: 현재 검사가 `/auth\.getUser\(\)/.test(src)` 문자열 매칭뿐이라 반환값 미검사·401 미반환도 통과한다.
+  - titleKey: test api 라우트 인증 검사가 문자열 존재 grep이라 호출했지만 결과를 안 본다 를 못 잡는다
+- test: packages의 .tsx 컴포넌트 6개가 커버리지 리포트에서 '보이지 않는다'
+  - 근거: Duck.tsx, ui/components의 Button·Card·Input·Spinner·Toast.tsx가 집계에서 아예 빠져 91.24%라는 수치가 실제보다 좋아 보인다.
+  - titleKey: test packages의 tsx 컴포넌트 6개가 커버리지 리포트에서 보이지 않는다
+- test: e2e에 고정 대기(waitForTimeout)와 networkidle 의존이 남아 flake 여지
+  - 근거: 고정 대기는 위음성·낭비를 동시에 유발하고 networkidle은 Supabase Realtime(wss) 연결이 있는 이 앱에서 비결정적이며 retries:0이라 한 번의 흔들림이 곧바로 CI 실패로 이어진다.
+  - titleKey: test e2e에 고정 대기 waitfortimeout 와 networkidle 의존이 남아 flake 여지
+- test: packages/api의 가짜 Supabase가 테이블명·필터 인자를 통째로 무시한다 — 잘못된 테이블·누락된 소유자 필터를 어떤 테스트도 못 잡는다
+  - 근거: 현재 124/130개 from() 정의가 테이블명을 무시해 잘못된 테이블 조회나 소유자 스코프 누락 같은 회귀가 전부 green으로 통과하며, RLS도 실 DB로 검증되지 않아 소유자 스코프 검증 층이 코드베이스 전체에 하나도 없다.
+  - titleKey: test packages api의 가짜 supabase가 테이블명 필터 인자를 통째로 무시한다 잘못된 테이블 누락된 소유자 필터를 어떤 테스트도 못 잡는다
+- test: API 라우트 12개 중 7개가 라우트 레벨 테스트 0건 — 외부 비용이 드는 ai/write·embed·standup·news/collect 포함
+  - 근거: 이들 라우트는 Gemini·GitHub·RSS 등 유료/외부 호출을 하면서 인증·입력검증·에러 매핑을 자체 구현하는데, 그 분기들이 한 번도 실행된 적이 없다.
+  - titleKey: test api 라우트 12개 중 7개가 라우트 레벨 테스트 0건 외부 비용이 드는 ai write embed standup news collect 포함
+- test: 서버 강제 게이트 헬퍼(blockIfFeatureDisabled·requireGeminiKey)에 동작 테스트가 0건 — grep 가드만 있다
+  - 근거: 기존 apiFeatureGate.test.ts는 라우트 소스에 문자열이 등장하는지 grep할 뿐, 함수 자체의 핵심 동작(특히 fail-open 여부)이 검증되지 않는다.
+  - titleKey: test 서버 강제 게이트 헬퍼 blockiffeaturedisabled requiregeminikey 에 동작 테스트가 0건 grep 가드만 있다
+- test: 런타임 접근성 검증이 0건 — a11y 전량을 손수 만든 regex 소스 스캔에 의존한다(axe 미도입)
+  - 근거: 현재 a11y 검증은 정규식 기반 소스 스캔뿐이라 실제 계산된 대비, 조건부 렌더 결과, aria-live 실제 announce, 포커스 순서는 원리적으로 판정 불가능하며, 파서 오탐 이력도 실증돼 있다.
+  - titleKey: test 런타임 접근성 검증이 0건 a11y 전량을 손수 만든 regex 소스 스캔에 의존한다 axe 미도입
+- test: e2e teardown이 todos·memos 2개 테이블만 지운다 — presentation 스펙이 만드는 pages 행은 접두사 규약 밖이라 영구히 남는다
+  - 근거: 현재는 실행 회차 × 스펙 수만큼 무제목 페이지가 실제 사용자 프로덕션 계정에 영구 누적되고 있다.
+  - titleKey: test e2e teardown이 todos memos 2개 테이블만 지운다 presentation 스펙이 만드는 pages 행은 접두사 규약 밖이라 영구히 남는다
+- test: e2e 11개 스펙 중 9개가 클라이언트 런타임 예외를 무시한다 — pageerror 가드가 비인증 스펙 2곳에만 있다
+  - 근거: App Router에 error.tsx가 없어 렌더 중 예외가 부분 트리만 조용히 죽이는데, pageerror 가드가 없는 9개 스펙은 단언 대상 요소만 보이면 통과해 이를 놓친다.
+  - titleKey: test e2e 11개 스펙 중 9개가 클라이언트 런타임 예외를 무시한다 pageerror 가드가 비인증 스펙 2곳에만 있다
+- test: 단일출처 가드 테스트가 하드코딩 파일 목록 기반이라 새로 추가되는 컴포넌트는 자동으로 검사 밖으로 빠진다
+  - 근거: 새 텍스트 입력이나 유사 컴포넌트가 추가되면 가드가 침묵해, 애초에 막으려던 '갈라짐' 패턴이 조용히 재발한다.
+  - titleKey: test 단일출처 가드 테스트가 하드코딩 파일 목록 기반이라 새로 추가되는 컴포넌트는 자동으로 검사 밖으로 빠진다
+- test: role="dialog" 17곳 중 공용 a11y 훅을 쓰는 곳은 7곳뿐인데 이를 잠그는 가드도, 훅 자체 테스트도 없다
+  - 근거: 이 저장소는 IME·emoji·KST에는 단일출처 가드를 붙였는데 정작 모달 접근성에는 붙이지 않았고, 훅 자체도 테스트 0건이라 P127에서 연결한 훅 사용이 미래에 또 누락돼도 잡히지 않는다.
+  - titleKey: test role dialog 17곳 중 공용 a11y 훅을 쓰는 곳은 7곳뿐인데 이를 잠그는 가드도 훅 자체 테스트도 없다
+- test: office 미니게임 835줄(office-draw 761 + sprite-loader 74)이 테스트 0건 — 이름이 비슷한 기존 테스트가 커버한다는 착시가 있다
+  - 근거: officeSound·officeDuckSprite 등 이름이 비슷한 기존 테스트가 실제로는 office-draw.ts·clientErrorLog.ts를 한 줄도 실행하지 않으며, 특히 clientErrorLog는 다른 모든 클라이언트 오류 보고의 유일한 경로다.
+  - titleKey: test office 미니게임 835줄 office draw 761 sprite loader 74 이 테스트 0건 이름이 비슷한 기존 테스트가 커버한다는 착시가 있다
+- test: e2e 피드백 루프가 직렬 11분 + 매 실행 full next build — 샤딩·브라우저 프로젝트 분리·잡 타임아웃이 전부 없다
+  - 근거: 현재 workers:1 직렬 실행에 매 실행 풀빌드가 포함되고, timeout-minutes 부재로 webServer가 안 뜨면 러너 기본 6시간까지 매달릴 수 있으며, 모바일 뷰포트/터치 이벤트 경로 검증이 전무하다.
+  - titleKey: test e2e 피드백 루프가 직렬 11분 매 실행 full next build 샤딩 브라우저 프로젝트 분리 잡 타임아웃이 전부 없다
+- test: packages/mascot는 제품 정체성인데 phrases.ts만 테스트된다 — usePrefersReducedMotion은 접근성 설정 경로인데 0건
+  - 근거: 전 저장소의 모션 감소 대응이 reducedMotionSingleSource.test.ts가 강제하는 이 미검증 훅 하나에 수렴하는데, 아직 한 번도 테스트되지 않았다.
+  - titleKey: test packages mascot는 제품 정체성인데 phrases ts만 테스트된다 useprefersreducedmotion은 접근성 설정 경로인데 0건
+
+## ux (25건)
+
+- ux: 미정의 토큰 --destructive-foreground → 확인 다이얼로그·오프라인 배너 대비 WCAG AA 미달
+  - 근거: 미정의 토큰으로 글자색이 --foreground로 상속돼 라이트 3.31:1, 다크 2.42:1로 WCAG 2.1 AA(4.5:1)를 위반한다.
+  - titleKey: ux 미정의 토큰 destructive foreground 확인 다이얼로그 오프라인 배너 대비 wcag aa 미달
+- ux: hover 전용 노출 컨트롤이 터치 기기에서 보이지 않으면서 눌린다 — 모바일 오작동 삭제 위험
+  - 근거: 터치 기기는 hover가 없어 컨트롤이 영원히 발견되지 않으면서도 pointer-events는 살아 있어 보이지 않는 '삭제' 버튼이 탭에 반응한다(모바일 트래픽 54%).
+  - titleKey: ux hover 전용 노출 컨트롤이 터치 기기에서 보이지 않으면서 눌린다 모바일 오작동 삭제 위험
+- ux: 칸반 보드 카드 이동이 드래그 전용 — WCAG 2.2 SC 2.5.7(끌기 대체수단) 위반, 터치·키보드로 불가
+  - 근거: HTML5 DnD 전용이라 모바일 터치와 키보드 사용자는 보드 뷰의 핵심 조작이 원리적으로 불가능하다.
+  - titleKey: ux 칸반 보드 카드 이동이 드래그 전용 wcag 2 2 sc 2 5 7 끌기 대체수단 위반 터치 키보드로 불가
+- ux: hover 노출 버튼 일부에 focus-visible 보정이 빠져 키보드 포커스가 보이지 않는다(WCAG 2.4.7)
+  - 근거: 키보드로 포커스가 들어가도 opacity:0이라 포커스 링이 보이지 않아 키보드 사용자가 자기 위치를 알 수 없다.
+  - titleKey: ux hover 노출 버튼 일부에 focus visible 보정이 빠져 키보드 포커스가 보이지 않는다 wcag 2 4 7
+- ux: CardTitle이 div라서 h1 아래 제목 구조가 전무 — 스크린리더 주 탐색 수단이 없다
+  - 근거: 스크린리더 사용자의 최다 페이지 탐색 수단인 제목 목록이 사실상 비어 있어 위젯 사이를 건너뛸 방법이 없다(WCAG 1.3.1).
+  - titleKey: ux cardtitle이 div라서 h1 아래 제목 구조가 전무 스크린리더 주 탐색 수단이 없다
+- ux: 오리 채팅: 새 답변 자동 스크롤 없음 + 스크롤 영역 키보드 접근 불가 + 답변 라이브 리전 없음
+  - 근거: 대화가 길어지면 답변이 화면 밖에 그려지고, 스크롤 영역이 키보드로 접근 불가하며, 완성된 답변이 라이브 리전 밖이라 스크린리더 사용자는 답이 온 사실을 못 듣는다.
+  - titleKey: ux 오리 채팅 새 답변 자동 스크롤 없음 스크롤 영역 키보드 접근 불가 답변 라이브 리전 없음
+- ux: 디자인 시스템이 두 벌 — packages/ui는 별도 팔레트·인라인 스타일이라 테마 토글이 먹지 않는다
+  - 근거: 별도 팔레트+미디어쿼리 기반 다크모드가 앱의 .dark 클래스 토글과 어긋나 @ldd/ui 컴포넌트만 테마를 따라가지 않고, Toast.tsx는 색상을 하드코딩하고 있다.
+  - titleKey: ux 디자인 시스템이 두 벌 packages ui는 별도 팔레트 인라인 스타일이라 테마 토글이 먹지 않는다
+- ux: 반복 목록의 아이콘 버튼 접근명이 '수정'/'삭제'로 동일 — 어떤 항목인지 알 수 없다
+  - 근거: 동일 라벨이 할 일 개수만큼 반복돼 스크린리더에는 '수정 버튼, 삭제 버튼'이 수십 번 반복되고 어느 항목인지 구분되지 않는다.
+  - titleKey: ux 반복 목록의 아이콘 버튼 접근명이 수정 삭제 로 동일 어떤 항목인지 알 수 없다
+- ux: 접힌 사이드바에서 검색 입구가 사라지고, 메뉴 링크는 title 속성에만 이름을 의존한다
+  - 근거: 접힘 상태가 localStorage로 영속돼 한 번 접은 사용자는 검색 진입점을 영구히 볼 수 없고, title 속성 폴백은 보조기술·터치에서 불안정하다.
+  - titleKey: ux 접힌 사이드바에서 검색 입구가 사라지고 메뉴 링크는 title 속성에만 이름을 의존한다
+- ux: 위젯 접기 버튼에 aria-expanded 없음 + 라벨이 모든 위젯에서 동일('접기')
+  - 근거: 7~8개 위젯의 동일한 '접기 버튼'이 반복되고 상태 변화가 스크린리더에 전달되지 않는다(WCAG 4.1.2).
+  - titleKey: ux 위젯 접기 버튼에 aria expanded 없음 라벨이 모든 위젯에서 동일 접기
+- ux: 터치 타깃이 권장치(44px) 미달 — 행 액션 14px, sm 버튼 32px, 맨위로 36px
+  - 근거: 14~36px 터치 타깃은 WCAG 2.2 SC 2.5.8 권장치에 아슬아슬하거나 미달해, '삭제'가 '수정' 바로 옆에 붙어 있는 구성은 오조작 비용이 크다.
+  - titleKey: ux 터치 타깃이 권장치 44px 미달 행 액션 14px sm 버튼 32px 맨위로 36px
+- ux: 색·점 모양만으로 상태 전달 — 미완료 투두 알림 점과 마감 초과 표시에 텍스트 대안 없음
+  - 근거: 색상·점 모양만으로 상태를 전달해 스크린리더·색각 이상 사용자가 정보를 받지 못한다(WCAG 1.4.1).
+  - titleKey: ux 색 점 모양만으로 상태 전달 미완료 투두 알림 점과 마감 초과 표시에 텍스트 대안 없음
+- ux: 대시보드 그리드가 duck/chat 위치를 하드코딩해 사용자 재정렬이 xl에서 무시된다
+  - 근거: xl 뷰포트에서는 명시적 grid 배치가 사용자 재정렬을 이겨 항상 첫 줄에 남아, 조작이 반영되지 않는 것처럼 느껴진다.
+  - titleKey: ux 대시보드 그리드가 duck chat 위치를 하드코딩해 사용자 재정렬이 xl에서 무시된다
+- ux: 미학: Geist(Next 기본) + 기본 shadcn 카드 그리드 조합 — 3D 오리라는 차별점이 UI에 반영되지 않았다
+  - 근거: Geist 기본 폰트+균등 카드 그리드가 '기본값 그대로'라는 인상을 주고, 로그인 placeholder 대비도 3.35:1로 4.5:1 미달이다.
+  - titleKey: ux 미학 geist next 기본 기본 shadcn 카드 그리드 조합 3d 오리라는 차별점이 ui에 반영되지 않았다
+- ux: AI 작문 도우미가 비스트리밍 — 최대 수십 초 동안 결과 영역이 비어 있다
+  - 근거: Gemini 응답이 통상 5~30초 걸리는데 결과 영역이 완전히 비어 있어 생성 진행 감각이 없고, 결과를 최종본으로 오인할 여지가 있다.
+  - titleKey: ux ai 작문 도우미가 비스트리밍 최대 수십 초 동안 결과 영역이 비어 있다
+- ux: 라우트 16개 중 13개에 metadata가 없어 모든 화면의 브라우저 제목이 'Little Dev Duck' 하나다 (WCAG 2.4.2, Level A)
+  - 근거: 화면 전환 시 스크린리더가 제목을 낭독해 이동을 알리는데, 지금은 모든 화면이 동일 제목이라 사용자가 어디에 도착했는지 알 수 없고 탭·북마크·히스토리도 구분되지 않는다.
+  - titleKey: ux 라우트 16개 중 13개에 metadata가 없어 모든 화면의 브라우저 제목이 little dev duck 하나다 wcag 2 4 2 level a
+- ux: aria-modal="true" 모달 10곳이 포커스 트랩·복원 없이 역할만 선언 — 공용 useModalA11y는 5곳만 쓴다
+  - 근거: aria-modal=true는 보조기술에 '바깥은 없는 셈 치라'고 선언하지만 실제 Tab 포커스가 새어 나가, 스크린리더 사용자가 읽히지 않는 곳에 포커스가 가 있는 최악의 조합이 된다.
+  - titleKey: ux aria modal true 모달 10곳이 포커스 트랩 복원 없이 역할만 선언 공용 usemodala11y는 5곳만 쓴다
+- ux: ARIA 역할(tablist·menu·listbox)만 붙이고 그 역할이 약속한 키보드 패턴을 구현하지 않았다
+  - 근거: 역할만 선언되고 동작이 없으면 보조기술이 특정 상호작용 모드로 전환해 오히려 항목에 도달하지 못하는 역효과가 발생한다 — 역할이 없느니만 못한 상태다.
+  - titleKey: ux aria 역할 tablist menu listbox 만 붙이고 그 역할이 약속한 키보드 패턴을 구현하지 않았다
+- ux: 모바일 안전영역 처리가 실제로는 없다 — pb-safe는 정의된 적 없는 no-op이고 viewport export도 없다
+  - 근거: viewport-fit=cover 없이는 env(safe-area-inset-bottom)이 항상 0이라 pb-safe 클래스가 정의돼도 동작하지 않으며, 현재는 클래스 자체가 존재하지 않아 iOS 홈 인디케이터가 하단 탭바 라벨/터치영역을 가린다.
+  - titleKey: ux 모바일 안전영역 처리가 실제로는 없다 pb safe는 정의된 적 없는 no op이고 viewport export도 없다
+- ux: 휴대폰에서 검색·통계·관리자로 가는 입구가 전부 사라진다 — 하단바 6칸에 없고 사이드바는 md 이상에서만 렌더된다
+  - 근거: SearchTrigger(CommandPalette 진입)가 데스크톱 사이드바 안에만 있고 Cmd+K는 소프트키보드에 없어, 모바일에서는 검색·통계·관리자에 도달할 방법이 URL 직접 입력 외에 전무하다.
+  - titleKey: ux 휴대폰에서 검색 통계 관리자로 가는 입구가 전부 사라진다 하단바 6칸에 없고 사이드바는 md 이상에서만 렌더된다
+- ux: 타이포 스케일이 12~14px에 갇혀 있고 10~11px 하드코딩이 42곳 — 카드 제목(14px)이 섹션 제목과 같은 크기라 위계가 평평하다
+  - 근거: 12px 이하 텍스트는 저시력·노안 사용자에게 확대 없이 안 읽히고 iOS는 16px 미만 입력에 자동 줌인을 걸며, 현재는 상위 제목이 하위 제목보다 흐려 보이는 위계 역전이 실제로 존재한다.
+  - titleKey: ux 타이포 스케일이 12 14px에 갇혀 있고 10 11px 하드코딩이 42곳 카드 제목 14px 이 섹션 제목과 같은 크기라 위계가 평평하다
+- ux: AI 작문 결과가 '초안'임을 알리지 않고 편집·재조정 경로도 없으며, 템플릿·원문과 같은 상자에 섞여 출처를 구분할 수 없다
+  - 근거: Gemini가 지어낸 문장과 사용자가 예전에 쓴 문장이 동일한 상자·서식으로 나타나 구분이 불가능해 검증 없이 복사될 위험이 있고, 완료 시점과 내용이 스크린리더 사용자에게 통보되지 않는다.
+  - titleKey: ux ai 작문 결과가 초안 임을 알리지 않고 편집 재조정 경로도 없으며 템플릿 원문과 같은 상자에 섞여 출처를 구분할 수 없다
+- ux: 오리 승인 카드가 뜨는 순간 포커스가 사라진다 — 포커스가 있던 입력창을 disabled로 바꾸고 alertdialog로 옮기지 않는다
+  - 근거: 포커스된 요소가 disabled로 바뀌면 브라우저가 포커스를 body로 떨어뜨려 키보드 사용자의 위치가 통째로 사라지고, 되돌릴 수 없는 외부 작업(캘린더 생성·Gmail 휴지통 이동)을 승인하는 지점이라 영향이 크다.
+  - titleKey: ux 오리 승인 카드가 뜨는 순간 포커스가 사라진다 포커스가 있던 입력창을 disabled로 바꾸고 alertdialog로 옮기지 않는다
+- ux: 로그인 화면만 토큰 밖 하드코딩 색 12종을 쓰고, placeholder 대비가 3.3:1로 AA 미달인데 대비 테스트가 이 화면을 보지 못한다
+  - 근거: 현재 대비 검사는 globals.css 파싱 방식이라 인라인 헥스값 12종은 검사 대상이 아니며, placeholder는 실측 약 3.3:1로 WCAG 1.4.3 AA(4.5:1)에 미달한다 — 제품에서 가장 먼저·가장 많이 보는 화면이다.
+  - titleKey: ux 로그인 화면만 토큰 밖 하드코딩 색 12종을 쓰고 placeholder 대비가 3 3 1로 aa 미달인데 대비 테스트가 이 화면을 보지 못한다
+- ux: 전역 prefers-reduced-motion 폴백이 없다 — motion-safe를 쓰는 파일은 5개뿐인데 애니메이션은 29파일 48곳에서 돈다
+  - 근거: motion-safe로 감싼 곳이 5개 파일뿐이라 나머지 48곳(29파일)과 오피스 HUD 반복 페이드 등은 움직임 줄이기 설정과 무관하게 그대로 재생돼, 전정기관 장애 사용자에게 특히 문제가 된다.
+  - titleKey: ux 전역 prefers reduced motion 폴백이 없다 motion safe를 쓰는 파일은 5개뿐인데 애니메이션은 29파일 48곳에서 돈다
+
+## 교차검증 기각 (36건)
+
+- core 배럴이 손으로 유지하는 707줄·99개 재export 문이다
+- room_members INSERT 정책에 초대 검증이 없어 임의의 방에 스스로 멤버로 들어갈 수 있다
+- touch_room_on_message가 authenticated에 EXECUTE로 남아 있다
+- RLS 정책이 실제 DB에서 한 번도 검증되지 않는다 — 정적 regex 검사가 전부
+- apps/web 컴포넌트 112개 전부 커버리지 0% — DOM 테스트 환경 자체가 없다
+- 커버리지 게이트가 없다 — CI가 coverage를 돌리지 않고 apps/web은 측정 대상에서 제외
+- Rust 수집기 테스트 6건이 CI에서 한 번도 실행되지 않는다
+- packages/ui와 apps/web/src/components/ui가 같은 프리미티브를 두 벌로 유지 — CLAUDE.md 3-5 인벤토리 규칙 위반
+- 컴포넌트 렌더 테스트 인프라가 없다 — jsdom·testing-library 미설치로 93개 컴포넌트가 단위 테스트 불가
+- 클라이언트 편중 구조 — tsx 112개 중 83개가 'use client', Suspense 0회, Server Action 0회
+- packages/core/src/domain에 190여 모듈이 한 디렉터리에 평면 배치되고 707줄 배럴이 이를 재수출한다
+- apps/desktop이 turbo 파이프라인에서 사실상 비어 있다 — lint/test/build 스크립트가 없어 Rust 305줄이 검증 밖
+- 마감일은 저장되는데 아무도 알려주지 않는다 — 리마인더 기능 부재
+- '자동'으로 보이는 모든 동작이 실제로는 화면을 열어야 실행된다 — 서버 스케줄러 부재
+- 구글 캘린더 일정이 화면 어디에도 안 보인다 — 통합 캘린더 뷰 없음
+- 캘린더에 반복 일정이 없다 — 주간 회의를 매주 손으로 만들어야 한다
+- 휴대폰에서 페이지 목록에 아예 닿을 수 없다 — 모바일 사이드바 대체 UI 없음
+- 전역 검색이 '페이지 전용 부분일치'다 — 할 일·메모·메시지·뉴스는 검색되지 않는다
+- 할 일 모델이 제목·완료·마감뿐 — 우선순위/태그/하위작업/설명이 없다
+- 오리 응답이 스트리밍이 아니다 — 도구 루프 최대 5회 동안 화면이 멈춘 것처럼 보인다
+- 페이지 공유가 '전체 공개 링크' 아니면 '비공개' 이분법 — 특정 사용자에게 줄 수 없다
+- 페이지에 코멘트·멘션이 없다 — 문서 위에서 논의가 안 된다
+- Gmail 어댑터가 읽기와 휴지통뿐 — '이 메일 답장해줘'가 성립하지 않는다
+- 오리에게 장기 기억이 없다 — 매번 처음 만나는 비서
+- 다른 도구에서 데이터를 가져올 방법이 없다 — 신규 사용자 이주 장벽
+- 집중 세션이 '무엇에' 쓴 시간인지 연결되지 않는다 — 시간 추적 리포트 불가
+- 휴대폰 전용 경험이 없다 — apps/에 mobile이 없고 웹도 일부 화면이 데스크톱 전제
+- 정규식 기반 자체 정적검사 층 20여 개가 vitest 안에 산다 — 자작 주석제거기·JSX 파서까지 유지 대상
+- 테스트 파일 배치 관례가 두 갈래 — colocated와 __tests__/가 한 패키지에 공존
+- 메시지 INSERT 정책이 임의 멤버의 '오리(agent) 사칭'을 허용한다
+- 인증 설정 하드닝 미비 — MFA가 백엔드에만 켜져 있고, OTP 만료가 1시간, 가입이 완전 개방
+- apps/web의 Button 프리미티브가 사실상 안 쓰인다 — 원시 button 229곳 vs Button 37파일, 포커스 표시가 두 벌로 갈렸다
+- core 도메인 98개 모듈 중 pomodoro.ts만 테스트 없이 남아 커버리지 규율의 유일한 구멍이 됐다
+- React 19 관용 위반 — 이펙트로 상태를 파생하는 패턴이 규칙 억제 49건으로 고착됐다
+- 순수 도메인 로직 67개 모듈이 packages/core가 아니라 apps/web/src/lib에 있다 — 모바일 공유 계약과 어긋난다
+- 화면 컴포넌트가 1900줄까지 자랐고 89개가 한 디렉터리에 평면 배치돼 있다
