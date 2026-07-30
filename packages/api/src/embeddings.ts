@@ -3,7 +3,6 @@ import {
   LddError,
   chunkText,
   retrievedChunkSchema,
-  type EmbeddingChunk,
   type EmbeddingSource,
   type RetrievedChunk,
 } from "@ldd/core";
@@ -15,26 +14,6 @@ function toVector(embedding: number[]): string {
   return `[${embedding.join(",")}]`;
 }
 
-// 청크 1개 upsert. unique(user,source_type,source_id,chunk_index)로 재임베딩 시 덮어쓴다.
-export async function upsertEmbedding(
-  supabase: SupabaseClient,
-  chunk: EmbeddingChunk,
-  embedding: number[],
-): Promise<void> {
-  const { error } = await supabase.from("embeddings").upsert(
-    {
-      user_id: chunk.userId,
-      source_type: chunk.sourceType,
-      source_id: chunk.sourceId,
-      chunk_index: chunk.chunkIndex,
-      content: chunk.content,
-      embedding: toVector(embedding),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,source_type,source_id,chunk_index" },
-  );
-  if (error) throw new LddError("internal", error.message);
-}
 
 // 한 소스의 모든 임베딩 삭제(내용이 비워지거나 원본 삭제 시).
 export async function deleteSourceEmbeddings(

@@ -71,7 +71,6 @@ export { assistWrite } from "./aiWrite";
 export { generateDuckLine } from "./duckLine";
 
 export {
-  upsertEmbedding,
   deleteSourceEmbeddings,
   indexSource,
   searchEmbeddings,

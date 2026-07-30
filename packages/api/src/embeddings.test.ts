@@ -3,7 +3,6 @@ import {
   deleteSourceEmbeddings,
   indexSource,
   searchEmbeddings,
-  upsertEmbedding,
 } from "./embeddings";
 
 const USER_ID = "33333333-3333-4333-8333-333333333333";
@@ -56,20 +55,6 @@ function fakeSupabase(opts: FakeOpts = {}) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 }
-
-describe("upsertEmbedding", () => {
-  it("벡터를 pgvector 리터럴 문자열로 넘긴다", async () => {
-    let captured: Record<string, unknown> = {};
-    const supabase = fakeSupabase({ onUpsert: (p) => (captured = p) });
-    await upsertEmbedding(
-      supabase,
-      { userId: USER_ID, sourceType: "memo", sourceId: "m1", chunkIndex: 0, content: "x" },
-      [0.1, 0.2, 0.3],
-    );
-    expect(captured.embedding).toBe("[0.1,0.2,0.3]");
-    expect(captured.source_type).toBe("memo");
-  });
-});
 
 describe("searchEmbeddings", () => {
   it("snake_case rpc 결과를 RetrievedChunk로 매핑", async () => {

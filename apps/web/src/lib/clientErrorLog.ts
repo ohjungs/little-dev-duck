@@ -4,7 +4,7 @@
 // 서버 액션용 그대로). 메시지 문구만 남긴다 — 본문·개인 데이터는 에러 문구에 안 담는 것이
 // 기존 규약이고, 여기서도 그 이상을 저장하지 않는다.
 
-import { readRing, pushRing, clearRing } from "./localRing";
+import { readRing, pushRing } from "./localRing";
 
 const KEY = "ldd:client-errors";
 export const CLIENT_ERROR_CAP = 50;
@@ -26,8 +26,4 @@ export function recordClientError(message: string): void {
 
 export function readClientErrors(): ClientErrorEntry[] {
   return readRing(KEY, isEntry);
-}
-
-export function clearClientErrors(): void {
-  clearRing(KEY);
 }
