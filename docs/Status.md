@@ -470,7 +470,7 @@
 - [ ] security: createGithubIssue title/body 필드 길이 상한 추가 — packages/api/src/githubIssues.ts
 - [ ] quality: 사이트 URL 계산 글루 코드 3중 반복을 getSiteUrl() 래퍼로 통합 — apps/web/src/app/layout.tsx
 - [ ] quality: knip을 lint/CI 파이프라인에 배선 — apps/web/src/lib/clientErrorLog.ts
-- [ ] stack: 미사용 framer-motion 의존성 제거 — apps/web/package.json
+- [x] stack: 미사용 framer-motion 의존성 제거 — 2026-07-31 완료(b3e3575). 저장소 전체 import 0건 확인 후 pnpm remove — apps/web/package.json
 - [ ] stack: Dependabot 또는 Renovate 도입 — .github/workflows/ci.yml
 - [기각] ux: AI 응답 대기 중 진행 단계 안내 문구 추가 — 2026-07-30. **만들지 않기로 이미 결정된
   항목이 백로그에 남아 계속 재선택됐다.** 근거(커밋 532718d): agent 라우트가 스트리밍이 아니라
