@@ -133,11 +133,22 @@ export function clampHistory(history: readonly HistoryTurn[]): HistoryTurn[] {
 /**
  * 프롬프트의 "직전 대화" 절. 비면 null — 빈 절은 노이즈다.
  * 발화자 라벨은 화면 표기와 같은 말(사용자/오리)로 — 모델이 역할을 헷갈리지 않게 한다.
+ *
+ * 2026-07-30 (mv #108): buildRagContext가 "[사용자 자료]에 없으면 모른다고 답하라"를 강하게
+ * 지시한다(agent.ts의 TOOL_PREFERENCE_GUARD와 같은 이유로 2026-07-23에 액션 요청을 억눌렀던
+ * 그 문구). history를 그냥 "참고 맥락"이라고만 하면 모델이 여전히 [사용자 자료] 쪽을 우선해
+ * "그중 제일 급한 게 뭐야?" 같은 후속 질문에 모른다고 답한다 — 직전 대화도 [사용자 자료]와
+ * 동등한 근거임을 명시해야 한다.
  */
 export function historyPromptSection(history: readonly HistoryTurn[]): string | null {
   if (history.length === 0) return null;
   const lines = history.map(
     (t) => `${t.role === "user" ? "사용자" : "오리"}: ${t.content}`,
   );
-  return ["[직전 대화]", ...lines, "(위는 참고 맥락이다. 아래 질문에 답하라.)"].join("\n");
+  return [
+    "[직전 대화]",
+    ...lines,
+    "(위 대화도 [사용자 자료]와 동등한 근거다. 질문이 위 대화를 가리키면 [사용자 자료]에 " +
+      "없어도 모른다고 하지 말고 위 대화를 근거로 답하라.)",
+  ].join("\n");
 }

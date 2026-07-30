@@ -60,12 +60,11 @@ export default async function MessagesPage() {
         >
           {notice}
         </p>
-      ) : rooms.length === 0 ? (
-        <p className="rounded-lg border border-border p-4 text-sm text-muted-foreground break-keep">
-          아직 대화가 없어요.
-        </p>
       ) : (
-        // 목록 렌더·이름 필터(L-023)는 클라이언트 컴포넌트가 맡는다.
+        // 2026-07-30 (mv #98): rooms.length === 0일 때 여기서 안내 문구만 보여주고 RoomList를
+        // 아예 렌더하지 않아, "오리와 대화하기" 버튼(RoomList 안)이 방이 없는 계정에서는
+        // 절대 보이지 않았다 — 빈 상태 문구도 RoomList가 자체적으로 보여준다(rooms.length===0
+        // 분기가 이미 있다). 목록 렌더·이름 필터(L-023)는 클라이언트 컴포넌트가 맡는다.
         <RoomList rooms={rooms} />
       )}
     </div>

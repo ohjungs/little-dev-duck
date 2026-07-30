@@ -47,6 +47,18 @@ describe("dailyIssues (하루 이슈 선정 — Phase 61 T1)", () => {
     expect(r.items).toHaveLength(10);
   });
 
+  it("피드가 적어 상한만으로 10개를 못 채우면, 상한을 넘겨서라도 채운다", () => {
+    // 2026-07-30 : mv #99/#102 — 피드 2개(각 5건)면 상한(3)만으로는 6개에서 멈춘다.
+    // "오늘 10장" 약속은 피드 개수와 무관하게 지켜야 한다 — 남는 자리는 순위 그대로 채운다.
+    const arts = [
+      ...Array.from({ length: 5 }, (_, i) => art({ id: `one${i}`, feedId: "f1" })),
+      ...Array.from({ length: 5 }, (_, i) => art({ id: `two${i}`, feedId: "f2" })),
+    ];
+    const r = dailyIssues(arts, { now: NOW });
+    expect(r.items).toHaveLength(10);
+    expect(r.items.map((x) => x.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
   it("카테고리는 피드 매핑에서, 모르는 피드는 종합", () => {
     const r = dailyIssues(
       [art({ id: "a1", feedId: "known" }), art({ id: "a2", feedId: "unknown" })],

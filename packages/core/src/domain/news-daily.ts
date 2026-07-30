@@ -58,11 +58,27 @@ export function dailyIssues<T extends RankableArticle>(
 
   const perFeed = new Map<string, number>();
   const items: DailyIssue<T>[] = [];
+  const overflow: { article: T; feedCount: number }[] = [];
   for (const { article, feedCount } of ranked.items) {
     if (items.length >= limit) break;
     const used = perFeed.get(article.feedId) ?? 0;
-    if (used >= perFeedCap) continue;
+    if (used >= perFeedCap) {
+      overflow.push({ article, feedCount });
+      continue;
+    }
     perFeed.set(article.feedId, used + 1);
+    items.push({
+      rank: items.length + 1,
+      category: topics[article.feedId] ?? DAILY_ISSUE_FALLBACK_CATEGORY,
+      article,
+      feedCount,
+    });
+  }
+  // 2026-07-30 : mv #99/#102 — 피드가 적으면(예: 2개) 상한만으로는 10장을 못 채운다
+  // (상한×피드수 < limit). "오늘 10장" 약속은 피드 개수와 무관하게 지켜야 하므로, 자리가
+  // 남으면 상한에 걸려 밀려난 기사로 순위 그대로 채운다 — 다양성은 1순위, 개수 약속은 2순위.
+  for (const { article, feedCount } of overflow) {
+    if (items.length >= limit) break;
     items.push({
       rank: items.length + 1,
       category: topics[article.feedId] ?? DAILY_ISSUE_FALLBACK_CATEGORY,

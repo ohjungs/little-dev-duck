@@ -217,4 +217,12 @@ describe("historyPromptSection", () => {
   it("비어 있으면 null — 빈 절을 프롬프트에 넣지 않는다", () => {
     expect(historyPromptSection([])).toBeNull();
   });
+
+  // 2026-07-30 : mv #108 — buildRagContext의 "자료에 없으면 모른다"가 history보다 먼저·강하게
+  // 읽혀, 직전 대화로 답할 수 있는 후속 질문에도 "모르겠다"고 답하는 문제가 실사용에서 확인됐다
+  // (TOOL_PREFERENCE_GUARD가 도구 호출에서 이미 한 번 겪은 것과 같은 종류의 지시문 충돌).
+  it("직전 대화도 [사용자 자료]와 동등한 근거라고 명시한다", () => {
+    const s = historyPromptSection([{ role: "user", content: "안녕" }]);
+    expect(s).toContain("[사용자 자료]에 없어도");
+  });
 });

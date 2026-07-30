@@ -121,7 +121,9 @@ export function NewsTopWidget() {
       )}
 
       {items.length > 0 && (
-        <ol className="flex flex-col gap-1">
+        // 2026-07-30 : mv #102 — 10개 전부 펼치면 대시보드 카드 하나가 다른 위젯을 밀어낸다.
+        // 안(스크롤)으로 접는다 — 접기/펼치기 토글을 새로 만들 만큼 자주 쓰는 동작은 아니다(ponytail).
+        <ol className="flex max-h-[320px] flex-col gap-1 overflow-y-auto">
           {items.map(({ rank, category, article: a, feedCount }) => {
             const read = readSet.has(a.id);
             return (
