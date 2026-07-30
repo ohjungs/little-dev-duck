@@ -12,6 +12,9 @@ import { describeRecurrence } from "@ldd/core";
 // Gemini 계약과 UI 표현을 분리).
 export const TOOL_LABELS: Record<string, string> = {
   createCalendarEvent: "캘린더 일정 만들기",
+  // 2026-07-30: 표시용 현재 제목(title) → 새 제목(newTitle) 형태로 카드에 드러난다
+  // (editTodo와 같은 규약이라 describeCall 변경 없이 그대로 읽힌다).
+  updateCalendarEvent: "캘린더 일정 수정",
   createGithubIssue: "GitHub 이슈 만들기",
   trashEmail: "이메일 휴지통으로 이동",
   createTodo: "할 일 추가",
@@ -28,6 +31,10 @@ export const TOOL_LABELS: Record<string, string> = {
   createPage: "페이지 만들기",
   addCalendarEvent: "앱 캘린더에 일정 추가",
   checkHabit: "습관 체크",
+  // 2026-07-30 : 라벨 커버리지 검사(approvalLabelCoverage.test.ts)를 새로 넣자마자 잡힌 누락.
+  // 이 도구는 선언 자체가 "되돌릴 수 없다"고 명시하는데 카드에는 `convertPageToDatabase`라는
+  // 영어 식별자만 떠 있었다 — 되돌릴 수 없는 작업일수록 카드가 마지막 방어선이라 그 사실을 적는다.
+  convertPageToDatabase: "페이지를 데이터베이스로 전환(되돌릴 수 없음)",
 };
 
 export function formatWhen(value: unknown): string | null {
