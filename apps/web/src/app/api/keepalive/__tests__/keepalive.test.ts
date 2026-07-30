@@ -14,7 +14,7 @@ beforeEach(() => {
   vi.resetModules();
   // 라우트가 Supabase env를 읽는다(없으면 500으로 빠져 레이트리밋 판정을 못 본다).
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://placeholder.supabase.co";
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "placeholder-anon-key";
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "placeholder-anon-key"; // allow-secret: 자리표시자
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => new Response("[]", { status: 200 })),

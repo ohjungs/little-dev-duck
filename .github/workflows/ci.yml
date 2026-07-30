@@ -34,6 +34,13 @@ jobs:
       # 사유 누락·근거 만료는 dependencyAuditIgnores.test.ts가 잡는다.
       - run: pnpm audit --prod --audit-level high --ignore-registry-errors
 
+      # 2026-07-31 : 보안 - 시크릿 - 커밋게이트
+      # 이 저장소에는 시크릿 검사가 없었다. 자율 루프가 상태 파일(plan-ledger·cycles·체크포인트)을
+      # 쓰기 시작하면서 커밋되는 파일이 늘었고, 그 내용은 에이전트가 읽은 코드와 **테스트 실패
+      # 출력**에서 온다 — 환경변수가 찍히면 그대로 박힌다. 저장소가 PUBLIC이라 되돌리기 어렵다.
+      # 의존성 없이 도는 node 스크립트라 install 전에 둬도 되지만, 순서를 단순하게 유지한다.
+      - run: node scripts/check-secrets.mjs
+
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm test

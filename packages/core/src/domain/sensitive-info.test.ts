@@ -19,7 +19,7 @@ describe("detectSensitiveInfo", () => {
   });
 
   it("흔한 API 키 접두사를 잡는다", () => {
-    expect(detectSensitiveInfo("sk-abcdefghijklmnopqrstuvwx")).toContain("API 키로 보이는 문자열");
+    expect(detectSensitiveInfo("sk-abcdefghijklmnopqrstuvwx")).toContain("API 키로 보이는 문자열"); // allow-secret: 가짜 고정값
     expect(detectSensitiveInfo("ghp_" + "a".repeat(36))).toContain("API 키로 보이는 문자열");
     expect(detectSensitiveInfo("AKIA" + "A".repeat(16))).toContain("API 키로 보이는 문자열");
   });

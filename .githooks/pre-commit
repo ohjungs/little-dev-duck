@@ -1,0 +1,9 @@
+#!/bin/sh
+# 시크릿이 커밋에 섞이는 것을 막는다. CI(.github/workflows/ci.yml)에도 같은 검사가 있지만,
+# 푸시 전에 잡아야 히스토리에 안 남는다 — 공개 저장소라 한 번 들어가면 지우기 어렵다.
+#
+# 켜기(저장소당 1회):  git config core.hooksPath .githooks
+# 한 번만 건너뛰기:    git commit --no-verify   (되도록 쓰지 말 것)
+#
+# 스테이지된 변경만 본다. 저장소 전체 검사는 `node scripts/check-secrets.mjs`.
+node scripts/check-secrets.mjs --staged
