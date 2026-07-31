@@ -536,6 +536,332 @@
 
 ## Status 이관 기록 (2026-07-29 정리 — 원문 그대로, 최신순)
 
+> ## ✅ 2026-07-30 `/loop-eng` — 기능 토글이 화면만 숨기고 API는 열려 있던 것 수정 (인가)
+> 지난 두 사이클에 오리의 mutating 도구를 둘 늘렸으니, **선언이 실제로 집행되는지** 먼저
+> 검증했다. 승인 게이트 자체는 카탈로그 기반으로 견고했다(하드코딩 목록 없음 — 새 도구가 자동
+> 으로 승인 대상이 됨). 그런데 그 과정에서 **다른 결함**을 찾았다.
+>
+> - **발견**: core `canUseFeature`는 주석에 "화면·API 양쪽이 **같은 함수**를 쓴다 — 화면에서만
+>   숨기면 주소를 직접 치는 사람에겐 열려 있는 것과 같다"고 적어 뒀지만, 실제로 쓰는 곳은
+>   `(app)/layout.tsx`·`(app)/page.tsx` **둘뿐이고 API 라우트는 0곳**이었다. 즉 관리자가
+>   `duck-chat`을 꺼도(또는 역할을 customer로 내려도) `/api/ai/agent`에 직접 POST하면 오리가
+>   답하고 **도구까지 실행**했다. 설계가 약속한 것이 구현돼 있지 않았다.
+> - **범위 정정(과장하지 않음)**: 오리 도구는 RLS 범위 안에서 본인 데이터·본인 토큰으로만
+>   동작하므로 "남의 데이터 접근"은 아니다. "관리자가 끈 기능을 쓸 수 있다"가 정확한 문제이고,
+>   지금은 사용자 1명(본인=관리자)이라 실제 노출 상황은 아니다.
+> - **수정**: `lib/featureGate.ts`(`blockIfFeatureDisabled`) 단일 지점 신설 → `/api/ai/agent`와
+>   `/api/ai/agent/approve` 양쪽에 적용. **대화만 막고 실행을 열어 두면 반쪽**이라 승인 라우트도
+>   함께 막았다. 401(로그인 필요)과 구분해 **403**으로 답한다.
+> - `getMyAccess(supabase, userId?)` 선택 인자 추가 — 라우트가 인증 단계에서 이미 받은 user를
+>   재사용해 `auth.getUser()` 왕복을 늘리지 않는다(하위호환, 화면 호출부 무변경).
+> - **잠금 4건**: 보호 대상 라우트가 공용 헬퍼를 타는지(정적) + 헬퍼가 화면과 같은 판정 함수를
+>   쓰고 403을 주는지 + **실제 POST로 403 확인**(꺼진 사용자) + **켜진 사용자는 200**(늘 막는
+>   게이트도 통과하는 검사를 피하려고 양방향 확인).
+> - **내가 낸 회귀 발견·복구**: 새 의존성 때문에 기존 라우트 테스트 19건이 mock 누락으로 깨졌다
+>   (`getMyAccess` 미제공). 두 테스트 파일의 mock을 보강해 복구 — **전 패키지 재검증으로 잡았다.**
+> - 검증: turbo lint+test **17/17 GREEN**(api 527 / web 570) + tsc. 나머지 라우트의 기능 매핑은
+>   제품 의도라 임의로 정하지 않았다 → [mv 114번](loop-eng/manual-verification.md) 결정 대기.
+
+> ## ✅ 2026-07-30 `/loop-eng` — 오리가 GitHub 이슈를 닫을 수 있게 (기능 공백 해소)
+> 직전 사이클의 캘린더 수정과 대칭인 공백 — GitHub 어댑터도 **조회·생성만** 있어 "그 이슈
+> 닫아줘"가 성립하지 않았다.
+>
+> - **이건 넣어도 되는 이유(캘린더 삭제와의 차이)**: 이슈 닫기는 GitHub에서 **다시 열 수 있고
+>   제목·본문·댓글이 전부 그대로 남는다** — 되돌릴 수 있으므로 "영구삭제 금지"(CLAUDE.md 5절)
+>   대상이 아니다. 직전 사이클에 캘린더 삭제를 보류한 근거(되돌리기 불확실)가 여기엔 적용되지
+>   않는다. 근거를 어댑터 주석에 남겼다.
+> - `closeGithubIssue`(mutating) — issueNumber는 `listGithubIssues`가 이미 돌려주므로 새 조회
+>   경로 불필요(Gmail messageId·캘린더 eventId와 같은 패턴). PATCH `{state:"closed"}`.
+> - 테스트 7건 신규: **issueNumber를 양의 정수로 강제**(0·음수·소수·문자열 `"7"`·`"7/comments"`
+>   전부 거부 — 경로에 들어가는 값이라 강제변환 없는 `z.number()`가 경로 주입도 함께 막는다),
+>   owner/repo 경로 구분자 차단, **표시용 title이 요청 본문에 실리지 않는지**(실으면 이슈 제목이
+>   의도 없이 바뀐다), 401 구분.
+> - **직전 사이클에 만든 라벨 커버리지 잠금이 즉시 작동했다** — 라벨을 잊은 채 도구를 추가하니
+>   `approvalLabelCoverage.test.ts`가 `closeGithubIssue` 누락을 바로 잡아냈다(만든 다음 사이클에
+>   실제로 값을 한 셈). 승인 카드가 **저장소(owner/repo)와 이슈 제목**을 함께 보여주는지도
+>   단정 추가 — 저장소를 모르면 남의 저장소 이슈를 닫는 요청이어도 사람이 알아챌 수 없다.
+> - 기존 catalog 테스트는 "전체 목록 단정"에서 "조회·생성의 kind 확인"으로 좁혔다 — 같은 사실을
+>   두 곳에서 중복 단정하면 도구가 늘 때마다 두 곳을 고쳐야 한다.
+> - 검증: turbo lint+test **17/17 GREEN**(api 525 / web 565) + tsc. 실제 GitHub 반영·연동 상태는
+>   실 토큰으로만 확인 가능 → [mv 113번](loop-eng/manual-verification.md) 보류.
+
+> ## ✅ 2026-07-30 `/loop-eng` — 오리가 캘린더 일정을 수정할 수 있게 (기능 공백 해소)
+> 감사 지적("어댑터에 수정·삭제가 없다")을 코드로 확인 — 사실이었다. 캘린더·GitHub 어댑터가
+> **조회·생성만** 있어 **"그 회의 3시로 바꿔줘"가 성립하지 않았다**. 캘린더 수정을 추가했다.
+>
+> - `updateCalendarEvent`(mutating) — eventId는 `listUpcomingEvents`가 이미 돌려주므로 새 조회
+>   경로 불필요(Gmail `trashEmail`이 messageId를 받는 것과 같은 패턴). **PATCH(부분 수정)**을
+>   써서 안 넘긴 필드는 그대로 유지 — PUT이면 나머지가 지워진다.
+> - **핵심 설계 판단 — 시작만 바꿀 때 원래 길이를 유지한다**: 시작만 바꾸면 종료도 함께 보내야
+>   하는데(새 시작이 기존 종료보다 늦으면 Google이 거부), 여기서 "시작+1시간"으로 밀면 **2시간
+>   회의가 조용히 1시간이 된다** — 사용자가 요청하지 않은 데이터 손실이다. 그래서 원래 일정을
+>   먼저 읽어 길이를 계산해 적용하고, 종일 일정·파싱 실패 시에만 1시간으로 떨어진다.
+> - 어댑터 테스트 9건 신규: eventId 경로 조작 차단(Gmail·GitHub와 같은 confused-deputy 방어),
+>   **빈 PATCH 거부**(Google이 200을 주고 아무것도 안 바꿔 "바꿨다"가 거짓 보고가 된다),
+>   길이 유지, 명시 종료 우선, 폴백, 401 구분.
+> - **삭제는 넣지 않았다**: Google Calendar 삭제가 되돌릴 수 있는지(휴지통 경유) 확인하지
+>   못했고, 이 저장소는 Gmail에서 이미 "영구삭제 금지, 휴지통만"을 원칙으로 세웠다(CLAUDE.md
+>   5절). 같은 근거를 적용해 보류 — "일정 취소해줘" 지원은 사용자 판단 필요(mv 112번).
+> - **부수 발견·수정(기존 결함)**: 승인 카드 라벨 커버리지 검사를 새로 넣자마자
+>   **`convertPageToDatabase`에 한국어 라벨이 없던 것**이 잡혔다. 이 도구는 선언 자체가 "되돌릴
+>   수 없다"고 명시하는데 카드에는 영어 식별자만 떠 있었다 — 되돌릴 수 없는 작업일수록 카드가
+>   마지막 방어선이라 그 사실까지 문구에 담아 추가했다. `approvalLabelCoverage.test.ts`가
+>   앞으로 **모든 mutating 도구의 라벨 누락**을 잡는다(전 어댑터 카탈로그를 순회).
+> - 검증: turbo lint+test **17/17 GREEN**(api 518 / web 564) + tsc. 실제 Google Calendar 반영은
+>   가짜 fetch로 원리적으로 확인 불가 → [mv 112번](loop-eng/manual-verification.md) 보류
+>   (2026-07-23에 "코드는 성공인데 11일 뒤 날짜에 0초 일정" 버그를 실기로만 잡은 전례가 있다).
+
+> ## ✅ 2026-07-30 `/loop-eng` — OAuth scope 단일 출처 + 감사 지적 1건 기각(근거 기록)
+> 감사가 "Gmail OAuth scope 과다 권한"으로 지적한 항목을 코드로 검증한 결과 **지적이 사실이
+> 아니었다**. 대신 조사 중 **더 실질적인 결함**을 찾아 그것을 고쳤다.
+>
+> - **기각 근거(중요)**: Gmail 어댑터는 `listRecentEmails`(읽기)와 `trashEmail`(휴지통 이동)
+>   두 가지만 한다. `messages.trash`는 `gmail.readonly`로 불가하고 **`gmail.modify`가 Google이
+>   제공하는 최소 권한**이다(더 넓은 `https://mail.google.com/`은 영구삭제 포함으로 CLAUDE.md
+>   5절이 금지). 즉 현재 값이 이미 최소값이다. 근거를 `lib/oauthScopes.ts` 주석에 못박아
+>   다음에 같은 지적이 반복되지 않게 했다. (FEATURES.md의 "send/read 분리" MUST는 send 기능이
+>   구현돼 있지 않아 아직 해당 없음.)
+> - **실제로 찾은 결함**: scope 문자열이 **6곳에 복사**돼 있었고, 그중 하나는 요청이 아니라
+>   **기록**이었다 — `auth/callback/route.ts`는 실제 승인 내역을 확인하지 않고 자기가 아는
+>   문자열을 토큰 테이블 `scope` 컬럼에 저장한다. 요청 쪽만 좁히면 **저장된 값이 실제 권한과
+>   다른 거짓 기록**이 되고, "이 토큰으로 무엇을 할 수 있나"를 그 값으로 판단하면 틀린 결론에
+>   이른다(safeHref L-21과 같은 복사-드리프트).
+> - `lib/oauthScopes.ts` 한 벌로 모으고 6곳 연결(값은 한 글자도 안 바꿈 — 순수 리팩터링).
+>   `oauthScopesSingleSource.test.ts`가 ① 다른 파일에 scope 리터럴 재등장 금지(src 전체 순회)
+>   ② 6곳이 공용 상수를 실제로 쓰는지 ③ 상수 값이 필요 최소 권한인지를 잠근다. **리터럴을
+>   되돌려 검사가 위반을 실제로 잡는지 확인**(파일명까지 정확히 지목).
+> - 검증: turbo lint+test **17/17 GREEN**(web 560). `next build` 성공 + `/login` 실측
+>   (버튼 6종 정상, JS 에러 0). 스크린샷:
+>   [oauth-scopes-single-source](loop-eng/screenshots/2026-07-30/oauth-scopes-single-source/index.md).
+>   콘솔 404 1건은 기존 Vercel Analytics 미활성화(PENDING 5번)로 무관함을 재확인.
+> - **절차 개선 적용**: 직전 사이클의 "낡은 서버가 낡은 빌드 서빙" 재발 방지 — 포트 점유 사전
+>   확인 + 서버 로그·BUILD_ID 시각으로 "내 서버 + 신선한 빌드" 확증 후 스크린샷.
+
+> ## ✅ 2026-07-30 `/loop-eng` — 오리 응답 대기를 보조기술에 알림 (접근성)
+> 감사가 지적한 "AI 응답 로딩 UX" 항목을 코드로 확인 — **대시보드 오리 패널의 대기 표시가
+> 점 3개 애니메이션뿐**이고 텍스트도 라이브 리전도 없었다. 스크린리더 사용자는 질문을 보낸 뒤
+> 몇 초간 아무 반응이 없는 것으로 느낀다(오리 대화는 이 제품의 핵심 기능이다).
+>
+> - **메신저 오리 방은 이미 올바르게** `role="status"` + "오리가 생각하는 중…"으로 알리고
+>   있었다 — 대시보드 패널만 예외였다(같은 상태를 두 화면이 다르게 처리하던 불일치).
+> - `DuckChatPanel`에 `role="status"` + `sr-only` 문구 추가, 점 3개는 `aria-hidden`으로
+>   장식 처리. 문구는 `lib/duckPending.ts` 한 벌로 뽑아 두 화면이 공유 —
+>   복사되면 한쪽만 고쳐진다(L-21의 실패 모양).
+> - `duckPendingAnnounce.test.ts`로 잠금: ① 문구 리터럴은 lib에만 있다 ② 두 화면 모두
+>   `role="status"`를 갖는다. 새 오리 화면이 생기면 목록에 추가하는 구조.
+> - **감사의 "단계 라벨"(자료 찾는 중 → 생각하는 중)은 만들지 않았다** — agent 라우트가
+>   스트리밍이 아니라 실제 단계를 서버가 알려주지 않는다. 모르는 단계를 지어내 표시하는 것은
+>   거짓 정보라 기각(ponytail). 스트리밍 도입 시 재검토 대상.
+> - 검증: turbo lint+test **17/17 GREEN**(전 패키지 2,465 tests). 실제 스크린리더 발화 확인은
+>   코드로 판정 불가 → [mv 111번](loop-eng/manual-verification.md) 보류.
+
+> ## ✅ 2026-07-30 `/loop-eng` — 문서 언어(lang=ko) + GitHub 잔디 대체 텍스트 (접근성)
+> 감사 발견 2건을 코드로 재검증해 둘 다 실제 결함임을 확인하고 수정.
+>
+> - **`<html lang="en"` → `"ko"`**: Next 스캐폴드 기본값이 한 번도 안 고쳐진 채 배포돼 있었다.
+>   UI·description·openGraph locale이 전부 한국어인데 문서 언어만 영어라 **스크린리더가 한국어를
+>   영어 발음 규칙으로 읽었다**(WCAG 3.1.1 Language of Page, Level A 위반). 눈으로는 아무 이상이
+>   없어 리뷰로 안 잡히는 부류라 `htmlLang.test.ts`로 잠갔다 — lang 값 + **openGraph locale과의
+>   일치**까지(둘이 갈라져 있던 것이 이 결함의 본질).
+> - **GitHub 잔디 대체 텍스트**: 격자가 순수 div 365개 + 마우스용 `title`뿐이라 스크린리더에
+>   아무것도 전달되지 않았다. 격자를 `role="img"` 한 덩어리로 묶고 core `contributionGridLabel`
+>   (순수함수, 테스트 6건 — 기여 0건·빈 배열·동일 최대치 경계 포함)의 요약 문구를 대체 텍스트로.
+>   가짜 grid/row 역할을 씌우는 대안은 DOM이 열 우선이라 행·열이 뒤바뀐 채 노출돼 기각(ponytail).
+> - **직전 사이클 기록 정정(중요)**: `--muted-foreground` 스크린샷이 **수정 전 색이었다** —
+>   회귀 격리로 stash·재빌드한 뒤 복원 후 재빌드를 빠뜨렸고, 포트 5100에 낡은 서버(PID 31608)가
+>   남아 새 `next start`가 EADDRINUSE로 죽은 채 낡은 빌드가 응답했다. **코드 수정은 정상이었고,
+>   이번에 새 빌드로 브라우저 실측해 5.62:1(AA 통과)을 확정**했다. 교훈: 재빌드 없이 찍은
+>   스크린샷은 증거가 아니다(e2e는 `buildFreshness.ts`가 막지만 직접 띄운 서버엔 그 가드가 없다).
+> - 검증: turbo lint+test **17/17 GREEN**(core 1365 / web 554). 스크린샷·실측:
+>   [lang-ko-and-grass-aria](loop-eng/screenshots/2026-07-30/lang-ko-and-grass-aria/index.md).
+>   잔디 위젯 화면은 로그인 필요 + e2e 세션 만료로 이월(mv 109번).
+
+> ## ✅ 2026-07-30 `/loop-eng` — RLS 권한상승 2건 수정 (2026-07-31 적용 확인으로 종결)
+> **2026-07-31 종결**: "실서버 적용 승인 대기"로 남아 있었으나 실제로는 2026-07-30에 적용됐고,
+> 오늘 실서버를 직접 조회해 트리거 3개가 **전부 활성**임을 확인했다
+> (`profiles_guard_admin_columns` · `room_members_guard_room_id` · `messages_guard_room_id`).
+> 막힌 것이 아니라 **표시만 낡아 있었다** — 문서가 실제 상태보다 뒤처져 있던 사례로 남긴다.
+>
+> 백그라운드 감사 워크플로우가 뒤늦게 산출한 스펙 초안 3건을 발견해 전부 코드로 재검증했다.
+> 1건은 이미 고친 것(중복 → superseded 표기), **2건은 실제로 열려 있는 RLS 권한상승 구멍**이었다.
+>
+> - **[S1] profiles 권한상승**: `profiles_update_own`이 행 단위(`id = auth.uid()`)만 봐서, 로그인한
+>   일반 사용자가 REST로 `{"role":"admin"}`을 보내면 **스스로 관리자가 된다**(`disabled_features`도
+>   같은 방법으로 해제 가능). `updateMyProfile`이 그 키를 안 보내는 건 앱 계층 방어일 뿐 —
+>   `access.ts`가 명시한 "권한의 단일 출처는 RLS"가 실제로는 안 지켜지고 있었다.
+>   → `20260730160000_profiles_admin_column_guard`: BEFORE UPDATE 트리거가 `is_admin()` 아닌
+>   세션의 두 컬럼 변경을 거부. RLS 정책으로는 컬럼 단위 제한을 표현할 수 없어 트리거를 쓴다
+>   (`touch_room_on_message` 선례와 같은 이유).
+> - **[S1] room_id 위조**: `room_members_update_self`·`messages_update_sender`도 소유자만 검사해
+>   `room_id`가 열려 있었다 — 자기 멤버십 행의 `room_id`만 바꾸면 초대를 거치지 않고 **남의 방
+>   멤버가 되어 대화가 읽힌다**(메시지를 다른 방으로 옮기는 것도 가능).
+>   → `20260730170000_room_id_immutable`: 양쪽 테이블에 BEFORE UPDATE 트리거.
+> - **정적 잠금**: `schemaGuard`에 검사 2종 추가(`isProfilesAdminColumnGuardMissing`,
+>   `findTablesMissingRoomIdGuard`) + 메타검증 8건. **각 검사가 공짜 통과가 아님을 마이그레이션을
+>   실제로 치워 실패하는지로 확인**했다. 구현 중 정규식 함정 1건 발견·수정 — `create trigger ...
+>   execute function public.X()`가 함수 정의로 오인돼 뒤의 진짜 정의를 삼켰다(`create|replace`
+>   앵커로 해결, 기존 `findUnrevokedDefiners` 관례와 통일).
+> - **기능 손실 0 확인(전수)**: profiles UPDATE 4곳·room 관련 UPDATE 5곳을 전부 확인 —
+>   정상 경로는 잠그는 컬럼을 애초에 갱신하지 않는다. service_role 경로도 profiles를 안 만진다.
+> - 검증: turbo lint+test **17/17 GREEN**(api 509 / web 551). 원격 DB는 로컬 마이그레이션 41건
+>   전건 적용 상태를 MCP로 확인했고, **이 2건은 DDL이라 승인 없이 적용하지 않았다**
+>   (CLAUDE.md 5절 · loop-eng 8-1 예외). 적용 요청: [PENDING 머리말](loop-eng/PENDING.md) ·
+>   [manual-verification 110번](loop-eng/manual-verification.md).
+
+> ## ✅ 2026-07-30 `/loop-eng` — ConfirmDialog 공용 접근성 훅 연결 (유휴 개선)
+> 감사 기억(claude-mem)의 "ConfirmDialog가 useModalA11y 패턴을 안 쓴다"는 발견을 코드로
+> 재확인 — 실제로 자체 Escape 핸들러 + 최초 포커스만 있고 **Tab 포커스 트랩·닫힐 때 포커스
+> 복원이 없었다**(VersionHistory·PageExportDialog·ShortcutsHelp·ChatQuoteDialog·
+> OnboardingOverlay 5곳은 이미 공용 `useModalA11y` 사용 중, ConfirmDialog만 예외).
+>
+> - `ConfirmDialog.tsx`가 자체 구현(useRef+useEffect+onKeyDown) 대신 공용 `useModalA11y`를
+>   쓰도록 교체 — 키보드 사용자가 삭제 확인 등 모달에서 Tab으로 배경 요소로 새지 않고,
+>   닫으면 열기 전 포커스로 복원됨. 이 컴포넌트는 9곳(TodoWidget·HabitWidget·TrashView·
+>   NewsReader·MessageStorageCard·ImportDataButton·DuckChatPanel·MessageImageViewer·
+>   LocalResetButton)에서 공유돼 한 번의 수정이 전부에 적용된다.
+> - 검증: web 79 test files·551 tests + tsc + eslint(무관 warning 2건만) GREEN. 컴포넌트 단위
+>   포커스 트랩 자동 테스트는 `@testing-library/react` 미설치라 이번 스코프에서 의존성을
+>   새로 추가하지 않고(스코프 고정), 다른 5개 사용처와 동일한 신뢰 패턴에 기댐. 실제 화면의
+>   Tab 순환 확인은 e2e 인증 세션 만료([109번](loop-eng/manual-verification.md))로 이월.
+
+> ## ✅ 2026-07-30 `/loop-eng` — 라이트 테마 보조 텍스트 대비 수정 (유휴 개선)
+> 버퍼 비어 있고 남은 항목이 전부 사용자-블록이라, 이전 세션 감사 기억(claude-mem)에 남아 있던
+> "라이트 테마 `--muted-foreground` 3.74:1, WCAG AA 4.5:1 미달" 발견을 **코드로 직접 재계산해
+> 확인**(기억은 근거로만, 재검증은 코드로 — 계산이 정확히 일치) 후 착수.
+>
+> - `globalsTextContrast.test.ts` 신설(HabitHeatmap.contrast.test.ts와 같은 결 — globals.css
+>   실물을 파싱해 WCAG 명도 대비를 잰다) → RED(3.74:1) 확인 → `--muted-foreground`를
+>   `#8a8069`→`#6c6452`로 수정(같은 카키 색조 유지, 어둡게만) → GREEN(배경 3종 × 라이트/다크
+>   전부 4.5:1 이상).
+> - **회귀 격리 검증**: CSS 변경을 잠시 stash하고 동일 e2e 실패가 재현되는지 확인 — 재현됨.
+>   즉 이번 변경과 무관한 **기존 문제**임을 확인(아래 참조).
+> - **부수 발견(확대하지 않고 기록만)**: `apps/web/e2e/.auth/user.json` 세션이 다시 만료돼
+>   인증필요 Playwright 스펙이 스킵 대신 타임아웃으로 실패 — `manual-verification.md` 109번에
+>   재현 절차 + `authState.ts` 판정 갭 의심을 기록. 사용자 세션 재생성 필요.
+> - 검증: web 79 test files·551 tests + tsc + eslint(무관 warning 2건만) 전부 GREEN. 스크린샷:
+>   [screenshots/2026-07-30/muted-foreground-contrast-fix](loop-eng/screenshots/2026-07-30/muted-foreground-contrast-fix/index.md)
+>   (공개 화면만 — 인증 화면은 세션 만료로 이월).
+
+> ## ✅ 2026-07-30 사용자 지시 — 실기검증 톱 5(98·99·102·105·108) 근본 원인 조사·수정
+> 사용자가 "톱 5가 전부 안 된다"고 보고 → 5개 병렬 조사 후 프로덕션 DB를 직접 조회해
+> 근본 원인을 확정. **핵심 발견: "코드 완료·테스트 green"과 "실제 프로덕션에서 동작"은
+> 별개였다** — 전 계정 rooms 0건이 메신저 방 생성이 서비스 오픈 이후 한 번도 성공한 적
+> 없음을 증명했다.
+>
+> - **[98] 메신저**: `ensureAgentRoom`의 `insert().select()`가 RETURNING에도 적용되는
+>   Postgres RLS SELECT 정책(멤버만 조회) 때문에 방 생성 자체가 매번 실패. 롤백
+>   트랜잭션으로 재현·검증 후 `rooms_select_member`에 "만든 사람은 항상 본다" 추가
+>   (마이그레이션 `20260730150000_fix_rooms_select_own`, 적용 완료). 사용자 스크린샷으로
+>   버그가 하나 더 있음을 확인 — `/messages` 페이지가 방 0개일 때 `RoomList`(버튼 포함)
+>   자체를 렌더 안 함. 배포 후 **Playwright + 실 배포 사이트로 실기 확인 완료**(사용자가
+>   e2e OAuth 세션 1회 저장 → 헤드리스로 버튼 클릭 → "안녕" → 오리 실제 응답 스크린샷 확보).
+>   앞으로 UI 수정은 코드리뷰만으로 끝내지 않고 이 방식으로 직접 화면 확인한다.
+> - **[99]/[102] 브리핑·위젯**: 다양성 상한(피드당 3개)이 피드 적은 계정(실사용 계정
+>   확인: 2개)에서 10장을 수학적으로 못 채움 — `dailyIssues`에 백필 추가. 위젯 높이
+>   제한도 없었던 것 확인해 추가(`max-h-[320px]`). **Playwright로 실기 확인 완료** —
+>   GeekNews·Hacker News RSS(하루 다건 발행) 추가 → 뉴스 화면 01~10 카드 전부 채워짐 +
+>   대시보드 위젯 "0/10" 정상 노출, 높이도 다른 위젯 안 밀어냄. 테스트 피드는 삭제해 원복.
+> - **[108] 오리 이어 말하기**: RAG "자료에 없으면 모른다" 지시가 history보다 우선 읽혀
+>   후속 질문에 답을 못 할 개연성 — history도 동등한 근거라는 문구 추가(2023-07-23
+>   TOOL_PREFERENCE_GUARD와 같은 패턴의 지시문 충돌). **Playwright로 실기 확인 완료** —
+>   "오늘 할 일 뭐 있어?" → 3건 답 → "그중 제일 급한 거는?" → 그 3건을 정확히 재참조.
+> - **[105] 지원 현황**: 정적 조사로는 결함 없음. **Playwright로 실기 확인 완료** — 템플릿
+>   생성 → 표(열 정상) → 행 추가 → 보드(3단 칸반, 방금 행이 정상 배치) 전부 스크린샷 확인,
+>   결함 없음. 테스트 페이지는 휴지통으로 정리.
+> - 검증: core/api/web 8개 패키지 빌드·린트·테스트 전부 GREEN(548 테스트). **톱 5 전부
+>   Playwright 실기 확인 완료**(98·99·102·105·108). 실기 확인은
+>   [manual-verification.md](loop-eng/manual-verification.md) 98·99·102·105·108 참조.
+
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 64](plans/phase_64.md) 완료: 오리 멀티턴 대화 맥락
+> 오리가 이제 직전 대화를 알고 답한다 — "그중 마감 제일 빠른 게?" 같은 후속 발화 성립.
+>
+> - core `clampHistory`(6턴·500자 절단)·`historyPromptSection`(테스트 5건) — 상한이 무료
+>   쿼터의 보증. 계약: history 형식 오류는 400 거부, 길이 초과는 절단(계약 vs 예산).
+> - runDuckTurn에 [직전 대화] 절 주입 — rule 라우팅·RAG 검색은 최신 발화만(잡음·쿼터).
+> - 대시보드 패널(useDuckChat)·메신저 오리 방 양쪽 연결. history 없는 기존 호출 하위호환.
+> - 검증 18/18 GREEN. 실기: [mv 108번](loop-eng/manual-verification.md). 버퍼 비었음.
+
+> ## ✅ 2026-07-29 `/loop-eng` — 버퍼 충전: [Phase 64 draft](plans/phase_64.md) 오리 멀티턴 맥락
+> **2026-07-31 종결**: 이 계획은 같은 날 구현돼 위 "Phase 64 완료" 블록으로 대체됐다.
+> 완료 표시가 없어 미해결처럼 보였을 뿐, 남은 일은 없다.
+>
+> [확인됨] /api/ai/agent는 question 하나만 받아 오리가 직전 대화를 모른다 — "아까 그거
+> 등록해줘"가 성립 안 함. 패널·메신저 공통 품질 개선으로 draft 설계(엄격 상한 6턴·500자,
+> 하위호환, RAG 검색어는 최신 발화만). 다음 개발 사이클에 stale 가드 후 T1부터.
+
+> ## ✅ 2026-07-29 `/loop-eng` — 교훈 기록 + REF-LOW 해소 (유휴 정비)
+> - lessons-learned에 오늘 실제 버그 2건의 교훈 추가: **L-20 "기능은 입구까지가 완성"**
+>   (메신저 — 라우트는 있는데 메뉴·방 생성·오리 응답이 없었다), **L-21 "보안 헬퍼는
+>   복사되는 순간 구멍"**(safeHref — 복사본 두 벌 + 세 번째 화면 누락).
+> - NewsReader scrapContent의 paragraph 리터럴을 textToBlocks 한 벌로 승격(리뷰 REF-LOW).
+>   여러 줄 요약이 문단 나눔으로 저장되는 개선 동반. 검증 18/18 GREEN.
+
+> ## ✅ 2026-07-29 `/loop-eng` — 오리 방 첫 인사 (유휴 개선)
+> 오리 방을 처음 만들면 빈 화면 대신 오리 인사말("무엇이든 물어보세요… /로 명령")이
+> 먼저 와 있다. ensureAgentRoom이 created 여부를 돌려주고 **처음 만들 때만** 인사를
+> 넣는다(중복 방지, 실패해도 입장은 막지 않음). 검증 18/18 GREEN.
+> 실기: [mv 107번](loop-eng/manual-verification.md).
+
+> ## ✅ 2026-07-29 `/loop-eng` — safeHref 정적 잠금 + 실기검증 톱 5 요약
+> - 리뷰 후속 잠금: `safeHrefLock.test.ts` — ① safeHref 정의는 lib 한 곳뿐 ② 기사 링크를
+>   href에 넣는 파일은 반드시 공용 import. 다음 뉴스 화면이 또 빠뜨리면 테스트가 먼저 잡는다.
+> - [manual-verification](loop-eng/manual-verification.md) 머리에 "지금 5분이면 되는 확인
+>   톱 5"(98·99·102·105·106) — 106개 목록을 사용자가 소화 가능하게.
+> - 검증 18/18 GREEN. 버퍼는 여전히 비어 있음 — 사용자 결정(메신저 방향·PENDING 6/12)
+>   대기 중이며, 유휴 사이클은 이런 소형 개선·잠금으로 채운다.
+
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 63](plans/phase_63.md) 완료 (T3 폐기) + 리뷰 수정 1건
+> - **리뷰 발견·수정**: 표에서 행을 지워도 임베딩이 남아 오리가 지운 행을 근거로 답할 수
+>   있었다 — 페이지 삭제 관례(빈 텍스트 재인덱싱)로 정리. 검증 18/18 GREEN.
+> - T3(캘린더 자동 연계)은 폐기 — 두 저장소 정합 비용이 개인용 가치 대비 과대. 마감일은
+>   이미 RAG로 답할 수 있고, 일정 등록은 오리 명령 한 번. 재개 조건은 계획 파일에.
+> - Phase 63 마감: 취업 준비 지원(템플릿 + 오리 지식 연결) 완결.
+
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 63](plans/phase_63.md) T2: 데이터베이스 행을 오리 지식에
+> [확인됨] 표에서만 관리하는 행은 RAG에 아무것도 안 남았다(재인덱싱 미호출 + 속성은
+> plain_text에 없음) — "SK 지원 단계 뭐야?"에 답할 재료가 없었다.
+>
+> - core `dbRowEmbedText`(테스트 3건): 제목+속성을 사람이 읽는 평문으로. select는 옵션
+>   **이름**으로 풀고, 모르는 옵션·빈 값은 지어내지 않고 건너뜀(todoEmbedText와 같은 결).
+> - DatabaseView: 행 생성·제목·속성 변경 **저장 성공 뒤** reindexSource(page) fire-and-forget.
+> - 검증 18/18 GREEN. 실기: [mv 106번](loop-eng/manual-verification.md). 잔여 T3은 후순위.
+
+> ## ✅ 2026-07-29 `/loop-eng` — SCOPE 발굴: [Phase 63](plans/phase_63.md) 취업 준비 지원, T1 완료
+> 발굴 근거는 사용자의 실제 할 일 데이터(전부 취업 준비 — 면접·지원서·자격증). 단계·마감이
+> 있는 목록엔 데이터베이스가 맞는 도구이고 도구는 이미 있다 — 새 인프라 0.
+>
+> - T1 **"지원 현황" 템플릿**: 단계(관심→서류→지원→합격/불합격) 칸반 + 직무·마감일·공고
+>   링크. 기존 dbSchema 템플릿 한 벌(프로젝트 트래커와 같은 결), 잠금 테스트 29건 통과.
+> - 검증 18/18 GREEN. 실기: [mv 105번](loop-eng/manual-verification.md).
+> - 다음: T2 확인(DB 행이 RAG에 들어가 오리가 "면접 언제야?"에 답하는가).
+
+> ## ✅ 2026-07-29 `/loop-eng` — 명령 팔레트에 메신저 액션 + 버퍼 판단 기록
+> - Ctrl+K 팔레트에 "메신저 열기" 추가(사이드바에 이어 두 번째 입구 — gap 문서의
+>   "검색+액션" 방향). 검증 18/18 GREEN.
+> - **버퍼(5-A) 판단**: notion-gap-analysis의 P0·P1은 전수 확인 결과 모두 구현 완료
+>   (백링크·브레드크럼·최근 방문·템플릿·업로드·버전 등). 잔여는 전부 "의도적 보류" 명시
+>   항목이라 **투기적 draft를 만들지 않는다**(YAGNI). 다음 버퍼는 사용자 방향 답변
+>   (메신저 기대상·PENDING 6/12) 또는 마케팅 스킬 발굴로 채운다.
+
+> ## ✅ 2026-07-29 `/loop-eng` — Phase 61·62 리뷰 + SEC 수정
+> Phase 완료 시 /review 1회 규범 이행. [스냅샷](reviews/2026-07-29-phase61-62.md).
+>
+> - **SEC-MED 발견·즉시 수정**: 브리핑 카드가 RSS 외부 URL을 화이트리스트 없이 href에
+>   넣고 있었다(javascript: 스킴 통과 가능). `safeHref`를 lib 한 벌로 승격, 세 곳 통일
+>   (기존 중복 정의 2벌도 제거).
+> - 판단 기록 4건(오리 방 동시 생성 수렴·응답 유실·scrapContent 중복·조회 상한 60) —
+>   스냅샷에 근거와 함께. 검증 18/18 GREEN.
+
+> ## ✅ 2026-07-29 `/loop-eng` — [Phase 62](plans/phase_62.md) 완료: 할 일 마감일 사용성
+> stale 가드가 계획의 절반을 걸러냈다 — **T3·T4는 이미 있었고(폐기), T1도 입구는 있었다.**
+> 실제로 만든 것은 둘: ① 마감 달력 아이콘을 마감일 없는 행에도 흐리게 상시 노출(발견성 —
+> hover 뒤에 숨어 있어 사용자가 존재를 몰랐다) ② "마감일순" 보기 토글(core sortTodosByDue
+> 테스트 3건 — 보기 전용, 저장 순서 불변, 정렬 중엔 이동 버튼 숨김).
+>
+> - 검증: turbo lint·test·build **18/18 GREEN**. 실기: [mv 104번](loop-eng/manual-verification.md).
+> - 교훈 기록: draft 계획은 착수 시 반드시 재검증 — 이번엔 4개 중 2.5개가 낡아 있었다.
+> - 버퍼 비었음 — 다음 유휴 사이클에 재충전.
+
 > ## 2026-07-29 `/loop-eng` — 선행 버퍼 충전: [Phase 62 draft](plans/phase_62.md)
 > Phase 61 완료·메신저 보류로 착수 가능 계획이 소진돼 버퍼(5-A)를 채웠다.
 > **할 일 마감일 사용성** — 오늘 사용자 마찰("오늘 마감 안 나옴")의 뿌리(마감일 입구가

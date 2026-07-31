@@ -6,4 +6,21 @@
 # 한 번만 건너뛰기:    git commit --no-verify   (되도록 쓰지 말 것)
 #
 # 스테이지된 변경만 본다. 저장소 전체 검사는 `node scripts/check-secrets.mjs`.
-node scripts/check-secrets.mjs --staged
+node scripts/check-secrets.mjs --staged || exit 1
+
+# 2026-07-31 : 문서 - Status - 완료분 자동 이관 (사용자 결정 B-10)
+#
+# "앞으로도 완료분은 자동으로 옮기도록"의 실행 지점이다. 손으로 하는 정리는 반드시 다시
+# 밀린다 — 2026-07-29에 한 번 정리하고 이틀 만에 1,354줄로 되돌아간 것이 증거다.
+#
+# **Status.md를 실제로 건드린 커밋에서만 돈다.** 매 커밋마다 문서를 뒤지면 관계없는 작업이
+# 느려지고, 느려지는 훅은 사람이 끈다.
+#
+# 훅이 파일을 고쳐 커밋에 끼워 넣는다는 사실을 숨기지 않는다 — 무엇이 바뀌었는지 출력한다.
+if git diff --cached --name-only | grep -q '^docs/Status\.md$'; then
+  node scripts/archive-status.mjs || exit 1
+  if ! git diff --quiet -- docs/Status.md docs/History.md; then
+    git add docs/Status.md docs/History.md
+    echo "pre-commit: Status.md 완료분을 History.md로 옮겨 이 커밋에 포함했습니다."
+  fi
+fi
