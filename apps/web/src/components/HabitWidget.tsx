@@ -17,6 +17,7 @@ import { subscribeTable } from "@/lib/realtime";
 import { emitXpChanged } from "@/lib/xpSignal";
 import { recordToDuckRoom } from "@/lib/duckRoomLog";
 import { todayIso } from "@/lib/today";
+import { friendlyError } from "@/lib/friendlyError";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   Card,
@@ -142,9 +143,9 @@ export function HabitWidget() {
       );
       try {
         await uncheckHabit(supabase, habit.id, today);
-      } catch {
+      } catch (err) {
         setChecks(prevChecks);
-        setActionError("변경하지 못했습니다.");
+        setActionError(friendlyError(err, "변경하지 못했습니다."));
       }
       return;
     }
@@ -158,8 +159,11 @@ export function HabitWidget() {
       // 체크 해제는 기록하지 않는다: 해제 알림은 소음이고, 남은 기록이 거짓이 되지도 않는다
       // (그날 체크했다가 무른 사실 자체는 참이다).
       void recordToDuckRoom(supabase, `습관 "${habit.title}"을(를) 체크했어요.`);
-    } catch {
-      setActionError("변경하지 못했습니다.");
+    } catch (err) {
+      // 2026-07-31 (사용자 피드백: "체크박스 클릭시 변경 안됨"): 모든 실패를 같은 여섯 글자로
+      // 뭉개고 있어서 사용자도 개발자도 원인을 못 봤다. 서버 쪽(정책·제약·XP 함수·duck_state)을
+      // 전부 조회해 정상임을 확인했는데도 원인이 안 잡힌 이유가 이것이다. 원문을 살린다.
+      setActionError(friendlyError(err, "변경하지 못했습니다."));
     }
   };
 

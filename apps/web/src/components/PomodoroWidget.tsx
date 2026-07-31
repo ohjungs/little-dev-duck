@@ -427,10 +427,14 @@ export function PomodoroWidget() {
                     {min}분
                   </button>
                 ))}
-                {/* 직접 입력(1~180분) — 프리셋 외 값 선택 */}
+                {/* 직접 입력(1~180분) — 프리셋 외 값 선택.
+                    2026-07-31 (사용자 피드백: "뽀모도로에 직접입력 부분 깨짐"): 4칸 균등 그리드의
+                    마지막 칸에 w-8(32px) 입력창과 "분" 글자를 나란히 넣어 자리표시 "직접"이 잘리고
+                    "직 분"으로 보였다. 단위는 옆 프리셋(15분·25분·50분)이 이미 알려주므로 "분"을
+                    떼고 입력창이 칸을 다 쓰게 한다. */}
                 <span
                   className={cn(
-                    "flex items-center justify-center gap-0.5 rounded-md px-1 py-1 text-sm font-medium transition-colors",
+                    "flex items-center justify-center rounded-md px-1 py-1 text-sm font-medium transition-colors",
                     customInput !== "" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
                   )}
                 >
@@ -452,9 +456,8 @@ export function PomodoroWidget() {
                         );
                       }
                     }}
-                    className="w-8 min-w-0 bg-transparent text-center outline-none placeholder:text-muted-foreground"
+                    className="w-full min-w-0 bg-transparent text-center outline-none placeholder:text-muted-foreground"
                   />
-                  <span className="text-muted-foreground">분</span>
                 </span>
               </div>
             </div>
