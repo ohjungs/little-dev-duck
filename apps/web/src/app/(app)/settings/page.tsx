@@ -31,8 +31,6 @@ import { AppearanceSetting } from "@/components/AppearanceSetting";
 import { QuietHoursSetting } from "@/components/QuietHoursSetting";
 import { NotifySetting } from "@/components/NotifySetting";
 import { SendKeySetting } from "@/components/SendKeySetting";
-import { MessageStorageCard } from "@/components/MessageStorageCard";
-import { MessageNotifySetting } from "@/components/MessageNotifySetting";
 import { DataSaverSetting } from "@/components/DataSaverSetting";
 import { buildLabel } from "@/lib/buildInfo";
 import { SettingsResetCard } from "@/components/SettingsResetCard";
@@ -136,21 +134,6 @@ export default async function SettingsPage() {
             <SendKeySetting />
           </CardContent>
         </Card>
-        {/* 2026-07-29 (Phase 56 M-007·M-008): 방이 늘면 전부 알림은 곧 전부 끔이 된다 — 키워드만 골라 받는 길. */}
-        <Card>
-          <CardHeader className="flex-col items-start gap-1">
-            <CardTitle>
-              <Bell className="size-4 text-primary-accent" />
-              메시지 알림 방식
-            </CardTitle>
-            <CardDescription>
-              새 메시지 알림을 전부 받을지, 고른 키워드가 들었을 때만 받을지 정합니다.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MessageNotifySetting />
-          </CardContent>
-        </Card>
         {/* 2026-07-29 (Phase 56 T2 T-009): 대역폭 5GB/월 대책 — 사진을 누를 때만 받는다. */}
         <Card>
           <CardHeader className="flex-col items-start gap-1">
@@ -164,21 +147,6 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <DataSaverSetting />
-          </CardContent>
-        </Card>
-        {/* 2026-07-29 (Q-022): 무료 티어 1GB의 계기판. 50% 초과가 정리(Phase 55 T3) 착수 기준이다. */}
-        <Card>
-          <CardHeader className="flex-col items-start gap-1">
-            <CardTitle>
-              <Database className="size-4 text-primary-accent" />
-              메신저 저장 공간
-            </CardTitle>
-            <CardDescription>
-              대화에 올린 사진이 쓰는 저장 공간을 무료 한도(1GB) 대비로 보여줍니다.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MessageStorageCard />
           </CardContent>
         </Card>
         {/* 2026-07-26 (피드백 6-1·1-2·1-5): 대시보드 구성도 "내 것"이라 설정에 둔다.

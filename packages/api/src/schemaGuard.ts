@@ -26,6 +26,7 @@ export type SchemaFacts = {
 const RE_CREATE_TABLE = /create\s+table\s+(?:if\s+not\s+exists\s+)?public\.(\w+)\s*\(/gi;
 const RE_ENABLE_RLS = /alter\s+table\s+public\.(\w+)\s+enable\s+row\s+level\s+security/gi;
 const RE_POLICY = /create\s+policy\s+"[^"]+"\s+on\s+public\.(\w+)/gi;
+const RE_DROP_TABLE = /drop\s+table\s+(?:if\s+exists\s+)?public\.(\w+)/gi;
 const RE_PURGE_FN = /function\s+public\.delete_all_my_data/i;
 const RE_DELETE_FROM = /delete\s+from\s+(?:public\.)?(\w+)/gi;
 
@@ -76,6 +77,23 @@ export function collectSchemaFacts(files: MigrationFile[]): SchemaFacts {
     for (const m of sql.matchAll(RE_POLICY)) {
       facts.policyCount.set(m[1], (facts.policyCount.get(m[1]) ?? 0) + 1);
     }
+
+    // 2026-07-31 : 스키마검사 - 삭제된 테이블 (메신저 제거 B-9)
+    // 이 검사는 마이그레이션 **파일**을 읽는다. 테이블을 지워도 그것을 만든 옛 파일은 그대로
+    // 남으므로(적용 이력이자 복구 경로다) 지운 테이블이 계속 "존재"로 잡힌다. 실제로
+    // 메신저 4개 테이블을 내린 직후 "파기 함수에서 빠졌다"고 실패했다 — 파기할 대상이
+    // 애초에 없어졌는데도.
+    // **파일 순서대로 처리하므로 뒤에 오는 drop이 앞의 create를 이긴다.** 되살리는
+    // 마이그레이션이 나중에 오면 그게 다시 이긴다.
+    for (const m of sql.matchAll(RE_DROP_TABLE)) {
+      const table = m[1];
+      facts.tables.delete(table);
+      facts.rlsEnabled.delete(table);
+      facts.withUserId.delete(table);
+      facts.policyCount.delete(table);
+      facts.cascadeParents.delete(table);
+    }
+
     if (RE_PURGE_FN.test(sql)) latestPurgeSql = sql;
   }
 

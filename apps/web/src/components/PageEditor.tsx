@@ -17,7 +17,6 @@ import {
   ImageIcon,
   Link2,
   Loader2,
-  MessageSquareQuote,
   RefreshCw,
   Save,
   Smile,
@@ -50,7 +49,6 @@ import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { PageExportDialog } from "@/components/PageExportDialog";
-import { ChatQuoteDialog } from "@/components/ChatQuoteDialog";
 import { VersionHistory } from "@/components/VersionHistory";
 import { DatabaseView } from "@/components/DatabaseView";
 import { AiWriteAssistant } from "@/components/AiWriteAssistant";
@@ -186,8 +184,6 @@ export function PageEditor({
   const [textCopied, setTextCopied] = useState(false);
   // 내보내기·가져오기 모달 열림 상태(Phase 43 T1). 동작은 전부 기존 핸들러가 한다.
   const [exportOpen, setExportOpen] = useState(false);
-  // 채팅 인용 모달(Phase 59 T1 S-008). 삽입 함수는 BlockEditor가 넘겨준다(onInsertReady).
-  const [quoteOpen, setQuoteOpen] = useState(false);
   // Phase 11: 이 페이지가 데이터베이스면 dbSchema 설정. 전환/스키마편집은 로컬 상태 + db_schema 저장.
   const [dbSchema, setDbSchema] = useState<DbSchema | null>(page.dbSchema);
 
@@ -558,16 +554,6 @@ export function PageEditor({
         >
           <Download className="size-3.5" /> 내보내기 · 가져오기
         </Button>
-        {/* 채팅 인용(S-008): 대화에서 나눈 말을 quote 블록으로 삽입한다. */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setQuoteOpen(true)}
-          className="text-muted-foreground"
-        >
-          <MessageSquareQuote className="size-3.5" /> 채팅 인용
-        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -630,15 +616,6 @@ export function PageEditor({
         onCopyText={handleCopyText}
         onImportFile={handleImportFile}
         textCopied={textCopied}
-      />
-      <ChatQuoteDialog
-        open={quoteOpen}
-        onClose={() => setQuoteOpen(false)}
-        onInsert={(blocks) => {
-          // 삽입은 onChange를 발화시켜 자동 저장까지 이어진다(가져오기와 같은 경로).
-          insertBlocks.current?.(blocks);
-          flashMsg("채팅 인용을 삽입했습니다.");
-        }}
       />
       {showVersions && (
         <VersionHistory

@@ -22,9 +22,7 @@ describe("isComposingEnter", () => {
 
 describe("IME 가드 단일 출처", () => {
   // 판정이 두 곳에 생기면 한쪽만 고쳐진다 — 실제로 X-017·X-018로 나뉘어 둘 다 미구현이었다.
-  const files = [
-    "src/components/MessageRoom.tsx",
-    "src/components/DuckChatPanel.tsx",
+  const files = [    "src/components/DuckChatPanel.tsx",
   ];
 
   it("메시지·오리 입력이 모두 같은 판정을 쓴다", () => {

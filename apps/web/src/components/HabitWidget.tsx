@@ -15,7 +15,6 @@ import { reindexSource } from "@ldd/ai";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeTable } from "@/lib/realtime";
 import { emitXpChanged } from "@/lib/xpSignal";
-import { recordToDuckRoom } from "@/lib/duckRoomLog";
 import { todayIso } from "@/lib/today";
 import { friendlyError } from "@/lib/friendlyError";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -158,7 +157,6 @@ export function HabitWidget() {
       // 2026-07-29 (Phase 59 T1 S-009): 오리 방에 기록 — 방 없으면 스킵·실패 조용(lib 계약).
       // 체크 해제는 기록하지 않는다: 해제 알림은 소음이고, 남은 기록이 거짓이 되지도 않는다
       // (그날 체크했다가 무른 사실 자체는 참이다).
-      void recordToDuckRoom(supabase, `습관 "${habit.title}"을(를) 체크했어요.`);
     } catch (err) {
       // 2026-07-31 (사용자 피드백: "체크박스 클릭시 변경 안됨"): 모든 실패를 같은 여섯 글자로
       // 뭉개고 있어서 사용자도 개발자도 원인을 못 봤다. 서버 쪽(정책·제약·XP 함수·duck_state)을

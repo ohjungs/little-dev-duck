@@ -13,7 +13,8 @@ webServer는 `next start` — 즉 **미리 빌드된 결과물**을 서빙하는
 로그인 없이 바로 돈다.
 `widgets.spec.ts`(투두/메모), `todo-recurrence.spec.ts`(반복 할 일),
 `undo-delete.spec.ts`(삭제 되돌리기), `duck-examples.spec.ts`(대화 예시 칩), `duck.spec.ts`,
-`github-contributions.spec.ts`, 그리고 나머지
+`github-contributions.spec.ts`,
+`admin-insights-settings-news-smoke.spec.ts`(관리자/통계/뉴스/설정 4페이지 스모크), 그리고 나머지
 파일의 로그인 뒤 화면 테스트는 OAuth 뒤에 있어 저장된 로그인 세션이 있어야 실행되고, 없으면
 자동으로 스킵된다(실패 아님).
 

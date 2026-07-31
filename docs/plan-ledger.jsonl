@@ -119,3 +119,5 @@
 {"titleKey":"security messages update rls sender type 불변조건","verdict":"confirmed","approved":true,"date":"2026-07-31","reason":"사용자 승인(2026-07-31). 되돌리기 어려운 작업 게이트 해제 — 마이그레이션은 down 스크립트 동반 필수."}
 {"titleKey":"security message attachments 삭제 정책을 업로더 본인으로 제한","verdict":"confirmed","approved":true,"date":"2026-07-31","reason":"사용자 승인(2026-07-31). 되돌리기 어려운 작업 게이트 해제 — 마이그레이션은 down 스크립트 동반 필수."}
 {"titleKey":"test rls 정책 통합 테스트 도입 pgtap 로컬 supabase 스택","verdict":"confirmed","approved":true,"date":"2026-07-31","reason":"사용자 승인(2026-07-31). 되돌리기 어려운 작업 게이트 해제."}
+{"titleKey":"security messages update rls sender type 불변조건","verdict":"done","date":"2026-07-31","reason":"이미 구현돼 있었다 — supabase/migrations/20260730180000_message_sender_immutable.sql (BEFORE UPDATE 트리거 guard_message_sender_immutable). down 스크립트도 있다. 사이클 7 유효성 확인에서 alreadyDone으로 잡혔고 파일 존재를 직접 확인함."}
+{"titleKey":"security message attachments 삭제 정책을 업로더 본인으로 제한","verdict":"done","date":"2026-07-31","reason":"이미 구현돼 있었다 — supabase/migrations/20260731100000_message_attachment_delete_owner.sql (owner = auth.uid() and can_access_room_folder). down 스크립트도 있다. 파일 내용 직접 확인함."}

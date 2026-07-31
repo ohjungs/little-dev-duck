@@ -588,44 +588,6 @@ export {
   type TemplateParseResult,
 } from "./domain/template-file";
 
-// 2026-07-27 : 메신저 - 방·메시지 계약 (Phase 50 T1)
-export {
-  roomSchema,
-  roomTypeSchema,
-  roomMemberSchema,
-  messageSchema,
-  messageBody,
-  messageAttachment,
-  replyPreview,
-  REPLY_MISSING_TEXT,
-  REPLY_PREVIEW_MAX,
-  isRoomMuted,
-  likePattern,
-  MUTE_DURATIONS,
-  unreadCount,
-  sortRooms,
-  roomDisplayTitle,
-  filterRoomsByTitle,
-  galleryPaths,
-  galleryNav,
-  attachmentDeleted,
-  canEditMessage,
-  canForwardMessage,
-  mergeAroundWindow,
-  mergeMessages,
-  todoTitleFrom,
-  conversionReceiptText,
-  TODO_TITLE_MAX,
-} from "./domain/room";
-
-export {
-  DELETED_MESSAGE_TEXT,
-  type Room,
-  type RoomType,
-  type RoomMember,
-  type Message,
-} from "./domain/room";
-
 // 2026-07-29 : 메신저 - 검색 하이라이트 (Phase 51 T3 잔여)
 export { splitByQuery, type HighlightPart } from "./domain/search-highlight";
 export { kstDayRange, type MessageSearchFilter } from "./domain/search-filter";
@@ -647,16 +609,6 @@ export { codeFenceParts, type CodeFencePart } from "./domain/code-fence";
 
 // 2026-07-29 : 메신저 - 링크 모아보기 (Phase 55 T3 K-016)
 export { extractLinks, type CollectedLink } from "./domain/link-collection";
-
-// 2026-07-29 : 메신저 - 대화 내보내기 (Phase 55 T2 Q-001)
-export {
-  formatTranscript,
-  formatTranscriptMarkdown,
-  transcriptJson,
-  transcriptFileName,
-  quoteSourceLabel,
-  type TranscriptFormat,
-} from "./domain/transcript";
 
 // 2026-07-29 : 메신저 - 슬래시 커맨드 (Phase 52 T2)
 export {
@@ -697,13 +649,3 @@ export {
   type ReactionEmoji,
   type ReactionSummary,
 } from "./domain/reaction";
-
-// 2026-07-29 : 메신저 - 날짜·미읽음 구분선 (Phase 51 T6)
-export {
-  NEAR_BOTTOM_PX,
-  dayDivider,
-  dayKey,
-  dayLabel,
-  firstUnreadId,
-  isNearBottom,
-} from "./domain/message-timeline";

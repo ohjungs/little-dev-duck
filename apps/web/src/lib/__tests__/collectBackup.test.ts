@@ -16,7 +16,6 @@ const listFeeds = vi.fn();
 const getDuckState = vi.fn();
 const listPomodoroSessions = vi.fn();
 const listActivityDaily = vi.fn();
-const listRooms = vi.fn();
 const fetchAllRoomMessages = vi.fn();
 
 vi.mock("@ldd/api", () => ({
@@ -31,9 +30,6 @@ vi.mock("@ldd/api", () => ({
   getDuckState: (...a: unknown[]) => getDuckState(...a),
   listPomodoroSessions: (...a: unknown[]) => listPomodoroSessions(...a),
   listActivityDaily: (...a: unknown[]) => listActivityDaily(...a),
-  listRooms: (...a: unknown[]) => listRooms(...a),
-  fetchAllRoomMessages: (...a: unknown[]) => fetchAllRoomMessages(...a),
-  ROOM_LIST_LIMIT: 200,
   ACTIVITY_EXPORT_LIMIT: 3000,
   PAGE_EXPORT_LIMIT: 500,
   HABIT_CHECK_EXPORT_LIMIT: 5000,
@@ -57,7 +53,6 @@ beforeEach(() => {
   getDuckState.mockResolvedValue({ userId: "u", xp: 0, level: 1, feed: 100, costume: "default", updatedAt: "t" });
   listPomodoroSessions.mockResolvedValue([]);
   listActivityDaily.mockResolvedValue([]);
-  listRooms.mockResolvedValue([]);
   fetchAllRoomMessages.mockResolvedValue({ messages: [], hitGuard: false });
 });
 
@@ -147,25 +142,14 @@ describe("collectBackup", () => {
   });
 
   // v5: 메신저 대화 — 다시 만들 방법이 없는 유일본이라 백업에 담는다(보관 전용).
-  it("대화방과 방별 전체 메시지를 부른다", async () => {
-    listRooms.mockResolvedValue([{ id: "r1" }, { id: "r2" }]);
-    fetchAllRoomMessages
-      .mockResolvedValueOnce({ messages: [{ id: "m1" }], hitGuard: false })
-      .mockResolvedValueOnce({ messages: [{ id: "m2" }, { id: "m3" }], hitGuard: false });
+  // 2026-07-31 : 메신저 제거(B-9) — 방·메시지 수집이 없어졌다.
+  // **키는 남기고 늘 비어 있는지를 검사한다.** 예전 백업 파일에 이 키가 있어서 스키마에서
+  // 빼면 그 파일을 다시 못 읽는다(하위호환). 수집만 멈춘 것이 계약이다.
+  it("대화방·메시지는 빈 배열로 남는다 (옛 백업 파일 하위호환)", async () => {
     const backup = await collectBackup(fakeClient);
-    expect(fetchAllRoomMessages).toHaveBeenCalledTimes(2);
-    expect(fetchAllRoomMessages).toHaveBeenCalledWith(fakeClient, "r1");
-    expect(backup.messageRooms).toHaveLength(2);
-    expect(backup.messages.map((m) => (m as { id: string }).id)).toEqual(["m1", "m2", "m3"]);
-  });
-
-  it("방 하나라도 왕복 가드에 닿으면 메시지를 잘림으로 알린다", async () => {
-    listRooms.mockResolvedValue([{ id: "r1" }, { id: "r2" }]);
-    fetchAllRoomMessages
-      .mockResolvedValueOnce({ messages: [{ id: "m1" }], hitGuard: true })
-      .mockResolvedValueOnce({ messages: [], hitGuard: false });
-    const backup = await collectBackup(fakeClient);
-    expect(backup.truncated).toContain("messages");
+    expect(backup.messageRooms).toEqual([]);
+    expect(backup.messages).toEqual([]);
+    expect(backup.truncated).not.toContain("messages");
   });
 
   it("조회 하나가 실패하면 반쪽 백업을 만들지 않고 실패시킨다", async () => {

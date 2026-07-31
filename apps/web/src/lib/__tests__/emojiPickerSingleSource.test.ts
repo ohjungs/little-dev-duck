@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 describe("이모지 피커 단일 출처", () => {
   it("최근 이모지 키는 EmojiPicker에만 있다", () => {
-    const files = ["src/components/PageEditor.tsx", "src/components/MessageRoom.tsx"];
+    const files = ["src/components/PageEditor.tsx"];
     for (const f of files) {
       const src = readFileSync(join(process.cwd(), f), "utf8");
       expect(src).not.toContain("ldd:recent-emojis");

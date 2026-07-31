@@ -10,12 +10,9 @@ import {
   getDuckState,
   listPomodoroSessions,
   listActivityDaily,
-  listRooms,
-  fetchAllRoomMessages,
   ACTIVITY_EXPORT_LIMIT,
   HABIT_CHECK_EXPORT_LIMIT,
   PAGE_EXPORT_LIMIT,
-  ROOM_LIST_LIMIT,
 } from "@ldd/api";
 import { buildBackup, type Backup, type BackupCollectionKey } from "@ldd/core";
 import { readLocalPrefs } from "./localPrefs";
@@ -36,7 +33,6 @@ const QUERY_CAPS: Partial<Record<BackupCollectionKey, number>> = {
   habitChecks: HABIT_CHECK_EXPORT_LIMIT,
   pomodoroSessions: 500,
   activityDaily: ACTIVITY_EXPORT_LIMIT,
-  messageRooms: ROOM_LIST_LIMIT,
 };
 
 export const BACKUP_LABELS: Record<BackupCollectionKey, string> = {
@@ -82,17 +78,11 @@ export async function collectBackup(supabase: SupabaseClient): Promise<Backup> {
       listActivityDaily(supabase),
     ]);
 
-  // v5: 메신저 대화 — 다시 만들 방법이 없는 유일본이다. 대화 내보내기(.txt)와 같은
-  // 수집 경로(fetchAllRoomMessages)로 방마다 처음까지 전부 읽는다. 방별로 순차 실행 —
-  // 방 수 × 왕복을 한꺼번에 쏘면 요청이 몰린다(백업은 급하지 않다).
-  const messageRooms = await listRooms(supabase);
+  // 2026-07-31 : 메신저 제거(B-9) — 방·메시지 테이블이 없어졌다.
+  // **키는 남긴다.** 예전 백업 파일(v5)에 이 키가 들어 있어서, 스키마에서 빼면 그 파일을
+  // 다시 못 읽는다(하위호환). 수집만 멈춰 늘 빈 배열이 된다.
+  const messageRooms: unknown[] = [];
   const messages: unknown[] = [];
-  let messagesHitGuard = false;
-  for (const room of messageRooms) {
-    const r = await fetchAllRoomMessages(supabase, room.id);
-    messages.push(...r.messages);
-    if (r.hitGuard) messagesHitGuard = true;
-  }
 
   return buildBackup(
     {
@@ -114,8 +104,6 @@ export async function collectBackup(supabase: SupabaseClient): Promise<Backup> {
     // 브라우저에만 있던 값(할 일 순서·즐겨찾기·방해금지 등). DB 조회가 아니라 상한 판정 대상이
     // 아니고, 서버·테스트 환경에는 window가 없어 빈 객체가 된다.
     readLocalPrefs(),
-    // 메시지는 방별 왕복 가드라 개수-상한 비교로는 잘림을 알 수 없다 — 가드에 닿은
-    // 사실 자체를 전달한다(한 방이라도 닿았으면 파일 어딘가가 짧다).
-    messagesHitGuard ? ["messages"] : [],
+    [],
   );
 }

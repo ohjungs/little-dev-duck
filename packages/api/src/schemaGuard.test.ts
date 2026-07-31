@@ -171,6 +171,42 @@ describe("검사가 위반을 실제로 잡는다", () => {
     },
   ];
 
+  // 2026-07-31 : 삭제된 테이블은 검사 대상이 아니다 (메신저 제거 B-9)
+  // 이 검사는 마이그레이션 **파일**을 읽는데, 테이블을 지워도 그것을 만든 옛 파일은 남는다
+  // (적용 이력이자 복구 경로다). drop을 못 보면 이미 없는 테이블을 두고 "RLS가 없다·파기에서
+  // 빠졌다"고 영원히 실패한다 — 메신저 4개를 내린 직후 실제로 그렇게 실패했다.
+  describe("삭제된 테이블", () => {
+    const withDrop = (dropSql: string): MigrationFile[] => [
+      ...base(),
+      { name: "0002_drop.sql", sql: dropSql },
+    ];
+
+    it("drop 뒤에는 그 테이블을 검사하지 않는다", () => {
+      // 파기 함수에서 빠진 채로 두어도(=아래 base에서 notes를 지우지 않아도) 통과해야 한다.
+      const files = withDrop("drop table if exists public.notes cascade;");
+      expect(collectSchemaFacts(files).tables.has("notes")).toBe(false);
+      expect(findViolations(collectSchemaFacts(files)).purgeMissing).toEqual([]);
+    });
+
+    it("drop이 없으면 여전히 검사한다 (검사가 공짜로 통과하지 않는다)", () => {
+      // 위 통과가 "drop을 봤기 때문"임을 증명한다 — 안 그러면 규칙이 죽어도 초록이다.
+      const files = withDrop("-- 아무것도 지우지 않는다");
+      expect(collectSchemaFacts(files).tables.has("notes")).toBe(true);
+    });
+
+    it("나중에 다시 만들면 되살아난다", () => {
+      // 파일 순서대로 처리한다는 계약. 복구 마이그레이션이 뒤에 오면 그게 이긴다.
+      const files: MigrationFile[] = [
+        ...withDrop("drop table public.notes;"),
+        {
+          name: "0003_restore.sql",
+          sql: "create table public.notes ( id uuid primary key, user_id uuid );",
+        },
+      ];
+      expect(collectSchemaFacts(files).tables.has("notes")).toBe(true);
+    });
+  });
+
   it("기준 입력은 위반이 없다", () => {
     expect(findViolations(collectSchemaFacts(base()))).toEqual({
       rlsMissing: [],
