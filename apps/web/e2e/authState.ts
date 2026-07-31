@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
+import { AUTH_STATE_PATH } from "./authStatePath";
 
 // 2026-07-26 : e2e - 인증세션 - 단일계약 (Phase 40 T2·T3)
 // 같은 3줄(경로 계산 · 존재 확인 · skip+storageState)이 **10개 스펙에 복사돼 있었다.**
@@ -11,8 +11,7 @@ import path from "node:path";
 // 살아 있는지 알 수 없다 — 가짜 입력으로 검증할 수 있어야 한다(`schemaGuard.ts` 머리말 원칙).
 // 그 테스트는 `src/lib/__tests__/e2eAuthState.test.ts`에 있다(vitest가 `e2e/**`를 제외하므로).
 
-export const AUTH_STATE_PATH =
-  process.env.E2E_AUTH_STATE ?? path.join(__dirname, ".auth/user.json");
+export { AUTH_STATE_PATH };
 
 const HINT =
   "e2e/README.md의 '인증 세션 만들기' 절차로 세션을 만들거나 갱신하세요.";
