@@ -281,6 +281,35 @@ export function DailyBriefing({ articles, feeds, readSet }: Props) {
           {feedCount > 1 && <span>{feedCount}개 매체</span>}
           {read && <span>읽음</span>}
         </div>
+        {/* 2026-07-31 : 뉴스 - 카드 대표 이미지 (사용자 결정 B-6)
+            없는 기사가 더 많다(개발 블로그 RSS 대부분) — 없으면 이 자리가 통째로 빠져
+            지금까지와 똑같은 글자 카드가 된다. 자리만 잡아 두고 비워 두지 않는다.
+
+            **next/image를 쓰지 않는다.** 원격 호스트를 최적화 경로에 태우려면
+            next.config의 remotePatterns를 열어야 하는데, 그건 남이 만든 이미지가
+            sharp(libvips)로 들어오는 길을 새로 내는 것이다. 카드 썸네일 한 장에
+            그 표면을 늘릴 이유가 없다(ponytail).
+
+            referrerPolicy: 우리 페이지 주소를 남의 CDN에 보내지 않는다.
+            onError: 링크가 죽으면 깨진 이미지 아이콘 대신 자리를 지운다 —
+            외부 자산이라 언제든 사라질 수 있고, 그때 카드가 흉해지면 안 된다. */}
+        {a.imageUrl && (
+          // next/image를 쓰면 remotePatterns를 열어야 하고, 그건 남이 만든 이미지가
+          // sharp(libvips) 최적화 경로로 들어오는 길을 새로 내는 것이다(위 주석 참조).
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={a.imageUrl}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+            className="mb-2 h-28 w-full rounded-lg object-cover"
+          />
+        )}
         <p
           className={
             (font === "large" ? "text-base" : "text-sm") + " font-medium leading-snug break-keep"

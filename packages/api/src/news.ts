@@ -115,6 +115,10 @@ type ArticleRow = {
   link: string;
   snippet: string | null;
   summary: string | null;
+  // 2026-07-31 : 뉴스 - 카드 이미지 (B-6). 마이그레이션 적용 전에는 이 컬럼이 없어 select가
+  // undefined를 준다 — 옵셔널로 둬야 미적용 상태에서도 목록이 통째로 죽지 않는다
+  // (이 저장소가 Phase 37에서 "미적용 컬럼을 payload에 무조건 실어 쓰기가 죽은" 사고를 겪었다).
+  image_url?: string | null;
   published_at: string | null;
   created_at: string;
 };
@@ -142,6 +146,7 @@ function articleFromRow(r: ArticleRow): Article {
     link: r.link,
     snippet: r.snippet,
     summary: r.summary,
+    imageUrl: r.image_url ?? null,
     publishedAt: r.published_at,
     createdAt: r.created_at,
   });
@@ -434,6 +439,8 @@ export async function collectFeed(
       link: item.link,
       snippet: item.snippet,
       summary: null,
+      // 값은 코어 파서가 이미 https만 통과시켰다(safeImageUrl). 여기서 다시 거르지 않는다.
+      image_url: item.imageUrl,
       published_at: item.publishedAt,
     });
     if (!error) inserted += 1;

@@ -24,6 +24,9 @@ export const articleSchema = z.object({
   link: z.string().url(),
   snippet: z.string().nullable(),
   summary: z.string().nullable(),
+  // 2026-07-31 : 뉴스 - 카드 이미지 (B-6). 마이그레이션 전 행은 이 컬럼이 없어 undefined로
+  // 들어온다 — 기본값을 두어 옛 데이터가 스키마 검증에서 떨어지지 않게 한다(하위호환).
+  imageUrl: z.string().nullable().default(null),
   publishedAt: z.string().datetime({ offset: true }).nullable(),
   createdAt: z.string().datetime({ offset: true }),
 });
@@ -34,7 +37,31 @@ export type RssItem = {
   link: string;
   publishedAt: string | null; // ISO 문자열 또는 null
   snippet: string | null;
+  // 2026-07-31 : 뉴스 - 카드 이미지 (사용자 결정 B-6)
+  // 피드가 알려 준 대표 이미지. 없으면 null이고 카드는 지금처럼 글자만 나온다.
+  imageUrl: string | null;
 };
+
+// 2026-07-31 : 뉴스 - 이미지 URL - 외부 입력 검증 (사용자 결정 B-6)
+// **이 값은 남의 서버가 준 문자열이고 곧장 `<img src>`에 들어간다.** 링크에 safeHref를 두는
+// 것과 같은 이유로 여기서도 스킴을 화이트리스트한다 — `javascript:`가 src에서 실행되지는
+// 않지만, `data:`는 임의 콘텐츠를 심는 통로이고 `http:`는 https 페이지에서 혼합 콘텐츠로
+// 차단돼 깨진 이미지만 남는다. **https만 통과시킨다.**
+//
+// 저장 시점에 거른다(읽는 곳마다 다시 거르면 한 곳을 빠뜨린다 — L-21 복사-드리프트).
+// core는 환경 중립이라 `URL` 전역을 쓰지 않는다(브라우저·Node 어느 쪽도 가정하지 않는다).
+// 판정 규칙 자체가 "https로 시작하고 공백·제어문자가 없다"뿐이라 정규식으로 충분하다.
+// 상대 경로는 기준 URL이 있어야 풀리는데 피드마다 기준이 달라 신뢰할 수 없다 → 버린다.
+// 규칙은 "https로 시작하고 공백·따옴표·꺾쇠·역슬래시가 없다" 하나뿐이다. 제어문자 범위를
+// 따로 막지 않는 이유: `\s`가 탭·개행을 이미 걷어내고, 값이 들어가는 자리는 React가
+// 이스케이프하는 속성이라 남은 제어문자로 속성을 벗어날 수 없다. 규칙은 적을수록 안 깨진다.
+const HTTPS_URL = /^https:\/\/[^\s"'<>\\]+$/;
+
+export function safeImageUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  return HTTPS_URL.test(trimmed) ? trimmed : null;
+}
 
 // 자동 일시정지 임계: 연속 수집 실패가 이 횟수에 도달하면 피드를 paused로.
 export const FEED_FAIL_THRESHOLD = 5;
@@ -90,6 +117,52 @@ function extractLink(block: string): string | null {
   return atom ? atom[1].trim() : null;
 }
 
+// 2026-07-31 : 뉴스 - 대표 이미지 추출 (사용자 결정 B-6)
+// 피드마다 이미지를 다른 자리에 넣는다. 실제로 쓰이는 순서대로 본다:
+//  ① <enclosure url type="image/*">  — RSS 2.0 표준 첨부
+//  ② <media:content url medium="image"> — Media RSS(유튜브·많은 언론사)
+//  ③ <media:thumbnail url>            — Media RSS 썸네일
+//  ④ 본문 HTML의 첫 <img src>          — 위 셋이 없을 때의 마지막 수단
+//
+// ④를 마지막에 두는 이유: 본문 첫 이미지는 대표 이미지가 아닐 때가 많고(광고 배너·추적
+// 픽셀·프로필 아바타), 그래서 명시적으로 "이게 대표다"라고 알려 준 ①~③을 먼저 믿는다.
+//
+// **외부 사이트를 크롤링하지 않는다.** og:image를 긁으려면 기사마다 원문을 받아야 하는데,
+// 비용·저작권 문제이고 계획(Phase 61)이 애초에 하지 않기로 정한 방향이다. 피드가 준 것만 쓴다.
+export function extractImageUrl(block: string): string | null {
+  const enclosure = block.match(
+    /<enclosure\b[^>]*\btype=["']image\/[^"']*["'][^>]*>/i,
+  );
+  if (enclosure) {
+    const url = enclosure[0].match(/\burl=["']([^"']+)["']/i);
+    const safe = safeImageUrl(url?.[1]);
+    if (safe) return safe;
+  }
+
+  // media:content는 medium="image"로 알리거나 type="image/*"로 알린다. 둘 다 없으면
+  // 영상·오디오일 수 있어 건너뛴다 — 모르는 것을 이미지로 취급하지 않는다.
+  for (const m of block.matchAll(/<media:content\b[^>]*>/gi)) {
+    const tag = m[0];
+    const isImage =
+      /\bmedium=["']image["']/i.test(tag) || /\btype=["']image\//i.test(tag);
+    if (!isImage) continue;
+    const safe = safeImageUrl(tag.match(/\burl=["']([^"']+)["']/i)?.[1]);
+    if (safe) return safe;
+  }
+
+  const thumb = block.match(/<media:thumbnail\b[^>]*\burl=["']([^"']+)["']/i);
+  const thumbSafe = safeImageUrl(thumb?.[1]);
+  if (thumbSafe) return thumbSafe;
+
+  // 본문 HTML은 XML 엔티티로 이스케이프돼 오는 경우가 흔하다(&lt;img ...). 먼저 푼 뒤 찾는다.
+  const body =
+    firstTag(block, "content:encoded") ??
+    firstTag(block, "content") ??
+    firstTag(block, "description");
+  if (!body) return null;
+  return safeImageUrl(body.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1]);
+}
+
 function toIso(s: string): string | null {
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
@@ -126,6 +199,7 @@ export function parseRssItems(xml: string): RssItem[] {
       // 이스케이프하는 경우(`--&amp;gt;`)가 흔해서, 한 번만 풀면 `&gt;`가 화면에 그대로 뜬다
       // (실측: DEV Community). 걷어낸 뒤 남은 엔티티는 HTML 본문의 것이므로 푸는 게 맞다.
       snippet: rawSnippet ? decodeEntities(stripTags(rawSnippet)).slice(0, 500) : null,
+      imageUrl: extractImageUrl(block),
     });
   }
   return items;

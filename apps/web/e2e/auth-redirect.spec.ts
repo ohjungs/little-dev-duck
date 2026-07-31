@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { AUTH_STATE } from "./authState";
 
 // Phase 13 T4: 비로그인 접근은 마케팅 랜딩(/welcome)으로 보낸다(로그인 폼은 랜딩 CTA로 도달).
 test("비로그인 사용자가 /에 접근하면 /welcome(랜딩)으로 리다이렉트된다", async ({
@@ -66,19 +65,41 @@ test.describe("미인증 리다이렉트 상태 코드 (proxy.ts)", () => {
   });
 });
 
-// 로그아웃은 세션 쿠키가 있어야 실제 auth.signOut() 경로를 타므로, 다른 인증 필요 스펙과
-// 동일한 스킵가드 패턴을 쓴다. 세션 생성 방법: e2e/README.md 참고.
-
+// 2026-07-31 : e2e - 로그아웃 검사 - 세션 격리 (실측으로 잡은 결함)
+//
+// 이 검사는 **공유 세션을 쓰면 안 된다.** 로그아웃은 그 세션의 리프레시 토큰을 실제로 폐기하는데,
+// 모든 스펙이 세션 파일 **하나**를 공유하므로 여기서 로그아웃하면 **뒤따르는 모든 인증 스펙이
+// 로그아웃된 채로 돈다.** 알파벳순으로 이 파일이 두 번째라 피해가 43건이었다.
+//
+// 오래 안 보였던 이유: 세션 파일이 없어 인증 스펙이 전부 스킵돼 **한 번도 같이 돌아본 적이
+// 없었다.** globalSetup이 스스로 로그인하게 되자 그날 바로 드러났다.
+//
+// `scope: "local"`로 바꿔도 해결되지 않는다(실측) — local도 **그 세션**을 끊고, 모든 컨텍스트가
+// 바로 그 세션을 쓰고 있기 때문이다. 범위 문제가 아니라 **공유 문제**다.
+//
+// 그래서 이 검사만 **자기 세션을 새로 만들어** 쓴다. 끊어도 남에게 영향이 없다.
 test.describe("로그아웃 라우트 리다이렉트 상태 코드", () => {
-  test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
-  test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
+  const email = process.env.E2E_EMAIL;
+  const password = process.env.E2E_PASSWORD;
+  test.skip(
+    !email || !password,
+    "E2E_EMAIL/E2E_PASSWORD가 없으면 버릴 세션을 만들 수 없습니다(e2e/README.md).",
+  );
+  // 공유 세션을 **일부러 쓰지 않는다** — 위 사유.
+  test.use({ storageState: undefined });
 
-  test("POST /auth/logout은 303으로 /login에 리다이렉트된다", async ({
-    request,
-  }) => {
+  test("POST /auth/logout은 303으로 /login에 리다이렉트된다", async ({ page }) => {
+    // 이 검사 전용 세션을 실제 로그인 화면으로 만든다.
+    await page.goto("/login");
+    await page.getByRole("button", { name: "로그인", exact: true }).click();
+    await page.locator('input[type="email"]').fill(email!);
+    await page.locator('input[type="password"]').fill(password!);
+    await page.getByRole("button", { name: "이메일로 로그인" }).click();
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+
     // maxRedirects: 0으로 리다이렉트를 따라가지 않아야 apps/web/src/app/auth/logout/route.ts가
     // 실제로 보낸 status code(303)를 그대로 확인할 수 있다. 307로 회귀하면 이 값이 307이 된다.
-    const response = await request.post("/auth/logout", { maxRedirects: 0 });
+    const response = await page.request.post("/auth/logout", { maxRedirects: 0 });
     expect(response.status()).toBe(303);
   });
 });
