@@ -50,7 +50,14 @@ function getDailyMotivation(): string {
 // 배치가 고른 id 순서대로, 준비된 위젯 정의를 꺼내 DashboardGrid가 받는 모양으로 만든다.
 // 정의가 없는 id(예전 배치에 남은 위젯)는 조용히 건너뛴다 — core resolveOrder가 이미 걸러내지만
 // 여기서도 막아 두면 정의와 목록이 어긋났을 때 화면이 죽지 않는다.
-type WidgetDef = { label: string; className?: string; children: React.ReactNode };
+type WidgetDef = {
+  label: string;
+  className?: string;
+  // 기본 배치에서만 쓰는 자리 고정. 사용자가 순서를 정하면 DashboardGrid가 떼어낸다 —
+  // 자리가 못박혀 있으면 카드를 끌어도 xl 화면에서 제자리로 돌아간다.
+  pinnedClassName?: string;
+  children: React.ReactNode;
+};
 function pickWidgets(ids: string[], defs: Record<string, WidgetDef>) {
   return ids
     .filter((id) => defs[id])
@@ -115,15 +122,18 @@ export default async function DashboardPage() {
           관리자 기능 토글이 함께 정한다. 판정은 core 순수 함수에 있고 여기서는 고르기만 한다.
           비어 있으면(전부 숨김) DashboardGrid가 안내를 띄운다. */}
       <DashboardGrid
+        layout={access?.dashboardLayout ?? EMPTY_LAYOUT}
         widgets={pickWidgets(shownIds, {
           duck: {
             label: "오리",
-            className: "md:col-span-1 xl:col-start-3 xl:row-start-1",
+            className: "md:col-span-1",
+            pinnedClassName: "xl:col-start-3 xl:row-start-1",
             children: <DuckWidget />,
           },
           chat: {
             label: "오리 채팅",
-            className: "md:col-span-2 xl:col-start-1 xl:col-span-2 xl:row-start-1",
+            className: "md:col-span-2 xl:col-span-2",
+            pinnedClassName: "xl:col-start-1 xl:row-start-1",
             children: <DuckChatPanel />,
           },
           todo: { label: "할 일", children: <TodoWidget /> },

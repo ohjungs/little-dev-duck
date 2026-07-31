@@ -4,22 +4,37 @@ packages:
 allowBuilds:
   sharp: true
   unrs-resolver: true
+# 2026-07-31 : 보안 - 의존성 - 취약 버전 강제 상향 (사용자 결정 B-5)
+# PENDING 10번의 선택지 3("전부 강제")을 사용자가 골랐다. 선택지 1(그대로 둔다)을 권고했던
+# 근거는 "실제 노출 경로가 없다"였고 그 판단은 지금도 유효하다 — 사용자는 **깨질 수 있다는
+# 것을 알고** 숫자를 0으로 만드는 쪽을 택했다. 그래서 근거가 아니라 결정으로 적는다.
+#
+# 각 줄의 위험:
+#  · postcss  — next가 8.4.31을 정확히 고정한다. 강제하면 next가 시험한 적 없는 조합이 된다.
+#  · sharp    — libvips를 품은 네이티브 패키지라 마이너 상향이 플랫폼별로 다르게 터진다.
+#
+# **brace-expansion은 강제하지 못한다 — 실측으로 확인했다.** 5.0.9로 올리면 eslint가 통째로
+# 죽는다: `TypeError: expand is not a function` (minimatch@3.1.5의 braceExpand). 5.x가 기본
+# 내보내기를 함수에서 객체로 바꿔서 `require('brace-expansion')`가 함수가 아니게 된다.
+# 취향이 아니라 **호환 불가**라 남긴다. 개발·린트 전용이라 `pnpm audit --prod`(CI 게이트)에는
+# 애초에 잡히지 않고, 배포 산출물에도 들어가지 않는다. minimatch가 4+로 올라가면 자연히 풀린다.
+#
+# 되돌리는 법: 이 블록을 지우고 `pnpm install`. 그러면 아래 면제 목록을 되살려야 한다
+# (지운 내역은 git 이력에 있다) — 안 그러면 CI 감사 게이트가 막는다.
+overrides:
+  postcss: ^8.5.25
+  sharp: ^0.35.3
 # 2026-07-26 : 보안 - 의존성감사 - 허용목록 (Phase 39)
 # CI가 `pnpm audit --prod --audit-level high`로 게이트를 잡는다. 여기 등재된 것만 통과한다.
 #
 # 규칙: 무시는 판단이므로 **각 줄 위에 왜 지금 노출이 아닌지**를 적는다.
 # 그 규칙은 `apps/web/src/lib/__tests__/dependencyAuditIgnores.test.ts`가 강제한다 —
 # 사유 없이 한 줄 늘리면 테스트가 실패한다. 고칠 수 있으면 무시하지 말고 버전을 올린다.
+#
+# 2026-07-31: **목록을 비웠다.** 있던 3건(sharp 1 · postcss 2)은 위 overrides로 실제 버전을
+# 올려 해소됐다 — 면제할 취약점이 남아 있지 않다. 그 규범("고칠 수 있으면 무시하지 말고 버전을
+# 올린다")을 따른 결과다. 실측: `pnpm audit --prod --audit-level high` → 취약점 0건.
 auditConfig:
-  ignoreGhsas:
-    # sharp(high) — next의 optionalDependency. **남이 만든 이미지가 최적화 경로에 닿지 않는다**:
-    # next.config.ts에 remotePatterns가 없어 Next가 원격 호스트를 전부 거부하고, next/image에
-    # 넘기는 값은 우리 /duck-logo.png뿐이며 유일한 변수 src(PageEditor 표지)는 unoptimized다.
-    # 이 근거는 remotePatterns가 생기는 순간 거짓이 된다 → 위 테스트가 그 조합을 실패로 만든다.
-    - GHSA-f88m-g3jw-g9cj
-    # postcss(high) — next가 8.4.31을 **정확히 고정**해 우리가 올릴 수 없다(16.2.11도 동일).
-    # 빌드 시점에만 돌고, 공격 경로는 악의적 CSS를 빌드 입력에 넣는 것이다. 빌드는 우리
-    # 저장소로만 돈다. **기계로 확인할 수 있는 전제조건이 없어** 주석 사유로만 남긴다.
-    - GHSA-6g55-p6wh-862q
-    # postcss(high) — 위와 같은 패키지·같은 근거(sourceMappingURL 경로 순회).
-    - GHSA-r28c-9q8g-f849
+  ignoreGhsas: []
+minimumReleaseAgeExclude:
+  - brace-expansion@5.0.9
