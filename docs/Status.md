@@ -1,5 +1,39 @@
 # Status.md — 현재 Phase 진행 현황
 
+> ## ✅ 2026-07-31 이메일 로그인 테스트 계층 (Phase 41 T1~T3) — 렌더 17 + e2e 6, 전부 통과
+> 이메일 로그인·가입·비밀번호 재설정은 **테스트 0건**으로 배포돼 있었다. 계정 열거 차단,
+> 시도 상한, 문구 정책이 전부 "코드에 그렇게 쓰여 있다"로만 지켜지던 상태다. 두 계층으로 덮었다.
+>
+> - **신규 2파일**: `apps/web/src/app/login/__tests__/LoginForm.test.tsx`(렌더 17건),
+>   `apps/web/e2e/email-login.spec.ts`(e2e 6건). **`LoginForm.tsx`는 한 줄도 고치지 않았다** —
+>   기존 동작을 그대로 못박는 것이 이 작업의 스코프였다.
+> - **계층 소유권을 나눴다(중복 단언 금지)**: 오류 원문 → 한국어 문구 매핑, 상한 인자·키 정규화,
+>   busy 재진입 차단은 **렌더**가 소유한다. HTML5 `required` 차단, 성공 시 **실제 페이지 이동**,
+>   요청이 진짜 네트워크에 나갔는지는 **e2e**가 소유한다. 같은 사실을 두 곳에서 재지 않는다.
+> - **잠근 계약 중 값이 큰 것**: ① 자격증명 실패는 "없는 계정"과 "틀린 비밀번호"를 구분하지
+>   않는다(가입의 "이미 있는 계정"도 같은 문구로 수렴 — 열거 차단) ② 어떤 실패에서도 **영문
+>   원문이 화면에 새지 않는다**(라틴문자 미포함으로 단언) ③ 6번째 로그인 시도는 **네트워크에
+>   나가지 않는다**(요청 5건에서 멈춤) ④ 재설정 실패는 `authErrorMessage`로 바꾼다 —
+>   `passwordUpdateErrorMessage`가 아니다(두 함수가 다른 답을 주는 원문으로 못박음).
+> - **의도된 비대칭을 "고치지 않고" 잠갔다**: 상한 키에는 정규화된 이메일이, 인증 요청에는
+>   입력 원문이 간다. 테스트가 양쪽을 함께 단언하므로 나중에 누가 한쪽에 맞춰 정리하면 깨진다.
+> - **e2e는 실계정 0건이다**: GoTrue 호출 전부를 `page.route`로 가로챈다. 포괄 가드
+>   (`**/auth/v1/**` → 카운트 후 abort)를 먼저, 구체 핸들러를 나중에 걸어 **예상 못 한 인증
+>   호출이 프로덕션에 닿지 않는다**. 세션이 필요 없어 **CI에서도 실제로 돈다**(스킵 아님).
+> - **실측으로 확인한 환경 사실 3개**(추측 아님, 프로브·실행으로 확인):
+>   ① `vi.spyOn(window.location, "assign")`은 이 환경에서 불가능하다(`Cannot redefine
+>   property`). window의 own property `location`을 통째로 교체하는 방식은 통과한다(원복함).
+>   ② DuckVideo는 jsdom에서 실제로 터진다 — 원인은 영상이 아니라 `window.matchMedia` 부재다.
+>   ③ **Next가 항상 심는 `<div role="alert" id="__next-route-announcer__">` 때문에 e2e에서
+>   `getByRole("alert")`를 페이지 전역에 쓰면 안 된다**(다른 스펙에도 적용되는 사실이라
+>   `e2e/README.md`에 적었다).
+> - **정직하게 남기는 한계**: 성공 경로의 **최종 목적지가 `/`라는 것은 e2e가 검증하지 않는다**.
+>   서명 없는 가짜 토큰이라 서버가 되물어 거부한다 — 실계정 세션이 있어야 하는 검증이고 "실계정
+>   0건" 전제와 맞바꿀 수 없다. 대신 **떠났다는 사실**(전체 페이지 이동)을 e2e가, **`/`로
+>   보낸다는 사실**을 렌더가 `location.assign` 호출로 잠근다. 두 층을 합쳐야 계약이 덮인다.
+> - 검증: web vitest **684/684 통과**(신규 17 포함), `email-login.spec.ts` **6/6 통과**,
+>   `tsc --noEmit` 통과, 신규 2파일 eslint 통과.
+
 > ## ✅ 2026-07-30 사용자 승인 — 보안 마이그레이션 2건 **실서버 적용·실측 검증 완료**
 > 사용자가 "Supabase 너가 푸시하고 배포하면 되잖아"로 승인 → claude.ai Supabase MCP
 > `apply_migration`으로 **직접 적용**했다. 며칠간 "적용 대기"로 남아 있던 구멍 2개가 닫혔다.
@@ -421,7 +455,7 @@
 - [x] security: room_members/messages RLS room_id 불변조건 추가 — 2026-07-30 실서버 적용·실측 검증 완료. 상세: [migration-applied-2026-07-30.md](loop-eng/migration-applied-2026-07-30.md) · 원래 항목: (멤버십·메시지 위조 차단, P9+P10 병합) — supabase/migrations/20260727030000_messenger_rooms.sql → 스펙: [docs/specs/2026-07-30-room-rls-room-id-immutable.md](specs/2026-07-30-room-rls-room-id-immutable.md)
 - [ ] ux: 라이트 테마 --muted-foreground 대비 WCAG AA 미달 수정 — apps/web/src/app/globals.css (**이미 완료 추정** — 위 참고) → 스펙: [docs/specs/2026-07-30-light-theme-contrast-wcag.md](specs/2026-07-30-light-theme-contrast-wcag.md)
 - [ ] test: 컴포넌트 렌더 테스트 인프라 도입 (jsdom+testing-library, 후속 테스트 다수의 선행조건) — apps/web/vitest.config.ts
-- [ ] test: LoginForm 로그인/가입 제출 로직 컴포넌트·E2E 테스트 추가 — apps/web/src/app/login/LoginForm.tsx
+- [x] test: LoginForm 로그인/가입 제출 로직 컴포넌트·E2E 테스트 추가 — apps/web/src/app/login/LoginForm.tsx
 - [ ] test: AdminUserPanel 역할 변경 권한 테스트 추가 (admin/insights/settings/news 스모크 포함) — apps/web/src/components/AdminUserPanel.tsx
 - [ ] test: 계정 영구 삭제 API 라우트 테스트 추가 — apps/web/src/app/api/account/delete/route.ts
 - [ ] test: 블록 에디터(PageEditor/PageWorkspace/BlockEditor) 핵심 기능 컴포넌트·E2E 테스트 추가 — apps/web/src/components/PageEditor.tsx

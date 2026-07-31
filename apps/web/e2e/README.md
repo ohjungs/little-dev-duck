@@ -9,12 +9,43 @@ webServer는 `next start` — 즉 **미리 빌드된 결과물**을 서빙하는
 어느 파일 때문인지 짚고 실행을 중단하므로, 잊어도 조용히 거짓 통과하지는 않는다.
 포트는 5100 (로컬 개발 서버가 쓰는 5000과 겹치지 않게 분리 — 포트 충돌 방지).
 
-`auth-redirect.spec.ts`, `responsive.spec.ts`(로그인 페이지 부분)는 로그인 없이 바로 돈다.
+`auth-redirect.spec.ts`, `email-login.spec.ts`, `responsive.spec.ts`(로그인 페이지 부분)는
+로그인 없이 바로 돈다.
 `widgets.spec.ts`(투두/메모), `todo-recurrence.spec.ts`(반복 할 일),
 `undo-delete.spec.ts`(삭제 되돌리기), `duck-examples.spec.ts`(대화 예시 칩), `duck.spec.ts`,
 `github-contributions.spec.ts`, 그리고 나머지
 파일의 로그인 뒤 화면 테스트는 OAuth 뒤에 있어 저장된 로그인 세션이 있어야 실행되고, 없으면
 자동으로 스킵된다(실패 아님).
+
+## 이메일 로그인 스펙 (`email-login.spec.ts`) — 실계정 0건
+
+이 스펙은 **세션 없이, CI에서도 실제로 돈다.** 모든 GoTrue 호출(`**/auth/v1/**`)을
+`page.route`로 가로채므로 **실계정 가입·로그인이 한 건도 일어나지 않고**, 프로덕션
+Supabase에 남는 데이터도 없다. 라우트는 반드시 `goto("/login")` **이전에** 건다 —
+그 뒤에 걸면 첫 렌더가 만드는 호출을 놓친다.
+
+등록 순서가 계약이다. Playwright는 **나중에 등록한 라우트를 먼저** 보므로
+① 포괄 가드(`**/auth/v1/**` → 카운트 후 abort)를 먼저, ② 구체 핸들러(`token`·`signup`·
+`recover`)를 나중에 건다. 이러면 예상 못 한 인증 호출이 프로덕션에 닿지 않고 카운터에 남는다.
+glob에 호스트를 적지 않는 것도 규칙이다(Supabase URL은 환경변수라 CI와 로컬이 다르다).
+
+이 파일을 만들며 실측한 환경 사실 둘 — 로그인 화면을 건드리는 다른 스펙에도 그대로 적용된다:
+
+- **`getByRole("alert")`를 페이지 전역에 쓰면 안 된다.** Next가 항상 심어 두는
+  `<div role="alert" id="__next-route-announcer__">`가 함께 잡혀 strict mode violation이 나거나
+  "alert 없음" 단언이 영원히 실패한다. `page.locator("form").getByRole("alert")`처럼 좁힌다.
+- **`getByLabel("이메일")`은 `{ exact: true }`가 필요하다.** 탭 묶음의 aria-label
+  ("이메일 로그인 또는 가입 선택")이 "이메일"을 부분문자열로 품고 있다.
+
+계층 경계: 오류 원문 → 한국어 문구 **매핑**과 상한 **인자·키 정규화**는 렌더 테스트
+(`src/app/login/__tests__/LoginForm.test.tsx`)가 소유한다. 여기서 다시 단언하지 않는다.
+여기서만 할 수 있는 것은 HTML5 `required` 차단, 성공 시 **실제 페이지 이동**, 그리고
+브라우저가 진짜로 네트워크에 나갔는지(요청 횟수)다.
+
+**한계(명시)**: 성공 경로의 최종 목적지가 `/`라는 것은 검증하지 않는다. 서명 없는 가짜
+토큰이라 서버가 되물어 거부하고 미인증 경로로 보낸다 — 실계정 세션이 필요한 검증이고, 이
+파일의 전제(실계정 0건)와 맞바꿀 수 없다. "`/`로 이동한다"는 렌더 테스트가 `location.assign`
+호출로 잠근다.
 
 ## 인증 세션 만들기 (최초 1회, 로컬에서 수동)
 

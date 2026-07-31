@@ -289,14 +289,17 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
               />
             </label>
 
-            {/* 오류·안내는 role로 알린다 — 화면을 보지 않는 사용자에게도 결과가 전달돼야 한다. */}
+            {/* 오류·안내는 role로 알린다 — 화면을 보지 않는 사용자에게도 결과가 전달돼야 한다.
+                2026-07-31 (사이클 4 화면검증): break-keep이 빠져 한글이 단어 중간에서 끊겼다.
+                이 파일 하단 문단은 이미 고쳐져 있었는데(아래 주석) 오류·안내 문단만 남아 있었다 —
+                당시 provider가 꺼져 있어 오류 상태를 화면으로 볼 수 없었던 것이 원인으로 보인다. */}
             {error !== "" && (
-              <p role="alert" className="text-left text-sm text-[#ff9d8a]">
+              <p role="alert" className="break-keep text-left text-sm text-[#ff9d8a]">
                 {error}
               </p>
             )}
             {notice !== "" && (
-              <p role="status" className="text-left text-sm text-[#9fd39a]">
+              <p role="status" className="break-keep text-left text-sm text-[#9fd39a]">
                 {notice}
               </p>
             )}

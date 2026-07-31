@@ -29,6 +29,13 @@
   --accent: #f5f1e8;
   --accent-foreground: #262117;
   --destructive: #dc2626;
+  /* 2026-07-31 : 접근성 - 텍스트 대비 - 파괴적 액션 (게이트 차단 건)
+     이 토큰이 **없는 채로** ConfirmDialog/OfflineIndicator가 text-destructive-foreground를
+     썼다. Tailwind v4는 미정의 토큰의 유틸리티를 아예 만들지 않으므로 클래스가 통째로
+     사라지고 글자색이 --foreground로 상속돼 붉은 바탕 위 3.31:1이었다(AA 4.5:1 미달).
+     흰색은 #dc2626 위 4.83:1. **@theme inline 매핑까지 있어야** 클래스가 생긴다 —
+     globalsTextContrast.test.ts의 "미정의 색 토큰 참조" 검사가 그 짝을 잠근다. */
+  --destructive-foreground: #ffffff;
   --success: #217e3a;
   /* 2026-07-31 : 접근성 - 비텍스트 대비 - 경계/포커스링 (SC 1.4.11, 게이트 차단 건)
      전에는 --border/--input이 #ebe7dd(배경 대비 1.18:1), --ring이 #ca8a04(2.81:1)이라
@@ -106,6 +113,10 @@
   --accent: #2a241c;
   --accent-foreground: #f4f0e6;
   --destructive: #f87171;
+  /* 다크의 --destructive는 밝은 살구빛이라 흰 글자를 얹으면 1.5:1이다. 순검정 대신
+     --background과 같은 따뜻한 먹색을 써서 6.46:1을 만든다(팔레트의 다른 -foreground와
+     같은 방식 — 다크에서 진한 글자는 전부 이 색조다). */
+  --destructive-foreground: #1a1712;
   --success: #3fb950;
   /* 2026-07-31 : 접근성 - 비텍스트 대비 - 경계 (SC 1.4.11)
      다크의 --ring(#eab308)은 이미 8.6:1 이상이라 그대로 둔다. 경계만 #332d24(1.2:1)에서
@@ -115,7 +126,13 @@
   --ring: #eab308;
 
   /* GitHub 잔디(다크): GitHub 다크 테마의 초록 스케일 */
-  --gh-0: #2a251c;
+  /* 2026-07-31 : 잔디 - 레벨0 - 카드 대비 (게이트 차단 건)
+     전에는 #2a251c라 카드(#221e18)와 ΔE 4.0이었다 — 사람이 겨우 알아채는 2.3은 넘지만
+     훑어보는 격자에서는 빈 칸의 격자 자체가 사라진다. --heat-*가 이미 지키던 기준
+     (레벨0 vs 카드 ΔE≥6)을 그대로 적용해 11.1로 올린다. 색조는 라이트 --gh-0(#ebe7dd)과
+     같은 따뜻한 카키 계열로 유지했다 — 초록 스케일 옆에서 회색이 튀지 않게.
+     검사는 HabitHeatmap.contrast.test.ts가 0..4 램프를 **자동 발견**해 건다(수동 목록 없음). */
+  --gh-0: #3a3428;
   --gh-1: #0e4429;
   --gh-2: #006d32;
   --gh-3: #26a641;
@@ -155,6 +172,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-border: var(--border);
   --color-input: var(--input);
