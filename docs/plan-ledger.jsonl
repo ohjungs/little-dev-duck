@@ -64,3 +64,54 @@
 {"titleKey":"ux 사이드바 로고 흰 배경이 어두운 테마에서 흰 덩어리로 보인다","fileKey":"ux animatedducklogo tsx","title":"ux: 사이드바 로고가 어두운 테마에서 흰 덩어리로 보인다","verdict":"confirmed","date":"2026-07-31","reason":"사용자 보고(2026-07-31 화면 확인). duck-logo-96.mp4와 포스터가 흰 배경이라 어두운 사이드바에서 흰 사각형으로 뜬다. 로드 실패가 아니라 자산 배경 문제 — 표현 방식 결정 필요."}
 {"titleKey":"feature 대시보드 카드를 마우스로 잡아 끌어 옮기기","fileKey":"feature dashboardlayoutpanel tsx","title":"feature: 대시보드 카드를 마우스로 잡아 끌어 옮기기","verdict":"confirmed","date":"2026-07-31","reason":"사용자가 세 번째 요청(2026-07-31). 현재 순서 변경은 설정 패널의 위/아래 버튼뿐이고 카드를 직접 잡아 끄는 경로가 없다. 접기 버튼만 동작한다."}
 {"titleKey":"bug 습관 체크박스 클릭이 저장되지 않는다","fileKey":"bug habitwidget tsx","title":"bug: 습관 체크박스 클릭이 저장되지 않는다","verdict":"confirmed","date":"2026-07-31","reason":"사용자 보고(2026-07-31). 서버 쪽은 실서버 조회로 정상 확인(RLS 3종·UNIQUE·award_xp 권한·duck_state 전부 이상 없음). 1f46cc4로 실제 오류 메시지가 화면에 뜨게 했으니 그 문구를 받아 원인 확정 후 수정."}
+{"titleKey":"test adminuserpanel 역할 변경 권한 테스트 추가 admin insights settings news 스모크 포함","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test 계정 영구 삭제 api 라우트 테스트 추가","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test 블록 에디터 pageeditor pageworkspace blockeditor 핵심 기능 컴포넌트 e2e 테스트 추가","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test rls 정책 통합 테스트 도입 pgtap 로컬 supabase 스택","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"security messages update rls sender type 불변조건","severity":"S1","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"ux dbtableview dbboardview hover 버튼 focus visible 터치타겟 확대 p16 p18 병합","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"ux githubcontributionwidget grid gridcell 접근성 속성 추가","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"quality 전역 errorboundary에 componentdidcatch 추가 렌더 크래시 무기록 방지","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"quality 401 429 에러 응답 리터럴 중복 문구 불일치 공용 함수로 통합","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test packages api 20개 fakesupabase 목 중복을 공유 테스트 팩토리로 통합","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test coverage 스크립트에 apps web 포함","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test ci에 e2e auth state b64 시크릿 등록 또는 스킵 현황 가시화","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test geminigenerate 응답 파싱 단위 테스트 추가","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test agent agent approve 라우트 401 429 분기 실제 실행 테스트 추가","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"security oauth 토큰 google github gmail 저장 시 암호화 적용","severity":"S1","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"security message attachments 삭제 정책을 업로더 본인으로 제한","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"quality rooms ts 36개 export 를 도메인별 파일 5개로 분리","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"quality pageeditor tsx 968줄 관심사별 훅 useversionhistory 등 분리","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"ux 모달 9곳 usemodala11y 적용 achievementcard 캔버스 텍스트 대체 p54 p55 병합","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"ux 9 10px 임의값 폰트 33곳을 최소 11px 이상으로 통일","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"ux 공용 button input 기본 높이 44px 터치타겟으로 상향","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test app api 라우트 7개에 라우트 레벨 테스트 추가","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test rooms ts 미테스트 13개 export 커버리지 보강","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test 3d 마스코트 duck tsx 렌더링 애니메이션 로직 테스트 추가","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"stack app layout tsx force dynamic 재검토로 인증 이중화 정적 렌더링 무효화 해소","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"feature web push 백그라운드 알림 채널 구현","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"feature calendar github 어댑터에 update delete 도구 추가","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test messageroom 핵심 플로우 e2e 시나리오 신규 작성","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"security next config ts에 poweredbyheader false 추가","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"security api keepalive cron secret 미설정 시 fail closed로 전환","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"security 이메일 비밀번호 가입 최소 길이 강도 정책 추가","severity":"S1","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"security creategithubissue title body 필드 길이 상한 추가","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"quality 사이트 url 계산 글루 코드 3중 반복을 getsiteurl 래퍼로 통합","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"quality knip을 lint ci 파이프라인에 배선","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"stack dependabot 또는 renovate 도입","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test tauri rust 테스트를 ci 파이프라인에 연결","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test ci에 커버리지 실행 및 threshold 게이트 추가","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test usemodala11y 포커스 트랩 복원 동작 단위 테스트 추가","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"feature oauth 없이 구독 가능한 ics webcal 피드 제공","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"quality 위젯 loading error 보일러플레이트를 useasyncdata 훅으로 추출","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"quality appactions execute if else 사슬을 디스패치 테이블로 전환","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"ux 오리 채팅 입력창을 자동 높이 textarea로 교체","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test apps web src lib 미테스트 유틸 12개에 단위 테스트 추가","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test 칸반 databaseview 드래그앤드롭 e2e 추가","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"test playwright에 webkit 프로젝트 추가","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"feature cmd k 명령 팔레트에 pgvector 시맨틱 검색 연동","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"feature rag 검색에 키워드 tsvector 하이브리드 랭킹 도입","severity":"S3","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"security e2e를 프로덕션 supabase에서 분리 전용 프로젝트 또는 로컬 스택","severity":"S1","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"ux 사이드바 로고 흰 배경이 어두운 테마에서 흰 덩어리로 보인다","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"feature 대시보드 카드를 마우스로 잡아 끌어 옮기기","severity":"S2","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
+{"titleKey":"bug 습관 체크박스 클릭이 저장되지 않는다","severity":"S1","date":"2026-07-31","note":"등급 부여(신호등 분류)"}
