@@ -1750,3 +1750,34 @@ github/contributions·ai/write·ai/standup·ai/duck-line).
 - 재현 절차: 개발 서버를 띄우고 라이트 테마로 ① 대시보드 위젯 카드 ② 데이터베이스 표 뷰 ③ 설정 화면 입력창
   ④ 아무 버튼에 Tab으로 포커스 이동 — 테두리가 과하게 진하지 않은지, 포커스링이 뚜렷한지 본다.
 - 현재 상태: open. 이 확인 전까지 main 푸시(=Vercel 배포)를 보류한다.
+
+## 116. 비밀번호 강도·재인증 정책 — Supabase Auth 설정이라 코드로 못 바꾼다 (2026-07-31)
+
+- Task: security: 이메일/비밀번호 가입 최소 길이·강도 정책 추가 (대장 S1)
+- 무엇을: 비밀번호 최소 길이·유출 비밀번호 차단·비밀번호 변경 시 재인증(secure_password_change).
+- 왜 사용자 검증이 필요한가: 셋 다 Supabase 대시보드의 Auth 설정값이다. 저장소 코드나 마이그레이션으로
+  바꿀 수 없어 루프가 자율로 처리할 수 없다.
+- 재현 절차: Supabase 대시보드 → Authentication → Policies/Passwords에서 현재값 확인.
+  최소 길이, leaked password protection, secure password change 세 항목.
+- 현재 상태: open. 사용자가 설정을 바꾸면 해소.
+
+## 117. e2e를 프로덕션 Supabase에서 분리 — 방식 결정이 먼저다 (2026-07-31)
+
+- Task: security: e2e를 프로덕션 Supabase에서 분리 (대장 S1)
+- 무엇을: `.env.local`의 Supabase URL이 `supabase/config.toml`의 프로덕션 project_id와 같다(이번 사이클
+  시작 시 코드로 재확인). e2e가 실사용자 데이터에 쓴다.
+- 왜 사용자 검증이 필요한가: 전용 테스트 프로젝트를 팔지, 로컬 Supabase 스택(Docker)을 쓸지가
+  사용자 결정이다(NEXT-2026-07-31.md A-4). 어느 쪽이든 자격증명 발급·설치가 따라온다.
+- 재현 절차: `.env.local`의 SUPABASE_URL 호스트와 `supabase/config.toml`의 project_id를 비교.
+- 현재 상태: open. 결정 전까지 4-00 제한(사이클당 e2e 1회, 변경이 그 경로를 건드릴 때만)을 지킨다.
+
+## 118. 습관 체크박스 저장 실패 — 화면에 뜨는 오류 문구가 있어야 원인이 잡힌다 (2026-07-31)
+
+- Task: bug: 습관 체크박스 클릭이 저장되지 않는다 (대장 S1, 사용자 보고)
+- 무엇을: 서버 쪽은 실서버 조회로 전부 정상 확인됨(habit_checks RLS 3종 · UNIQUE(habit_id, checked_date) ·
+  award_xp 존재와 authenticated 실행권한 · duck_state 행 누락 0건 · 체크박스 onChange 배선).
+- 왜 사용자 검증이 필요한가: catch가 모든 실패를 "변경하지 못했습니다."로 뭉개고 있었다. 커밋 1f46cc4로
+  실제 오류 문구가 화면에 뜨게 고쳤으므로, 그 문구를 받아야 원인이 확정된다. 추측으로 고치면 안 된다.
+- 재현 절차: 새로고침 후 습관 체크박스를 클릭하고 화면에 뜨는 오류 문구를 그대로 알려준다.
+  ("로그인이 필요합니다"가 뜨면 세션 만료다.)
+- 현재 상태: open.
