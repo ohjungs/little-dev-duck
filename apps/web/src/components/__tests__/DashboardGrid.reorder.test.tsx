@@ -71,8 +71,21 @@ describe("DashboardGrid 순서 바꾸기", () => {
     expect(handleOrder()).toEqual(["메모 카드 순서 이동", "할 일 카드 순서 이동"]);
     expect(saveMyDashboardLayout).toHaveBeenCalledTimes(1);
     // 숨긴 habit은 순서에서 사라지지 않는다 — 다시 켜면 제자리로 돌아와야 한다.
+    // 저장에는 화면에 없는 카드까지 전체 순서가 들어간다 — 그래야 숨긴 카드를 다시 켰을 때
+    // 제자리로 돌아온다. 위젯을 추가하면 이 기대값도 함께 바뀌는 것이 정상이다
+    // (2026-08-01에 커밋 잔디가 늘면서 이 검사가 먼저 잡아 줬다).
     expect(saveMyDashboardLayout.mock.calls[0]![1]).toEqual({
-      order: ["habit", "memo", "todo", "duck", "chat", "pomodoro", "calendar", "news-top"],
+      order: [
+        "habit",
+        "memo",
+        "todo",
+        "duck",
+        "chat",
+        "pomodoro",
+        "calendar",
+        "github",
+        "news-top",
+      ],
       hidden: ["habit"],
     });
   });

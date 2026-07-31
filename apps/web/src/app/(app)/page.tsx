@@ -7,6 +7,7 @@ import { CalendarWidget } from "@/components/CalendarWidget";
 import { HabitWidget } from "@/components/HabitWidget";
 import { PomodoroWidget } from "@/components/PomodoroWidget";
 import { NewsTopWidget } from "@/components/NewsTopWidget";
+import { GithubContributionWidget } from "@/components/GithubContributionWidget";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { DashboardGrid } from "@/components/DashboardGrid";
 import { LastPageLink } from "@/components/LastPageLink";
@@ -141,6 +142,7 @@ export default async function DashboardPage() {
           pomodoro: { label: "뽀모도로", children: <PomodoroWidget /> },
           memo: { label: "메모", className: "md:col-span-2", children: <MemoWidget /> },
           calendar: { label: "캘린더", children: <CalendarWidget /> },
+          github: { label: "커밋 잔디", children: <GithubContributionWidget /> },
           "news-top": { label: "오늘의 뉴스", children: <NewsTopWidget /> },
         })}
       />

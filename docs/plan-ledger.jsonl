@@ -121,3 +121,14 @@
 {"titleKey":"test rls 정책 통합 테스트 도입 pgtap 로컬 supabase 스택","verdict":"confirmed","approved":true,"date":"2026-07-31","reason":"사용자 승인(2026-07-31). 되돌리기 어려운 작업 게이트 해제."}
 {"titleKey":"security messages update rls sender type 불변조건","verdict":"done","date":"2026-07-31","reason":"이미 구현돼 있었다 — supabase/migrations/20260730180000_message_sender_immutable.sql (BEFORE UPDATE 트리거 guard_message_sender_immutable). down 스크립트도 있다. 사이클 7 유효성 확인에서 alreadyDone으로 잡혔고 파일 존재를 직접 확인함."}
 {"titleKey":"security message attachments 삭제 정책을 업로더 본인으로 제한","verdict":"done","date":"2026-07-31","reason":"이미 구현돼 있었다 — supabase/migrations/20260731100000_message_attachment_delete_owner.sql (owner = auth.uid() and can_access_room_folder). down 스크립트도 있다. 파일 내용 직접 확인함."}
+{"titleKey":"quality rooms ts 36개 export 를 도메인별 파일 5개로 분리","verdict":"rejected","date":"2026-07-31","reason":"메신저 전면 제거(사용자 결정 B-9, 734f1c7)로 packages/api/src/rooms.ts 자체가 사라졌다. 대상 소멸."}
+{"titleKey":"test rooms ts 미테스트 13개 export 커버리지 보강","verdict":"rejected","date":"2026-07-31","reason":"메신저 전면 제거(B-9, 734f1c7)로 rooms.ts와 그 테스트가 함께 삭제됐다. 대상 소멸."}
+{"titleKey":"test messageroom 핵심 플로우 e2e 시나리오 신규 작성","verdict":"rejected","date":"2026-07-31","reason":"메신저 전면 제거(B-9, 734f1c7)로 MessageRoom과 /messages 라우트가 사라졌다. 대상 소멸."}
+{"titleKey":"quality rooms ts 36개 export 를 도메인별 파일 5개로 분리","verdict":"rejected","date":"2026-08-01","reason":"메신저 전면 제거(사용자 결정 B-9, 커밋 734f1c7)로 대상 코드가 사라졌다. rooms.ts·MessageRoom·room 테이블 모두 없다 — 재발굴 금지."}
+{"titleKey":"test rooms ts 미테스트 13개 export 커버리지 보강","verdict":"rejected","date":"2026-08-01","reason":"메신저 전면 제거(사용자 결정 B-9, 커밋 734f1c7)로 대상 코드가 사라졌다. rooms.ts·MessageRoom·room 테이블 모두 없다 — 재발굴 금지."}
+{"titleKey":"test messageroom 핵심 플로우 e2e 시나리오 신규 작성","verdict":"rejected","date":"2026-08-01","reason":"메신저 전면 제거(사용자 결정 B-9, 커밋 734f1c7)로 대상 코드가 사라졌다. rooms.ts·MessageRoom·room 테이블 모두 없다 — 재발굴 금지."}
+{"titleKey":"ux 사이드바 로고가 어두운 테마에서 흰 덩어리로 보인다","verdict":"done","date":"2026-08-01","reason":"흰 원형 배지로 처리(사용자 결정 A-1 ①). 커밋 4569d51, 배포본 화면 확인 완료."}
+{"titleKey":"feature 대시보드 카드를 마우스로 잡아 끌어 옮기기","verdict":"done","date":"2026-08-01","reason":"손잡이 드래그 + 화살표 키 경로 구현(사용자 결정 A-2). 커밋 4569d51, 배포본에서 순서 변경·저장까지 확인."}
+{"titleKey":"security e2e 를 프로덕션 supabase 에서 분리 전용 프로젝트 또는 로컬 스택","verdict":"rejected","date":"2026-08-01","reason":"사용자 결정(2026-07-31 A-4): 프로덕션에 써도 상관없으니 그대로 진행. 대신 전용 테스트 계정을 만들어 개인 데이터와 섞이지 않게 했다. 재발굴 금지."}
+{"titleKey":"ux 사이드바 로고 흰 배경이 어두운 테마에서 흰 덩어리로 보인다","verdict":"done","date":"2026-08-01","reason":"흰 원형 배지로 처리(사용자 결정 A-1 ①). 커밋 4569d51, 배포본 화면 확인 완료."}
+{"titleKey":"security e2e를 프로덕션 supabase에서 분리 전용 프로젝트 또는 로컬 스택","verdict":"rejected","date":"2026-08-01","reason":"사용자 결정(2026-07-31 A-4): 프로덕션에 써도 상관없으니 그대로 진행. 대신 전용 테스트 계정을 만들어 개인 데이터와 섞이지 않게 했다. 재발굴 금지."}
