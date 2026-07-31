@@ -98,3 +98,19 @@ jobs:
         # 로그인 세션 파일(e2e/.auth/user.json)이 CI에는 없어 인증 필요 스펙은 전부 자동 스킵된다
         # (실패 아님, 의도된 동작). auth-redirect.spec.ts 등 비인증 스펙만 실제로 실행된다.
         # 인증 필요 스펙까지 CI에서 돌리려면 apps/web/e2e/README.md "CI에서 실행" 절 참고.
+
+  db-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # 2026-08-01 : 테스트 - RLS/트리거 - pgTAP 회귀 게이트 (supabase/tests/database)
+      # 로컬 컨테이너만 띄운다 — 원격 프로젝트(iupprzfmlyfrdcctdupn)에는 어떤 자격증명도
+      # 넘기지 않는다. Docker는 ubuntu-latest 러너에 기본 설치돼 있어 별도 설정 불필요.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start
+      - run: supabase test db
+      - run: supabase stop

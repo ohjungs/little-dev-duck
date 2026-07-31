@@ -11,6 +11,7 @@
     "test": "turbo run test",
     "coverage": "vitest run --config vitest.coverage.config.ts --coverage",
     "check:secrets": "node scripts/check-secrets.mjs",
+    "test:db": "supabase test db",
     "docs:archive": "node scripts/archive-status.mjs",
     "prepare": "git config core.hooksPath .githooks",
     "dev": "turbo run dev"

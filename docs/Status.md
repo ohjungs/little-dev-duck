@@ -158,10 +158,10 @@
 - [ ] ux: 라이트 테마 --muted-foreground 대비 WCAG AA 미달 수정 — apps/web/src/app/globals.css (**이미 완료 추정** — 위 참고) → 스펙: [docs/specs/2026-07-30-light-theme-contrast-wcag.md](specs/2026-07-30-light-theme-contrast-wcag.md)
 - [ ] test: 컴포넌트 렌더 테스트 인프라 도입 (jsdom+testing-library, 후속 테스트 다수의 선행조건) — apps/web/vitest.config.ts
 - [x] test: LoginForm 로그인/가입 제출 로직 컴포넌트·E2E 테스트 추가 — apps/web/src/app/login/LoginForm.tsx
-- [ ] test: AdminUserPanel 역할 변경 권한 테스트 추가 (admin/insights/settings/news 스모크 포함) — apps/web/src/components/AdminUserPanel.tsx
-- [ ] test: 계정 영구 삭제 API 라우트 테스트 추가 — apps/web/src/app/api/account/delete/route.ts
+- [x] test: AdminUserPanel 역할 변경 권한 테스트 추가 (admin/insights/settings/news 스모크 포함) — 2026-08-01 사이클 8 착수 직전 재검증에서 **이미 완료돼 있음**을 확인: 역할 변경 권한은 packages/api/src/access.test.ts(setUserRole 3케이스), 렌더 층은 apps/web/src/components/__tests__/AdminUserPanel.test.tsx(8케이스), 스모크는 apps/web/e2e/admin-insights-settings-news-smoke.spec.ts. 추가 작업 없음 — apps/web/src/components/AdminUserPanel.tsx
+- [x] test: 계정 영구 삭제 API 라우트 테스트 추가 — 2026-08-01 사이클 8 완료. apps/web/src/app/api/account/delete/__tests__/route.test.ts(6케이스). TEST20 19렌즈 실행·하드 렌즈 전부 통과, 소프트 3건(boundary·negative-overflow·network-failure)은 후속 항목으로 대장 적재 — apps/web/src/app/api/account/delete/route.ts
 - [ ] test: 블록 에디터(PageEditor/PageWorkspace/BlockEditor) 핵심 기능 컴포넌트·E2E 테스트 추가 — apps/web/src/components/PageEditor.tsx
-- [ ] test: RLS 정책 통합 테스트 도입 (pgTAP/로컬 Supabase 스택) — supabase/migrations
+- [x] test: RLS 정책 통합 테스트 도입 (pgTAP/로컬 Supabase 스택) — 2026-08-01 리뷰 라운드에서 발견된 `tests` 스키마 USAGE grant 누락(같은 트랜잭션 내 2회차 이후 authenticate_as* 호출 시 42501 permission denied로 6개 파일 중 4개가 CI에서 상시 실패했을 결함)을 00_helpers.sql에 `grant usage on schema tests to authenticated, anon, service_role;` 추가로 수정. Docker 미설치 환경이라 `supabase test db` 실측 GREEN 확인은 미완 — supabase/tests/database, supabase/seed.sql · 추가로 메신저 완전 제거(734f1c7) 검증용 `supabase/tests/database/70_messenger_removed.sql`(plan 14 — 테이블 4·함수 5·트리거 4·publication 1, pg_catalog 직접 조회) 신설. 이 파일도 Docker 미설치로 실측 GREEN 확인은 미완, `supabase start && supabase test db`로 후속 검증 필요.
 
 ### S2 (priority 10~33)
 

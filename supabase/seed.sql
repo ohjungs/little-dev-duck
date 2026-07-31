@@ -1,0 +1,19 @@
+-- 2026-08-01 : 테스트 - pgTAP - 확장 활성화 (로컬/CI 전용, 원격에 절대 반영되지 않음)
+--
+-- 왜 여기(seed.sql)에 두는가, 왜 supabase/migrations/*.sql이 아닌가:
+-- `supabase test db`는 내부적으로 `supabase db reset`과 같은 경로로 로컬 DB를 초기화한다
+-- (migrations 순서 적용 -> 이 seed.sql 실행 -> tests/database/*.sql 실행). seed.sql은
+-- `supabase db push`로 원격(iupprzfmlyfrdcctdupn)에 절대 반영되지 않는다 — 로컬
+-- reset/start와 `supabase test db`에서만 실행된다. pgtap을 정식 migrations에 넣으면
+-- 프로덕션 스키마에 테스트 전용 확장이 영구히 얹혀 schemaGuard/보안감사 노출 표면만
+-- 늘리고 얻는 게 없다. 반대로 여기 두면 로컬/CI 스택에서만 살아 있다가 컨테이너와
+-- 함께 사라진다 — 정확히 우리가 원하는 수명주기다.
+--
+-- config.toml 쪽은 손댈 것이 없다: [db.seed] 섹션을 명시하지 않으면 CLI 기본값
+-- (enabled = true, sql_paths = ["./seed.sql"])이 이 파일을 자동으로 집어 그대로 쓴다.
+--
+-- `extensions` 스키마에 두는 이유: Supabase 로컬 Postgres 이미지의 관례(pg_trgm, vector 등
+-- 다른 확장도 전부 `extensions` 스키마에 둔다는 전제는 아니고 — pgtap 자체는 public이 아닌
+-- 별도 스키마에 둬 public 네임스페이스를 오염시키지 않는 Supabase 공식 pgTAP 가이드 관례를
+-- 따른다). tests/database/*.sql의 ok()/plan()/finish() 등 pgTAP 함수 전부 여기서 온다.
+create extension if not exists pgtap with schema extensions;
