@@ -5,8 +5,10 @@ export { duckStateSchema, type DuckState } from "./domain/duck-state";
 export {
   contributionDaySchema,
   contributionSummarySchema,
+  contributionsResponseSchema,
   type ContributionDay,
   type ContributionSummary,
+  type ContributionsResponse,
 } from "./domain/github-contribution";
 export { contributionGridLabel } from "./domain/github-contribution-label";
 export {

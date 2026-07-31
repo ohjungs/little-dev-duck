@@ -3,8 +3,9 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import {
   contributionGridLabel,
+  contributionsResponseSchema,
   type ContributionDay,
-  type ContributionSummary,
+  type ContributionsResponse,
 } from "@ldd/core";
 import { GitHubMark } from "@/components/ui/github-mark";
 import {
@@ -18,10 +19,6 @@ import { Button } from "@/components/ui/button";
 import { WidgetSkeleton } from "@/components/Skeleton";
 
 type LoadState = "loading" | "error" | "ready";
-
-type ContributionsResponse =
-  | { linked: true; summary: ContributionSummary }
-  | { linked: false };
 
 // 잔디 색은 GitHub식 진짜 초록 스케일(--gh-0..4, globals.css). 강도가 오를수록 진한 초록이 된다.
 // 레벨 0(기여 없음)은 중립 회색이라 빈 칸도 카드 배경과 구분된다.
@@ -55,8 +52,13 @@ export function GithubContributionWidget() {
     try {
       const res = await fetch("/api/github/contributions");
       if (!res.ok) throw new Error("요청 실패");
-      const json = (await res.json()) as ContributionsResponse;
-      setData(json);
+      // 2026-07-31 : 응답 - 신뢰경계 - 캐스트금지
+      // 200이라도 본문이 계약과 다를 수 있다(배포 시차, 프록시). `as` 캐스트는 그걸
+      // 통과시켜 `linked` 부재를 falsy로 읽고 **미연동 안내**를 띄웠다 — 원인 오도다.
+      // safeParse 실패는 아래 catch로 흘려 에러 상태(문구 + 다시 시도)로 수렴시킨다.
+      const parsed = contributionsResponseSchema.safeParse(await res.json());
+      if (!parsed.success) throw new Error("응답 형식이 계약과 다릅니다");
+      setData(parsed.data);
       setState("ready");
     } catch {
       setState("error");

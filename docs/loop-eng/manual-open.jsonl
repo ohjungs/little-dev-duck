@@ -107,3 +107,4 @@
 {"id":112,"title":"오리 캘린더 일정 수정의 실기 확인","date":"2026-07-30","status":"open","ref":"docs/loop-eng/manual-verification.md#L1660"}
 {"id":113,"title":"오리 GitHub 이슈 닫기의 실기 확인","date":"2026-07-30","status":"open","ref":"docs/loop-eng/manual-verification.md#L1679"}
 {"id":114,"title":"기능 토글 서버 강제 — 남은 라우트 매핑 판단 필요","date":"2026-07-30","status":"open","ref":"docs/loop-eng/manual-verification.md#L1698"}
+{"id":115,"itemKey":"ux 전역 테두리 포커스링 색 변경 시각 파급","title":"전역 테두리·포커스링 색 변경의 육안 확인","date":"2026-07-31","status":"open","ref":"docs/loop-eng/manual-verification.md#L-115"}

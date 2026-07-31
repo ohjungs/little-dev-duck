@@ -4,16 +4,12 @@ import { useEffect, useState } from "react";
 import {
   daysSinceLastCommit,
   deriveDuckMood,
-  type ContributionSummary,
+  type ContributionsResponse,
   type DuckMood,
   type TodayTodoTally,
 } from "@ldd/core";
 import { onTodosChanged } from "@/lib/todoSignal";
 import { todayIso } from "@/lib/today";
-
-type ContributionsResponse =
-  | { linked: true; summary: ContributionSummary }
-  | { linked: false };
 
 // 오리 기분을 클라이언트에서 파생한다(Phase 6 T1, DB 없음). 투두는 TodoWidget이 쏘는
 // 신호로, 커밋 잔디는 기존 API로 얻어 deriveDuckMood에 넣는다.
