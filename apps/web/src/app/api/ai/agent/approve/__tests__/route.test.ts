@@ -14,6 +14,8 @@ const logAction = vi.fn();
 const getGoogleTokens = vi.fn();
 const getGithubTokens = vi.fn();
 const getGmailTokens = vi.fn();
+const allowRequest = vi.fn();
+const getUser = vi.fn();
 
 // 실제 executeApprovedCalls를 쓴다 — 안전 규칙이 그 안에 있으므로 목으로 대체하면
 // **검사하려던 성질이 사라진다.** 어댑터 카탈로그만 우리가 정한다.
@@ -21,7 +23,7 @@ vi.mock("@ldd/api", async () => {
   const actual = await vi.importActual<typeof import("@ldd/api")>("@ldd/api");
   return {
     ...actual,
-    allowRequest: () => true,
+    allowRequest: (...a: unknown[]) => allowRequest(...a),
     // 2026-07-30: 라우트가 기능 토글을 서버에서 확인하게 됐다. `...actual`의 진짜 getMyAccess는
     // profiles를 조회하는데 이 파일의 supabase mock에는 `.from`이 없다 — 명시적으로 덮어
     // "아무 기능도 꺼지지 않은 사용자"로 둔다(게이트 자체 검사는 apiFeatureGate.test.ts).
@@ -45,12 +47,14 @@ vi.mock("@ldd/api", async () => {
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
-    auth: { getUser: async () => ({ data: { user: { id: "u1" } } }) },
+    auth: { getUser: () => getUser() },
   }),
 }));
 
 beforeEach(() => {
   vi.resetModules();
+  getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+  allowRequest.mockReturnValue(true);
   getGoogleTokens.mockResolvedValue(null);
   getGithubTokens.mockResolvedValue(null);
   getGmailTokens.mockResolvedValue(null);
@@ -132,6 +136,29 @@ describe("승인 실행 — 실행해도 되는 것만 실행한다", () => {
       "deleteEverything",
       "createTodo",
     ]);
+  });
+});
+
+describe("승인 실행 — 인증·레이트리밋", () => {
+  it("getUser가 null을 반환하면 401이고 아무것도 실행하지 않는다", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: null } });
+    const { status, json } = await approve({
+      calls: [{ id: "c1", name: "createTodo", args: {} }],
+    });
+    expect(status).toBe(401);
+    expect(json.error).toBe("로그인이 필요합니다.");
+    expect(allowRequest).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("allowRequest가 false를 반환하면 429이고 아무것도 실행하지 않는다", async () => {
+    allowRequest.mockReturnValueOnce(false);
+    const { status, json } = await approve({
+      calls: [{ id: "c1", name: "createTodo", args: {} }],
+    });
+    expect(status).toBe(429);
+    expect(json.error).toBe("요청이 많습니다. 잠시 후 다시 시도해주세요.");
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 
