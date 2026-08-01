@@ -32,6 +32,10 @@ select throws_ok(
   $$ insert into storage.objects (bucket_id, name, owner)
      values ('message-attachments', 'deadroom/new.png', current_setting('tests.bucket_user')::uuid) $$,
   '42501',
+  -- 3인자 throws_ok는 (sql, errcode, errmsg)다. RLS 거부 메시지('new row violates row-level
+  -- security policy for table "objects"')는 Postgres 문자열이라 계약이 아니므로 검사하지 않고,
+  -- "42501로 막힌다"까지만 계약으로 본다.
+  null::text,
   'authenticated 사용자는 message-attachments에 insert할 수 없다(정책 0건)'
 );
 
