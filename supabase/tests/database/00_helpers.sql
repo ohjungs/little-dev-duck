@@ -18,6 +18,27 @@ create schema if not exists tests;
 grant usage on schema tests to authenticated, anon, service_role;
 
 -- ---------------------------------------------------------------------------
+-- public 스키마 테이블 권한 보정 (로컬 테스트 DB 전용)
+-- ---------------------------------------------------------------------------
+-- 2026-08-01 : 테스트 - 환경 - 로컬DB권한보정
+-- 이 저장소의 마이그레이션에는 grant 문이 하나도 없다(함수 grant만 있다). 운영 DB
+-- (iupprzfmlyfrdcctdupn)는 anon/authenticated/service_role이 public 테이블에 ALL을 갖고 있는데
+-- (2026-08-01 information_schema.role_table_grants로 확인), 그 권한은 마이그레이션이 아니라
+-- Supabase 플랫폼이 프로젝트 생성 시 걸어 두는 `alter default privileges`에서 온다.
+-- `supabase start`로 만드는 로컬 컨테이너에는 그게 적용되지 않아, RLS를 검증하기도 전에
+-- `permission denied for table todos`(42501)로 죽는다 — 실제 CI 로그의 50_ 파일 실패 원인이다.
+--
+-- grant와 RLS는 별개 계층이라(권한이 있어도 정책이 없으면 여전히 막힌다) 여기서 권한을 열어도
+-- 검증 대상인 RLS 계약은 그대로 남는다. 운영과 같은 출발선을 만들어 주는 것뿐이다.
+--
+-- [확인 필요] 마이그레이션이 grant를 갖고 있지 않다는 것은 "새 Supabase 프로젝트를 이
+-- 마이그레이션만으로 세우면 앱이 안 뜬다"는 뜻이기도 하다. 그건 이 테스트 스위트의 범위 밖이라
+-- 여기서는 보정만 하고, 마이그레이션에 grant를 명시할지는 별도 결정으로 남긴다.
+grant usage on schema public to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
 -- tests.create_user(email, role) -> uuid
 -- ---------------------------------------------------------------------------
 -- 가짜 사용자를 auth.users에 심고 uuid를 돌려준다.
@@ -42,8 +63,18 @@ declare
 begin
   insert into auth.users (id, email) values (v_id, p_email);
 
+  -- 2026-08-01 : 테스트 - 헬퍼 - 가드트리거우회
+  -- `profiles_guard_admin_columns`(20260730160000)가 BEFORE UPDATE로 role 변경을 막는다.
+  -- 이 함수는 SECURITY DEFINER지만 트리거는 실행 role과 무관하게 무조건 발화하고, 트리거 안의
+  -- `public.is_admin()`은 이 시점에 auth.uid()가 없어 false다 — 그래서 시드용 update가
+  -- "role/disabled_features는 관리자만 변경할 수 있어요."로 죽었다(10·20·30 파일 전체 실패 원인).
+  -- 가드 자체는 20_profiles_admin_guard.sql이 정면으로 검증하므로, 여기서는 시드를 위해서만
+  -- 잠시 끈다. create_bare_user가 on_auth_user_created에 쓰는 것과 같은 수법이고,
+  -- disable/enable은 트랜잭션 범위라 각 테스트 파일의 rollback과 함께 원복된다.
   if p_role is distinct from 'user' then
+    alter table public.profiles disable trigger profiles_guard_admin_columns;
     update public.profiles set role = p_role where id = v_id;
+    alter table public.profiles enable trigger profiles_guard_admin_columns;
   end if;
 
   return v_id;

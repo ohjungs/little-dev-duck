@@ -29,7 +29,9 @@ select throws_ok(
   $$ insert into public.profiles (id, email, display_name)
      values (current_setting('tests.bare_id')::uuid, 'rls_bare@example.com', 'bare') $$,
   '42501',
-  'new row violates row-level security policy for table "profiles"',
+  -- 메시지 문구는 Postgres가 만드는 문자열이라 판본에 딸린다 — 계약은 "42501로 막힌다"까지다
+  -- (반대로 20_의 P0001 메시지는 우리가 raise로 직접 쓴 문구라 그건 계약이다).
+  null::text,
   '남의 id로 프로필 insert는 RLS 위반으로 거부된다'
 );
 
