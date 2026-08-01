@@ -84,10 +84,19 @@ $$;
 -- ---------------------------------------------------------------------------
 -- tests.create_bare_user(email) -> uuid
 -- ---------------------------------------------------------------------------
--- `on_auth_user_created` 트리거를 잠시 끄고 auth.users 행만 만든다 — "가입은 됐지만 아직
--- profiles 행이 없는" 상태를 재현해야 하는 테스트(예: profiles insert RLS 자체를 검증하는
--- 케이스) 전용. 트리거를 끄고 켜는 동작은 테이블 소유자(이 함수를 만든 슈퍼유저) 권한이 필요해
--- SECURITY DEFINER로 감싼다.
+-- "가입은 됐지만 아직 profiles 행이 없는" 상태를 재현해야 하는 테스트(예: profiles insert RLS
+-- 자체를 검증하는 케이스) 전용.
+--
+-- 2026-08-01 : 테스트 - 헬퍼 - 트리거끄기포기
+-- 원래는 `alter table auth.users disable trigger on_auth_user_created`로 트리거를 껐는데,
+-- CI에서 `must be owner of table users`(42501)로 죽었다. auth.users의 소유자는
+-- supabase_auth_admin이고 pgTAP이 붙는 postgres 롤은 Supabase에서 진짜 슈퍼유저가 아니라
+-- SECURITY DEFINER로도 소유자 전용 DDL을 못 한다(public.profiles는 postgres 소유라 같은 수법이
+-- create_user에서는 통한다 — 스키마마다 소유자가 다르다).
+--
+-- 트리거를 막는 대신 **트리거가 만든 행을 지운다**. 결과 상태는 같고 소유권도 필요 없다.
+-- 이 함수는 postgres(=public.profiles 소유자) 권한으로 도는 SECURITY DEFINER라 profiles의
+-- RLS를 우회해 지울 수 있다.
 create or replace function tests.create_bare_user(p_email text)
 returns uuid
 language plpgsql
@@ -97,9 +106,8 @@ as $$
 declare
   v_id uuid := gen_random_uuid();
 begin
-  alter table auth.users disable trigger on_auth_user_created;
   insert into auth.users (id, email) values (v_id, p_email);
-  alter table auth.users enable trigger on_auth_user_created;
+  delete from public.profiles where id = v_id;
   return v_id;
 end;
 $$;
@@ -173,3 +181,23 @@ exception
     return false;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- TAP 플랜
+-- ---------------------------------------------------------------------------
+-- 2026-08-01 : 테스트 - pg_prove - 플랜없음 실패
+-- 이 파일은 검증이 아니라 설치용이지만, `supabase test db`(pg_prove)는 디렉터리의 모든 .sql을
+-- 테스트 파일로 읽는다. 플랜(`1..n`)을 내보내지 않으면
+-- "Parse errors: No plan found in TAP output"으로 이 파일 자체가 실패로 집계돼, 나머지 7개가
+-- 전부 통과해도 잡이 빨갛게 남는다. 설치가 실제로 끝났는지 확인하며 플랜을 채운다.
+--
+-- has_function 대신 to_regprocedure를 쓴다 — pgTAP 시그니처 오버로드에 기대지 않고 순수
+-- SQL로 판정하므로 이 파일이 다른 이유로 깨질 여지를 남기지 않는다.
+select plan(1);
+select ok(
+  to_regprocedure('tests.create_user(text, text)') is not null
+    and to_regprocedure('tests.create_bare_user(text)') is not null
+    and to_regprocedure('tests.authenticate_as(uuid)') is not null,
+  'tests 헬퍼가 설치됐다'
+);
+select * from finish();
