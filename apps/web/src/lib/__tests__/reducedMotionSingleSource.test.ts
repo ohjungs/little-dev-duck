@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { resolveFromWebRoot } from "./testRepoPaths";
 
 // 2026-07-29 : 접근성 - 모션 축소 판정 한 벌 (Phase 57 T1 X-006)
 // JS에서 prefers-reduced-motion을 직접 matchMedia로 읽는 자리가 흩어지면(마스코트·오피스·
@@ -20,7 +21,7 @@ function walk(dir: string, out: string[] = []): string[] {
 describe("모션 축소 판정 단일 출처", () => {
   it("apps/web에는 matchMedia로 prefers-reduced-motion을 직접 읽는 줄이 없다", () => {
     const offenders: string[] = [];
-    for (const file of walk(join(process.cwd(), "src"))) {
+    for (const file of walk(resolveFromWebRoot("src"))) {
       // 이 검사 파일 자신은 설명 주석에 두 문자열이 같이 있다 — 제외.
       if (file.includes("reducedMotionSingleSource")) continue;
       const lines = readFileSync(file, "utf8").split("\n");
@@ -35,7 +36,7 @@ describe("모션 축소 판정 단일 출처", () => {
 
   it("mascot이 판정 한 벌(훅 + 즉시 읽기)을 내보낸다", () => {
     const src = readFileSync(
-      join(process.cwd(), "../../packages/mascot/src/usePrefersReducedMotion.ts"),
+      resolveFromWebRoot("../../packages/mascot/src/usePrefersReducedMotion.ts"),
       "utf8",
     );
     expect(src).toContain("prefers-reduced-motion");

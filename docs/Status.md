@@ -168,10 +168,10 @@
 - [~] security: messages UPDATE RLS sender_type 불변조건 — 2026-07-30 마이그레이션·정적검사·테스트 완료, **실서버 적용은 사용자 승인 대기**(DDL). 항목명이 "오리 발화 사칭"이라 적혀 있었으나 **사칭은 불가능하다** — UPDATE의 WITH CHECK가 sender_user_id를 auth.uid()로 묶어 NULL로 못 바꾸므로 정상 모양의 agent 행을 만들 수 없다. 실제 결과는 core messageSchema refine을 위반하는 모순된 행이 남아 **그 방의 메시지 적재가 통째로 실패**하는 것(무결성·가용성). rooms.type에 direct·group이 있어 다른 멤버까지 방을 못 열게 된다. 원래 항목: — supabase/migrations/20260727030000_messenger_rooms.sql
 - [ ] ux: DbTableView/DbBoardView hover 버튼 focus-visible + 터치타겟 확대 (P16+P18 병합) — apps/web/src/components/db/DbTableView.tsx
 - [ ] ux: GithubContributionWidget grid/gridcell 접근성 속성 추가 — apps/web/src/components/GithubContributionWidget.tsx
-- [ ] quality: 전역 ErrorBoundary에 componentDidCatch 추가 (렌더 크래시 무기록 방지) — apps/web/src/components/ErrorBoundary.tsx
+- [x] quality: 전역 ErrorBoundary에 componentDidCatch 추가 (렌더 크래시 무기록 방지) — 2026-08-01 사이클 10에서 구현했으나 TEST20이 결함을 잡았다: `error.message` 직접 접근이라 자식이 `throw null`/`throw undefined`를 하면 componentDidCatch 자체가 TypeError를 내고 바운더리를 우회했다(막으려던 바로 그 상황에서 실패). 사이클 11에서 `toErrorMessage()` + `instanceof Error` 가드로 수정하고 ErrorBoundary.test.tsx에 non-Error throw 5케이스를 추가해 잠갔다. 남은 공백: `Object.create(null)` throw 시 `String(error)`가 여전히 TypeError — 후속 항목으로 대장 적재 — apps/web/src/components/ErrorBoundary.tsx
 - [ ] quality: 401/429 에러 응답 리터럴 중복·문구 불일치 공용 함수로 통합 — apps/web/src/lib/apiHelpers.ts
 - [ ] test: packages/api 20개 fakeSupabase 목 중복을 공유 테스트 팩토리로 통합 — packages/api/src/todos.test.ts
-- [ ] test: coverage 스크립트에 apps/web 포함 — vitest.coverage.config.ts
+- [ ] test: coverage 스크립트에 apps/web 포함 — 2026-08-01 사이클 11 구현했으나 **게이트 미통과(회귀 렌즈 하드 실패)로 미완**. 구현 자체는 동작한다: 237파일·2625테스트, 커버리지 statements 44.12%. 하네스는 `pnpm coverage` 5회 반복 중 2회 v8 프로바이더 ENOENT 크래시·1회 apps/web 94파일 통째 누락을 관측했다(변경 전 베이스라인은 3/3 안정). 다만 그 측정은 에이전트 44개가 동시에 도는 고부하 상태였고, 유휴 상태에서 커맨드 층이 4회 반복 실행한 결과는 매번 동일(237/2625, exit 0)이었다 — 부하 의존 플레이키로 추정. CI 게이트로 승격하기 전에 워커 수 고정 등 안정화 필요 — vitest.coverage.config.ts
 - [ ] test: coverage config가 렌더 테스트를 수집하려면 include `.tsx` 확장 + jsdom 환경 결정이 동시에 필요 (`include: ["packages/*/src/**/*.test.ts"]`가 `.test.tsx`에 미매치 + environment 미지정으로 기본 node라 glob만 넓히면 `document is not defined`로 깨진다) — vitest.coverage.config.ts
 - [ ] test: CI에 E2E_AUTH_STATE_B64 시크릿 등록 또는 스킵 현황 가시화 — apps/web/e2e/README.md
 - [ ] test: geminiGenerate 응답 파싱 단위 테스트 추가 — packages/api/src/gemini.ts

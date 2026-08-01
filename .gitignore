@@ -18,6 +18,9 @@ supabase/.temp
 # 테스트 커버리지 리포트
 coverage/
 
+# Playwright json 리포터 산출물 — CI 요약 스텝이 읽는 로컬/CI 임시 파일
+apps/web/test-results/
+
 # /loop-eng 단일 인스턴스 락 — 머신·세션 지역 상태라 공유 대상이 아니다
 .claude/loop-eng.lock
 

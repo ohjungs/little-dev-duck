@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { resolveFromWebRoot } from "./testRepoPaths";
 
 // 2026-07-30 : 접근성 - 오리 응답 대기 알림 - 단일 출처 (감사 발견)
 //
@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 // 문구를 두 곳에 복사하면 한쪽만 고쳐진다(이 저장소 L-21의 실패 모양). 그래서 문구는
 // `DUCK_PENDING_LABEL` 한 벌로 두고, 두 화면이 그것을 쓰는지 정적으로 잠근다.
 
-const read = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
+const read = (f: string) => readFileSync(resolveFromWebRoot(f), "utf8");
 
 // 오리 응답 대기를 표시하는 화면 전부. 새 화면이 생기면 여기 추가한다.
 const DUCK_SURFACES = [

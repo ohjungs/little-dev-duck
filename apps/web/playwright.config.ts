@@ -49,7 +49,10 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: [["list"]],
+  // 2026-08-01 : e2e - 리포터 - CI요약 (json 병기)
+  // list는 콘솔 가독성 때문에 유지. json은 CI가 스킵/통과/실패 건수를 기계적으로 세기 위한
+  // 파싱 대상 — 사람이 로그를 열어 직접 세지 않아도 되게 한다(HD-003: 결정적 집계는 코드로).
+  reporter: [["list"], ["json", { outputFile: "test-results/results.json" }]],
   use: {
     baseURL: BASE_URL,
     trace: "on-first-retry",

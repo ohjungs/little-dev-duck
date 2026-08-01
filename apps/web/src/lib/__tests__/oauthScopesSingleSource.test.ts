@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { OAUTH_SCOPES } from "../oauthScopes";
+import { resolveFromWebRoot } from "./testRepoPaths";
 
 // 2026-07-30 : 보안 - OAuth scope - 단일 출처 (감사 후속)
 //
@@ -13,7 +14,7 @@ import { OAUTH_SCOPES } from "../oauthScopes";
 // 나중에 "이 토큰으로 무엇을 할 수 있나"를 그 값으로 판단하면 틀린 결론에 이른다.
 // 이 저장소가 safeHref(L-21)에서 겪은 "복사된 순간 구멍" 패턴과 같은 부류다.
 
-const SRC = join(process.cwd(), "src");
+const SRC = resolveFromWebRoot("src");
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -50,7 +51,7 @@ describe("OAuth scope 단일 출처", () => {
       "src/app/auth/callback/route.ts",
     ];
     for (const f of users) {
-      const src = readFileSync(join(process.cwd(), f), "utf8");
+      const src = readFileSync(resolveFromWebRoot(f), "utf8");
       expect(src, `${f}가 공용 OAUTH_SCOPES를 쓰지 않는다`).toContain("OAUTH_SCOPES");
     }
   });

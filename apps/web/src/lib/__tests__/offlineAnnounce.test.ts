@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { stripComments } from "../stripComments";
+import { resolveFromWebRoot } from "./testRepoPaths";
 
 // 2026-07-30 : 접근성 - 오프라인 배너 - 라이브 리전
 //
@@ -16,7 +16,7 @@ import { stripComments } from "../stripComments";
 
 const SRC = stripComments(
   readFileSync(
-    join(process.cwd(), "src", "components", "OfflineIndicator.tsx"),
+    resolveFromWebRoot("src/components/OfflineIndicator.tsx"),
     "utf8",
   ),
 );

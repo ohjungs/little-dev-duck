@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isComposingEnter, shouldSendOnKey } from "../composition";
+import { resolveFromWebRoot } from "./testRepoPaths";
 
 // 2026-07-29 : 입력 - IME 조합 중 전송 방지 (Phase 54 T1)
 
@@ -27,7 +27,7 @@ describe("IME 가드 단일 출처", () => {
 
   it("메시지·오리 입력이 모두 같은 판정을 쓴다", () => {
     for (const f of files) {
-      const src = readFileSync(join(process.cwd(), f), "utf8");
+      const src = readFileSync(resolveFromWebRoot(f), "utf8");
       expect(src).toContain("isComposingEnter");
       // 각자 keyCode 229를 다시 적으면 두 벌이다.
       expect(src).not.toMatch(/keyCode\s*===\s*229/);

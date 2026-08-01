@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { resolveFromWebRoot } from "./testRepoPaths";
 
 // 2026-07-27 : 로그인 - 시도 상한 - 인벤토리 (Phase 41 T2)
 // CLAUDE.md 3-5절: 공통 기능 재구현은 **최고 심각도 인벤토리 위반**이다.
@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 // 계획이 "공용 allowRequest를 쓴다"고 못박았으므로, 그게 지켜지는지 코드로 검사한다.
 // 사람 눈으로만 보면 다음 사람이 "간단하니까"라며 Map을 하나 더 만든다.
 const source = readFileSync(
-  join(process.cwd(), "src/app/login/LoginForm.tsx"),
+  resolveFromWebRoot("src/app/login/LoginForm.tsx"),
   "utf8",
 );
 

@@ -99,6 +99,15 @@ jobs:
         # (실패 아님, 의도된 동작). auth-redirect.spec.ts 등 비인증 스펙만 실제로 실행된다.
         # 인증 필요 스펙까지 CI에서 돌리려면 apps/web/e2e/README.md "CI에서 실행" 절 참고.
 
+      # 2026-08-01 : e2e - 리포터 - CI요약
+      # 스킵 건수를 사람이 로그를 열어 세지 않아도 되게, GITHUB_STEP_SUMMARY에 표로 남긴다.
+      # if: always() — e2e 스텝이 실패해도(테스트 실패든 빌드 실패든) 요약이 찍히게 한다.
+      # 실패 판정은 위 `pnpm --filter web e2e` 스텝의 종료코드가 이미 담당하므로 이 스텝은
+      # 항상 0으로 끝난다(정보 제공용, 게이트 아님).
+      - name: E2E 결과 요약 (GITHUB_STEP_SUMMARY)
+        if: always()
+        run: node apps/web/e2e/report-summary.mjs
+
   db-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
