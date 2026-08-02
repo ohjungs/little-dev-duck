@@ -30,6 +30,9 @@ export function parseRole(value: unknown): Role {
 // 새 key를 추가한다. label/description은 관리자 화면에 그대로 나온다.
 export const FEATURES = [
   { key: "pages", label: "페이지", description: "노트·문서 작성과 데이터베이스" },
+  // 2026-08-02 : 스프레드시트 (SPEC-2026-08-02-spreadsheet-a1 T1)
+  // pages와 별개 키다. 시트를 끄고 싶은데 문서 전체가 함께 꺼지면 의미가 없다.
+  { key: "sheet", label: "스프레드시트", description: "셀 주소와 수식이 있는 표" },
   { key: "insights", label: "통계", description: "활동 집계와 습관 히트맵" },
   { key: "news", label: "뉴스", description: "RSS 구독과 요약" },
   { key: "office", label: "오피스", description: "픽셀 오피스 화면" },
