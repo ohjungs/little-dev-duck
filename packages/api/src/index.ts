@@ -18,6 +18,16 @@ export {
   type UpdateMemoInput,
 } from "./memos";
 
+// 2026-08-02 : 스프레드시트 저장 계층 (SPEC-2026-08-02-spreadsheet-a1 T5)
+export {
+  listSheets,
+  createSheet,
+  loadSheetCells,
+  saveCells,
+  CELL_PAGE_SIZE,
+  type CreateSheetInput,
+} from "./sheets";
+
 export { fetchGithubContributions } from "./github";
 
 export {

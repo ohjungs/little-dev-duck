@@ -21,8 +21,13 @@ import { stripComments } from "./stripComments";
 
 // errors.push — 여러 건을 한 번에 처리하는 곳(백업 가져오기)에서 쓴다. 한 건이 실패해도 멈추지
 // 않고 계속 넣되 사유를 모아 두었다가 끝나고 함께 보여주는 방식이라, 즉시 setError를 부를 수 없다.
+// 2026-08-02 : 알림 수단을 이름 모양으로 인정한다(스프레드시트 T5에서 setSaveError·setPhase("error")가
+// 실제로 알리는데도 걸렸다). setError·setActionError·setStandupError를 하나씩 적던 것을
+// `set...Error` 한 줄로 합치고, `setState("error")`도 setter 이름을 가리지 않게 넓힌다.
+// 이 완화가 늘리는 가짜 통과는 "이름이 알리는 모양인데 실제로는 안 알리는" 경우뿐이고,
+// 그건 애초에 이 텍스트 검사가 잡을 수 있는 종류가 아니다(파일 머리 "한계" 참조).
 const INFORMS =
-  /setError|setActionError|setState\(\s*["']error["']\s*\)|showError|setNote|flashMsg|setVersionMsg|setStandupError|errors\.push|console\.(error|warn)|\bthrow\b|\breturn\b/;
+  /set[A-Za-z]*Error|set[A-Za-z]*\(\s*["']error["']\s*\)|showError|setNote|flashMsg|setVersionMsg|errors\.push|console\.(error|warn)|\bthrow\b|\breturn\b/;
 
 const HAS_COMMENT = /\/\/|\/\*/;
 

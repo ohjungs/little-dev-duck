@@ -51,6 +51,7 @@ import { Button } from "@/components/ui/button";
 import { PageExportDialog } from "@/components/PageExportDialog";
 import { VersionHistory } from "@/components/VersionHistory";
 import { DatabaseView } from "@/components/DatabaseView";
+import { SheetPanel } from "@/components/SheetPanel";
 import { AiWriteAssistant } from "@/components/AiWriteAssistant";
 import { PresentationMode } from "@/components/PresentationMode";
 import {
@@ -880,6 +881,10 @@ export function PageEditor({
           onSchemaChange={handleSchemaChange}
         />
       )}
+      {/* 2026-08-02 : 스프레드시트 - 마운트 (SPEC-2026-08-02-spreadsheet-a1 T5)
+          데이터베이스 뷰와 **나란히** 둔다. 둘은 표처럼 보일 뿐 다른 자료구조라(스펙 1절)
+          한쪽이 다른 쪽을 대체하지 않는다. 시트가 없는 페이지에는 추가 버튼만 보인다. */}
+      <SheetPanel pageId={page.id} />
       {celebration && (
         <div
           role="status"

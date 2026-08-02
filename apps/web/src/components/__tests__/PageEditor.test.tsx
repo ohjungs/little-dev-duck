@@ -35,6 +35,22 @@ vi.mock("@ldd/api", () => ({
   recordEvent: vi.fn(),
   listPages: vi.fn(),
   searchPages: vi.fn(),
+  // 2026-08-02 : PageEditor가 SheetPanel을 마운트한다(SPEC-2026-08-02-spreadsheet-a1 T5).
+  // 목에 없으면 시트가 "불러오지 못했어요" 상태로 그려져 이 파일의 렌더가 실제와 달라진다.
+  // 시트 자체의 계약은 SheetPanel.test.tsx가 잠근다 — 여기서는 있는 그대로만 채운다.
+  getMyAccess: vi.fn(async () => ({
+    id: "u1",
+    email: "a@example.com",
+    displayName: "오리",
+    avatarUrl: null,
+    role: "user",
+    disabledFeatures: [],
+    dashboardLayout: { order: [], hidden: [] },
+  })),
+  listSheets: vi.fn(async () => []),
+  createSheet: vi.fn(),
+  loadSheetCells: vi.fn(async () => []),
+  saveCells: vi.fn(),
 }));
 vi.mock("@ldd/ai", () => ({ reindexSource: vi.fn() }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
