@@ -11,6 +11,8 @@ drop function if exists public.sheet_cells_guard_owner();
 drop function if exists public.sheets_guard_owner();
 
 -- 정책은 테이블과 함께 사라지지만, 테이블만 남기고 되돌리는 부분 실패에 대비해 명시한다.
+-- *_select_public 두 개는 2026-08-02에 죽은 정책으로 판정돼 제거됐다(마이그레이션 주석 참조).
+-- 이미 적용된 DB에는 남아 있을 수 있어 if exists로 함께 지운다.
 drop policy if exists "sheet_cells_select_public" on public.sheet_cells;
 drop policy if exists "sheet_cells_delete_own" on public.sheet_cells;
 drop policy if exists "sheet_cells_update_own" on public.sheet_cells;

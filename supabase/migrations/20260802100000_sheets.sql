@@ -71,27 +71,20 @@ create policy "sheet_cells_update_own" on public.sheet_cells
 create policy "sheet_cells_delete_own" on public.sheet_cells
   for delete using (user_id = (select auth.uid()));
 
--- 공개 공유된 페이지의 시트는 anon이 읽는다. pages의 공개 공유(is_public)와 같은 계약이고,
--- **읽기만** 연다. 공개가 아니면 위 정책만 남으므로 로그인한 소유자에게만 보인다.
-create policy "sheets_select_public" on public.sheets
-  for select using (
-    exists (
-      select 1 from public.pages p
-      where p.id = sheets.page_id and p.is_public = true and p.is_trashed = false
-    )
-  );
-
-create policy "sheet_cells_select_public" on public.sheet_cells
-  for select using (
-    exists (
-      select 1
-      from public.sheets s
-      join public.pages p on p.id = s.page_id
-      where s.id = sheet_cells.sheet_id
-        and p.is_public = true
-        and p.is_trashed = false
-    )
-  );
+-- ── 공개 공유는 여기서 열지 않는다 (2026-08-02 CI가 잡은 것) ──────────────────
+-- 처음엔 "공개된 페이지의 시트는 anon도 읽는다"는 정책 2개를 넣었다. exists(select 1 from
+-- public.pages where is_public)로 판정하는 형태였다. **그 정책은 절대 만족될 수 없다** —
+-- pages에는 공개용 select 정책이 없어서(pages_select_own 하나뿐) 정책 안의 서브쿼리 자체가
+-- anon에게 0행을 준다. 즉 만들어 두면 "공개 공유가 배선됐다"고 오해하게 만드는 죽은 정책이다.
+--
+-- 내 프로덕션 검증은 이걸 못 잡았다. service_role로 확인해서 RLS를 통째로 우회했기 때문이다.
+-- 실제 role로 도는 pgTAP이 CI에서 잡았다 — 권한 검증은 반드시 그 권한으로 해야 한다.
+--
+-- 이 저장소의 공개 공유는 RLS가 아니라 `get_public_page()` SECURITY DEFINER RPC로 한다
+-- (어드바이저가 "anon이 실행 가능"이라고 표시하는 그 함수 — 의도된 설계다).
+-- 시트 공개 보기를 만들 때도 같은 길을 따른다: 슬러그를 받아 시트와 셀을 함께 돌려주는
+-- RPC를 하나 추가한다. 화면이 생기는 시점(T5 이후)에 만든다 — 지금 열어 두면 쓰는 곳도 없이
+-- 공개 표면만 넓어진다.
 
 -- ── 소유자 일치 강제 ────────────────────────────────────────────────────────
 -- user_id를 비정규화한 대가다. RLS는 "내 user_id인가"만 보므로, 남의 페이지에 내 user_id로
@@ -104,12 +97,14 @@ language plpgsql set search_path = '' as $$
 declare
   page_owner uuid;
 begin
+  -- 이 트리거는 SECURITY INVOKER다. 그래서 이 select에도 pages의 RLS가 걸리고,
+  -- **남의 페이지는 아예 0행으로 보인다** — "없는 페이지"와 "남의 페이지"가 구분되지 않는다.
+  -- 그 구분을 되찾으려면 SECURITY DEFINER로 올려야 하는데, 그건 노출 표면을 넓히는 대가다.
+  -- 여기서는 **구분하지 않는 쪽이 오히려 맞다**: 남의 페이지 id를 넣어 본 사람에게 그 페이지가
+  -- 존재하는지 알려 주지 않는다(존재 여부 노출 방지). 두 경우를 한 문구로 합친다.
   select user_id into page_owner from public.pages where id = new.page_id;
-  if page_owner is null then
-    raise exception '없는 페이지입니다.';
-  end if;
-  if page_owner <> new.user_id then
-    raise exception '시트의 소유자가 페이지 소유자와 다릅니다.';
+  if page_owner is null or page_owner <> new.user_id then
+    raise exception '이 페이지에 시트를 만들 수 없습니다.';
   end if;
   return new;
 end;
@@ -124,12 +119,10 @@ language plpgsql set search_path = '' as $$
 declare
   sheet_owner uuid;
 begin
+  -- sheets_guard_owner와 같은 이유로 두 경우를 합친다(위 주석 참조).
   select user_id into sheet_owner from public.sheets where id = new.sheet_id;
-  if sheet_owner is null then
-    raise exception '없는 시트입니다.';
-  end if;
-  if sheet_owner <> new.user_id then
-    raise exception '셀의 소유자가 시트 소유자와 다릅니다.';
+  if sheet_owner is null or sheet_owner <> new.user_id then
+    raise exception '이 시트에 셀을 쓸 수 없습니다.';
   end if;
   return new;
 end;

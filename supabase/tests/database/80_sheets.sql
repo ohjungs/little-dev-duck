@@ -6,12 +6,12 @@
 --   3. cascade — 페이지를 지우면 시트와 셀이 함께 사라진다
 --      (이게 delete_all_my_data를 손대지 않은 근거다. 마이그레이션 주석 참조 —
 --       "어차피 되겠지"를 검사로 바꾸는 것이 이 절의 목적이다)
---   4. 공개 공유된 페이지의 시트는 anon이 읽고, 공개가 아니면 못 읽는다
+--   4. anon은 시트를 못 읽는다 — 페이지를 공개로 바꿔도 그렇다(현재 설계. 아래 4절 참조)
 --
 -- 사용자 id는 10_profiles_rls.sql과 같은 관례로 set_config에 담는다(psql 메타명령을 쓰지 않는다 —
 -- pg_prove가 파일을 그대로 흘려보내므로 SQL만으로 끝나야 한다).
 begin;
-select plan(16);
+select plan(17);
 
 select set_config('tests.sheet_owner', tests.create_user('sheet_owner@example.com')::text, true);
 select set_config('tests.sheet_other', tests.create_user('sheet_other@example.com')::text, true);
@@ -101,7 +101,7 @@ select throws_ok(
   $$ insert into public.sheets (page_id, user_id, name, position)
      values (current_setting('tests.page_id')::uuid,
              current_setting('tests.sheet_other')::uuid, '침입', 0) $$,
-  'P0001', '시트의 소유자가 페이지 소유자와 다릅니다.',
+  'P0001', '이 페이지에 시트를 만들 수 없습니다.',
   '남의 페이지에 내 소유로 시트를 만들 수 없다(트리거)');
 
 -- ---------------------------------------------------------------------------
@@ -115,11 +115,15 @@ select tests.authenticate_as(current_setting('tests.sheet_owner')::uuid);
 update public.pages set is_public = true
   where id = current_setting('tests.page_id')::uuid;
 
+-- **공개로 바꿔도 anon은 읽지 못한다.** 이건 결함이 아니라 현재 설계다 — 이 저장소의 공개
+-- 공유는 RLS가 아니라 get_public_page() SECURITY DEFINER RPC로 한다(pages에는 공개용 select
+-- 정책이 아예 없다). 처음엔 여기에 공개 정책을 넣었다가 이 검사가 죽은 정책임을 잡아냈다.
+-- 시트 공개 보기는 화면이 생기는 시점에 같은 RPC 방식으로 만든다. 그때 이 두 줄이 뒤집힌다.
 select tests.authenticate_as_anon();
-select is((select count(*)::int from public.sheet_cells), 3,
-  '공개된 페이지의 셀은 anon이 읽는다');
-select is((select count(*)::int from public.sheets), 1,
-  '공개된 페이지의 시트 목록도 anon이 읽는다');
+select is((select count(*)::int from public.sheet_cells), 0,
+  '공개 페이지여도 anon은 셀을 못 읽는다 — 시트 공개 보기는 아직 배선되지 않았다');
+select is((select count(*)::int from public.sheets), 0,
+  '공개 페이지여도 anon은 시트 목록을 못 읽는다 — RPC 경로로 후속');
 
 -- ---------------------------------------------------------------------------
 -- 5. cascade — delete_all_my_data를 손대지 않은 근거
