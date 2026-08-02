@@ -114,13 +114,15 @@ export function SheetPanel({ pageId }: { pageId: string }) {
     };
   }, []);
 
-  function handleCommit(cell: Cell): void {
+  function handleCommit(next: Cell[]): void {
+    if (next.length === 0) return;
     setCells((prev) => {
-      const rest = prev.filter((c) => !(c.r === cell.r && c.c === cell.c));
-      const empty = cell.v === null && cell.f === null && cell.s === null;
-      return empty ? rest : [...rest, cell];
+      const touched = new Set(next.map((c) => cellKey(c.r, c.c)));
+      const rest = prev.filter((c) => !touched.has(cellKey(c.r, c.c)));
+      const kept = next.filter((c) => !(c.v === null && c.f === null && c.s === null));
+      return [...rest, ...kept];
     });
-    pending.current.set(cellKey(cell.r, cell.c), cell);
+    for (const cell of next) pending.current.set(cellKey(cell.r, cell.c), cell);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       timer.current = null;
@@ -183,7 +185,7 @@ export function SheetPanel({ pageId }: { pageId: string }) {
           {saveError}
         </p>
       )}
-      <SheetGrid sheet={sheet} cells={cells} onCellCommit={handleCommit} />
+      <SheetGrid sheet={sheet} cells={cells} onCellsCommit={handleCommit} />
     </div>
   );
 }

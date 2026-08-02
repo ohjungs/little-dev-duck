@@ -92,6 +92,84 @@ test.describe("스프레드시트 — 격자·수식·키보드", () => {
     await expect(cellAt(page, 0, 1)).toHaveText("7");
   });
 
+  test("E2: 복사한 수식을 옆 칸에 붙이면 상대참조가 따라간다", async ({ page }) => {
+    await createSheetPage(page, `e2e-sheet-ref-${Date.now()}`);
+
+    await focusCell(page, 0, 0);
+    await page.keyboard.type("10");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("20");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("=SUM(A1:A2)");
+    await page.keyboard.press("Enter");
+    await expect(cellAt(page, 2, 0)).toHaveText("30");
+
+    // A3 복사 → B3 붙여넣기. 실제 클립보드를 거친다(권한 없이 되는 경로여야 한다).
+    await focusCell(page, 2, 0);
+    await page.keyboard.press("Control+c");
+    await focusCell(page, 2, 1);
+    const saved = waitForCellSave(page);
+    await page.keyboard.press("Control+v");
+
+    await expect(page.getByLabel("수식 입력줄")).toHaveValue("=SUM(B1:B2)");
+    await expect(cellAt(page, 2, 1)).toHaveText("0"); // B1·B2가 비어 있으므로 0
+    await saved;
+  });
+
+  test("E4: 엑셀에서 복사한 TSV(줄바꿈 포함 셀)를 붙여넣으면 그 모양대로 채워진다", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await createSheetPage(page, `e2e-sheet-tsv-${Date.now()}`);
+
+    // 엑셀이 싣는 것과 같은 모양: 줄바꿈이 든 셀은 따옴표로 감싸여 온다.
+    await page.evaluate(() =>
+      navigator.clipboard.writeText('사과\t100\n"두\n줄"\t200'),
+    );
+
+    await focusCell(page, 0, 0);
+    const saved = waitForCellSave(page);
+    await page.keyboard.press("Control+v");
+
+    await expect(cellAt(page, 0, 0)).toHaveText("사과");
+    await expect(cellAt(page, 0, 1)).toHaveText("100");
+    await expect(cellAt(page, 1, 1)).toHaveText("200");
+    await saved;
+  });
+
+  test("채우기 핸들을 끌면 연속 데이터가 채워지고 Ctrl+Z로 되돌아간다", async ({ page }) => {
+    await createSheetPage(page, `e2e-sheet-fill-${Date.now()}`);
+
+    await focusCell(page, 0, 0);
+    await page.keyboard.type("1");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("2");
+    await page.keyboard.press("Enter");
+
+    // A1:A2를 잡고 핸들을 A4까지 끈다.
+    await focusCell(page, 0, 0);
+    await page.keyboard.press("Shift+ArrowDown");
+    const handle = page.getByLabel("채우기 핸들");
+    const box = (await handle.boundingBox())!;
+    const target = (await cellAt(page, 3, 0).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, {
+      steps: 5,
+    });
+    const saved = waitForCellSave(page);
+    await page.mouse.up();
+
+    await expect(cellAt(page, 2, 0)).toHaveText("3");
+    await expect(cellAt(page, 3, 0)).toHaveText("4");
+    await saved;
+
+    await page.keyboard.press("Control+z");
+    await expect(cellAt(page, 2, 0)).toHaveText("");
+    await expect(cellAt(page, 3, 0)).toHaveText("");
+  });
+
   test("E6: 마우스 없이 이름 상자·방향키·F2·Esc로 이동하고 편집한다", async ({ page }) => {
     await createSheetPage(page, `e2e-sheet-kbd-${Date.now()}`);
 

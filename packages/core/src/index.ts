@@ -326,6 +326,10 @@ export {
   type Graph,
   type RecalcResult,
 } from "./domain/recalc";
+// 2026-08-02 : 스프레드시트 복사·붙여넣기·채우기 (SPEC T6)
+export { shiftFormulaRefs } from "./domain/sheet-shift";
+export { parseDelimited, toDelimited } from "./domain/sheet-clipboard";
+export { fillValues } from "./domain/sheet-fill";
 // 2026-08-02 : 스프레드시트 함수 1차 (SPEC T4)
 export {
   createFormulaFunctions,
