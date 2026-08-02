@@ -81,7 +81,10 @@ function roundHalfAway(n: number, digits: number): number {
 
 // ── 조건 판정(SUMIF·COUNTIF) ────────────────────────────────────────────────
 // 엑셀의 조건은 값 하나이거나 ">10" 같은 문자열이다. 후자를 파싱해야 한다.
-const CRITERIA_RE = /^(<=|>=|<>|<|>|=)?(.*)$/s;
+// [\s\S]로 쓰는 이유: `.`+`s` 플래그는 es2018 이상에서만 되는데, apps/web의 빌드 타깃이
+// 그보다 낮아 core 소스를 다시 타입체크할 때 깨진다(2026-08-02 CI가 잡음).
+// 줄바꿈이 든 조건 문자열도 그대로 읽어야 하므로 `.`만 쓰는 것으로는 부족하다.
+const CRITERIA_RE = /^(<=|>=|<>|<|>|=)?([\s\S]*)$/;
 
 function matchesCriteria(value: EvalValue, criteria: EvalValue): boolean {
   const raw = criteria === null ? "" : String(criteria);
