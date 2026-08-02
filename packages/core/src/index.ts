@@ -326,6 +326,13 @@ export {
   type Graph,
   type RecalcResult,
 } from "./domain/recalc";
+// 2026-08-02 : 스프레드시트 함수 1차 (SPEC T4)
+export {
+  createFormulaFunctions,
+  formulaFunctionNames,
+  formatValue as formatCellByCode,
+  type FormulaFnOptions,
+} from "./domain/formula-fns";
 export {
   AGENT_MAX_ITERATIONS,
   toolKindSchema,
