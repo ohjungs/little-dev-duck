@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { resolveSiteUrl } from "@ldd/core";
 import { Analytics } from "@vercel/analytics/next";
+// 2026-08-01 : 계측 - Speed Insights - 사용자 결정 C-8
+// 서버는 이 스크립트를 이미 서빙하고 있었는데 앱이 쓰지 않아 실사용자 성능(Core Web Vitals)이
+// 한 건도 안 걷혔다. `<Analytics />`(방문자 수)와 다른 계측이라 둘 다 필요하다.
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import "./globals.css";
 
@@ -71,6 +75,7 @@ export default function RootLayout({
         <OfflineIndicator />
         {children}
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
