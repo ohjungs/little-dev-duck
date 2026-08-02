@@ -96,7 +96,10 @@ export default async function globalTeardown(): Promise<void> {
   });
 
   let total = 0;
-  for (const table of ["todos", "memos"] as const) {
+  // 2026-08-02 : e2e - 데이터정리 - pages 추가 (pages-workspace.spec.ts)
+  // 계약 정찰 리스크 2, 옵션 (a) 채택: pages도 e2e- 접두사 행만 지운다. RLS로 본인 데이터만
+  // 대상이라 todos/memos와 같은 안전선이다.
+  for (const table of ["todos", "memos", "pages"] as const) {
     const { data, error } = await supabase
       .from(table)
       .delete()

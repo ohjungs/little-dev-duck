@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   createPage,
+  getPage,
   listPages,
   listTrashedPages,
   softDeletePage,
@@ -230,6 +231,30 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
     sync();
     return subscribeFavorites(sync);
   }, []);
+
+  // 2026-08-02 : 페이지 - 본문유실 - full fetch 보강
+  // listPages는 content 컬럼을 뺀 얕은 목록이다(트리 전송량 절약, listPages 주석 참고).
+  // 선택된 페이지의 content가 아직 없으면(=목록에서만 온 얕은 레코드) getPage로 본문을 채운다.
+  // 이미 채워진 페이지(생성 직후·복제 직후·한 번 열어 본 뒤 로컬에 남은 상태)는 다시 받지 않는다 —
+  // content가 null(얕은 레코드)일 때만 조회하므로 편집 중 재실행돼도 즉시 bail한다.
+  useEffect(() => {
+    if (!pageId) return;
+    const target = pages.find((p) => p.id === pageId);
+    if (!target || target.content != null) return;
+    let cancelled = false;
+    getPage(supabase, pageId).then(
+      (full) => {
+        if (cancelled || !full) return;
+        setPages((prev) => prev.map((p) => (p.id === pageId ? full : p)));
+      },
+      () => {
+        // 실패해도 조용히 둔다 — 얕은 레코드로라도 화면은 뜨고, 재저장 시 본문을 다시 채울 기회가 있다.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [pageId, pages, supabase]);
 
   const filteredPages = useMemo(
     () =>
@@ -631,12 +656,25 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
 
       <section className="min-w-0 flex-1">
         {current ? (
-          <PageEditor
-            key={current.id}
-            page={current}
-            breadcrumb={breadcrumb}
-            onSaved={(patch) => handleSaved(current.id, patch)}
-          />
+          // content가 아직 없는(=listPages의 얕은 레코드) 상태에서 그대로 마운트하면 BlockNote가
+          // initialContent=null로 굳어버려(위 hydrate effect가 나중에 채워도 재마운트 전까진 반영 안 됨)
+          // 본문이 빈 문서로 보인다. getPage 응답이 pages에 병합될 때까지는 렌더를 미룬다.
+          current.content != null ? (
+            <PageEditor
+              key={current.id}
+              page={current}
+              breadcrumb={breadcrumb}
+              onSaved={(patch) => handleSaved(current.id, patch)}
+            />
+          ) : (
+            <div
+              role="status"
+              aria-label="페이지를 불러오는 중"
+              className="flex min-h-screen items-center justify-center"
+            >
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            </div>
+          )
         ) : (
           <div className="flex h-full min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
             <FileText className="size-10 text-muted-foreground/40" />

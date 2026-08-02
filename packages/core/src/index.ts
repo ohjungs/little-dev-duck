@@ -282,6 +282,50 @@ export {
   type Sheet,
   type CellInput,
 } from "./domain/sheet";
+// 2026-08-02 : 스프레드시트 수식 파서 (SPEC T2)
+export {
+  ERROR_VALUES,
+  BINARY_OPS,
+  isErrorValue,
+  tokenize,
+  parseFormula,
+  formatAst,
+  formatFormula,
+  collectRefs,
+  type ErrorValue,
+  type Token,
+  type TokenType,
+  type Node as FormulaNode,
+  type BinaryOp,
+  type ParseResult,
+  type FormulaRefs,
+} from "./domain/formula-parse";
+// 2026-08-02 : 스프레드시트 평가기·재계산 (SPEC T3)
+export {
+  evaluate,
+  toNumber as cellToNumber,
+  toText as cellToText,
+  toBoolean as cellToBoolean,
+  toCellValue,
+  type EvalValue,
+  type EvalResult,
+  type EvalContext,
+  type FunctionDef,
+  type FunctionRegistry,
+} from "./domain/formula-eval";
+export {
+  nodeKey,
+  buildGraph,
+  directDependents,
+  recalc,
+  recalcAll,
+  type NodeKey,
+  type CellData,
+  type SheetCells,
+  type Workbook,
+  type Graph,
+  type RecalcResult,
+} from "./domain/recalc";
 export {
   AGENT_MAX_ITERATIONS,
   toolKindSchema,
