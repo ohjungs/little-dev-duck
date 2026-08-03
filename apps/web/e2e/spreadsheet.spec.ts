@@ -340,6 +340,35 @@ test.describe("스프레드시트 — 격자·수식·키보드", () => {
     await expect(cellAt(page, 1, 1)).toHaveText("6000");
   });
 
+  test("E5: 엑셀로 내보낸 뒤 다시 가져오면 값과 수식이 보존된다", async ({ page }) => {
+    await createSheetPage(page, `e2e-sheet-xlsx-${Date.now()}`);
+
+    await focusCell(page, 0, 0);
+    await page.keyboard.type("10");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("=A1*2");
+    const saved = waitForCellSave(page);
+    await page.keyboard.press("Enter");
+    await expect(cellAt(page, 1, 0)).toHaveText("20");
+    await saved;
+
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "엑셀 내보내기" }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toMatch(/\.xlsx$/);
+    const path = await file.path();
+
+    const importSave = waitForCellSave(page);
+    await page.getByLabel("엑셀 가져오기").setInputFiles(path!);
+    await importSave;
+
+    // 새 시트로 들어오고 수식이 수식으로 살아 다시 계산된다.
+    await expect(page.getByRole("tab")).toHaveCount(2);
+    await expect(cellAt(page, 1, 0)).toHaveText("20");
+    await focusCell(page, 1, 0);
+    await expect(page.getByLabel("수식 입력줄")).toHaveValue("=A1*2");
+  });
+
   test("E6: 마우스 없이 이름 상자·방향키·F2·Esc로 이동하고 편집한다", async ({ page }) => {
     await createSheetPage(page, `e2e-sheet-kbd-${Date.now()}`);
 

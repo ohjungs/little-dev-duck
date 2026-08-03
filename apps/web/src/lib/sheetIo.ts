@@ -9,6 +9,7 @@ import {
   recalcAll,
   styleAt,
   type Cell,
+  type EvalValue,
   type SheetCells,
   type SheetMeta,
   type Workbook,
@@ -88,6 +89,22 @@ export function rowsToCells(
     });
   });
   return out;
+}
+
+/**
+ * 여러 시트를 한 번에 계산한다. 키는 core의 nodeKey(`시트!행:열`) 그대로다 —
+ * xlsx로 내보낼 때 "이 칸의 계산된 값"을 그 키로 찾는다.
+ */
+export function computeAll(
+  sheets: readonly { name: string; cells: readonly Cell[] }[],
+): Map<string, EvalValue> {
+  const wb: Workbook = new Map();
+  for (const s of sheets) {
+    const m: SheetCells = new Map();
+    for (const cell of s.cells) m.set(cellKey(cell.r, cell.c), { v: cell.v, f: cell.f });
+    wb.set(s.name, m);
+  }
+  return recalcAll(wb, createFormulaFunctions()).values;
 }
 
 /** 내려받을 파일 이름. 파일 시스템이 싫어하는 글자는 밑줄로 바꾼다. */

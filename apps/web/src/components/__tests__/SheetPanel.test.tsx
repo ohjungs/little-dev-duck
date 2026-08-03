@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
   createSheet,
   getMyAccess,
@@ -192,6 +192,50 @@ describe("SheetPanel CSV", () => {
     expect(vi.mocked(createSheet).mock.calls[0][1]).toMatchObject({ name: "매출" });
     expect(screen.getByRole("gridcell", { name: "오리" })).toBeTruthy();
     expect(vi.mocked(saveCells).mock.calls[0][2]).toHaveLength(4);
+  });
+});
+
+describe("SheetPanel xlsx", () => {
+  // 이 묶음만 **실제 타이머**를 쓴다. xlsx 라이브러리는 동적 import로 불러오는데(첫 화면
+  // 번들에서 빼려고), 그 모듈 로딩은 가짜 타이머를 아무리 돌려도 풀리지 않는다.
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("내보낸 xlsx를 다시 가져오면 값과 수식이 산다 (E5)", async () => {
+    vi.mocked(loadSheetCells).mockResolvedValue([
+      { r: 0, c: 0, v: 10, f: null, s: null },
+      { r: 1, c: 0, v: null, f: "=A1*2", s: null },
+    ]);
+    vi.mocked(createSheet).mockResolvedValue({ ...SHEET, id: "sheet-x", name: "가져온표" });
+
+    const blobs: Blob[] = [];
+    Object.defineProperty(URL, "createObjectURL", {
+      value: vi.fn((b: Blob) => {
+        blobs.push(b);
+        return "blob:x";
+      }),
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+
+    render(<SheetPanel pageId="page-1" />);
+    await screen.findByRole("grid");
+
+    fireEvent.click(screen.getByRole("button", { name: "엑셀 내보내기" }));
+    await waitFor(() => expect(blobs).toHaveLength(1));
+
+    const bytes = new Uint8Array(await blobs[0].arrayBuffer());
+    // xlsx는 zip이다 — 첫 두 바이트가 PK여야 엑셀이 연다.
+    expect([bytes[0], bytes[1]]).toEqual([0x50, 0x4b]);
+
+    const file = new File([bytes], "내보낸것.xlsx");
+    fireEvent.change(screen.getByLabelText("엑셀 가져오기"), { target: { files: [file] } });
+
+    // 수식이 수식으로 돌아와 다시 계산된다(20).
+    await screen.findByRole("gridcell", { name: "20" });
+    // 무엇을 못 가져왔는지 알린다(AC-16).
+    expect(screen.getByRole("alert").textContent).toContain("차트");
   });
 });
 

@@ -24,7 +24,7 @@ import {
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { SheetGrid } from "@/components/SheetGrid";
-import { rowsToCells, sheetFileName, sheetToRows } from "@/lib/sheetIo";
+import { computeAll, rowsToCells, sheetFileName, sheetToRows } from "@/lib/sheetIo";
 
 // 2026-08-02 : 스프레드시트 - 화면 - 불러오기·저장 (SPEC-2026-08-02-spreadsheet-a1 T5)
 //
@@ -247,6 +247,81 @@ export function SheetPanel({ pageId }: { pageId: string }) {
     }
   }
 
+  // ── 엑셀(xlsx) 입출력 (T9 / AC-16·17) ──────────────────────────────────────
+  // SheetJS는 수백 KB라 **동적으로** 부른다. 시트를 안 쓰는 사람이 그 값을 치르지 않게.
+  async function handleExportXlsx(): Promise<void> {
+    setBusy(true);
+    try {
+      const { buildXlsx } = await import("@/lib/sheetXlsx");
+      const inputs = sheets.map((s) => ({
+        name: s.name,
+        cells: cellsBySheet[s.id] ?? [],
+        meta: s.meta,
+      }));
+      // 계산은 한 번만 한다 — 워크북 전체를 한 번에 세고 그 결과를 파일에 함께 싣는다.
+      const computed = computeAll(inputs);
+      const bytes = buildXlsx(inputs, computed);
+      const blob = new Blob([bytes as BlobPart], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = sheetFileName(document.title, sheets[0]?.name ?? "sheet", "xlsx");
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setSaveError("엑셀 파일을 만들지 못했어요.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** 가져오기는 파일 안의 시트마다 **새 시트**를 만든다(CSV와 같은 이유로 덮지 않는다). */
+  async function handleImportXlsx(file: File): Promise<void> {
+    setBusy(true);
+    try {
+      const { readXlsx } = await import("@/lib/sheetXlsx");
+      const result = readXlsx(await file.arrayBuffer());
+
+      const used = sheets.map((s) => s.name);
+      let lastId: string | null = null;
+      for (const [i, incoming] of result.sheets.entries()) {
+        const name =
+          isValidSheetName(incoming.name) && !used.includes(incoming.name)
+            ? incoming.name
+            : nextSheetName(used);
+        used.push(name);
+        const created = await createSheet(supabase, {
+          pageId,
+          name,
+          position: sheets.length + i,
+        });
+        setSheets((prev) => [...prev, created]);
+        setCellsBySheet((prev) => ({ ...prev, [created.id]: incoming.cells }));
+        for (const cell of incoming.cells) {
+          pending.current.set(pendKey(created.id, cell), { sheetId: created.id, cell });
+        }
+        lastId = created.id;
+      }
+      if (lastId) setActiveId(lastId);
+      schedule();
+
+      // **무엇을 잃었는지 알린다**(AC-16). 조용히 버리면 사용자는 파일이 온전히 들어온 줄 안다.
+      const notes: string[] = [];
+      if (result.lost.formulas > 0) {
+        notes.push(`읽지 못한 수식 ${result.lost.formulas}개는 값으로 들어왔어요`);
+      }
+      if (result.lost.macros) notes.push("매크로는 가져오지 않았어요");
+      notes.push("차트·이미지·피벗 테이블은 가져오지 않아요");
+      setSaveError(notes.join(". ") + ".");
+    } catch {
+      setSaveError("엑셀 파일을 가져오지 못했어요. 파일을 확인해 주세요.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleAddSheet(): Promise<void> {
     setBusy(true);
     try {
@@ -351,6 +426,28 @@ export function SheetPanel({ pageId }: { pageId: string }) {
               // 같은 파일을 다시 고를 수 있게 값을 비운다(안 그러면 change가 안 난다).
               e.target.value = "";
               if (file) void handleImportCsv(file);
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => void handleExportXlsx()}
+          disabled={busy}
+          className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
+        >
+          엑셀 내보내기
+        </button>
+        <label className="cursor-pointer rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
+          엑셀 가져오기
+          <input
+            type="file"
+            accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            aria-label="엑셀 가져오기"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void handleImportXlsx(file);
             }}
           />
         </label>
