@@ -13,9 +13,11 @@ const runDuckTurn = vi.fn();
 const getGoogleTokens = vi.fn();
 const getGithubTokens = vi.fn();
 const getGmailTokens = vi.fn();
+const allowRequest = vi.fn();
+const getUser = vi.fn();
 
 vi.mock("@ldd/api", () => ({
-  allowRequest: () => true,
+  allowRequest: (...a: unknown[]) => allowRequest(...a),
   // 2026-07-30: 라우트가 기능 토글을 서버에서 확인하게 되어 이 mock이 필요해졌다.
   // 기본은 "아무 기능도 꺼지지 않은 사용자" — 게이트 자체의 검사는 apiFeatureGate.test.ts에 있다.
   getMyAccess: async () => ({ role: "user", disabledFeatures: [] }),
@@ -32,12 +34,14 @@ vi.mock("@ldd/api", () => ({
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
-    auth: { getUser: async () => ({ data: { user: { id: "u1" } } }) },
+    auth: { getUser: () => getUser() },
   }),
 }));
 
 beforeEach(() => {
   vi.resetModules();
+  getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+  allowRequest.mockReturnValue(true);
   process.env.GEMINI_API_KEY = "test-key";
   getGoogleTokens.mockResolvedValue(null);
   getGithubTokens.mockResolvedValue(null);
@@ -134,6 +138,25 @@ describe("오리 라우트 — 미연동 안내 조립", () => {
     expect(note).not.toContain("구글 캘린더 연동은");
     expect(note).toContain("GitHub");
     expect(note).toContain("Gmail");
+  });
+});
+
+describe("오리 라우트 — 인증·레이트리밋", () => {
+  it("getUser가 null을 반환하면 401이고 아무것도 실행하지 않는다", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: null } });
+    const { status, json } = await ask();
+    expect(status).toBe(401);
+    expect(json.error).toBe("로그인이 필요합니다.");
+    expect(allowRequest).not.toHaveBeenCalled();
+    expect(runDuckTurn).not.toHaveBeenCalled();
+  });
+
+  it("allowRequest가 false를 반환하면 429이고 아무것도 실행하지 않는다", async () => {
+    allowRequest.mockReturnValueOnce(false);
+    const { status, json } = await ask();
+    expect(status).toBe(429);
+    expect(json.error).toBe("요청이 많습니다. 잠시 후 다시 시도해주세요.");
+    expect(runDuckTurn).not.toHaveBeenCalled();
   });
 });
 

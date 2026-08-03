@@ -2,13 +2,13 @@
 
 <!-- LOOP-STATUS:BEGIN -->
 <!-- loop-state.mjs apply-cycle이 기계로 갱신하는 구간. 손으로 고치면 다음 사이클에 덮인다. -->
-**루프 현황** — 사이클 15 · 2026-08-02 기준
+**루프 현황** — 사이클 20 · 2026-08-03 기준
 
-- 마지막 사이클: build / failed — test: 블록 에디터(PageEditor/PageWorkspace/BlockEditor) 핵심 기능 컴포넌트·E2E 테스트 추가
-- 게이트: build red · test20 red · visual red · review HARD_CAP
-- 최근 10회: blocked 4 · passed 1 · failed 5
-- 남은 대장 후보: 52건 (S1 2 · S2 12 · S3 38)
-- 사람 확인 대기: 69건
+- 마지막 사이클: build / passed — test: agent/agent-approve 라우트 401/429 분기 실제 실행 테스트 추가
+- 게이트: build green · test20 green · visual 안돌림 · review SUCCESS
+- 최근 10회: failed 4 · blocked 2 · passed 3 · deferred 1
+- 남은 대장 후보: 59건 (S1 3 · S2 15 · S3 41)
+- 사람 확인 대기: 72건
 
 위 숫자의 원본은 `docs/plan-ledger.jsonl` · `docs/loop-eng/cycles.jsonl` · `docs/loop-eng/manual-open.jsonl`이다.
 <!-- LOOP-STATUS:END -->
