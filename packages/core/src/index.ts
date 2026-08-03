@@ -331,6 +331,16 @@ export { shiftFormulaRefs } from "./domain/sheet-shift";
 export { parseDelimited, toDelimited } from "./domain/sheet-clipboard";
 export { fillValues } from "./domain/sheet-fill";
 // 2026-08-02 : 스프레드시트 서식 (SPEC T7)
+// 2026-08-02 : 스프레드시트 행·열 삽입삭제·정렬 (SPEC T8)
+export {
+  adjustFormula,
+  insertLines,
+  deleteLines,
+  type Axis as SheetAxisKind,
+  type MutateInput,
+  type MutateResult,
+} from "./domain/sheet-mutate";
+export { sortRange, type SortRange } from "./domain/sheet-sort";
 export {
   MAX_STYLES,
   applyStyle,

@@ -245,6 +245,67 @@ test.describe("스프레드시트 — 격자·수식·키보드", () => {
     await expect(page.getByRole("button", { name: "틀 고정 해제" })).toBeVisible();
   });
 
+  test("행을 끼워 넣으면 수식 참조가 따라가고, 지우면 #REF!가 된다 (AC-12)", async ({
+    page,
+  }) => {
+    await createSheetPage(page, `e2e-sheet-mutate-${Date.now()}`);
+
+    await focusCell(page, 0, 0);
+    await page.keyboard.type("10");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("=A1*2");
+    const firstSave = waitForCellSave(page);
+    await page.keyboard.press("Enter");
+    await expect(cellAt(page, 1, 0)).toHaveText("20");
+    await firstSave;
+
+    // A1 위에 행을 끼워 넣으면 값은 A2로, 수식은 A3으로 내려가고 참조도 따라간다.
+    await focusCell(page, 0, 0);
+    const insertSave = waitForCellSave(page);
+    await page.getByRole("button", { name: "행 삽입" }).click();
+    await expect(cellAt(page, 1, 0)).toHaveText("10");
+    await expect(cellAt(page, 2, 0)).toHaveText("20");
+    await focusCell(page, 2, 0);
+    await expect(page.getByLabel("수식 입력줄")).toHaveValue("=A2*2");
+    await insertSave;
+
+    // 값이 있는 행을 지우면 그것을 가리키던 수식은 #REF!가 된다.
+    await focusCell(page, 1, 0);
+    const deleteSave = waitForCellSave(page);
+    await page.getByRole("button", { name: "행 삭제" }).click();
+    await expect(cellAt(page, 1, 0)).toHaveText("#REF!");
+    await deleteSave;
+  });
+
+  test("시트를 더하고 다른 시트를 수식으로 참조한다 (AC-7)", async ({ page }) => {
+    await createSheetPage(page, `e2e-sheet-tabs-${Date.now()}`);
+
+    // Sheet2를 만들고 A1에 값을 넣는다.
+    await page.getByRole("button", { name: "시트 추가" }).click();
+    await expect(page.getByRole("tab", { name: "Sheet2" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await focusCell(page, 0, 0);
+    await page.keyboard.type("42");
+    const save2 = waitForCellSave(page);
+    await page.keyboard.press("Enter");
+    await save2;
+
+    // Sheet1으로 돌아와 Sheet2!A1을 참조한다.
+    await page.getByRole("tab", { name: "Sheet1" }).click();
+    await focusCell(page, 0, 0);
+    await page.keyboard.type("=Sheet2!A1+1");
+    const save1 = waitForCellSave(page);
+    await page.keyboard.press("Enter");
+    await expect(cellAt(page, 0, 0)).toHaveText("43");
+    await save1;
+
+    // 새로고침해도 시트 간 참조가 산다.
+    await page.reload();
+    await expect(cellAt(page, 0, 0)).toHaveText("43");
+  });
+
   test("E6: 마우스 없이 이름 상자·방향키·F2·Esc로 이동하고 편집한다", async ({ page }) => {
     await createSheetPage(page, `e2e-sheet-kbd-${Date.now()}`);
 

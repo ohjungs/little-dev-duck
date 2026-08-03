@@ -228,3 +228,31 @@ export async function saveCells(
     if (error) throw new Error(error.message);
   }
 }
+
+/** 시트 이름을 바꾼다. 수식이 이 이름을 그대로 담으므로 core 규칙으로 먼저 거른다. */
+export async function renameSheet(
+  supabase: SupabaseClient,
+  sheetId: string,
+  name: string,
+): Promise<void> {
+  if (!isValidSheetName(name)) {
+    throw new Error("시트 이름에 쓸 수 없는 글자가 있습니다.");
+  }
+  await requireUserId(supabase);
+  const { error } = await supabase
+    .from("sheets")
+    .update({ name, updated_at: new Date().toISOString() })
+    .eq("id", sheetId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * 시트를 지운다. 셀은 `on delete cascade`가 함께 지운다(마이그레이션 참조).
+ * **다른 시트의 수식이 이 시트를 가리키고 있으면 그 수식은 #REF!가 된다** — 지우기 전에
+ * 화면이 알린다(엔진은 없는 시트 참조를 이미 #REF!로 다룬다).
+ */
+export async function deleteSheet(supabase: SupabaseClient, sheetId: string): Promise<void> {
+  await requireUserId(supabase);
+  const { error } = await supabase.from("sheets").delete().eq("id", sheetId);
+  if (error) throw new Error(error.message);
+}

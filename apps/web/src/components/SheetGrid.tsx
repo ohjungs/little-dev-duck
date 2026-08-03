@@ -7,13 +7,16 @@ import {
   cellKey,
   colToLetters,
   createFormulaFunctions,
+  deleteLines,
   displayCellText,
   formatCellRef,
+  insertLines,
   nodeKey,
   parseCellInput,
   parseCellRange,
   parseCellRef,
   recalcAll,
+  sortRange,
   styleAt,
   type Cell,
   type CellStyle,
@@ -124,6 +127,14 @@ const NUMBER_FORMATS = [
   { code: "yyyy-mm-dd", label: "2026-08-02" },
 ];
 
+// 행·열 조작. 선택한 범위의 줄 수만큼 넣거나 지운다.
+const MUTATE_BUTTONS: { label: string; axis: "row" | "col"; deleting: boolean }[] = [
+  { label: "행 삽입", axis: "row", deleting: false },
+  { label: "행 삭제", axis: "row", deleting: true },
+  { label: "열 삽입", axis: "col", deleting: false },
+  { label: "열 삭제", axis: "col", deleting: true },
+];
+
 const ALIGN_CLASS: Record<"left" | "center" | "right", string> = {
   left: "text-left",
   center: "text-center",
@@ -144,6 +155,7 @@ function clamp(n: number, min: number, max: number): number {
 export function SheetGrid({
   sheet,
   cells,
+  otherSheets,
   onCellsCommit,
   onMetaChange,
 }: {
@@ -154,6 +166,11 @@ export function SheetGrid({
    * 바꾸고, 그것들이 **한 덩어리로** 저장돼야 실행취소가 한 번에 되돌아간다.
    * 값이 빈 셀은 v·f·s가 모두 null이다(저장 계층이 행을 지운다).
    */
+  /**
+   * 같은 문서의 다른 시트들(이름 -> 셀). 수식이 `Sheet2!A1`로 이들을 참조한다(AC-7).
+   * 주지 않으면 다른 시트 참조는 #REF!가 된다 — 엔진이 없는 시트를 그렇게 다룬다.
+   */
+  otherSheets?: ReadonlyMap<string, readonly Cell[]>;
   onCellsCommit: (cells: Cell[]) => void;
   /** 서식 팔레트·열 너비·행 높이·틀 고정이 바뀌었을 때. 없으면 그 조작이 화면에서 빠진다. */
   onMetaChange?: (meta: SheetMeta) => void;
@@ -202,13 +219,19 @@ export function SheetGrid({
   // 지금 구조에서는 이득 없이 상태만 는다. 붙여넣기·행열 삽입으로 한 번에 수백 셀이 바뀌는
   // T6·T8에서 그래프를 들고 있게 바꾼다.
   const values = useMemo(() => {
-    const sheetCells: SheetCells = new Map();
-    for (const cell of cells) {
-      sheetCells.set(cellKey(cell.r, cell.c), { v: cell.v, f: cell.f });
+    const toSheetCells = (list: readonly Cell[]): SheetCells => {
+      const m: SheetCells = new Map();
+      for (const cell of list) m.set(cellKey(cell.r, cell.c), { v: cell.v, f: cell.f });
+      return m;
+    };
+    const wb: Workbook = new Map([[sheet.name, toSheetCells(cells)]]);
+    // 다른 시트도 워크북에 넣어야 Sheet2!A1이 값을 찾는다.
+    for (const [name, list] of otherSheets ?? []) {
+      if (name === sheet.name) continue;
+      wb.set(name, toSheetCells(list));
     }
-    const wb: Workbook = new Map([[sheet.name, sheetCells]]);
     return recalcAll(wb, createFormulaFunctions()).values;
-  }, [cells, sheet.name]);
+  }, [cells, sheet.name, otherSheets]);
 
   const { rows, cols } = useMemo(() => {
     let maxR = 0;
@@ -620,6 +643,52 @@ export function SheetGrid({
     if (cleared.length > 0) applyCells(cleared);
   }
 
+  // ── 행·열 삽입삭제 · 정렬 (T8) ─────────────────────────────────────────────
+  // core가 시트 전체의 **새 셀 목록**을 돌려주므로, 여기서는 옛 목록과 견줘 "무엇을 저장할
+  // 것인가"만 뽑는다. 사라진 칸은 빈 셀로 실어야 저장 계층이 그 행을 지운다.
+  function commitWhole(next: Cell[]): void {
+    const nextByKey = new Map(next.map((cell) => [cellKey(cell.r, cell.c), cell]));
+    const out: Cell[] = [];
+    for (const cell of next) {
+      const prev = byKey.get(cellKey(cell.r, cell.c));
+      // 값·수식·서식이 그대로면 저장할 것이 없다.
+      if (prev && prev.v === cell.v && prev.f === cell.f && prev.s === cell.s) continue;
+      out.push(cell);
+    }
+    for (const [key, prev] of byKey) {
+      if (nextByKey.has(key)) continue;
+      out.push({ r: prev.r, c: prev.c, v: null, f: null, s: null });
+    }
+    applyCells(out);
+  }
+
+  function runMutate(axis: "row" | "col", deleting: boolean): void {
+    const at = axis === "row" ? range.r0 : range.c0;
+    const count =
+      axis === "row" ? range.r1 - range.r0 + 1 : range.c1 - range.c0 + 1;
+    const input = {
+      cells,
+      meta: sheet.meta,
+      sheetName: sheet.name,
+      axis,
+      at,
+      count,
+    };
+    const result = deleting ? deleteLines(input) : insertLines(input);
+    if (onMetaChange) onMetaChange(result.meta);
+    commitWhole(result.cells);
+  }
+
+  function runSort(ascending: boolean): void {
+    try {
+      // 기준 열은 범위의 첫 열이다(엑셀의 기본 정렬과 같다).
+      commitWhole(sortRange(cells, range, range.c0, ascending));
+      setFormatError(null);
+    } catch (err) {
+      setFormatError(err instanceof Error ? err.message : "정렬하지 못했어요.");
+    }
+  }
+
   // ── 클립보드 ────────────────────────────────────────────────────────────────
   // 브라우저의 copy/cut/paste 이벤트를 그대로 쓴다(비동기 Clipboard API + 권한 요청 없이).
   // 입력칸이 늘 포커스를 쥐고 있어서 이벤트가 여기로 온다.
@@ -777,6 +846,34 @@ export function SheetGrid({
             }`}
           >
             병합
+          </button>
+          <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+          {MUTATE_BUTTONS.map((b) => (
+            <button
+              key={b.label}
+              type="button"
+              aria-label={b.label}
+              onClick={() => runMutate(b.axis, b.deleting)}
+              className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              {b.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-label="오름차순 정렬"
+            onClick={() => runSort(true)}
+            className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            정렬 ↑
+          </button>
+          <button
+            type="button"
+            aria-label="내림차순 정렬"
+            onClick={() => runSort(false)}
+            className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            정렬 ↓
           </button>
           <span className="mx-1 h-4 w-px bg-border" aria-hidden />
           <select

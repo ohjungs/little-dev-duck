@@ -103,6 +103,54 @@ describe("SheetPanel 불러오기", () => {
   });
 });
 
+// 2026-08-02 : T8 — 여러 시트 탭과 시트 간 참조
+
+const SHEET2: Sheet = { ...SHEET, id: "sheet-2", name: "Sheet2", position: 1 };
+
+describe("SheetPanel 시트 탭", () => {
+  it("시트가 여럿이면 탭이 모두 보이고 눌러서 옮겨간다", async () => {
+    vi.mocked(listSheets).mockResolvedValue([SHEET, SHEET2]);
+    vi.mocked(loadSheetCells).mockImplementation(async (_c, id) =>
+      id === "sheet-2" ? [{ r: 0, c: 0, v: "둘째 시트", f: null, s: null }] : [],
+    );
+    render(<SheetPanel pageId="page-1" />);
+    await settle();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sheet2" }));
+    await settle();
+    expect(screen.getByRole("gridcell", { name: "둘째 시트" })).toBeTruthy();
+  });
+
+  it("다른 시트의 셀을 수식으로 참조할 수 있다 (AC-7)", async () => {
+    vi.mocked(listSheets).mockResolvedValue([SHEET, SHEET2]);
+    vi.mocked(loadSheetCells).mockImplementation(async (_c, id) =>
+      id === "sheet-2" ? [{ r: 0, c: 0, v: 42, f: null, s: null }] : [],
+    );
+    render(<SheetPanel pageId="page-1" />);
+    await settle();
+
+    const input = screen.getByLabelText("셀 편집");
+    fireEvent.change(input, { target: { value: "=Sheet2!A1+1" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await settle();
+
+    expect(screen.getByRole("gridcell", { name: "43" })).toBeTruthy();
+  });
+
+  it("시트를 더하면 이름이 이어 붙고 그 시트로 옮겨간다", async () => {
+    vi.mocked(createSheet).mockResolvedValue(SHEET2);
+    render(<SheetPanel pageId="page-1" />);
+    await settle();
+
+    fireEvent.click(screen.getByRole("button", { name: "시트 추가" }));
+    await settle();
+    expect(vi.mocked(createSheet).mock.calls[0][1]).toMatchObject({ name: "Sheet2" });
+    expect(screen.getByRole("tab", { name: "Sheet2" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+  });
+});
+
 describe("SheetPanel 저장", () => {
   async function editCell(value: string) {
     const input = screen.getByLabelText("셀 편집");

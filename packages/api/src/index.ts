@@ -25,6 +25,8 @@ export {
   loadSheetCells,
   saveCells,
   updateSheetMeta,
+  renameSheet,
+  deleteSheet,
   CELL_PAGE_SIZE,
   type CreateSheetInput,
 } from "./sheets";

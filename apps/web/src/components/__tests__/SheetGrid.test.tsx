@@ -471,6 +471,91 @@ describe("SheetGrid 병합", () => {
   });
 });
 
+// 2026-08-02 : T8 — 행·열 삽입삭제 · 정렬
+
+describe("SheetGrid 행·열 삽입삭제", () => {
+  it("행을 넣으면 아래 셀이 내려가고 수식 참조가 따라간다", () => {
+    const { input, onCellsCommit } = renderWithMeta(
+      [cell(1, 0, 10), cell(2, 0, null, "=A2*2")],
+      createDefaultSheetMeta(),
+    );
+    fireEvent.keyDown(input, { key: "ArrowDown" }); // A2 선택
+    fireEvent.click(screen.getByRole("button", { name: "행 삽입" }));
+
+    const committed = onCellsCommit.mock.calls[0][0] as Cell[];
+    const at = (r: number, c: number) => committed.find((x) => x.r === r && x.c === c);
+    expect(at(2, 0)?.v).toBe(10);
+    expect(at(3, 0)?.f).toBe("=A3*2");
+    // 비워진 자리도 함께 실린다(옛 값이 남지 않게).
+    expect(at(1, 0)?.v).toBeNull();
+  });
+
+  it("행을 지우면 그 행을 가리키던 수식이 #REF!가 된다", () => {
+    const { input, onCellsCommit } = renderWithMeta(
+      [cell(1, 0, 10), cell(2, 0, null, "=A2*2")],
+      createDefaultSheetMeta(),
+    );
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.click(screen.getByRole("button", { name: "행 삭제" }));
+
+    const committed = onCellsCommit.mock.calls[0][0] as Cell[];
+    expect(committed.find((x) => x.r === 1 && x.c === 0)?.f).toBe("=#REF!*2");
+  });
+
+  it("열 너비·병합도 함께 옮겨진다", () => {
+    const { input, onMetaChange } = renderWithMeta([], {
+      ...createDefaultSheetMeta(),
+      cols: { "1": { w: 200 } },
+    });
+    fireEvent.keyDown(input, { key: "ArrowRight" }); // B1
+    fireEvent.click(screen.getByRole("button", { name: "열 삽입" }));
+    expect(onMetaChange).toHaveBeenCalledWith(
+      expect.objectContaining({ cols: { "2": { w: 200 } } }),
+    );
+  });
+
+  it("삽입은 한 번에 되돌아간다", () => {
+    const { input, onCellsCommit } = renderWithMeta([cell(1, 0, 10)], createDefaultSheetMeta());
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.click(screen.getByRole("button", { name: "행 삽입" }));
+    fireEvent.keyDown(input, { key: "z", ctrlKey: true });
+
+    const back = onCellsCommit.mock.calls.at(-1)![0] as Cell[];
+    expect(back.find((x) => x.r === 1 && x.c === 0)?.v).toBe(10);
+    expect(back.find((x) => x.r === 2 && x.c === 0)?.v).toBeNull();
+  });
+});
+
+describe("SheetGrid 정렬", () => {
+  it("고른 범위를 첫 열 기준으로 정렬한다", () => {
+    const { input, onCellsCommit } = renderWithMeta(
+      [cell(0, 0, "나"), cell(0, 1, 2), cell(1, 0, "가"), cell(1, 1, 1)],
+      createDefaultSheetMeta(),
+    );
+    fireEvent.keyDown(input, { key: "ArrowDown", shiftKey: true });
+    fireEvent.keyDown(input, { key: "ArrowRight", shiftKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "오름차순 정렬" }));
+
+    const committed = onCellsCommit.mock.calls[0][0] as Cell[];
+    const at = (r: number, c: number) => committed.find((x) => x.r === r && x.c === c);
+    expect(at(0, 0)?.v).toBe("가");
+    expect(at(0, 1)?.v).toBe(1);
+    expect(at(1, 0)?.v).toBe("나");
+  });
+
+  it("수식이 있는 범위는 정렬하지 않고 사유를 알린다", () => {
+    const { input, onCellsCommit } = renderWithMeta(
+      [cell(0, 0, 2), cell(1, 0, null, "=A1")],
+      createDefaultSheetMeta(),
+    );
+    fireEvent.keyDown(input, { key: "ArrowDown", shiftKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "오름차순 정렬" }));
+
+    expect(onCellsCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toContain("수식");
+  });
+});
+
 describe("SheetGrid 실행취소", () => {
   it("Ctrl+Z가 옛 값을 되돌리고 Ctrl+Y가 다시 넣는다", () => {
     const { input, onCellsCommit } = renderGrid([cell(0, 0, "옛값")]);
