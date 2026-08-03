@@ -2,12 +2,12 @@
 
 <!-- LOOP-STATUS:BEGIN -->
 <!-- loop-state.mjs apply-cycle이 기계로 갱신하는 구간. 손으로 고치면 다음 사이클에 덮인다. -->
-**루프 현황** — 사이클 20 · 2026-08-03 기준
+**루프 현황** — 사이클 22 · 2026-08-03 기준
 
-- 마지막 사이클: build / passed — test: agent/agent-approve 라우트 401/429 분기 실제 실행 테스트 추가
+- 마지막 사이클: build / passed — test: app/api 라우트 7개에 라우트 레벨 테스트 추가
 - 게이트: build green · test20 green · visual 안돌림 · review SUCCESS
-- 최근 10회: failed 4 · blocked 2 · passed 3 · deferred 1
-- 남은 대장 후보: 59건 (S1 3 · S2 15 · S3 41)
+- 최근 10회: failed 2 · blocked 2 · passed 4 · deferred 2
+- 남은 대장 후보: 61건 (S1 3 · S2 15 · S3 43)
 - 사람 확인 대기: 72건
 
 위 숫자의 원본은 `docs/plan-ledger.jsonl` · `docs/loop-eng/cycles.jsonl` · `docs/loop-eng/manual-open.jsonl`이다.
