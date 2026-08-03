@@ -9,6 +9,8 @@ import { formatClockTime, type Npc, type GameClock,
   npcStatusLabel,
 } from "@ldd/core";
 
+import { useModalA11y } from "@/hooks/useModalA11y";
+
 type Props = {
   npcs: Npc[];
   clock: GameClock;
@@ -16,6 +18,8 @@ type Props = {
 };
 
 export function OfficeDashboard({ npcs, clock, onClose }: Props) {
+  const dialogRef = useModalA11y<HTMLDivElement>(true, onClose);
+
   // 부서별 그룹핑
   const byDept = new Map<string, Npc[]>();
   for (const npc of npcs) {
@@ -34,9 +38,11 @@ export function OfficeDashboard({ npcs, clock, onClose }: Props) {
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="전사 대시보드"
+      tabIndex={-1}
       className="absolute inset-4 bg-background/95 backdrop-blur border border-border rounded-xl shadow-2xl z-50 overflow-y-auto"
     >
       {/* 헤더 */}

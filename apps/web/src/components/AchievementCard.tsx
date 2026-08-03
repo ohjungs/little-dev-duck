@@ -21,6 +21,7 @@ export function AchievementCard({
   onClose: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const ariaLabel = `레벨 ${level}, XP ${xp}, 먹이 ${feed}`;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -85,6 +86,8 @@ export function AchievementCard({
           ref={canvasRef}
           width={W}
           height={H}
+          role="img"
+          aria-label={ariaLabel}
           className="w-full max-w-xs rounded-xl"
         />
         <div className="flex justify-end gap-2">
