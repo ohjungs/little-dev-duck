@@ -18,6 +18,13 @@ function waitForPageSave(page: BrowserPage) {
   );
 }
 
+// 2026-08-02 : e2e - 페이지 워크스페이스 - 삭제→휴지통 이동 경합 수정
+// PageWorkspace의 삭제는 낙관적 업데이트라 사이드바에서 사라지는 건 softDeletePage(실제 PATCH)가
+// 끝나기 전에 이미 반영된다(회귀 실측: /pages/trash로 즉시 이동하면 "휴지통이 비어 있습니다"로
+// 보임 — is_trashed PATCH가 서버에 아직 반영되지 않은 상태에서 TrashView가 조회한 것). 삭제 버튼을
+// 클릭하는 시점부터 waitForPageSave와 같은 PATCH 응답을 함께 기다려 결정적으로 만든다 —
+// softDeletePage도 pages 테이블에 PATCH를 보내므로 같은 매처를 재사용한다.
+
 test.describe("페이지 워크스페이스 — 생성·편집·자동저장", () => {
   test.skip(!AUTH_STATE.usable, AUTH_STATE.reason);
   test.use({ storageState: AUTH_STATE.usable ? AUTH_STATE.path : undefined });
@@ -54,20 +61,18 @@ test.describe("페이지 워크스페이스 — 생성·편집·자동저장", (
     expect(sentBody.plain_text).toBe(body);
     expect(JSON.stringify(sentBody.content)).toContain(body);
 
-    // 2026-08-02 : 회귀 - 페이지 워크스페이스 - 새로고침 후 본문 유실 (실측으로 발견한 버그)
+    // 2026-08-02 : 회귀 - 페이지 워크스페이스 - 새로고침 후 본문 유실 (실측으로 발견 → 수정 확인)
     // PageWorkspace는 listPages()로만 목록을 채우는데, listPages는 content 컬럼을 select하지
-    // 않는다(packages/api/src/pages.ts 주석: "페이지 열람 시 getPage로 full fetch" — 그런데
-    // PageWorkspace/PageEditor 어디에도 getPage 호출이 없다, 2026-08-02 grep으로 확인).
-    // 그래서 방금 저장한 본문이 서버에는 정확히 있는데(위 PATCH 요청 바디로 확인 완료),
-    // 새로고침(또는 다른 페이지로 갔다 오는 클라이언트 내비게이션)으로 PageWorkspace가 다시
-    // 마운트되면 이 페이지의 content가 null로 와서 화면에는 빈 문서로 보인다.
-    // **이 아래 두 단언은 지금 실패한다.** 고쳐지지 않은 실제 버그를 감추지 않고 그대로 잠근다 —
-    // getPage() 배선이 추가되면(또는 listPages가 content를 포함하게 바뀌면) green으로 바뀐다.
+    // 않는다(packages/api/src/pages.ts 주석: "페이지 열람 시 getPage로 full fetch"). PageWorkspace.tsx가
+    // pageId 선택 시 content===null이면 getPage로 본문을 채운 뒤에만 PageEditor를 마운트하도록
+    // 고쳐졌다(PageWorkspace.tsx의 "본문유실 - full fetch 보강" 주석 참고). 아래 두 단언은 이 라운드
+    // 테스트 실행(2026-08-02, 실제 프로덕션 Supabase 대상)에서 green으로 확인됐다 — 회귀 고정 유지.
     await page.reload();
     await expect(page.getByLabel("페이지 제목")).toHaveValue(title);
     await expect(page.getByText(body)).toBeVisible();
 
     // 정리: 방금 만든 페이지를 휴지통으로 보낸다.
+    const trashPatch = waitForPageSave(page);
     await page
       .locator("aside")
       .getByRole("button", { name: `${title} 삭제` })
@@ -75,6 +80,17 @@ test.describe("페이지 워크스페이스 — 생성·편집·자동저장", (
     await expect(
       page.locator("aside").getByText(title, { exact: true }),
     ).toHaveCount(0);
+    // softDeletePage의 is_trashed PATCH가 실제로 서버에 반영될 때까지 기다린다 — 낙관적
+    // 업데이트로 위 단언은 그보다 먼저 통과하므로, 이걸 기다리지 않고 아래 /pages/trash로
+    // 이동하면 아직 커밋 전이라 "휴지통이 비어 있습니다"로 보이는 경합이 있었다(실측).
+    await trashPatch;
+
+    // 2026-08-02 : e2e - 페이지 워크스페이스 - 삭제→휴지통 실제 도착 확인
+    // 위 단언은 "사이드바 트리에서 사라짐"만 증명한다 — 그것만으로는 휴지통에 도착했는지,
+    // 아니면 그냥 유실됐는지 구별되지 않는다. /pages/trash로 직접 이동해 제목이 실제로
+    // 거기 있는지 확인한다(TrashView.tsx: li 안 <p class="...font-medium"> 제목 텍스트).
+    await page.goto("/pages/trash");
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
   });
 
   test("즐겨찾기 토글과 복제가 동작한다", async ({ page }) => {
@@ -125,6 +141,71 @@ test.describe("페이지 워크스페이스 — 생성·편집·자동저장", (
       .click();
     await expect(
       page.locator("aside").getByText(title, { exact: true }),
+    ).toHaveCount(0);
+  });
+
+  // 2026-08-02 : e2e - 페이지 워크스페이스 - 사이드바 검색/정렬
+  // 컴포넌트 테스트(PageWorkspace.test.tsx)는 PageEditor를 스텁으로 대체해 검증하지만,
+  // 실제 입력 필드·select 조작이 실 브라우저에서도 그대로 동작하는지는 별도로 확인해야 한다.
+  test("사이드바 검색으로 필터링하고 이름순 정렬로 순서를 바꿀 수 있다", async ({ page }) => {
+    const ts = Date.now();
+    const titleA = `e2e-${ts}-가가`;
+    const titleB = `e2e-${ts}-나나`;
+
+    async function createBlankPage(title: string) {
+      await page.goto("/pages");
+      await page.getByRole("button", { name: "새 페이지 메뉴" }).click();
+      await page.getByRole("button", { name: "빈 페이지" }).click();
+      await page.getByLabel("페이지 제목").fill(title);
+      await page.locator('[contenteditable="true"]').first().click();
+      await page.keyboard.type("본문");
+      await waitForPageSave(page);
+    }
+
+    await createBlankPage(titleA);
+    await createBlankPage(titleB);
+
+    // 검색: "가가"로 좁히면 "나나"는 트리에서 사라진다.
+    await page.getByLabel("페이지 검색").fill("가가");
+    await expect(
+      page.locator("aside").getByText(titleA, { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator("aside").getByText(titleB, { exact: true }),
+    ).toHaveCount(0);
+
+    // 검색 초기화: 둘 다 다시 보인다.
+    await page.getByLabel("검색 초기화").click();
+    await expect(
+      page.locator("aside").getByText(titleA, { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator("aside").getByText(titleB, { exact: true }),
+    ).toBeVisible();
+
+    // 이름순 정렬: "가가"(ㄱ)가 "나나"(ㄴ)보다 앞에 온다.
+    await page.getByLabel("페이지 정렬 기준").selectOption("name");
+    const orderedTitles = (
+      await page.locator("aside").getByRole("link").allTextContents()
+    ).filter((t) => t.includes(titleA) || t.includes(titleB));
+    expect(orderedTitles).toHaveLength(2);
+    expect(orderedTitles[0]).toContain(titleA);
+    expect(orderedTitles[1]).toContain(titleB);
+
+    // 정리: 두 페이지 모두 휴지통으로 보낸다.
+    await page
+      .locator("aside")
+      .getByRole("button", { name: `${titleA} 삭제` })
+      .click();
+    await page
+      .locator("aside")
+      .getByRole("button", { name: `${titleB} 삭제` })
+      .click();
+    await expect(
+      page.locator("aside").getByText(titleA, { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator("aside").getByText(titleB, { exact: true }),
     ).toHaveCount(0);
   });
 });

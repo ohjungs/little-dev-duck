@@ -10,6 +10,8 @@ import {
   softDeletePage,
 } from "@ldd/api";
 import { reindexSource } from "@ldd/ai";
+import { subscribeTable } from "@/lib/realtime";
+import { PAGE_TEMPLATES } from "@/lib/pageTemplates";
 import { PageWorkspace } from "@/components/PageWorkspace";
 
 // 2026-08-02 : 테스트 - PageWorkspace - 트리/CRUD/라우팅 계약 잠금
@@ -165,6 +167,54 @@ describe("PageWorkspace — pageId 선택", () => {
       await screen.findByText("편집 중: 본문 채워질 페이지"),
     ).not.toBeNull();
   });
+
+  // 2026-08-02 : 테스트 - PageWorkspace - realtime 재조회 content 유실(리마운트 경합) 회귀 고정
+  // listPages는 content를 조회하지 않아 항상 null을 준다. realtime 이벤트(자기 자신의 저장
+  // 왕복 포함)마다 fetchPages()가 재실행되는데, 그 결과로 이미 getPage/자동저장으로 채워둔
+  // "현재 편집 중" 페이지의 content가 다시 null로 덮이면 렌더 게이트가 PageEditor를 강제
+  // 언마운트시켜 title 등 로컬 편집 state가 유실된다("복제 시 제목 없음" 회귀의 원인).
+  it("content를 채운 뒤 realtime 이벤트로 재조회해도 content를 잃지 않아 에디터가 리마운트되지 않는다", async () => {
+    // 다른 테스트에 영향이 남지 않도록 Once로 이 테스트의 1회 호출에만 적용한다
+    // (이 효과는 마운트 시 1회만 getUser를 호출한다).
+    mockSupabase.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: "u1" } },
+    });
+    const shallow = makePage({ id: "p1", title: "편집 중인 페이지", content: null });
+    vi.mocked(listPages).mockResolvedValue([shallow]);
+    let resolveGetPage!: (page: Page) => void;
+    vi.mocked(getPage).mockReturnValue(
+      new Promise<Page>((resolve) => {
+        resolveGetPage = resolve;
+      }),
+    );
+
+    render(<PageWorkspace pageId="p1" />);
+    await screen.findByText("편집 중인 페이지");
+    expect(screen.queryByTestId("page-editor-stub")).toBeNull();
+
+    resolveGetPage(
+      makePage({
+        id: "p1",
+        title: "편집 중인 페이지",
+        content: [{ type: "paragraph" }],
+      }),
+    );
+    await screen.findByText("편집 중: 편집 중인 페이지");
+
+    await waitFor(() => expect(subscribeTable).toHaveBeenCalled());
+    const onChange = vi.mocked(subscribeTable).mock.calls[0][3];
+
+    // realtime 이벤트 시뮬레이션: fetchPages()가 재실행되고, listPages 모의값은 여전히
+    // content: null인 얕은 레코드를 준다(실제 DB 응답과 동일한 모양).
+    onChange();
+    await waitFor(() => expect(listPages).toHaveBeenCalledTimes(2));
+
+    // 병합 로직이 이미 채운 content를 지켜, 에디터가 로딩 상태로 되돌아가거나 재마운트되지 않는다.
+    expect(screen.getByTestId("page-editor-stub")).not.toBeNull();
+    expect(screen.getByText("편집 중: 편집 중인 페이지")).not.toBeNull();
+    // content가 유지됐다면 "본문유실 보강" 이펙트가 다시 getPage를 부를 이유가 없다.
+    expect(getPage).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("PageWorkspace — 새 페이지 생성", () => {
@@ -195,6 +245,58 @@ describe("PageWorkspace — 새 페이지 생성", () => {
     expect(
       await screen.findByText("페이지를 만들지 못했습니다. 다시 시도해 주세요."),
     ).not.toBeNull();
+  });
+
+  // 2026-08-02 : 테스트 - PageWorkspace - 템플릿으로 새 페이지 생성 계약 잠금
+  // "회의록"은 datedTitle이 없어 제목이 날짜와 무관하게 결정적이다(daily/weekly-retro/diary는
+  // 만든 날짜가 붙어 비결정적이라 피한다). 메뉴 열림(aria-expanded) → 템플릿 클릭 → createPage
+  // 인자가 템플릿의 title/content 그대로, dbSchema는 undefined로 전달되는지 확인한다.
+  it("템플릿 메뉴에서 '회의록'을 고르면 해당 템플릿의 제목·본문으로 createPage를 호출한다", async () => {
+    vi.mocked(listPages).mockResolvedValue([]);
+    const meeting = PAGE_TEMPLATES.find((t) => t.key === "meeting")!;
+    vi.mocked(createPage).mockResolvedValue(makePage({ id: "tpl-meeting" }));
+
+    render(<PageWorkspace pageId={null} />);
+    const menuButton = await screen.findByRole("button", {
+      name: "새 페이지 메뉴",
+    });
+    expect(menuButton.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(menuButton);
+    expect(menuButton.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(screen.getByText(meeting.label).closest("button")!);
+
+    await waitFor(() =>
+      expect(createPage).toHaveBeenCalledWith(mockSupabase, {
+        title: meeting.title,
+        content: meeting.content,
+        dbSchema: undefined,
+      }),
+    );
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/pages/tpl-meeting"),
+    );
+  });
+
+  // 데이터베이스 템플릿("프로젝트 트래커")은 dbSchema가 그대로 전달돼야 표/보드 뷰가 살아난다.
+  it("데이터베이스 템플릿을 고르면 dbSchema가 함께 createPage로 전달된다", async () => {
+    vi.mocked(listPages).mockResolvedValue([]);
+    const tracker = PAGE_TEMPLATES.find((t) => t.key === "project-tracker")!;
+    vi.mocked(createPage).mockResolvedValue(makePage({ id: "tpl-tracker" }));
+
+    render(<PageWorkspace pageId={null} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "새 페이지 메뉴" }),
+    );
+    fireEvent.click(screen.getByText(tracker.label).closest("button")!);
+
+    await waitFor(() =>
+      expect(createPage).toHaveBeenCalledWith(mockSupabase, {
+        title: tracker.title,
+        content: tracker.content,
+        dbSchema: tracker.dbSchema,
+      }),
+    );
   });
 });
 

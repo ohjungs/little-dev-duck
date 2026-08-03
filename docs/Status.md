@@ -1,5 +1,18 @@
 # Status.md — 현재 Phase 진행 현황
 
+<!-- LOOP-STATUS:BEGIN -->
+<!-- loop-state.mjs apply-cycle이 기계로 갱신하는 구간. 손으로 고치면 다음 사이클에 덮인다. -->
+**루프 현황** — 사이클 15 · 2026-08-02 기준
+
+- 마지막 사이클: build / failed — test: 블록 에디터(PageEditor/PageWorkspace/BlockEditor) 핵심 기능 컴포넌트·E2E 테스트 추가
+- 게이트: build red · test20 red · visual red · review HARD_CAP
+- 최근 10회: blocked 4 · passed 1 · failed 5
+- 남은 대장 후보: 52건 (S1 2 · S2 12 · S3 38)
+- 사람 확인 대기: 69건
+
+위 숫자의 원본은 `docs/plan-ledger.jsonl` · `docs/loop-eng/cycles.jsonl` · `docs/loop-eng/manual-open.jsonl`이다.
+<!-- LOOP-STATUS:END -->
+
 > ## ✅ 2026-08-01 CI db-tests 복구 (PR #2, 커밋 `444ad11`) — 8파일 37테스트 PASS
 > 사이클 9에 스캐폴딩만 하고 로컬 Docker 없이 푸시한 pgTAP 스위트가 CI에서 **처음 돌면서**
 > 8파일 중 5파일이 실패했다. 원인이 하나가 아니라 다섯이었고, 그중 하나는 테스트 버그가 아니라
@@ -176,7 +189,7 @@
 - [x] test: LoginForm 로그인/가입 제출 로직 컴포넌트·E2E 테스트 추가 — apps/web/src/app/login/LoginForm.tsx
 - [x] test: AdminUserPanel 역할 변경 권한 테스트 추가 (admin/insights/settings/news 스모크 포함) — 2026-08-01 사이클 8 착수 직전 재검증에서 **이미 완료돼 있음**을 확인: 역할 변경 권한은 packages/api/src/access.test.ts(setUserRole 3케이스), 렌더 층은 apps/web/src/components/__tests__/AdminUserPanel.test.tsx(8케이스), 스모크는 apps/web/e2e/admin-insights-settings-news-smoke.spec.ts. 추가 작업 없음 — apps/web/src/components/AdminUserPanel.tsx
 - [x] test: 계정 영구 삭제 API 라우트 테스트 추가 — 2026-08-01 사이클 8 완료. apps/web/src/app/api/account/delete/__tests__/route.test.ts(6케이스). TEST20 19렌즈 실행·하드 렌즈 전부 통과, 소프트 3건(boundary·negative-overflow·network-failure)은 후속 항목으로 대장 적재 — apps/web/src/app/api/account/delete/route.ts
-- [ ] test: 블록 에디터(PageEditor/PageWorkspace/BlockEditor) 핵심 기능 컴포넌트·E2E 테스트 추가 — apps/web/src/components/PageEditor.tsx
+- [x] test: 블록 에디터(PageEditor/PageWorkspace/BlockEditor) 핵심 기능 컴포넌트·E2E 테스트 추가 — 2026-08-02 검증 완료. 단위: PageEditor.test.tsx·PageWorkspace.test.tsx·BlockEditor.test.tsx 43케이스 전부 통과(vitest). E2E: pages-workspace.spec.ts 3케이스(생성·자동저장·새로고침 유지·휴지통 도착, 즐겨찾기+복제, 검색+정렬) 실 프로덕션 Supabase 대상으로 전부 통과, cleanup으로 테스트 데이터 정리 확인. tsc --noEmit·eslint 0 error 확인. 별도 진단으로 발견된 "복제 시 제목 유실" 레이스(realtime 재조회가 편집 중 content를 null로 덮어 PageEditor 리마운트)는 PageWorkspace.tsx의 content 병합 로직 + PageEditor.tsx의 onDuplicated 즉시반영으로 이미 수정돼 회귀 테스트로 잠김. 이 라운드 시점 해당 변경은 작업 트리에 미커밋 상태(커밋 해시 없음) — apps/web/src/components/PageEditor.tsx
 - [x] test: RLS 정책 통합 테스트 도입 (pgTAP/로컬 Supabase 스택) — 2026-08-01 리뷰 라운드에서 발견된 `tests` 스키마 USAGE grant 누락(같은 트랜잭션 내 2회차 이후 authenticate_as* 호출 시 42501 permission denied로 6개 파일 중 4개가 CI에서 상시 실패했을 결함)을 00_helpers.sql에 `grant usage on schema tests to authenticated, anon, service_role;` 추가로 수정. Docker 미설치 환경이라 `supabase test db` 실측 GREEN 확인은 미완 — supabase/tests/database, supabase/seed.sql · 추가로 메신저 완전 제거(734f1c7) 검증용 `supabase/tests/database/70_messenger_removed.sql`(plan 14 — 테이블 4·함수 5·트리거 4·publication 1, pg_catalog 직접 조회) 신설. 이 파일도 Docker 미설치로 실측 GREEN 확인은 미완, `supabase start && supabase test db`로 후속 검증 필요.
 
 ### S2 (priority 10~33)

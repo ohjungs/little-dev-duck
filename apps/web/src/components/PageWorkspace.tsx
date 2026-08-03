@@ -200,7 +200,25 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
   const fetchPages = () => {
     listPages(supabase).then(
       (data) => {
-        setPages(data);
+        // 2026-08-02 : 페이지 - 복제 - 제목유실 - 리마운트경합 수정
+        // listPages는 content를 조회하지 않아 매번 null로 온다(위 listPages 주석 참고). 이 함수는
+        // 초기 로드뿐 아니라 realtime 이벤트(자기 자신의 저장 왕복 포함)마다도 재호출되는데,
+        // 그대로 setPages(data)하면 이미 getPage/자동저장으로 채워둔 "현재 편집 중인" 페이지의
+        // content까지 매번 null로 되돌아가, 아래 렌더 게이트(content != null)가 PageEditor를
+        // 강제로 언마운트→재마운트시킨다. 재마운트는 title/latest 로컬 state를 page prop의
+        // 그 시점 값(아직 최신 저장이 반영 안 됐을 수 있는 옛 값)으로 리셋하고, 그 직후 복제를
+        // 누르면 latest.current.title이 비어 "제목 없음"으로 복제되는 회귀가 있었다.
+        // 이미 로컬에 채운 content가 있으면 이 얕은 재조회로 덮어쓰지 않고 유지한다
+        // (title/icon 등 나머지 필드는 여전히 최신값으로 갱신 — 다른 기기 변경 반영은 유지).
+        setPages((prev) => {
+          const prevById = new Map(prev.map((p) => [p.id, p]));
+          return data.map((p) => {
+            const existing = prevById.get(p.id);
+            return existing && existing.content != null
+              ? { ...p, content: existing.content }
+              : p;
+          });
+        });
         setState("ready");
       },
       () => setState("error"),
@@ -665,6 +683,7 @@ export function PageWorkspace({ pageId }: { pageId: string | null }) {
               page={current}
               breadcrumb={breadcrumb}
               onSaved={(patch) => handleSaved(current.id, patch)}
+              onDuplicated={(created) => setPages((prev) => [...prev, created])}
             />
           ) : (
             <div

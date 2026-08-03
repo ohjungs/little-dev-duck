@@ -99,10 +99,17 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 export function PageEditor({
   page,
   onSaved,
+  onDuplicated,
   breadcrumb,
 }: {
   page: Page;
   onSaved?: (patch: { title: string; content: unknown }) => void;
+  // 2026-08-02 : 페이지 - 복제 - 즉시반영
+  // 복제로 만든 페이지를 상위(PageWorkspace)의 사이드바 목록에 즉시 반영한다. 이걸 빠뜨리면
+  // 새 페이지가 목록에 나타날 때까지 전적으로 realtime 왕복에 의존하게 되어, 그 사이 이동한
+  // 새 페이지 화면이 "목록에 없는 페이지"로 잠깐 보일 수 있고 경합 창도 넓어진다
+  // (PageWorkspace의 handleCreate/handleImportTemplate/handleDuplicate와 동일한 관례).
+  onDuplicated?: (created: Page) => void;
   // 상위 페이지 체인(root→parent). 중첩 페이지 내비게이션. 없으면 렌더 안 함.
   breadcrumb?: Page[];
 }) {
@@ -440,6 +447,7 @@ export function PageEditor({
         icon: icon,
         parentId: page.parentId,
       });
+      onDuplicated?.(newPage);
       router.push(`/pages/${newPage.id}`);
     } catch {
       flashMsg("복제에 실패했습니다.");
