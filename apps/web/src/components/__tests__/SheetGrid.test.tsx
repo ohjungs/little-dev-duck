@@ -303,6 +303,174 @@ describe("SheetGrid 채우기 핸들", () => {
   });
 });
 
+// 2026-08-02 : T7 — 서식(굵게·정렬·숫자서식) · 열 너비 · 틀 고정
+
+function renderWithMeta(cells: Cell[], meta: Sheet["meta"], onMetaChange = vi.fn()) {
+  const onCellsCommit = vi.fn();
+  render(
+    <SheetGrid
+      sheet={{ ...SHEET, meta }}
+      cells={cells}
+      onCellsCommit={onCellsCommit}
+      onMetaChange={onMetaChange}
+    />,
+  );
+  return {
+    onCellsCommit,
+    onMetaChange,
+    input: screen.getByLabelText("셀 편집") as HTMLInputElement,
+  };
+}
+
+describe("SheetGrid 서식", () => {
+  it("굵게를 누르면 팔레트에 서식이 생기고 셀이 그 인덱스를 가리킨다", () => {
+    const { onCellsCommit, onMetaChange } = renderWithMeta(
+      [cell(0, 0, "글자")],
+      createDefaultSheetMeta(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "굵게" }));
+
+    expect(onMetaChange).toHaveBeenCalledWith(
+      expect.objectContaining({ styles: [{ bold: true }] }),
+    );
+    expect(onCellsCommit).toHaveBeenCalledWith([
+      { r: 0, c: 0, v: "글자", f: null, s: 0 },
+    ]);
+  });
+
+  it("이미 굵은 셀에서 다시 누르면 굵기가 빠진다(토글)", () => {
+    const meta = { ...createDefaultSheetMeta(), styles: [{ bold: true }] };
+    const { onCellsCommit } = renderWithMeta([{ r: 0, c: 0, v: "글자", f: null, s: 0 }], meta);
+    fireEvent.click(screen.getByRole("button", { name: "굵게" }));
+    expect(onCellsCommit).toHaveBeenCalledWith([
+      { r: 0, c: 0, v: "글자", f: null, s: null },
+    ]);
+  });
+
+  it("서식은 선택한 범위 전체에 적용된다", () => {
+    const { input, onCellsCommit } = renderWithMeta(
+      [cell(0, 0, 1), cell(1, 0, 2)],
+      createDefaultSheetMeta(),
+    );
+    fireEvent.keyDown(input, { key: "ArrowDown", shiftKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "굵게" }));
+    expect(onCellsCommit.mock.calls[0][0]).toHaveLength(2);
+  });
+
+  it("숫자 서식이 셀 표시에 적용된다", () => {
+    renderWithMeta([{ r: 0, c: 0, v: 1234.5, f: null, s: 0 }], {
+      ...createDefaultSheetMeta(),
+      styles: [{ numFmt: "#,##0.00" }],
+    });
+    expect(screen.getByRole("gridcell", { name: "1,234.50" })).toBeTruthy();
+  });
+
+  it("굵게·정렬이 실제 스타일로 그려진다", () => {
+    renderWithMeta([{ r: 0, c: 0, v: "글자", f: null, s: 0 }], {
+      ...createDefaultSheetMeta(),
+      styles: [{ bold: true, align: "center" }],
+    });
+    const el = screen.getByRole("gridcell", { name: "글자" });
+    expect(el.className).toContain("font-bold");
+    expect(el.className).toContain("text-center");
+  });
+});
+
+describe("SheetGrid 열 너비와 틀 고정", () => {
+  it("meta의 열 너비가 셀 위치에 반영된다", () => {
+    renderWithMeta([cell(0, 1, "B")], {
+      ...createDefaultSheetMeta(),
+      cols: { "0": { w: 200 } },
+    });
+    // A열이 200이면 B열은 머리글 너비(52) + 200에서 시작한다.
+    expect(screen.getByRole("gridcell", { name: "B" }).style.left).toBe("252px");
+  });
+
+  it("열 경계를 끌면 그 열의 너비가 저장된다", () => {
+    const { onMetaChange } = renderWithMeta([], createDefaultSheetMeta());
+    const handle = screen.getByLabelText("A열 너비 조절");
+    fireEvent.mouseDown(handle, { clientX: 100 });
+    fireEvent.mouseMove(window, { clientX: 160 });
+    fireEvent.mouseUp(window);
+    expect(onMetaChange).toHaveBeenCalledWith(
+      expect.objectContaining({ cols: { "0": { w: 164 } } }),
+    );
+  });
+
+  it("틀 고정 버튼은 선택한 칸 위쪽·왼쪽을 고정한다", () => {
+    const { input, onMetaChange } = renderWithMeta([], createDefaultSheetMeta());
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("button", { name: "틀 고정" }));
+    expect(onMetaChange).toHaveBeenCalledWith(
+      expect.objectContaining({ freeze: { r: 1, c: 1 } }),
+    );
+  });
+
+  it("이미 고정돼 있으면 같은 버튼이 해제한다", () => {
+    const { onMetaChange } = renderWithMeta([], {
+      ...createDefaultSheetMeta(),
+      freeze: { r: 1, c: 0 },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "틀 고정 해제" }));
+    expect(onMetaChange).toHaveBeenCalledWith(
+      expect.objectContaining({ freeze: { r: 0, c: 0 } }),
+    );
+  });
+
+  it("틀 고정된 행은 스크롤해도 자리를 지킨다", () => {
+    renderWithMeta([cell(0, 0, "머리")], {
+      ...createDefaultSheetMeta(),
+      freeze: { r: 1, c: 0 },
+    });
+    const frozen = screen.getByRole("gridcell", { name: "머리" });
+    // 고정된 줄은 스크롤 값을 더해 제자리에 붙는다(스크롤 0에서는 원래 자리).
+    expect(frozen.style.zIndex).toBe("15");
+  });
+});
+
+describe("SheetGrid 병합", () => {
+  it("범위를 병합하면 meta에 기록되고 좌상단만 남는다", () => {
+    const { input, onMetaChange, onCellsCommit } = renderWithMeta(
+      [cell(0, 0, "제목"), cell(0, 1, "지워질 값")],
+      createDefaultSheetMeta(),
+    );
+    fireEvent.keyDown(input, { key: "ArrowRight", shiftKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "병합" }));
+
+    expect(onMetaChange).toHaveBeenCalledWith(
+      expect.objectContaining({ merges: ["A1:B1"] }),
+    );
+    // 좌상단을 뺀 칸의 값은 사라진다(엑셀과 같다 — 가려진 값이 남아 있으면 나중에 유령이 된다).
+    expect(onCellsCommit).toHaveBeenCalledWith([
+      { r: 0, c: 1, v: null, f: null, s: null },
+    ]);
+  });
+
+  it("병합된 칸은 좌상단 하나만 그려지고 넓게 차지한다", () => {
+    renderWithMeta([cell(0, 0, "넓은 제목")], {
+      ...createDefaultSheetMeta(),
+      merges: ["A1:B1"],
+    });
+    const el = screen.getByRole("gridcell", { name: "넓은 제목" });
+    // 열 두 칸(104 × 2)
+    expect(el.style.width).toBe("208px");
+    // 가려진 칸은 렌더하지 않는다.
+    expect(
+      screen.getByRole("grid").querySelector('[aria-rowindex="2"] [aria-colindex="3"]'),
+    ).toBeNull();
+  });
+
+  it("병합된 칸에서 다시 누르면 해제된다", () => {
+    const { onMetaChange } = renderWithMeta([cell(0, 0, "제목")], {
+      ...createDefaultSheetMeta(),
+      merges: ["A1:B1"],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "병합 해제" }));
+    expect(onMetaChange).toHaveBeenCalledWith(expect.objectContaining({ merges: [] }));
+  });
+});
+
 describe("SheetGrid 실행취소", () => {
   it("Ctrl+Z가 옛 값을 되돌리고 Ctrl+Y가 다시 넣는다", () => {
     const { input, onCellsCommit } = renderGrid([cell(0, 0, "옛값")]);

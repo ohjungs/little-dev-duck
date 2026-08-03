@@ -330,6 +330,14 @@ export {
 export { shiftFormulaRefs } from "./domain/sheet-shift";
 export { parseDelimited, toDelimited } from "./domain/sheet-clipboard";
 export { fillValues } from "./domain/sheet-fill";
+// 2026-08-02 : 스프레드시트 서식 (SPEC T7)
+export {
+  MAX_STYLES,
+  applyStyle,
+  styleAt,
+  displayCellText,
+  alignOf,
+} from "./domain/sheet-format";
 // 2026-08-02 : 스프레드시트 함수 1차 (SPEC T4)
 export {
   createFormulaFunctions,

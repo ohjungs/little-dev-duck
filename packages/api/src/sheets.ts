@@ -3,9 +3,11 @@ import {
   MAX_CELLS_PER_SHEET,
   cellSchema,
   isValidSheetName,
+  sheetMetaSchema,
   sheetSchema,
   type Cell,
   type Sheet,
+  type SheetMeta,
 } from "@ldd/core";
 
 // 2026-08-02 : 스프레드시트 - 저장 계층 - 읽기·쓰기 (SPEC-2026-08-02-spreadsheet-a1 T5)
@@ -99,6 +101,33 @@ export async function createSheet(
 
   if (error) throw new Error(error.message);
   return fromSheetRow(data as SheetRow);
+}
+
+/**
+ * 시트 메타(열 너비·행 높이·틀 고정·병합·이름 정의·서식 팔레트)를 통째로 저장한다.
+ *
+ * 셀과 달리 부분 갱신을 하지 않는 이유: 메타는 작고(셀 개수와 무관하다) 한 화면 조작이
+ * 여러 키를 동시에 건드린다(열을 끌면 cols가, 서식을 주면 styles가 바뀐다). 통째로 쓰면
+ * "어느 키를 보냈나"를 따질 필요가 없다.
+ *
+ * **보내기 전에 스키마로 검증한다.** 화면에서 열 너비를 0까지 끌어 버리는 것 같은 값이
+ * 그대로 나가면 DB는 받아 주고(jsonb라 제약이 없다) 다음에 불러올 때 화면이 깨진다.
+ */
+export async function updateSheetMeta(
+  supabase: SupabaseClient,
+  sheetId: string,
+  meta: SheetMeta,
+): Promise<SheetMeta> {
+  const parsed = sheetMetaSchema.parse(meta);
+  await requireUserId(supabase);
+
+  const { error } = await supabase
+    .from("sheets")
+    .update({ meta: parsed, updated_at: new Date().toISOString() })
+    .eq("id", sheetId);
+
+  if (error) throw new Error(error.message);
+  return parsed;
 }
 
 // 한 번에 요청하는 셀 수. 서버가 이보다 적게 줄 수 있다(PostgREST max-rows).

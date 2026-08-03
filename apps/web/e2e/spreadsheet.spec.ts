@@ -170,6 +170,81 @@ test.describe("스프레드시트 — 격자·수식·키보드", () => {
     await expect(cellAt(page, 3, 0)).toHaveText("");
   });
 
+  test("서식·열 너비·틀 고정·병합이 새로고침 뒤에도 남는다", async ({ page }) => {
+    await createSheetPage(page, `e2e-sheet-fmt-${Date.now()}`);
+
+    // A1에 값을 넣고 굵게 + 천 단위 서식.
+    await focusCell(page, 0, 0);
+    await page.keyboard.type("1234.5");
+    await page.keyboard.press("Enter");
+    await focusCell(page, 0, 0);
+
+    const metaSave = page.waitForResponse(
+      (res) =>
+        res.url().includes("/rest/v1/sheets") &&
+        res.request().method() === "PATCH" &&
+        res.ok(),
+    );
+    await page.getByRole("button", { name: "굵게" }).click();
+    await page.getByLabel("숫자 서식").selectOption("#,##0.00");
+    await expect(cellAt(page, 0, 0)).toHaveText("1,234.50");
+    await expect(cellAt(page, 0, 0)).toHaveClass(/font-bold/);
+    await metaSave;
+
+    // 열 너비를 끌어 넓힌다.
+    const handle = page.getByLabel("A열 너비 조절");
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 80, box.y + box.height / 2, { steps: 5 });
+    const widthSave = page.waitForResponse(
+      (res) =>
+        res.url().includes("/rest/v1/sheets") &&
+        res.request().method() === "PATCH" &&
+        res.ok(),
+    );
+    await page.mouse.up();
+    await widthSave;
+
+    // 틀 고정.
+    await focusCell(page, 1, 0);
+    const freezeSave = page.waitForResponse(
+      (res) =>
+        res.url().includes("/rest/v1/sheets") &&
+        res.request().method() === "PATCH" &&
+        res.ok(),
+    );
+    await page.getByRole("button", { name: "틀 고정" }).click();
+    await freezeSave;
+
+    // 병합: A3:B3을 합치면 좌상단 하나가 두 칸을 차지한다.
+    await focusCell(page, 2, 0);
+    await page.keyboard.press("Shift+ArrowRight");
+    const mergeSave = page.waitForResponse(
+      (res) =>
+        res.url().includes("/rest/v1/sheets") &&
+        res.request().method() === "PATCH" &&
+        res.ok(),
+    );
+    await page.getByRole("button", { name: "병합" }).click();
+    await mergeSave;
+    await expect(
+      page.locator('[role="row"][aria-rowindex="4"] [role="gridcell"][aria-colindex="3"]'),
+    ).toHaveCount(0);
+
+    // 새로고침해도 서식·너비·고정·병합이 남는다.
+    await page.reload();
+    // 새로고침하면 선택은 A1로 돌아간다. 병합 여부는 **선택한 칸** 기준이라 그 칸을 다시 고른다.
+    await focusCell(page, 2, 0);
+    await expect(page.getByRole("button", { name: "병합 해제" })).toBeVisible();
+    await focusCell(page, 0, 0);
+    await expect(cellAt(page, 0, 0)).toHaveText("1,234.50");
+    await expect(cellAt(page, 0, 0)).toHaveClass(/font-bold/);
+    const width = await cellAt(page, 0, 0).evaluate((el) => (el as HTMLElement).style.width);
+    expect(Number.parseInt(width, 10)).toBeGreaterThan(150);
+    await expect(page.getByRole("button", { name: "틀 고정 해제" })).toBeVisible();
+  });
+
   test("E6: 마우스 없이 이름 상자·방향키·F2·Esc로 이동하고 편집한다", async ({ page }) => {
     await createSheetPage(page, `e2e-sheet-kbd-${Date.now()}`);
 

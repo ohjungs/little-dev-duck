@@ -8,8 +8,9 @@ import {
   listSheets,
   loadSheetCells,
   saveCells,
+  updateSheetMeta,
 } from "@ldd/api";
-import { canUseFeature, cellKey, type Cell, type Sheet } from "@ldd/core";
+import { canUseFeature, cellKey, type Cell, type Sheet, type SheetMeta } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { SheetGrid } from "@/components/SheetGrid";
 
@@ -34,6 +35,8 @@ export function SheetPanel({ pageId }: { pageId: string }) {
 
   // 아직 저장되지 않은 셀. 키가 셀 좌표라 같은 셀을 연달아 고치면 마지막 것만 남는다.
   const pending = useRef(new Map<string, Cell>());
+  // 아직 저장되지 않은 시트 메타. 셀과 달리 통째로 쓰므로 마지막 것 하나만 들고 있으면 된다.
+  const pendingMeta = useRef<SheetMeta | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sheetId = useRef<string | null>(null);
   // 언마운트 정리 함수는 처음 만들어진 flush를 붙들기 때문에, 최신 flush를 ref로 건네준다.
@@ -84,12 +87,18 @@ export function SheetPanel({ pageId }: { pageId: string }) {
     }
     const id = sheetId.current;
     const batch = [...pending.current.values()];
-    if (!id || batch.length === 0) return;
+    const meta = pendingMeta.current;
+    if (!id || (batch.length === 0 && meta === null)) return;
     pending.current.clear();
+    pendingMeta.current = null;
     try {
-      await saveCells(supabase, id, batch);
+      // 메타를 먼저 쓴다 — 셀이 가리키는 서식 인덱스가 팔레트에 없는 순간을 만들지 않기 위해서다
+      // (그 사이 다른 기기가 읽으면 서식 없는 셀로 보인다).
+      if (meta) await updateSheetMeta(supabase, id, meta);
+      if (batch.length > 0) await saveCells(supabase, id, batch);
       setSaveError(null);
     } catch {
+      if (meta && pendingMeta.current === null) pendingMeta.current = meta;
       // 실패한 편집을 **버리지 않는다.** 다시 대기열에 넣어 다음 저장에 함께 실린다
       // (새로 고친 셀이 있으면 그쪽이 이긴다 — 나중 것이 최신이다).
       for (const cell of batch) {
@@ -123,6 +132,19 @@ export function SheetPanel({ pageId }: { pageId: string }) {
       return [...rest, ...kept];
     });
     for (const cell of next) pending.current.set(cellKey(cell.r, cell.c), cell);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      void flushRef.current();
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  // 시트 메타(서식 팔레트·열 너비·틀 고정)는 셀과 **같은 디바운스**를 탄다. 열을 끄는 동안
+  // mousemove마다 저장하면 왕복이 수십 번 나기 때문이다. 화면은 바로 새 meta로 그려지고
+  // (아래 setSheet), 서버 저장만 늦게 따라간다.
+  function handleMetaChange(next: SheetMeta): void {
+    setSheet((prev) => (prev ? { ...prev, meta: next } : prev));
+    pendingMeta.current = next;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       timer.current = null;
@@ -185,7 +207,12 @@ export function SheetPanel({ pageId }: { pageId: string }) {
           {saveError}
         </p>
       )}
-      <SheetGrid sheet={sheet} cells={cells} onCellsCommit={handleCommit} />
+      <SheetGrid
+        sheet={sheet}
+        cells={cells}
+        onCellsCommit={handleCommit}
+        onMetaChange={handleMetaChange}
+      />
     </div>
   );
 }

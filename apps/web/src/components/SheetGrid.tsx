@@ -2,21 +2,29 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
+  alignOf,
+  applyStyle,
   cellKey,
   colToLetters,
   createFormulaFunctions,
+  displayCellText,
   formatCellRef,
   nodeKey,
   parseCellInput,
+  parseCellRange,
   parseCellRef,
   recalcAll,
+  styleAt,
   type Cell,
+  type CellStyle,
   type EvalValue,
   type Sheet,
   type SheetCells,
+  type SheetMeta,
   type Workbook,
 } from "@ldd/core";
 import { isComposingEnter } from "@/lib/composition";
+import { buildAxis } from "@/lib/sheetAxis";
 import {
   buildCopyBlock,
   buildCopyText,
@@ -57,16 +65,76 @@ const PAD_COLS = 4;
 // 첫 렌더는 이 크기로 그리고, 실제 크기를 잰 뒤(>0) 그 값으로 갈아탄다.
 const DEFAULT_VIEWPORT = { w: 900, h: 420 };
 
-function toDisplay(v: EvalValue | undefined): string {
-  if (v === null || v === undefined) return "";
-  if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-  if (typeof v === "number") {
-    if (!Number.isFinite(v)) return "#NUM!";
-    // 0.1 + 0.2가 "0.30000000000000004"로 보이지 않게 유효숫자 15자리에서 끊는다(엑셀과 같다).
-    // 숫자 서식(numFmt) 해석은 T7의 일이고, 여기는 "맨눈에 틀려 보이는 것"만 막는다.
-    return String(Number(v.toPrecision(15)));
-  }
-  return String(v);
+// 서식 버튼. 누를 때마다 **토글**이라 지금 서식을 보고 patch를 만든다(항상 켜기만 하면
+// 두 번째 누름이 아무 일도 하지 않는 것처럼 보인다).
+const FORMAT_BUTTONS: {
+  label: string;
+  text: string;
+  className?: string;
+  pressed: (s: CellStyle) => boolean;
+  patch: (s: CellStyle) => Partial<CellStyle>;
+}[] = [
+  {
+    label: "굵게",
+    text: "B",
+    className: "font-bold",
+    pressed: (s) => s.bold === true,
+    patch: (s) => ({ bold: !s.bold }),
+  },
+  {
+    label: "기울임",
+    text: "I",
+    className: "italic",
+    pressed: (s) => s.italic === true,
+    patch: (s) => ({ italic: !s.italic }),
+  },
+  {
+    label: "밑줄",
+    text: "U",
+    className: "underline",
+    pressed: (s) => s.underline === true,
+    patch: (s) => ({ underline: !s.underline }),
+  },
+  {
+    label: "왼쪽 정렬",
+    text: "◧",
+    pressed: (s) => s.align === "left",
+    patch: (s) => ({ align: s.align === "left" ? undefined : "left" }),
+  },
+  {
+    label: "가운데 정렬",
+    text: "◫",
+    pressed: (s) => s.align === "center",
+    patch: (s) => ({ align: s.align === "center" ? undefined : "center" }),
+  },
+  {
+    label: "오른쪽 정렬",
+    text: "◨",
+    pressed: (s) => s.align === "right",
+    patch: (s) => ({ align: s.align === "right" ? undefined : "right" }),
+  },
+];
+
+// 숫자 서식은 TEXT()와 같은 코드를 쓴다(core formatValue). 목록으로 고르게 해 오타를 없앤다.
+const NUMBER_FORMATS = [
+  { code: "", label: "일반" },
+  { code: "#,##0", label: "1,234" },
+  { code: "#,##0.00", label: "1,234.00" },
+  { code: "0.0%", label: "12.3%" },
+  { code: "yyyy-mm-dd", label: "2026-08-02" },
+];
+
+const ALIGN_CLASS: Record<"left" | "center" | "right", string> = {
+  left: "text-left",
+  center: "text-center",
+  right: "text-right",
+};
+
+/** 범위를 "A1:B2"로. meta.merges에 담기는 형식이다(T1 계약). */
+function rangeText(range: { r0: number; c0: number; r1: number; c1: number }): string {
+  const at = (r: number, c: number) =>
+    formatCellRef({ r, c, absR: false, absC: false, sheet: null });
+  return `${at(range.r0, range.c0)}:${at(range.r1, range.c1)}`;
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -77,6 +145,7 @@ export function SheetGrid({
   sheet,
   cells,
   onCellsCommit,
+  onMetaChange,
 }: {
   sheet: Sheet;
   cells: readonly Cell[];
@@ -86,6 +155,8 @@ export function SheetGrid({
    * 값이 빈 셀은 v·f·s가 모두 null이다(저장 계층이 행을 지운다).
    */
   onCellsCommit: (cells: Cell[]) => void;
+  /** 서식 팔레트·열 너비·행 높이·틀 고정이 바뀌었을 때. 없으면 그 조작이 화면에서 빠진다. */
+  onMetaChange?: (meta: SheetMeta) => void;
 }) {
   const gridId = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -153,21 +224,31 @@ export function SheetGrid({
     };
   }, [cells, sel]);
 
-  const firstRow = Math.max(0, Math.floor(scroll.top / ROW_H) - OVERSCAN);
-  const lastRow = Math.min(
-    rows - 1,
-    Math.ceil((scroll.top + viewport.h) / ROW_H) + OVERSCAN,
-  );
-  const firstCol = Math.max(0, Math.floor(scroll.left / COL_W) - OVERSCAN);
-  const lastCol = Math.min(
-    cols - 1,
-    Math.ceil((scroll.left + viewport.w) / COL_W) + OVERSCAN,
-  );
+  // 열 너비·행 높이는 meta가 정한다(예외만 담긴 희소 맵). 곱셈이 아니라 축으로 센다.
+  const colAxis = useMemo(() => buildAxis(sheet.meta.cols, COL_W), [sheet.meta.cols]);
+  const rowAxis = useMemo(() => buildAxis(sheet.meta.rows, ROW_H), [sheet.meta.rows]);
+  const freeze = sheet.meta.freeze;
 
+  const firstRow = Math.max(0, rowAxis.indexAt(scroll.top) - OVERSCAN);
+  const lastRow = Math.min(rows - 1, rowAxis.indexAt(scroll.top + viewport.h) + OVERSCAN);
+  const firstCol = Math.max(0, colAxis.indexAt(scroll.left) - OVERSCAN);
+  const lastCol = Math.min(cols - 1, colAxis.indexAt(scroll.left + viewport.w) + OVERSCAN);
+
+  // 틀 고정된 줄은 스크롤 밖으로 나가도 **늘 그린다**(그 자리에 붙어 있어야 하므로).
   const visibleRows: number[] = [];
-  for (let r = firstRow; r <= lastRow; r += 1) visibleRows.push(r);
+  for (let r = 0; r < Math.min(freeze.r, rows); r += 1) visibleRows.push(r);
+  for (let r = Math.max(firstRow, freeze.r); r <= lastRow; r += 1) visibleRows.push(r);
   const visibleCols: number[] = [];
-  for (let c = firstCol; c <= lastCol; c += 1) visibleCols.push(c);
+  for (let c = 0; c < Math.min(freeze.c, cols); c += 1) visibleCols.push(c);
+  for (let c = Math.max(firstCol, freeze.c); c <= lastCol; c += 1) visibleCols.push(c);
+
+  /** 이 줄이 틀 고정 영역인가 — 그렇다면 스크롤 값을 더해 제자리에 붙인다. */
+  const rowTop = (r: number): number =>
+    HEAD_H + rowAxis.at(r) + (r < freeze.r ? scroll.top : 0);
+  const colLeft = (c: number): number =>
+    HEAD_W + colAxis.at(c) + (c < freeze.c ? scroll.left : 0);
+  const cellZ = (r: number, c: number): number | undefined =>
+    r < freeze.r || c < freeze.c ? 15 : undefined;
 
   function measure(el: HTMLDivElement): void {
     // 0은 "아직 레이아웃 전"이다(jsdom은 언제나 0). 0으로 갈아타면 화면이 비므로 무시한다.
@@ -198,11 +279,22 @@ export function SheetGrid({
     return String(cell.v);
   }
 
+  function styleOf(r: number, c: number): CellStyle {
+    return styleAt(sheet.meta.styles, byKey.get(cellKey(r, c))?.s ?? null);
+  }
+
+  /** 이 칸의 계산된 값(수식이면 계산 결과, 아니면 입력값). */
+  function valueOf(r: number, c: number): EvalValue {
+    const cell = byKey.get(cellKey(r, c));
+    if (!cell) return null;
+    if (cell.f) return values.get(nodeKey(sheet.name, r, c)) ?? null;
+    return cell.v;
+  }
+
   function textOf(r: number, c: number): string {
     const cell = byKey.get(cellKey(r, c));
     if (!cell) return "";
-    if (cell.f) return toDisplay(values.get(nodeKey(sheet.name, r, c)));
-    return toDisplay(cell.v);
+    return displayCellText(valueOf(r, c), styleOf(r, c));
   }
 
   const range: SheetRange = normalize(sel, focus);
@@ -422,6 +514,112 @@ export function SheetGrid({
     }
   }
 
+  // ── 서식 ───────────────────────────────────────────────────────────────────
+  // 서식은 셀이 들고 있지 않고 팔레트(meta.styles) 인덱스로 가리킨다. 그래서 한 번의 조작이
+  // **meta와 셀 양쪽**을 바꾼다 — 팔레트에 항목을 (필요하면) 만들고, 범위 안의 셀이 그 인덱스를
+  // 가리키게 한다. 팔레트가 꽉 차면 조용히 넘어가지 않고 알린다.
+  const [formatError, setFormatError] = useState<string | null>(null);
+
+  function applyFormat(patch: Partial<CellStyle>): void {
+    if (!onMetaChange) return;
+    let styles = sheet.meta.styles;
+    const next: Cell[] = [];
+
+    for (let r = range.r0; r <= range.r1; r += 1) {
+      for (let c = range.c0; c <= range.c1; c += 1) {
+        const prev = byKey.get(cellKey(r, c));
+        const applied = applyStyle(styles, prev?.s ?? null, patch);
+        if (!applied) {
+          setFormatError("서식 종류가 너무 많아요(512개). 쓰지 않는 서식을 정리해 주세요.");
+          return;
+        }
+        styles = applied.styles;
+        // 값이 없는 칸에도 서식은 붙는다(엑셀과 같다 — 미리 서식을 잡아 두고 입력한다).
+        next.push({
+          r,
+          c,
+          v: prev?.v ?? null,
+          f: prev?.f ?? null,
+          s: applied.index,
+        });
+      }
+    }
+    setFormatError(null);
+    if (styles !== sheet.meta.styles) onMetaChange({ ...sheet.meta, styles });
+    applyCells(next);
+  }
+
+  /** 범위의 첫 칸 서식으로 토글 상태를 판정한다(엑셀도 활성 칸 기준이다). */
+  const activeStyle = styleOf(sel.r, sel.c);
+
+  // ── 틀 고정 ────────────────────────────────────────────────────────────────
+  // 엑셀과 같은 규칙: **선택 칸의 위쪽과 왼쪽**이 고정된다(B2를 고르고 누르면 1행과 A열).
+  const frozen = freeze.r > 0 || freeze.c > 0;
+
+  function toggleFreeze(): void {
+    if (!onMetaChange) return;
+    onMetaChange({
+      ...sheet.meta,
+      freeze: frozen ? { r: 0, c: 0 } : { r: sel.r, c: sel.c },
+    });
+  }
+
+  // ── 병합 ───────────────────────────────────────────────────────────────────
+  // 병합은 meta.merges에 "A1:B2" 문자열로 담는다(T1이 정한 계약). 화면은 좌상단 칸만 그리고
+  // 나머지는 건너뛴다.
+  const mergeOf = useMemo(() => {
+    // 가려지는 칸 -> 좌상단 좌표. 매 칸마다 목록을 훑지 않으려고 한 번만 펼친다.
+    const covered = new Map<string, { r: number; c: number }>();
+    const anchors = new Map<string, SheetRange>();
+    for (const text of sheet.meta.merges) {
+      const parsed = parseCellRange(text);
+      if (!parsed) continue;
+      const rng = normalize(
+        { r: parsed.start.r, c: parsed.start.c },
+        { r: parsed.end.r, c: parsed.end.c },
+      );
+      anchors.set(cellKey(rng.r0, rng.c0), rng);
+      for (let r = rng.r0; r <= rng.r1; r += 1) {
+        for (let c = rng.c0; c <= rng.c1; c += 1) {
+          if (r === rng.r0 && c === rng.c0) continue;
+          covered.set(cellKey(r, c), { r: rng.r0, c: rng.c0 });
+        }
+      }
+    }
+    return { covered, anchors };
+  }, [sheet.meta.merges]);
+
+  const selMergeText = (() => {
+    const rng = mergeOf.anchors.get(cellKey(range.r0, range.c0));
+    if (!rng) return null;
+    return rng.r0 === range.r0 && rng.c0 === range.c0 ? rangeText(rng) : null;
+  })();
+
+  function toggleMerge(): void {
+    if (!onMetaChange) return;
+    if (selMergeText) {
+      onMetaChange({
+        ...sheet.meta,
+        merges: sheet.meta.merges.filter((m) => m !== selMergeText),
+      });
+      return;
+    }
+    if (range.r0 === range.r1 && range.c0 === range.c1) return; // 한 칸은 병합할 것이 없다
+
+    // 가려지는 칸의 값은 지운다. 남겨 두면 병합을 풀 때 되살아나 "유령 값"이 된다.
+    const cleared: Cell[] = [];
+    for (let r = range.r0; r <= range.r1; r += 1) {
+      for (let c = range.c0; c <= range.c1; c += 1) {
+        if (r === range.r0 && c === range.c0) continue;
+        const prev = byKey.get(cellKey(r, c));
+        if (!prev) continue;
+        cleared.push({ r, c, v: null, f: null, s: null });
+      }
+    }
+    onMetaChange({ ...sheet.meta, merges: [...sheet.meta.merges, rangeText(range)] });
+    if (cleared.length > 0) applyCells(cleared);
+  }
+
   // ── 클립보드 ────────────────────────────────────────────────────────────────
   // 브라우저의 copy/cut/paste 이벤트를 그대로 쓴다(비동기 Clipboard API + 권한 요청 없이).
   // 입력칸이 늘 포커스를 쥐고 있어서 이벤트가 여기로 온다.
@@ -462,6 +660,31 @@ export function SheetGrid({
     const last = next[next.length - 1];
     setFocus({ r: last.r, c: last.c });
   }
+
+  // ── 열 너비 조절 ───────────────────────────────────────────────────────────
+  // 머리글 경계를 끄는 동안의 상태. 끝나는 순간 meta에 저장한다(끄는 내내 저장하면 왕복이
+  // 수십 번 난다). 하한은 스키마와 같은 8px — 0까지 끌어 버리면 되돌릴 손잡이가 사라진다.
+  const [resizing, setResizing] = useState<{ c: number; startX: number; startW: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!resizing || !onMetaChange) return;
+    const move = (e: MouseEvent): void => {
+      const w = Math.max(8, Math.min(2000, resizing.startW + (e.clientX - resizing.startX)));
+      onMetaChange({
+        ...sheet.meta,
+        cols: { ...sheet.meta.cols, [String(resizing.c)]: { w } },
+      });
+    };
+    const up = (): void => setResizing(null);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  });
 
   // ── 채우기 핸들 ────────────────────────────────────────────────────────────
   // 끄는 동안 목표 칸을 상태로 들고, 손을 떼는 순간 계산해서 확정한다. 목표 칸 갱신은 셀의
@@ -511,11 +734,70 @@ export function SheetGrid({
         : rawOf(sel.r, sel.c);
 
   const cellDomId = (r: number, c: number) => `${gridId}-cell-${r}-${c}`;
-  const totalW = HEAD_W + cols * COL_W;
-  const totalH = HEAD_H + rows * ROW_H;
+  const totalW = HEAD_W + colAxis.at(cols);
+  const totalH = HEAD_H + rowAxis.at(rows);
 
   return (
     <div className="mt-6 flex flex-col gap-2 px-4">
+      {onMetaChange && (
+        <div className="flex flex-wrap items-center gap-1">
+          {FORMAT_BUTTONS.map((b) => (
+            <button
+              key={b.label}
+              type="button"
+              aria-label={b.label}
+              aria-pressed={b.pressed(activeStyle)}
+              onClick={() => applyFormat(b.patch(activeStyle))}
+              className={`rounded px-2 py-1 text-xs transition-colors hover:bg-muted/60 ${
+                b.pressed(activeStyle)
+                  ? "bg-primary/15 font-medium text-foreground"
+                  : "text-muted-foreground"
+              } ${b.className ?? ""}`}
+            >
+              {b.text}
+            </button>
+          ))}
+          <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+          <button
+            type="button"
+            aria-label={frozen ? "틀 고정 해제" : "틀 고정"}
+            onClick={toggleFreeze}
+            className={`rounded px-2 py-1 text-xs transition-colors hover:bg-muted/60 ${
+              frozen ? "bg-primary/15 font-medium text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            틀 고정
+          </button>
+          <button
+            type="button"
+            aria-label={selMergeText ? "병합 해제" : "병합"}
+            onClick={toggleMerge}
+            className={`rounded px-2 py-1 text-xs transition-colors hover:bg-muted/60 ${
+              selMergeText ? "bg-primary/15 font-medium text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            병합
+          </button>
+          <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+          <select
+            aria-label="숫자 서식"
+            value={activeStyle.numFmt ?? ""}
+            onChange={(e) => applyFormat({ numFmt: e.target.value || undefined })}
+            className="rounded border border-border bg-transparent px-1 py-1 text-xs outline-none focus:ring-1 focus:ring-primary/40"
+          >
+            {NUMBER_FORMATS.map((f) => (
+              <option key={f.code} value={f.code}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {formatError && (
+        <p role="alert" className="text-xs text-destructive">
+          {formatError}
+        </p>
+      )}
       <div className="flex items-center gap-2">
         <input
           aria-label="이름 상자"
@@ -575,13 +857,25 @@ export function SheetGrid({
                     : "bg-muted/60 text-muted-foreground"
                 }`}
                 style={{
-                  left: HEAD_W + c * COL_W,
+                  left: colLeft(c),
                   top: 0,
-                  width: COL_W,
+                  width: colAxis.size(c),
                   height: HEAD_H,
                 }}
               >
                 {colToLetters(c)}
+                {onMetaChange && (
+                  <span
+                    role="separator"
+                    aria-label={`${colToLetters(c)}열 너비 조절`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setResizing({ c, startX: e.clientX, startW: colAxis.size(c) });
+                    }}
+                    className="absolute inset-y-0 right-0 w-1 cursor-col-resize hover:bg-primary/60"
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -598,24 +892,23 @@ export function SheetGrid({
                 }`}
                 style={{
                   left: scroll.left,
-                  top: HEAD_H + r * ROW_H,
+                  top: rowTop(r),
                   width: HEAD_W,
-                  height: ROW_H,
+                  height: rowAxis.size(r),
                 }}
               >
                 {r + 1}
               </div>
               {visibleCols.map((c) => {
                 // 범위 안의 칸은 모두 선택된 것으로 알린다(다중 선택 격자의 ARIA 계약).
+                // 병합에 가려진 칸은 그리지 않는다(좌상단 하나가 그 자리를 다 차지한다).
+                if (mergeOf.covered.has(cellKey(r, c))) return null;
+                const merged = mergeOf.anchors.get(cellKey(r, c));
                 const selected = inRange(range, r, c);
                 const editing = edit?.r === r && edit?.c === c;
-                const cell = byKey.get(cellKey(r, c));
                 const text = textOf(r, c);
-                const numeric =
-                  cell !== undefined &&
-                  (cell.f
-                    ? typeof values.get(nodeKey(sheet.name, r, c)) === "number"
-                    : typeof cell.v === "number");
+                const numeric = typeof valueOf(r, c) === "number";
+                const style = styleOf(r, c);
                 return (
                   <div
                     key={c}
@@ -637,8 +930,12 @@ export function SheetGrid({
                       if (fillTo !== null) setFillTo({ r, c });
                     }}
                     onDoubleClick={() => beginEdit(r, c, rawOf(r, c))}
-                    className={`absolute overflow-hidden border-b border-r border-border px-1.5 text-sm leading-[26px] whitespace-nowrap ${
-                      numeric ? "text-right tabular-nums" : "text-left"
+                    className={`absolute overflow-hidden border-b border-r border-border px-1.5 text-sm whitespace-nowrap ${
+                      ALIGN_CLASS[alignOf(style, numeric)]
+                    } ${numeric ? "tabular-nums" : ""} ${
+                      style.bold ? "font-bold" : ""
+                    } ${style.italic ? "italic" : ""} ${
+                      style.underline ? "underline" : ""
                     } ${text.startsWith("#") ? "text-destructive" : ""} ${
                       // 활성 칸은 음영에서 뺀다 — 엑셀처럼 "지금 어디를 치고 있는지"가 범위
                       // 안에서도 또렷하게 보여야 한다.
@@ -651,10 +948,17 @@ export function SheetGrid({
                       r === sel.r && c === sel.c ? "z-10 ring-2 ring-inset ring-primary" : ""
                     }`}
                     style={{
-                      left: HEAD_W + c * COL_W,
-                      top: HEAD_H + r * ROW_H,
-                      width: COL_W,
-                      height: ROW_H,
+                      left: colLeft(c),
+                      top: rowTop(r),
+                      // 병합된 칸은 오른쪽·아래 끝까지 넓힌다.
+                      width: merged
+                        ? colAxis.at(merged.c1 + 1) - colAxis.at(merged.c0)
+                        : colAxis.size(c),
+                      height: merged
+                        ? rowAxis.at(merged.r1 + 1) - rowAxis.at(merged.r0)
+                        : rowAxis.size(r),
+                      zIndex: merged ? 12 : cellZ(r, c),
+                      lineHeight: `${rowAxis.size(r)}px`,
                     }}
                   >
                     {editing ? "" : text}
@@ -697,10 +1001,10 @@ export function SheetGrid({
                 : "bg-transparent text-transparent caret-transparent"
             }`}
             style={{
-              left: HEAD_W + (edit ? edit.c : sel.c) * COL_W,
-              top: HEAD_H + (edit ? edit.r : sel.r) * ROW_H,
-              width: COL_W,
-              height: ROW_H,
+              left: colLeft(edit ? edit.c : sel.c),
+              top: rowTop(edit ? edit.r : sel.r),
+              width: colAxis.size(edit ? edit.c : sel.c),
+              height: rowAxis.size(edit ? edit.r : sel.r),
             }}
           />
 
@@ -716,8 +1020,8 @@ export function SheetGrid({
             }}
             className="absolute z-40 size-2 cursor-crosshair rounded-[1px] bg-primary"
             style={{
-              left: HEAD_W + (range.c1 + 1) * COL_W - 4,
-              top: HEAD_H + (range.r1 + 1) * ROW_H - 4,
+              left: colLeft(range.c1) + colAxis.size(range.c1) - 4,
+              top: rowTop(range.r1) + rowAxis.size(range.r1) - 4,
             }}
           />
         </div>

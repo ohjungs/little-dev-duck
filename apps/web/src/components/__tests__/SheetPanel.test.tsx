@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   createSheet,
   getMyAccess,
   listSheets,
   loadSheetCells,
   saveCells,
+  updateSheetMeta,
 } from "@ldd/api";
 import { createDefaultSheetMeta, type Sheet } from "@ldd/core";
 import { SheetPanel } from "@/components/SheetPanel";
@@ -21,6 +22,7 @@ vi.mock("@ldd/api", () => ({
   createSheet: vi.fn(),
   loadSheetCells: vi.fn(),
   saveCells: vi.fn(),
+  updateSheetMeta: vi.fn(),
 }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 
@@ -52,9 +54,14 @@ beforeEach(() => {
   vi.mocked(loadSheetCells).mockResolvedValue([]);
   vi.mocked(saveCells).mockResolvedValue(undefined);
   vi.mocked(createSheet).mockResolvedValue(SHEET);
+  vi.mocked(updateSheetMeta).mockResolvedValue(createDefaultSheetMeta());
 });
 
 afterEach(() => {
+  // **정리를 먼저 한다.** 언마운트 flush가 대기 중인 저장을 흘려보내는데(그게 이 컴포넌트의
+  // 계약이다), 자동 정리에 맡기면 그 호출이 vi.clearAllMocks() **뒤에** 기록돼 다음 테스트의
+  // 첫 호출로 새어 든다. 실제로 그 새어 든 호출 때문에 멀쩡한 단언이 깨졌다.
+  cleanup();
   vi.useRealTimers();
   vi.clearAllMocks();
 });
@@ -131,6 +138,38 @@ describe("SheetPanel 저장", () => {
     expect(vi.mocked(saveCells).mock.calls[0][2]).toEqual([
       { r: 0, c: 0, v: 7, f: null, s: null },
     ]);
+  });
+
+  it("서식을 주면 셀과 시트 메타가 함께 저장된다", async () => {
+    render(<SheetPanel pageId="page-1" />);
+    await settle();
+
+    fireEvent.click(screen.getByRole("button", { name: "굵게" }));
+    await settle(1000);
+
+    expect(vi.mocked(saveCells).mock.calls[0][2]).toEqual([
+      { r: 0, c: 0, v: null, f: null, s: 0 },
+    ]);
+    expect(vi.mocked(updateSheetMeta).mock.calls[0][2]).toMatchObject({
+      styles: [{ bold: true }],
+    });
+  });
+
+  it("메타 저장이 실패하면 알린다", async () => {
+    vi.mocked(updateSheetMeta).mockRejectedValueOnce(new Error("네트워크"));
+    const { unmount } = render(<SheetPanel pageId="page-1" />);
+    await settle();
+
+    fireEvent.click(screen.getByRole("button", { name: "굵게" }));
+    await settle(1000);
+
+    expect(screen.getByRole("alert").textContent).toContain("저장");
+
+    // 실패한 저장은 대기열에 남는다(설계). 이 테스트 안에서 흘려보내지 않으면 언마운트 flush가
+    // **다음 테스트의 mock에** 호출을 기록한다 — flush가 await 뒤에 저장을 부르기 때문에
+    // afterEach의 clearAllMocks보다 늦게 도착한다. 실제로 옆 테스트를 깨뜨렸다.
+    unmount();
+    await settle();
   });
 
   it("저장에 실패하면 알리고, 잃어버리지 않고 다음 저장에 다시 싣는다", async () => {
