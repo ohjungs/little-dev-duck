@@ -353,15 +353,18 @@ describe("목록", () => {
   });
 
   it("모르는 함수는 #NAME?", () => {
-    expect(run("=SUMIFS(1,2,3)")).toBe("#NAME?"); // 2차 목록(T10)
+    // 2026-08-02: 원래 SUMIFS로 검사했는데 T10이 그것을 실제로 구현하면서 뜻이 뒤집혔다.
+    // 앞으로도 함수가 될 일이 없는 이름으로 바꾼다.
+    expect(run("=없는함수이름(1,2,3)")).toBe("#NAME?");
   });
 
-  it("휘발성 표시는 TODAY·NOW에만 있다", () => {
+  it("휘발성 표시는 시간·난수 함수에만 있다", () => {
     const all = createFormulaFunctions();
     const volatiles = Object.entries(all)
       .filter(([, d]) => d.volatile)
       .map(([k]) => k)
       .sort();
-    expect(volatiles).toEqual(["NOW", "TODAY"]);
+    // RANDBETWEEN은 T10이 더했다. 스펙 D-3이 휘발성으로 못박은 목록 그대로다.
+    expect(volatiles).toEqual(["NOW", "RANDBETWEEN", "TODAY"]);
   });
 });

@@ -164,15 +164,56 @@ export function evaluate(node: Node, ctx: EvalContext): EvalResult {
   }
 }
 
+// 2026-08-02 : 배열 계산(브로드캐스트) — T10
+// `A1:A5>3`처럼 범위가 이항 연산에 오면 **원소별로** 센다. FILTER 같은 2차 함수가 이 배열을
+// 조건으로 받는다(그것 없이는 FILTER를 쓸 방법이 없다).
+//
+// 스펙 7절이 제외한 것은 **암시적 교차**(배열을 조용히 한 칸으로 접는 것)이지 배열 계산이
+// 아니다. 접는 쪽은 틀린 답을 맞는 것처럼 보이게 하지만, 원소별 계산은 결과가 배열로 남아
+// 무엇이 일어났는지 화면에 그대로 드러난다.
+function gridOf(v: EvalResult): EvalValue[][] | null {
+  return Array.isArray(v) ? v : null;
+}
+
 function evalBinary(
   op: BinaryOp,
   leftNode: Node,
   rightNode: Node,
   ctx: EvalContext,
 ): EvalResult {
-  const l = scalar(evaluate(leftNode, ctx));
+  const lv = evaluate(leftNode, ctx);
+  const rv = evaluate(rightNode, ctx);
+  const lg = gridOf(lv);
+  const rg = gridOf(rv);
+
+  if (lg || rg) {
+    const rows = Math.max(lg?.length ?? 1, rg?.length ?? 1);
+    const cols = Math.max(lg?.[0]?.length ?? 1, rg?.[0]?.length ?? 1);
+    // 크기가 다르면 조용히 맞추지 않는다 — 짝이 어긋난 계산은 값으로만 보면 알 수 없다.
+    if ((lg && (lg.length !== rows || (lg[0]?.length ?? 0) !== cols) && lg.length * (lg[0]?.length ?? 0) !== 1) ||
+        (rg && (rg.length !== rows || (rg[0]?.length ?? 0) !== cols) && rg.length * (rg[0]?.length ?? 0) !== 1)) {
+      return "#N/A";
+    }
+    const at = (g: EvalValue[][] | null, fallback: EvalResult, r: number, c: number): EvalValue =>
+      g ? (g.length === 1 && g[0].length === 1 ? g[0][0] : (g[r]?.[c] ?? null)) : (fallback as EvalValue);
+
+    const out: EvalValue[][] = [];
+    for (let r = 0; r < rows; r += 1) {
+      const row: EvalValue[] = [];
+      for (let c = 0; c < cols; c += 1) {
+        const one = binaryScalar(op, at(lg, lv, r, c), at(rg, rv, r, c));
+        row.push(one as EvalValue);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
+  return binaryScalar(op, scalar(lv), scalar(rv));
+}
+
+function binaryScalar(op: BinaryOp, l: EvalValue, r: EvalValue): EvalResult {
   if (isErrorValue(l)) return l; // 오류는 전파된다 — 왼쪽이 먼저다(엑셀과 같다)
-  const r = scalar(evaluate(rightNode, ctx));
   if (isErrorValue(r)) return r;
 
   if (op === "&") {

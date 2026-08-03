@@ -349,6 +349,7 @@ export {
   alignOf,
 } from "./domain/sheet-format";
 // 2026-08-02 : 스프레드시트 함수 1차 (SPEC T4)
+export { createSecondaryFunctions } from "./domain/formula-fns2";
 export {
   createFormulaFunctions,
   formulaFunctionNames,
