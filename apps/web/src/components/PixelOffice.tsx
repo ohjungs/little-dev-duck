@@ -59,6 +59,8 @@ import { drawDuckSprite, drawFurnitureSprite, drawFloorTile, drawFloorMI, drawWa
 import { loadAllSprites, type SpriteAssets } from "@/lib/sprite-loader";
 import { loadCharacterAssets, drawCharacter, type CharacterAssets } from "@/lib/office-characters";
 
+import { useModalA11y } from "@/hooks/useModalA11y";
+
 // ---------------------------------------------------------------------------
 // 상수
 // ---------------------------------------------------------------------------
@@ -343,6 +345,8 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
   useEffect(() => {
     showHelpRef.current = showHelp;
   }, [showHelp]);
+
+  const helpDialogRef = useModalA11y<HTMLDivElement>(showHelp, () => setShowHelp(false));
 
   // 맵 + NPC 초기화
   useEffect(() => {
@@ -1355,9 +1359,6 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
         {/* 단축키 도움말 오버레이 — ? 키 또는 ESC로 닫기 */}
         {showHelp && (
           <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="단축키 도움말"
             className="absolute inset-0 flex items-center justify-center z-50"
           >
             <div
@@ -1365,7 +1366,14 @@ export function PixelOffice({ realTasks }: OfficeProps = {}) {
               onClick={() => setShowHelp(false)}
               aria-hidden="true"
             />
-            <div className="relative bg-gray-900/95 border border-gray-600 rounded-xl shadow-2xl px-6 py-5 min-w-[220px] text-gray-100">
+            <div
+              ref={helpDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="단축키 도움말"
+              tabIndex={-1}
+              className="relative bg-gray-900/95 border border-gray-600 rounded-xl shadow-2xl px-6 py-5 min-w-[220px] text-gray-100"
+            >
               <div className="flex items-center justify-between mb-3">
                 <span className="font-bold text-sm text-yellow-300">단축키 도움말</span>
                 <button

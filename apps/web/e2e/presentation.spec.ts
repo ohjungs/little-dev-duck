@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { AUTH_STATE } from "./authState";
+import { expectTabTrap } from "./modalA11yHelpers";
 
 // 2026-07-26 : 페이지 - 발표 - e2e (Phase 34 후속)
 // 페이지 화면은 로그인 뒤에 있다 — 세션 스킵 가드는 authState.ts 한 곳에 있다.
@@ -73,5 +74,19 @@ test.describe("발표 모드 (Phase 34)", () => {
     const stage = page.getByRole("dialog", { name: "발표 모드" });
     await stage.getByRole("button", { name: "발표 끝내기" }).click();
     await expect(stage).toBeHidden();
+  });
+
+  // 2026-08-03 : useModalA11y 배선 검증 후속 — jsdom(offsetParent 항상 null)에서는
+  // Tab 순환을 잴 수 없어 PresentationMode.test.tsx가 e2e로 미뤄 둔 지점.
+  // "이전 장"은 첫 장에서 disabled라 포커서블이 아니다 — 실제 순환은 "다음 장" ↔ "발표 끝내기".
+  test("Tab 트랩 — 마지막 요소에서 Tab하면 첫 요소로, 첫 요소에서 Shift+Tab하면 마지막으로 순환한다", async ({
+    page,
+  }) => {
+    await openNewPage(page);
+    await page.getByRole("button", { name: "발표" }).click();
+
+    const stage = page.getByRole("dialog", { name: "발표 모드" });
+    await expect(stage).toBeVisible();
+    await expectTabTrap(stage, page);
   });
 });

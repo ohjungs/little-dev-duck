@@ -13,6 +13,7 @@ import {
   deptLabel,
 } from "@ldd/core";
 import { formatClockTime } from "@ldd/core";
+import { useModalA11y } from "@/hooks/useModalA11y";
 
 type Props = {
   npcs: Npc[];
@@ -42,6 +43,7 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 // ---------------------------------------------------------------------------
 export function OfficeManagementPanel({ npcs, clock, onClose, onSelectNpc }: Props) {
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const dialogRef = useModalA11y<HTMLDivElement>(true, onClose);
 
   // 부서별 그룹핑
   const byDept = new Map<string, Npc[]>();
@@ -74,9 +76,11 @@ export function OfficeManagementPanel({ npcs, clock, onClose, onSelectNpc }: Pro
 
       {/* 패널 본체 */}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="경영 관리 패널"
+        tabIndex={-1}
         className="absolute inset-y-0 right-0 z-50 flex flex-col
                    w-full sm:w-80
                    bg-gray-900/95 border-l border-gray-700

@@ -18,6 +18,7 @@ import type { Page } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { getRecentPages, type RecentPage } from "@/lib/recentPages";
+import { useModalA11y } from "@/hooks/useModalA11y";
 
 // ---------------------------------------------------------------------------
 // 최근 검색어 localStorage helpers
@@ -65,6 +66,7 @@ export function CommandPalette() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const dialogRef = useModalA11y<HTMLDivElement>(open, () => setOpen(false));
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Page[]>([]);
   const [state, setState] = useState<SearchState>("idle");
@@ -299,10 +301,12 @@ export function CommandPalette() {
       role="presentation"
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-lg overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label="검색 및 명령"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >

@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { deptColor, deptLabel, describeTaskSource, hasActiveWork, npcStatusLabel } from "@ldd/core";
 import type { Npc } from "@ldd/core";
+import { useModalA11y } from "@/hooks/useModalA11y";
 
 type Props = {
   npc: Npc;
@@ -13,14 +14,17 @@ type Props = {
 };
 
 export function OfficeTalkPanel({ npc, onClose }: Props) {
+  const dialogRef = useModalA11y<HTMLDivElement>(true, onClose);
   const activeTasks = npc.tasks.filter((t) => t.status === "active");
   const waitingTasks = npc.tasks.filter((t) => t.status === "waiting");
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={`${npc.name} 대화 패널`}
+      tabIndex={-1}
       className="absolute inset-x-0 bottom-0 md:bottom-4 md:left-1/2 md:-translate-x-1/2 md:w-96
                  bg-background border border-border rounded-t-xl md:rounded-xl shadow-2xl z-50
                  max-h-[60vh] overflow-y-auto"
