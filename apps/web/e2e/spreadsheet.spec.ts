@@ -306,6 +306,40 @@ test.describe("스프레드시트 — 격자·수식·키보드", () => {
     await expect(cellAt(page, 0, 0)).toHaveText("43");
   });
 
+  test("CSV를 내보내고 다시 가져오면 값이 보존된다 (AC-18)", async ({ page }) => {
+    await createSheetPage(page, `e2e-sheet-csv-${Date.now()}`);
+
+    await focusCell(page, 0, 0);
+    await page.keyboard.type("품목");
+    await page.keyboard.press("Tab");
+    await page.keyboard.type("12000");
+    await page.keyboard.press("Enter");
+    await focusCell(page, 1, 0);
+    await page.keyboard.type("연필");
+    await page.keyboard.press("Tab");
+    await page.keyboard.type("=B1/2");
+    const saved = waitForCellSave(page);
+    await page.keyboard.press("Enter");
+    await saved;
+
+    // 내보내기 — 실제 다운로드를 받아 내용을 확인한다.
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "CSV 내보내기" }).click();
+    const file = await download;
+    const path = await file.path();
+    expect(path).toBeTruthy();
+
+    // 다시 가져오면 새 시트로 들어온다(있던 시트를 덮지 않는다).
+    const importSave = waitForCellSave(page);
+    await page.getByLabel("CSV 가져오기").setInputFiles(path!);
+    await importSave;
+
+    // 새 탭이 생기고 그 안에 값이 있다. 수식은 **계산된 값**으로 나갔다가 값으로 들어온다.
+    await expect(page.getByRole("tab")).toHaveCount(2);
+    await expect(cellAt(page, 0, 0)).toHaveText("품목");
+    await expect(cellAt(page, 1, 1)).toHaveText("6000");
+  });
+
   test("E6: 마우스 없이 이름 상자·방향키·F2·Esc로 이동하고 편집한다", async ({ page }) => {
     await createSheetPage(page, `e2e-sheet-kbd-${Date.now()}`);
 

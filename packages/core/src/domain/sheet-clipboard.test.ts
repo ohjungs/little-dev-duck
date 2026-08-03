@@ -45,6 +45,10 @@ describe("parseDelimited (TSV)", () => {
     expect(parseDelimited("a\tb\n", "\t")).toEqual([["a", "b"]]);
   });
 
+  it("맨 앞의 BOM은 셀 내용이 아니다(엑셀이 저장한 CSV)", () => {
+    expect(parseDelimited("﻿이름	나이", "	")).toEqual([["이름", "나이"]]);
+  });
+
   it("빈 문자열은 빈 표다", () => {
     expect(parseDelimited("", "\t")).toEqual([]);
   });

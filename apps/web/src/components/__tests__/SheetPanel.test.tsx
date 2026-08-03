@@ -151,6 +151,50 @@ describe("SheetPanel 시트 탭", () => {
   });
 });
 
+describe("SheetPanel CSV", () => {
+  it("내보내기를 누르면 BOM이 붙은 CSV가 내려간다", async () => {
+    vi.mocked(loadSheetCells).mockResolvedValue([
+      { r: 0, c: 0, v: "이름", f: null, s: null },
+      { r: 0, c: 1, v: 3, f: null, s: null },
+    ]);
+    // Blob 내용을 확인하려면 createObjectURL을 가로채야 한다(jsdom에는 없다).
+    const blobs: Blob[] = [];
+    const createURL = vi.fn((b: Blob) => {
+      blobs.push(b);
+      return "blob:x";
+    });
+    Object.defineProperty(URL, "createObjectURL", { value: createURL, configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+
+    render(<SheetPanel pageId="page-1" />);
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "CSV 내보내기" }));
+
+    expect(createURL).toHaveBeenCalled();
+    // BOM은 **바이트로** 확인한다. Blob.text()는 규격상 UTF-8 디코딩에서 앞선 BOM을 떼므로
+    // 글자로 보면 늘 없는 것처럼 보인다 — 정작 엑셀이 읽는 것은 그 바이트다.
+    const bytes = new Uint8Array(await blobs[0].arrayBuffer());
+    expect([bytes[0], bytes[1], bytes[2]]).toEqual([0xef, 0xbb, 0xbf]);
+    expect(await blobs[0].text()).toContain("이름,3");
+  });
+
+  it("CSV를 가져오면 새 시트로 들어온다(있던 시트를 덮지 않는다)", async () => {
+    vi.mocked(createSheet).mockResolvedValue({ ...SHEET, id: "sheet-9", name: "매출" });
+    render(<SheetPanel pageId="page-1" />);
+    await settle();
+
+    const file = new File(["﻿이름,나이\n오리,3"], "매출.csv", { type: "text/csv" });
+    const input = screen.getByLabelText("CSV 가져오기") as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    await settle(1000);
+
+    // 파일 이름이 시트 이름이 된다.
+    expect(vi.mocked(createSheet).mock.calls[0][1]).toMatchObject({ name: "매출" });
+    expect(screen.getByRole("gridcell", { name: "오리" })).toBeTruthy();
+    expect(vi.mocked(saveCells).mock.calls[0][2]).toHaveLength(4);
+  });
+});
+
 describe("SheetPanel 저장", () => {
   async function editCell(value: string) {
     const input = screen.getByLabelText("셀 편집");

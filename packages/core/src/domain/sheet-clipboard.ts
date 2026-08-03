@@ -9,8 +9,16 @@
 // 따옴표 규칙은 RFC 4180과 엑셀이 실제로 쓰는 것을 따른다: 셀을 "로 감싸면 그 안의 구분자와
 // 줄바꿈은 내용이고, 안쪽의 "는 두 번 써서 이스케이프한다.
 
+/**
+ * UTF-8 BOM. 엑셀은 이게 없으면 CSV의 한글을 깨뜨린다(AC-18) — 내보낼 때 맨 앞에 붙인다.
+ */
+export const UTF8_BOM = "﻿";
+
 /** 구분자 텍스트를 행×열 문자열 표로 읽는다. 실패라는 개념이 없다 — 무엇이든 표가 된다. */
-export function parseDelimited(text: string, delimiter: string): string[][] {
+export function parseDelimited(rawText: string, delimiter: string): string[][] {
+  // 맨 앞의 BOM은 셀 내용이 아니다. 떼지 않으면 첫 칸이 "﻿이름"이 되어 머리글 대조가
+  // 조용히 어긋난다(엑셀이 저장한 CSV에는 거의 항상 붙어 있다).
+  const text = rawText.startsWith(UTF8_BOM) ? rawText.slice(1) : rawText;
   if (text === "") return [];
 
   const rows: string[][] = [];

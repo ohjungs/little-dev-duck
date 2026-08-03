@@ -11,15 +11,20 @@ import {
   updateSheetMeta,
 } from "@ldd/api";
 import {
+  UTF8_BOM,
   canUseFeature,
   cellKey,
+  isValidSheetName,
   nextSheetName,
+  parseDelimited,
+  toCsv,
   type Cell,
   type Sheet,
   type SheetMeta,
 } from "@ldd/core";
 import { createClient } from "@/lib/supabase/client";
 import { SheetGrid } from "@/components/SheetGrid";
+import { rowsToCells, sheetFileName, sheetToRows } from "@/lib/sheetIo";
 
 // 2026-08-02 : 스프레드시트 - 화면 - 불러오기·저장 (SPEC-2026-08-02-spreadsheet-a1 T5)
 //
@@ -193,6 +198,55 @@ export function SheetPanel({ pageId }: { pageId: string }) {
     schedule();
   }
 
+  // ── CSV 입출력 (T9 / AC-18) ────────────────────────────────────────────────
+  // 엑셀은 BOM이 없으면 CSV의 한글을 깨뜨린다. 이스케이프는 이 저장소의 공용 toCsv가 하는데,
+  // 거기에는 **수식 인젝션 방어**(=,+,@로 시작하는 값 앞에 작은따옴표)가 들어 있다 —
+  // 내보낸 파일을 엑셀에서 열었을 때 우리 값이 남의 수식으로 실행되지 않게 하는 장치다.
+  function handleExportCsv(): void {
+    if (!sheet) return;
+    const rows = sheetToRows(sheet.name, cells, sheet.meta, otherSheets);
+    const blob = new Blob([UTF8_BOM + toCsv(rows)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = sheetFileName(document.title, sheet.name, "csv");
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * 가져오기는 **새 시트를 만든다.** 지금 시트를 덮으면 되돌릴 수 없는 조작이 되고
+   * (CLAUDE.md 5), 확인 대화를 띄우는 것보다 새 탭으로 들어오는 편이 엑셀의 동작과도 가깝다.
+   */
+  async function handleImportCsv(file: File): Promise<void> {
+    setBusy(true);
+    try {
+      const text = await file.text();
+      const rows = parseDelimited(text, ",");
+      const imported = rowsToCells(rows);
+      const base = file.name.replace(/\.[^.]+$/, "");
+      const created = await createSheet(supabase, {
+        pageId,
+        // 파일 이름을 시트 이름으로 쓰되, 규칙에 어긋나거나 겹치면 Sheet2 식으로 물러난다.
+        name: isValidSheetName(base) && !sheets.some((s) => s.name === base)
+          ? base
+          : nextSheetName(sheets.map((s) => s.name)),
+        position: sheets.length,
+      });
+      setSheets((prev) => [...prev, created]);
+      setCellsBySheet((prev) => ({ ...prev, [created.id]: imported }));
+      setActiveId(created.id);
+      for (const cell of imported) {
+        pending.current.set(pendKey(created.id, cell), { sheetId: created.id, cell });
+      }
+      schedule();
+    } catch {
+      setSaveError("CSV를 가져오지 못했어요. 파일을 확인해 주세요.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleAddSheet(): Promise<void> {
     setBusy(true);
     try {
@@ -277,6 +331,29 @@ export function SheetPanel({ pageId }: { pageId: string }) {
             {s.name}
           </button>
         ))}
+        <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        >
+          CSV 내보내기
+        </button>
+        <label className="cursor-pointer rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
+          CSV 가져오기
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            aria-label="CSV 가져오기"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              // 같은 파일을 다시 고를 수 있게 값을 비운다(안 그러면 change가 안 난다).
+              e.target.value = "";
+              if (file) void handleImportCsv(file);
+            }}
+          />
+        </label>
         <button
           type="button"
           aria-label="시트 추가"

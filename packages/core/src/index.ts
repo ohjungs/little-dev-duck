@@ -328,7 +328,7 @@ export {
 } from "./domain/recalc";
 // 2026-08-02 : 스프레드시트 복사·붙여넣기·채우기 (SPEC T6)
 export { shiftFormulaRefs } from "./domain/sheet-shift";
-export { parseDelimited, toDelimited } from "./domain/sheet-clipboard";
+export { parseDelimited, toDelimited, UTF8_BOM } from "./domain/sheet-clipboard";
 export { fillValues } from "./domain/sheet-fill";
 // 2026-08-02 : 스프레드시트 서식 (SPEC T7)
 // 2026-08-02 : 스프레드시트 행·열 삽입삭제·정렬 (SPEC T8)
